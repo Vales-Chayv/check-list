@@ -1031,28 +1031,9 @@ async function unsubscribePush() {
 const manifest={name:'Мои карточки',short_name:'Карточки',start_url:'./',display:'standalone',background_color:'#0f0f0f',theme_color:'#0f0f0f',orientation:'portrait',icons:[{src:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f0f0f'/><text y='.9em' font-size='80' x='10'>🗂</text></svg>",sizes:'192x192',type:'image/svg+xml',purpose:'any maskable'}]};
 document.getElementById('manifest-link').href=URL.createObjectURL(new Blob([JSON.stringify(manifest)],{type:'application/json'}));
 if('serviceWorker' in navigator){
-  const sw=`
-    const C='mc-v4';
-    self.addEventListener('install', e => e.waitUntil(caches.open(C).then(c => c.addAll(['./', './index.html']))));
-    self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))));
-    self.addEventListener('push', e => {
-      if (!e.data) return;
-      let data = {};
-      try { data = e.data.json(); } catch { data = { title: '🔔 Напоминание', body: e.data.text() }; }
-      e.waitUntil(self.registration.showNotification(data.title || '🔔 Напоминание', {
-        body: data.body || '',
-        icon: 'https://vales-chayv.github.io/check-list/icon.png',
-        badge: 'https://vales-chayv.github.io/check-list/icon.png',
-        vibrate: [200, 100, 200],
-        data: { url: data.url || '/' }
-      }));
-    });
-    self.addEventListener('notificationclick', e => {
-      e.notification.close();
-      e.waitUntil(clients.openWindow(e.notification.data?.url || '/'));
-    });
-  `;
-  navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw],{type:'application/javascript'}))).catch(()=>{});
+  navigator.serviceWorker.register('/check-list/sw.js')
+    .then(reg => console.log('SW registered:', reg.scope))
+    .catch(e => console.error('SW error:', e));
 }
 
 // ---- LOCK ----
