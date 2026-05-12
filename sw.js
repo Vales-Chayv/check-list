@@ -1,25 +1,28 @@
-const CACHE = 'mc-v4';
+const CACHE = 'mc-v5';
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./'])));
   self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(clients.claim());
+  e.waitUntil(
+    Promise.all([
+      clients.claim(),
+      caches.keys().then(keys =>
+        Promise.all(keys.map(k => caches.delete(k)))
+      )
+    ])
+  );
 });
 
+// Always fetch fresh — no caching of HTML
 self.addEventListener('fetch', e => {
-  e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
 });
 
-// Handle push notifications
 self.addEventListener('push', e => {
   let data = { title: '🔔 Напоминание', body: 'Есть карточки на сегодня' };
-  try {
-    if (e.data) data = e.data.json();
-  } catch {}
-
+  try { if (e.data) data = e.data.json(); } catch {}
   e.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
@@ -33,15 +36,12 @@ self.addEventListener('push', e => {
   );
 });
 
-// Open app on notification click
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   e.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
-      for (const client of clientList) {
-        if (client.url.includes('check-list') && 'focus' in client) {
-          return client.focus();
-        }
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      for (const c of list) {
+        if (c.url.includes('check-list') && 'focus' in c) return c.focus();
       }
       return clients.openWindow('https://vales-chayv.github.io/check-list/');
     })
