@@ -603,20 +603,20 @@ window.addEventListener('beforeunload', e => {
 
 // ---- RENDER ----
 
+// Global cat selector — avoids all escaping issues
+window.setCatByIdx = function(idx) { setCat(catsList[idx].name); };
+
 function renderCats(){
   const bar=document.getElementById('cats-bar');
-  let html=`<button class="cat-btn ${filterCat==='all'?'active':''}" data-cat="all">Все</button>`;
+  let html=`<button class="cat-btn ${filterCat==='all'?'active':''}" onclick="setCat('all')">Все</button>`;
   catsList.forEach((c,i)=>{
     const col=c.color||'#888';
     const bg=filterCat===c.name?hexToRgba(col,0.15):'transparent';
     const border=filterCat===c.name?hexToRgba(col,0.5):'rgba(255,255,255,0.08)';
-    html+=`<button class="cat-btn ${filterCat===c.name?'active':''}" data-cat-idx="${i}" style="background:${bg};border-color:${border}">
+    html+=`<button class="cat-btn ${filterCat===c.name?'active':''}" onclick="setCatByIdx(${i})" style="background:${bg};border-color:${border}">
       <span class="cat-dot" style="background:${col}"></span>${escapeHTML(c.name)}</button>`;
   });
   bar.innerHTML=html;
-  // Attach events safely
-  bar.querySelectorAll('[data-cat]').forEach(btn=>btn.addEventListener('click',()=>setCat(btn.dataset.cat)));
-  bar.querySelectorAll('[data-cat-idx]').forEach(btn=>btn.addEventListener('click',()=>setCat(catsList[+btn.dataset.catIdx].name)));
 }
 
 function renderCards(){
