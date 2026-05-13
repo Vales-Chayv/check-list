@@ -197,6 +197,14 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .view-section{padding:14px 20px;border-bottom:1px solid var(--border)}
 .view-label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px}
 .file-action{display:inline-flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;color:var(--text2);text-decoration:none;margin:3px}
+.priority-urgent{border-left:4px solid var(--red) !important}
+.priority-high{border-left:4px solid var(--accent) !important}
+.deadline-chip{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.deadline-overdue{background:rgba(232,96,96,0.2);color:var(--red)}
+.deadline-today{background:rgba(232,96,96,0.15);color:var(--red)}
+.deadline-soon{background:rgba(232,138,58,0.15);color:var(--orange)}
+.deadline-week{background:rgba(232,197,106,0.15);color:var(--accent)}
+.deadline-ok{background:rgba(91,184,122,0.15);color:var(--green)}
 </style>
 <body>
 <div class="topbar">
@@ -210,6 +218,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 <div class="tabs">
   <button class="tab active" onclick="setView('cards',this)">Все карточки</button>
   <button class="tab" onclick="setView('checklist',this)">Чек-лист</button>
+  <button class="tab" onclick="setView('done',this)">✅ Выполненные</button>
 </div>
 <div class="cats" id="cats-bar"></div>
 <div class="scroll" id="main-scroll"></div>
@@ -244,6 +253,11 @@ body{display:flex;flex-direction:column;overflow:hidden}
         <input id="f-title" type="text" placeholder="О чём карточка?" oninput="checkSave()">
       </div>
       <div class="field">
+        <label>Срок выполнения</label>
+        <input id="f-deadline" type="date" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:11px 13px;font-size:15px;color:var(--text);font-family:inherit;width:100%">
+        <div style="font-size:12px;color:var(--text3);margin-top:2px">Чем ближе срок — тем чаще напоминания</div>
+      </div>
+      <div class="field">
         <label>Записи <span style="color:var(--text3);font-size:11px;font-weight:400">(каждая со своей датой и галочкой)</span></label>
         <div id="entries-edit-list" style="background:var(--surface2);border-radius:var(--radius-sm);padding:4px 12px;min-height:40px"></div>
         <button onclick="addEntryToEdit()" style="background:var(--surface2);border:1px dashed var(--border2);border-radius:var(--radius-sm);padding:9px;font-size:13px;color:var(--accent);cursor:pointer;font-family:inherit;margin-top:4px">+ Добавить запись</button>
@@ -252,7 +266,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
         <label>Заметка</label>
         <textarea id="f-body" placeholder="Подробности..."></textarea>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
         <div class="field">
           <label>Рубрика</label>
           <select id="f-cat" onchange="handleCatChange()"></select>
@@ -264,6 +278,14 @@ body{display:flex;flex-direction:column;overflow:hidden}
             <option value="in_progress">В процессе</option>
             <option value="waiting">Ожидание</option>
             <option value="done">Готово</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Приоритет</label>
+          <select id="f-priority">
+            <option value="normal">Обычный</option>
+            <option value="high">⚡ Важное</option>
+            <option value="urgent">🔥 Срочное</option>
           </select>
         </div>
       </div>
@@ -525,8 +547,61 @@ async function dbUpdate(card){setSyncState('syncing');const{id,...data}=card;con
 async function dbDelete(id){setSyncState('syncing');const{error}=await sb.from('cards').delete().eq('id',id);if(error){setSyncState('err');throw error;}setSyncState('ok');}
 async function dbAddCat(cat){const{error}=await sb.from('categories').insert(cat);if(error)console.error(error);}
 
+// ---- DEADLINE ----
+function deadlineInfo(deadline) {
+  if (!deadline) return null;
+  const t = new Date(); t.setHours(0,0,0,0);
+  const d = new Date(deadline + 'T00:00:00');
+  const diff = Math.round((d - t) / 86400000);
+  if (diff < 0) return {text:`⏰ Просрочено ${Math.abs(diff)} дн.`, cls:'deadline-overdue', days:diff};
+  if (diff === 0) return {text:'⏰ Срок сегодня!', cls:'deadline-today', days:0};
+  if (diff === 1) return {text:'⏰ Завтра', cls:'deadline-soon', days:1};
+  if (diff <= 3) return {text:`⏰ Через ${diff} дня`, cls:'deadline-soon', days:diff};
+  if (diff <= 7) return {text:`⏰ Через ${diff} дней`, cls:'deadline-week', days:diff};
+  return {text:`📅 ${d.toLocaleDateString('ru-RU',{day:'numeric',month:'short'})}`, cls:'deadline-ok', days:diff};
+}
+
+function renderCompleted() {
+  const el = document.getElementById('main-scroll');
+  const done = cards.filter(c => c.status === 'done' && (filterCat === 'all' || c.category === filterCat));
+  if (!done.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">✅</div><h3>Нет выполненных</h3><p>Здесь появятся карточки со статусом «Готово»</p></div>`;
+    return;
+  }
+  const grouped = {};
+  done.forEach(c => { const d=(c.created_at||today()).slice(0,10); (grouped[d]=grouped[d]||[]).push(c); });
+  const dates = Object.keys(grouped).sort((a,b) => b.localeCompare(a));
+  let html = '';
+  dates.forEach(date => {
+    html += `<div class="date-label">${fmtDate(date)}</div>`;
+    grouped[date].forEach(card => { html += cardHTML(card, true); });
+  });
+  el.innerHTML = html;
+}
+
+// ---- UNSAVED CHANGES ----
+let originalCardState = null;
+
+function getModalState() {
+  return JSON.stringify({
+    title: document.getElementById('f-title')?.value || '',
+    body: document.getElementById('f-body')?.value || '',
+    entries: tempEntries,
+    status: document.getElementById('f-status')?.value || '',
+    deadline: document.getElementById('f-deadline')?.value || '',
+  });
+}
+
+function hasUnsavedChanges() {
+  if (!document.getElementById('modal-overlay').classList.contains('open')) return false;
+  return originalCardState !== null && getModalState() !== originalCardState;
+}
+
+window.addEventListener('beforeunload', e => {
+  if (hasUnsavedChanges()) { e.preventDefault(); e.returnValue = ''; }
+});
+
 // ---- RENDER ----
-function render(){renderCats();if(currentView==='cards')renderCards();else renderChecklist();}
 
 function renderCats(){
   const bar=document.getElementById('cats-bar');
@@ -535,7 +610,8 @@ function renderCats(){
     const col=c.color||'#888';
     const bg=filterCat===c.name?hexToRgba(col,0.15):'transparent';
     const border=filterCat===c.name?hexToRgba(col,0.5):'rgba(255,255,255,0.08)';
-    html+=`<button class="cat-btn ${filterCat===c.name?'active':''}" onclick="setCat('${c.name.replace(/'/g,"\\'")}'')" style="background:${bg};border-color:${border}">
+    const safeName=c.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    html+=`<button class="cat-btn ${filterCat===c.name?'active':''}" onclick="setCat('${safeName}')" style="background:${bg};border-color:${border}">
       <span class="cat-dot" style="background:${col}"></span>${escapeHTML(c.name)}</button>`;
   });
   bar.innerHTML=html;
@@ -543,10 +619,15 @@ function renderCats(){
 
 function renderCards(){
   const el=document.getElementById('main-scroll');
-  const filtered=cards.filter(c=>filterCat==='all'||c.category===filterCat);
+  const priorityOrder={urgent:0,high:1,normal:2};
+  const filtered=cards.filter(c=>(filterCat==='all'||c.category===filterCat) && c.status!=='done');
   if(!filtered.length){el.innerHTML=`<div class="empty"><div class="empty-icon">🗂️</div><h3>Нет карточек</h3><p>Создай первую карточку</p><button class="btn-empty" onclick="openModal()">＋ Создать</button></div>`;return;}
   const grouped={};
   filtered.forEach(c=>{const d=(c.created_at||today()).slice(0,10);(grouped[d]=grouped[d]||[]).push(c);});
+  // Sort within each day: urgent first, then high, then normal
+  Object.keys(grouped).forEach(d=>{
+    grouped[d].sort((a,b)=>(priorityOrder[a.priority||'normal']||2)-(priorityOrder[b.priority||'normal']||2));
+  });
   const dates=Object.keys(grouped).sort((a,b)=>b.localeCompare(a));
   let html='';
   dates.forEach(date=>{
@@ -556,10 +637,10 @@ function renderCards(){
   el.innerHTML=html;
 }
 
-function cardHTML(card){
+function cardHTML(card, isDone=false){
   const col=getCatColor(card.category);
-  const bg=hexToRgba(col,0.13);
-  const border=hexToRgba(col,0.35);
+  const bg=hexToRgba(col,isDone?0.07:0.13);
+  const border=hexToRgba(col,isDone?0.2:0.35);
   const atts=card.attachments||[];
   const imgs=atts.filter(a=>a.type?.startsWith('image/'));
   const files=atts.filter(a=>!a.type?.startsWith('image/'));
@@ -588,14 +669,21 @@ function cardHTML(card){
       ${entries.length>3?`<div style="font-size:11px;opacity:0.5;padding-left:20px">...и ещё ${entries.length-3}</div>`:''}
     </div>`;
   }
-  return`<div class="card" style="background:${bg};border-color:${border}" onclick="openView('${card.id}')">
+  // Deadline
+  const dl = deadlineInfo(card.deadline);
+  const dlHTML = dl && !isDone ? `<span class="deadline-chip ${dl.cls}">${dl.text}</span>` : '';
+  // Priority — boost border if deadline urgent
+  const isDeadlineUrgent = dl && dl.days <= 1;
+  const priorityClass = isDeadlineUrgent ? 'priority-urgent' : card.priority==='urgent'?'priority-urgent':card.priority==='high'?'priority-high':'';
+  const priorityBadge=card.priority==='urgent'?'<span style="font-size:11px;font-weight:700;color:var(--red)">🔥</span>':card.priority==='high'?'<span style="font-size:11px;font-weight:700;color:var(--accent)">⚡</span>':'';
+  return`<div class="card ${priorityClass}" style="background:${bg};border-color:${border}${isDone?';opacity:0.75':''}" onclick="openView('${card.id}')">
     <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
       <div style="flex:1;min-width:0">
-        <div class="card-title" style="color:${col}">${remIcon}${escapeHTML(card.title)}</div>
+        <div class="card-title" style="color:${col};${isDone?'text-decoration:line-through;opacity:0.7':''}">${remIcon}${priorityBadge}${escapeHTML(card.title)}</div>
         ${bodyHTML}${entriesHTML}${imgsHTML}${filesHTML}
         <div class="card-meta">
           ${card.category?`<span class="cat-tag">${escapeHTML(card.category)}</span>`:''}
-          ${ball}${lastChange}
+          ${dlHTML}${ball}${lastChange}
         </div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0">
@@ -837,6 +925,8 @@ function openModal(id){
   document.getElementById('f-title').value=card?.title||'';
   document.getElementById('f-body').value=card?.body||'';
   document.getElementById('f-status').value=card?.status||'new';
+  document.getElementById('f-priority').value=card?.priority||'normal';
+  document.getElementById('f-deadline').value=card?.deadline||'';
   populateCatSelect(card?.category);
   ballVal=card?.ball||'';
   document.querySelectorAll('#seg-ball .seg-opt').forEach(b=>b.classList.remove('active'));
@@ -855,10 +945,15 @@ function openModal(id){
   document.querySelector('.modal-tab').classList.add('active');
   document.getElementById('tab-main').classList.add('active');
   document.getElementById('modal-overlay').classList.add('open');
-  setTimeout(()=>document.getElementById('f-title').focus(),350);
+  setTimeout(()=>{document.getElementById('f-title').focus(); originalCardState=getModalState();},350);
 }
 function openEdit(id){openModal(id);}
-function closeModal(){document.getElementById('modal-overlay').classList.remove('open');document.getElementById('new-cat-row').style.display='none';}
+function closeModal(){
+  if(hasUnsavedChanges()&&!confirm('Есть несохранённые изменения. Выйти без сохранения?'))return;
+  originalCardState=null;
+  document.getElementById('modal-overlay').classList.remove('open');
+  document.getElementById('new-cat-row').style.display='none';
+}
 function checkSave(){const v=document.getElementById('f-title').value.trim();['btn-save','btn-save2','btn-save3'].forEach(id=>{const b=document.getElementById(id);if(b)b.disabled=!v;});}
 
 function populateCatSelect(sel){
@@ -981,7 +1076,9 @@ async function saveCard(){
   if (cleanEntries.length > 0 && cleanEntries.every(e => e.done)) finalStatus = 'done';
 
   const data={title,body:document.getElementById('f-body').value.trim(),category:catVal,
-    status:finalStatus,ball:ballVal,attachments:tempAttachments,entries:cleanEntries,
+    status:finalStatus,priority:document.getElementById('f-priority').value||'normal',
+    deadline:document.getElementById('f-deadline').value||null,
+    ball:ballVal,attachments:tempAttachments,entries:cleanEntries,
     reminder:{enabled:remEnabled,freq:freqVal,days:customDays},
     history:hist,related_ids:tempRelatedIds};
 
@@ -1034,7 +1131,7 @@ async function toggleDone(id){
 }
 
 function setView(v,btn){currentView=v;document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));if(btn)btn.classList.add('active');render();}
-function setCat(c){filterCat=c;render();}
+function render(){renderCats();if(currentView==='cards')renderCards();else if(currentView==='checklist')renderChecklist();else if(currentView==='done')renderCompleted();}
 function setActiveNav(id){document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));document.getElementById(id).classList.add('active');}
 
 // ---- IMAGE VIEWER ----
@@ -1269,9 +1366,14 @@ async function unsubscribePush() {
 const manifest={name:'Мои карточки',short_name:'Карточки',start_url:'./',display:'standalone',background_color:'#0f0f0f',theme_color:'#0f0f0f',orientation:'portrait',icons:[{src:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f0f0f'/><text y='.9em' font-size='80' x='10'>🗂</text></svg>",sizes:'192x192',type:'image/svg+xml',purpose:'any maskable'}]};
 document.getElementById('manifest-link').href=URL.createObjectURL(new Blob([JSON.stringify(manifest)],{type:'application/json'}));
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('/check-list/sw.js')
-    .then(reg => console.log('SW registered:', reg.scope))
-    .catch(e => console.error('SW error:', e));
+  // Unregister all old service workers first
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(r => r.unregister());
+  });
+  // Register fresh after a small delay
+  setTimeout(() => {
+    navigator.serviceWorker.register('/check-list/sw.js').catch(()=>{});
+  }, 1000);
 }
 
 // ---- LOCK ----
