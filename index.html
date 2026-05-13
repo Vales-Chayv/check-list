@@ -605,16 +605,18 @@ window.addEventListener('beforeunload', e => {
 
 function renderCats(){
   const bar=document.getElementById('cats-bar');
-  let html=`<button class="cat-btn ${filterCat==='all'?'active':''}" onclick="setCat('all')">Все</button>`;
-  catsList.forEach(c=>{
+  let html=`<button class="cat-btn ${filterCat==='all'?'active':''}" data-cat="all">Все</button>`;
+  catsList.forEach((c,i)=>{
     const col=c.color||'#888';
     const bg=filterCat===c.name?hexToRgba(col,0.15):'transparent';
     const border=filterCat===c.name?hexToRgba(col,0.5):'rgba(255,255,255,0.08)';
-    const safeName=c.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    html+=`<button class="cat-btn ${filterCat===c.name?'active':''}" onclick="setCat('${safeName}')" style="background:${bg};border-color:${border}">
+    html+=`<button class="cat-btn ${filterCat===c.name?'active':''}" data-cat-idx="${i}" style="background:${bg};border-color:${border}">
       <span class="cat-dot" style="background:${col}"></span>${escapeHTML(c.name)}</button>`;
   });
   bar.innerHTML=html;
+  // Attach events safely
+  bar.querySelectorAll('[data-cat]').forEach(btn=>btn.addEventListener('click',()=>setCat(btn.dataset.cat)));
+  bar.querySelectorAll('[data-cat-idx]').forEach(btn=>btn.addEventListener('click',()=>setCat(catsList[+btn.dataset.catIdx].name)));
 }
 
 function renderCards(){
@@ -1219,6 +1221,7 @@ async function archiveDelete(){
 
 // ---- SETTINGS ----
 const FUNC_URL = 'https://rmlcbznnoroumjsqoluz.supabase.co/functions/v1/send-reminders';
+const SUPABASE_ANON_KEY = 'sb_publishable_uSJamI7r5fzooQhNUymkpw_vLpNm1ho';
 let notifEnabled = true;
 
 async function openSettings() {
@@ -1321,32 +1324,39 @@ function urlBase64ToUint8Array(base64String) {
 async function subscribePush() {
   try {
     const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      showToast('Разрешение не дано', true);
-      return;
-    }
+    if (permission !== 'granted') { showToast('Разрешение не дано', true); return; }
+
     const reg = await navigator.serviceWorker.ready;
+    
+    // Unsubscribe from any old subscription first
+    const oldSub = await reg.pushManager.getSubscription();
+    if (oldSub) await oldSub.unsubscribe();
+
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC)
     });
 
-    // Save subscription to Supabase via Edge Function
+    const deviceName = /iPhone/.test(navigator.userAgent) ? 'iPhone' :
+                       /Android/.test(navigator.userAgent) ? 'Android' : 'ПК';
+
     const res = await fetch(FUNC_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        subscription: sub.toJSON(),
-        deviceName: navigator.userAgent.includes('iPhone') ? 'iPhone' :
-                    navigator.userAgent.includes('Android') ? 'Android' : 'ПК'
-      })
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({ subscription: sub.toJSON(), deviceName })
     });
 
-    if (!res.ok) throw new Error('Ошибка сервера');
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(`Сервер: ${res.status} ${txt.slice(0,100)}`);
+    }
     showToast('✅ Уведомления включены!');
     checkPushStatus();
-  } catch(e) {
-    showToast('Ошибка: ' + e.message, true);
+  } catch(e: any) {
+    showToast('Ошибка: ' + (e.message||'неизвестно'), true);
   }
 }
 
