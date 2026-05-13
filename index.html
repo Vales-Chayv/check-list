@@ -1355,8 +1355,8 @@ async function subscribePush() {
     }
     showToast('✅ Уведомления включены!');
     checkPushStatus();
-  } catch(e: any) {
-    showToast('Ошибка: ' + (e.message||'неизвестно'), true);
+  } catch(e) {
+    showToast('Ошибка: ' + ((e instanceof Error ? e.message : String(e))||'неизвестно'), true);
   }
 }
 
