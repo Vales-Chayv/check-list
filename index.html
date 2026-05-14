@@ -1173,6 +1173,22 @@ document.getElementById('manifest-link').href=URL.createObjectURL(new Blob([JSON
 if('serviceWorker' in navigator) navigator.serviceWorker.register('/check-list/sw.js').catch(()=>{});
 
 // ═══════════════════════════════════════════
+//  ANDROID BACK BUTTON
+// ═══════════════════════════════════════════
+// Push a history state so back button can be intercepted
+history.pushState({app:true}, '');
+window.addEventListener('popstate', e => {
+  // Close whichever modal is open, in priority order
+  if(document.getElementById('view-ov').classList.contains('on')) { closeView(); history.pushState({app:true},''); return; }
+  if(document.getElementById('edit-ov').classList.contains('on')) { tryClose(); history.pushState({app:true},''); return; }
+  if(document.getElementById('arch-ov').classList.contains('on')) { closeArchive(); history.pushState({app:true},''); return; }
+  if(document.getElementById('set-ov').classList.contains('on')) { closeSettings(); history.pushState({app:true},''); return; }
+  if(document.getElementById('img-viewer').style.display==='flex') { closeImgViewer(); history.pushState({app:true},''); return; }
+  // Nothing open — push state again to prevent exit
+  history.pushState({app:true}, '');
+});
+
+// ═══════════════════════════════════════════
 //  LOCK
 // ═══════════════════════════════════════════
 const PWD='mc_pwd';
