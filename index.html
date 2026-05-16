@@ -1197,11 +1197,22 @@ function renderAttPrev() {
 function rmAtt(id) { tempAtt=tempAtt.filter(a=>a.id!==id); renderAttPrev(); }
 
 // Entries
+function autoResize(el) {
+  if(!el) return;
+  el.style.height='auto';
+  el.style.height=el.scrollHeight+'px';
+}
+
 function renderEntriesEdit() {
-  // Show existing entries at bottom
   const wrap = document.getElementById('e-entries-wrap');
   const el = document.getElementById('e-entries');
+  const newArea = document.getElementById('e-new-entry-area');
+  if(!wrap || !el || !newArea) return;
+
   const existing = tempEntries.filter(e => e._saved);
+  const newEntries = tempEntries.filter(e => !e._saved);
+
+  // Existing entries at bottom
   if(existing.length) {
     wrap.style.display='block';
     el.innerHTML=existing.map(e=>`<div class="entry-row">
@@ -1215,31 +1226,31 @@ function renderEntriesEdit() {
     el.querySelectorAll('.entry-textarea').forEach(t=>autoResize(t));
   } else {
     wrap.style.display='none';
+    el.innerHTML='';
   }
-  // Show new (unsaved) entries in the new-entry-area above notes
-  const newArea = document.getElementById('e-new-entry-area');
-  const newEntries = tempEntries.filter(e => !e._saved);
+
+  // New entries above notes
   if(newEntries.length) {
-    newArea.innerHTML=`<div style="background:var(--s2);border-radius:var(--rsm);padding:2px 12px;margin-bottom:4px">${newEntries.map(e=>`<div class="entry-row">
-      <div class="entry-cb${e.done?' on':''}" onclick="toggleEditEntry('${e.id}')">${e.done?checkSVG():''}</div>
-      <div style="flex:1">
-        <textarea class="entry-textarea" oninput="autoResize(this);updateEntry('${e.id}',this.value)" placeholder="Текст записи..." dir="auto">${esc(e.text)}</textarea>
-        <div class="entry-date">${e.date}</div>
-      </div>
-      <button class="entry-del" onclick="rmEntry('${e.id}')">✕</button>
-    </div>`).join('')}</div>`;
+    newArea.innerHTML=`<div style="background:var(--s2);border-radius:var(--rsm);padding:2px 12px;margin-bottom:4px">${
+      newEntries.map(e=>`<div class="entry-row">
+        <div class="entry-cb${e.done?' on':''}" onclick="toggleEditEntry('${e.id}')">${e.done?checkSVG():''}</div>
+        <div style="flex:1">
+          <textarea class="entry-textarea" oninput="autoResize(this);updateEntry('${e.id}',this.value)" placeholder="Текст записи..." dir="auto">${esc(e.text)}</textarea>
+          <div class="entry-date">${e.date}</div>
+        </div>
+        <button class="entry-del" onclick="rmEntry('${e.id}')">✕</button>
+      </div>`).join('')
+    }</div>`;
     newArea.querySelectorAll('.entry-textarea').forEach(t=>autoResize(t));
   } else {
     newArea.innerHTML='';
   }
 }
-
 function addEntry() {
   tempEntries.unshift({id:uid(),text:'',date:nowStr(),done:false,_saved:false});
   renderEntriesEdit();
   setTimeout(()=>{const ta=document.querySelector('#e-new-entry-area .entry-textarea');if(ta)ta.focus();},50);
 }
-function addEntry() { tempEntries.push({id:uid(),text:'',date:nowStr(),done:false}); renderEntriesEdit(); setTimeout(()=>{const ins=document.querySelectorAll('#e-entries .entry-text-inp');if(ins.length)ins[ins.length-1].focus();},50); }
 function toggleEditEntry(id) { const e=tempEntries.find(x=>x.id===id);if(e){e.done=!e.done;renderEntriesEdit();} }
 function updateEntry(id,val) { const e=tempEntries.find(x=>x.id===id);if(e)e.text=val; }
 function rmEntry(id) { tempEntries=tempEntries.filter(e=>e.id!==id); renderEntriesEdit(); }
@@ -1284,7 +1295,7 @@ async function saveCard() {
   if(!editId) hist.push({date:nowStr(),text:'Карточка создана',type:'created'});
   else if(oldStatus&&oldStatus!==newStatus) hist.push({date:nowStr(),text:`Статус: ${ST_LABELS[oldStatus]} → ${ST_LABELS[newStatus]}`,type:'status'});
   else hist.push({date:nowStr(),text:'Обновлено',type:'note'});
-  const cleanEntries=tempEntries.filter(e=>e.text.trim());
+  const cleanEntries=tempEntries.filter(e=>e.text.trim()).map(({_saved,...e})=>e);
   let finalStatus=newStatus;
   if(cleanEntries.length>0&&cleanEntries.every(e=>e.done)) finalStatus='done';
   const data={
