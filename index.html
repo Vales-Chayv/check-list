@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#0f0f0f">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -153,8 +153,13 @@ body{display:flex;flex-direction:column;overflow:hidden}
 /* Image viewer */
 .img-viewer{position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:500;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .img-viewer img{max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px;touch-action:pinch-zoom}
-.voice-btn{background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px;font-size:13px;color:var(--t2);cursor:pointer;display:flex;align-items:center;gap:6px}
+.voice-btn{background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px 14px;font-size:20px;color:var(--t2);cursor:pointer;display:flex;align-items:center;justify-content:center;min-width:52px}
 .voice-btn.recording{background:rgba(232,96,96,.15);border-color:var(--red);color:var(--red);animation:pulse 1s infinite}
+/* Image viewer with pinch zoom */
+.img-viewer{position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:500;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:none}
+.img-viewer img{max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px;transform-origin:center;transition:transform 0.1s}
+/* RTL support */
+[dir="rtl"] {text-align:right}
 .audio-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(91,184,122,.1);border:1px solid rgba(91,184,122,.2);border-radius:var(--rsm);padding:5px 10px;font-size:12px;color:var(--green)}
 .entry-textarea{background:transparent;border:none;border-bottom:1px solid var(--b1);padding:2px 0;font-size:14px;color:var(--t1);font-family:inherit;width:100%;resize:none;min-height:24px;overflow:hidden;line-height:1.5}
 .entry-textarea:focus{outline:none;border-bottom-color:var(--accent)}
@@ -245,16 +250,13 @@ body{display:flex;flex-direction:column;overflow:hidden}
     <div class="panel on" id="p-main">
       <div class="fld">
         <label>Заголовок</label>
-        <input id="e-title" placeholder="О чём карточка?" oninput="checkDirty()">
+        <input id="e-title" placeholder="О чём карточка?" oninput="checkDirty()" dir="auto">
       </div>
-      <div class="fld">
-        <label>Записи <span style="font-size:10px;font-weight:400;color:var(--t3)">— каждая со своей датой и галочкой</span></label>
-        <button onclick="addEntry()" style="background:var(--s2);border:1px dashed var(--b2);border-radius:var(--rsm);padding:8px;font-size:13px;color:var(--accent);cursor:pointer;font-family:inherit;margin-bottom:4px">＋ Добавить запись</button>
-        <div id="e-entries" style="background:var(--s2);border-radius:var(--rsm);padding:2px 12px;min-height:36px"></div>
-      </div>
+      <button onclick="addEntry()" style="background:var(--s2);border:1px dashed var(--b2);border-radius:var(--rsm);padding:11px;font-size:14px;color:var(--accent);cursor:pointer;font-family:inherit;font-weight:600;text-align:left">＋ Добавить запись</button>
+      <div id="e-new-entry-area"></div>
       <div class="fld">
         <label>Заметка</label>
-        <textarea id="e-body" placeholder="Подробности..."></textarea>
+        <textarea id="e-body" placeholder="Подробности..." dir="auto"></textarea>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px">
         <div class="fld">
@@ -281,7 +283,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
       </div>
       <div id="new-cat-box" style="display:none" class="fld">
         <label>Название рубрики</label>
-        <input id="e-new-cat" placeholder="Например: Здоровье">
+        <input id="e-new-cat" placeholder="Например: Здоровье" dir="auto">
         <label style="margin-top:6px">Цвет</label>
         <div class="pal" id="cat-pal"></div>
         <div style="display:flex;gap:7px;margin-top:7px">
@@ -341,6 +343,11 @@ body{display:flex;flex-direction:column;overflow:hidden}
         <button class="btn-d" id="del-btn" style="display:none" onclick="deleteCard()">Удалить</button>
         <button class="btn-s" onclick="tryClose()">Отмена</button>
         <button class="btn-p" id="save-btn" onclick="saveCard()" disabled>Сохранить</button>
+      </div>
+      <!-- Existing entries at bottom -->
+      <div id="e-entries-wrap" style="display:none;margin-top:4px">
+        <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;padding-top:8px;border-top:1px solid var(--b1)">Сохранённые записи</div>
+        <div id="e-entries" style="background:var(--s2);border-radius:var(--rsm);padding:2px 12px"></div>
       </div>
     </div>
 
@@ -452,7 +459,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="img-viewer" id="img-viewer" style="display:none" onclick="closeImgViewer()">
+<div class="img-viewer" id="img-viewer" style="display:none">
   <img id="viewer-img">
 </div>
 
@@ -877,15 +884,40 @@ const App = {
     const card=cards.find(c=>c.id===cardId); if(!card)return;
     const imgs=(card.attachments||[]).filter(a=>a.type?.startsWith('image/'));
     if(!imgs[i])return;
-    document.getElementById('viewer-img').src=imgs[i].data;
+    const img=document.getElementById('viewer-img');
+    img.src=imgs[i].data;
+    img.style.transform='scale(1)';
+    imgScale=1;
     document.getElementById('img-viewer').style.display='flex';
+    history.pushState({app:true,viewer:true},'');
   },
   openView(id) { openView(id); },
   toggleDone(id) { toggleDone(id); },
   toggleEntry(cardId,entryId) { toggleEntry(cardId,entryId); },
 };
 
-function closeImgViewer() { document.getElementById('img-viewer').style.display='none'; }
+function closeImgViewer() { document.getElementById('img-viewer').style.display='none'; imgScale=1; imgTransX=0; imgTransY=0; }
+
+// Pinch zoom for image viewer
+let imgScale=1, imgLastDist=0;
+(function setupImgZoom(){
+  const viewer=document.getElementById('img-viewer');
+  const img=document.getElementById('viewer-img');
+  viewer.addEventListener('touchstart',e=>{
+    if(e.touches.length===2)
+      imgLastDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+  },{passive:true});
+  viewer.addEventListener('touchmove',e=>{
+    if(e.touches.length===2){
+      e.preventDefault();
+      const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+      imgScale=Math.min(Math.max(0.5,imgScale*(d/imgLastDist)),6);
+      imgLastDist=d;
+      img.style.transform=`scale(${imgScale})`;
+    }
+  },{passive:false});
+  viewer.addEventListener('click',e=>{if(e.target===viewer)closeImgViewer();});
+})();
 
 // ═══════════════════════════════════════════
 //  VIEW MODAL
@@ -971,7 +1003,7 @@ function openEdit(id) {
   editId=id||null;
   const card=id?cards.find(c=>c.id===id):null;
   tempAtt=JSON.parse(JSON.stringify(card?.attachments||[]));
-  tempEntries=JSON.parse(JSON.stringify(card?.entries||[]));
+  tempEntries=JSON.parse(JSON.stringify(card?.entries||[])).map(e=>({...e,_saved:true}));
   tempHist=JSON.parse(JSON.stringify(card?.history||[]));
   tempRelIds=[...(card?.related_ids||[])];
   remOn=card?.reminder?.enabled||false;
@@ -1166,23 +1198,46 @@ function rmAtt(id) { tempAtt=tempAtt.filter(a=>a.id!==id); renderAttPrev(); }
 
 // Entries
 function renderEntriesEdit() {
-  const el=document.getElementById('e-entries');
-  if(!tempEntries.length){el.innerHTML='<div style="padding:8px 0;font-size:13px;color:var(--t3)">Нет записей</div>';return;}
-  el.innerHTML=tempEntries.map(e=>`<div class="entry-row">
-    <div class="entry-cb${e.done?' on':''}" onclick="toggleEditEntry('${e.id}')">${e.done?checkSVG():''}</div>
-    <div style="flex:1">
-      <textarea class="entry-textarea" oninput="autoResize(this);updateEntry('${e.id}',this.value)" placeholder="Текст записи...">${esc(e.text)}</textarea>
-      <div class="entry-date">${e.date}</div>
-    </div>
-    <button class="entry-del" onclick="rmEntry('${e.id}')">✕</button>
-  </div>`).join('');
-  // Auto-resize all textareas
-  el.querySelectorAll('.entry-textarea').forEach(t=>autoResize(t));
+  // Show existing entries at bottom
+  const wrap = document.getElementById('e-entries-wrap');
+  const el = document.getElementById('e-entries');
+  const existing = tempEntries.filter(e => e._saved);
+  if(existing.length) {
+    wrap.style.display='block';
+    el.innerHTML=existing.map(e=>`<div class="entry-row">
+      <div class="entry-cb${e.done?' on':''}" onclick="toggleEditEntry('${e.id}')">${e.done?checkSVG():''}</div>
+      <div style="flex:1">
+        <textarea class="entry-textarea" oninput="autoResize(this);updateEntry('${e.id}',this.value)" dir="auto">${esc(e.text)}</textarea>
+        <div class="entry-date">${e.date}</div>
+      </div>
+      <button class="entry-del" onclick="rmEntry('${e.id}')">✕</button>
+    </div>`).join('');
+    el.querySelectorAll('.entry-textarea').forEach(t=>autoResize(t));
+  } else {
+    wrap.style.display='none';
+  }
+  // Show new (unsaved) entries in the new-entry-area above notes
+  const newArea = document.getElementById('e-new-entry-area');
+  const newEntries = tempEntries.filter(e => !e._saved);
+  if(newEntries.length) {
+    newArea.innerHTML=`<div style="background:var(--s2);border-radius:var(--rsm);padding:2px 12px;margin-bottom:4px">${newEntries.map(e=>`<div class="entry-row">
+      <div class="entry-cb${e.done?' on':''}" onclick="toggleEditEntry('${e.id}')">${e.done?checkSVG():''}</div>
+      <div style="flex:1">
+        <textarea class="entry-textarea" oninput="autoResize(this);updateEntry('${e.id}',this.value)" placeholder="Текст записи..." dir="auto">${esc(e.text)}</textarea>
+        <div class="entry-date">${e.date}</div>
+      </div>
+      <button class="entry-del" onclick="rmEntry('${e.id}')">✕</button>
+    </div>`).join('')}</div>`;
+    newArea.querySelectorAll('.entry-textarea').forEach(t=>autoResize(t));
+  } else {
+    newArea.innerHTML='';
+  }
 }
 
-function autoResize(el) {
-  el.style.height='auto';
-  el.style.height=el.scrollHeight+'px';
+function addEntry() {
+  tempEntries.unshift({id:uid(),text:'',date:nowStr(),done:false,_saved:false});
+  renderEntriesEdit();
+  setTimeout(()=>{const ta=document.querySelector('#e-new-entry-area .entry-textarea');if(ta)ta.focus();},50);
 }
 function addEntry() { tempEntries.push({id:uid(),text:'',date:nowStr(),done:false}); renderEntriesEdit(); setTimeout(()=>{const ins=document.querySelectorAll('#e-entries .entry-text-inp');if(ins.length)ins[ins.length-1].focus();},50); }
 function toggleEditEntry(id) { const e=tempEntries.find(x=>x.id===id);if(e){e.done=!e.done;renderEntriesEdit();} }
