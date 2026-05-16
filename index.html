@@ -286,7 +286,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
             <option value="urgent">🔥 Срочное</option>
           </select>
         </div>
-      </div>
+      </div><!-- end card-settings-grid -->
       <div id="new-cat-box" style="display:none" class="fld">
         <label>Название рубрики</label>
         <input id="e-new-cat" placeholder="Например: Здоровье" dir="auto">
@@ -521,6 +521,16 @@ body{display:flex;flex-direction:column;overflow:hidden}
 // ═══════════════════════════════════════════
 //  CONFIG
 // ═══════════════════════════════════════════
+// Global error trap - shows errors on screen for debugging
+window.onerror = function(msg, src, line, col, err) {
+  const el = document.getElementById('lock-note');
+  if(el) el.textContent = 'JS Error: ' + msg + ' (line ' + line + ')';
+  return false;
+};
+window.onunhandledrejection = function(e) {
+  const el = document.getElementById('lock-note');
+  if(el) el.textContent = 'Promise Error: ' + e.reason;
+};
 const SB_URL = 'https://rmlcbznnoroumjsqoluz.supabase.co';
 const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJtbGNiem5ub3JvdW1qc3FvbHV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNDUyMjYsImV4cCI6MjA5MzcyMTIyNn0.9DlXlx8_X1S5kVAdzpTPNyq6rChlMNDkJbDXQIud62I';
 const FUNC_URL = 'https://rmlcbznnoroumjsqoluz.supabase.co/functions/v1/send-reminders';
@@ -912,6 +922,8 @@ function cardHTML(card, isDone=false) {
 // ═══════════════════════════════════════════
 //  APP ACTIONS (called from inline HTML via App.*)
 // ═══════════════════════════════════════════
+let imgScale=1, imgLastDist=0;
+
 const App = {
   setCat(idx) { filterCat = idx===-1 ? 'all' : cats[idx].name; render(); },
   toggleExpand(id) { expandedCards.has(id)?expandedCards.delete(id):expandedCards.add(id); render(); },
@@ -931,10 +943,9 @@ const App = {
   toggleEntry(cardId,entryId) { toggleEntry(cardId,entryId); },
 };
 
-function closeImgViewer() { document.getElementById('img-viewer').style.display='none'; imgScale=1; imgTransX=0; imgTransY=0; }
+function closeImgViewer() { document.getElementById('img-viewer').style.display='none'; imgScale=1; }
 
 // Pinch zoom for image viewer
-let imgScale=1, imgLastDist=0;
 (function setupImgZoom(){
   const viewer=document.getElementById('img-viewer');
   const img=document.getElementById('viewer-img');
