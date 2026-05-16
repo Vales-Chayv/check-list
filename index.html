@@ -258,7 +258,13 @@ body{display:flex;flex-direction:column;overflow:hidden}
         <label>Заметка</label>
         <textarea id="e-body" placeholder="Подробности..." dir="auto"></textarea>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px">
+      <!-- Card settings — collapsible for existing cards -->
+      <div id="card-settings-wrap">
+        <button onclick="toggleCardSettings()" id="card-settings-toggle" style="background:transparent;border:none;color:var(--t3);font-size:12px;cursor:pointer;padding:4px 0;font-family:inherit;display:flex;align-items:center;gap:5px">
+          <span id="card-settings-arrow">▶</span> Настройки карточки (рубрика, статус, приоритет...)
+        </button>
+        <div id="card-settings-body" style="display:none;flex-direction:column;gap:13px;margin-top:8px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px" id="card-settings-grid">
         <div class="fld">
           <label>Рубрика</label>
           <select id="e-cat" onchange="onCatChange()"></select>
@@ -291,19 +297,21 @@ body{display:flex;flex-direction:column;overflow:hidden}
           <button onclick="document.getElementById('new-cat-box').style.display='none'" style="background:var(--s2);color:var(--t2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px 14px;cursor:pointer;font-family:inherit">✕</button>
         </div>
       </div>
-      <div class="fld">
-        <label>Срок выполнения</label>
-        <input id="e-deadline" type="date">
-        <span style="font-size:11px;color:var(--t3)">Чем ближе срок — тем чаще напоминания</span>
-      </div>
-      <div class="fld">
-        <label>На чьей стороне мяч</label>
-        <div class="seg" id="seg-ball">
-          <button class="seg-btn on" data-ball="">—</button>
-          <button class="seg-btn" data-ball="mine">⚽ У меня</button>
-          <button class="seg-btn" data-ball="theirs">⚽ У них</button>
-        </div>
-      </div>
+          <div class="fld">
+            <label>Срок выполнения</label>
+            <input id="e-deadline" type="date">
+            <span style="font-size:11px;color:var(--t3)">Чем ближе срок — тем чаще напоминания</span>
+          </div>
+          <div class="fld">
+            <label>На чьей стороне мяч</label>
+            <div class="seg" id="seg-ball">
+              <button class="seg-btn on" data-ball="">—</button>
+              <button class="seg-btn" data-ball="mine">⚽ У меня</button>
+              <button class="seg-btn" data-ball="theirs">⚽ У них</button>
+            </div>
+          </div>
+        </div><!-- end card-settings-body -->
+      </div><!-- end card-settings-wrap -->
       <div class="fld">
         <label>Фото и файлы</label>
         <input type="file" id="f-cam" multiple accept="image/*,video/*,.pdf,.doc,.docx" style="display:none" onchange="handleFiles(this)">
@@ -388,6 +396,33 @@ body{display:flex;flex-direction:column;overflow:hidden}
 <!-- View modal -->
 <div class="overlay" id="view-ov" onclick="if(event.target===this)closeView()">
   <div class="sheet"><div class="sheet-handle"></div><div id="view-content"></div></div>
+</div>
+
+<!-- Quick Add Entry sheet -->
+<div class="overlay" id="ae-ov" onclick="if(event.target===this)closeAddEntry()">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title" id="ae-title">＋ Новая запись</span>
+      <button class="close-btn" onclick="closeAddEntry()">✕</button>
+    </div>
+    <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
+      <textarea id="ae-text" placeholder="Текст записи..." dir="auto"
+        style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:11px 12px;font-size:16px;color:var(--t1);font-family:inherit;resize:none;min-height:100px;line-height:1.6;width:100%"
+        oninput="autoResize(this)"></textarea>
+      <div>
+        <input type="file" id="ae-cam" multiple accept="image/*,video/*,.pdf,.doc,.docx" style="display:none" onchange="handleAEFiles(this)">
+        <input type="file" id="ae-file" multiple accept="*/*" style="display:none" onchange="handleAEFiles(this)">
+        <div id="ae-att-prev" class="att-prev" style="margin-bottom:8px"></div>
+        <div style="display:flex;gap:7px">
+          <button onclick="document.getElementById('ae-cam').click()" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px;font-size:13px;color:var(--t2);cursor:pointer">📷 Фото</button>
+          <button onclick="document.getElementById('ae-file').click()" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px;font-size:13px;color:var(--t2);cursor:pointer">📎 Файл</button>
+          <button id="ae-voice-btn" onclick="toggleAEVoice()" class="voice-btn">🎙</button>
+        </div>
+      </div>
+      <button onclick="saveNewEntry()" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:14px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit">Сохранить запись</button>
+    </div>
+  </div>
 </div>
 
 <!-- Archive modal -->
@@ -946,8 +981,9 @@ function openView(id) {
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
         <button onclick="closeView()" style="background:var(--s2);border:none;color:var(--t2);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px">✕</button>
-        <button onclick="closeView();setTimeout(()=>openEdit('${id}'),200)" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:7px;padding:5px 11px;font-size:13px;font-weight:700;cursor:pointer">✏️ Изменить</button>
-        <button onclick="if(confirm(getExitMsg().replace('выйти','удалить карточку').replace('לצאת','למחוק כרטיס').replace('exit','delete'))){closeView();deleteCardById('${id}')}" style="background:rgba(232,96,96,.15);color:var(--red);border:1px solid rgba(232,96,96,.25);border-radius:7px;padding:5px 11px;font-size:13px;cursor:pointer">🗑</button>
+        <button onclick="closeView();setTimeout(()=>openAddEntry('${id}'),200)" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:7px;padding:7px 14px;font-size:18px;font-weight:700;cursor:pointer">＋</button>
+        <button onclick="closeView();setTimeout(()=>openEdit('${id}'),200)" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:7px;padding:7px 11px;font-size:14px;cursor:pointer" title="Настройки карточки">⚙️</button>
+        <button onclick="if(confirm('Удалить карточку?')){closeView();deleteCardById('${id}')}" style="background:rgba(232,96,96,.15);color:var(--red);border:1px solid rgba(232,96,96,.25);border-radius:7px;padding:7px 11px;font-size:14px;cursor:pointer">🗑</button>
       </div>
     </div>
   </div>`;
@@ -956,11 +992,27 @@ function openView(id) {
 
   if(entries.length) {
     const dc=entries.filter(e=>e.done).length;
-    html+=`<div class="view-sec"><div class="view-lbl">Записи (${dc}/${entries.length})</div>${entries.map(e=>`
-      <div class="entry-row">
-        <div class="entry-cb${e.done?' on':''}" onclick="viewToggleEntry('${id}','${e.id}')">${e.done?checkSVG():''}</div>
-        <div style="flex:1"><div style="font-size:14px${e.done?';text-decoration:line-through;opacity:.45':''}">${esc(e.text)}</div><div class="entry-date">${e.date}</div></div>
-      </div>`).join('')}</div>`;
+    html+=`<div class="view-sec"><div class="view-lbl">Записи (${dc}/${entries.length})</div>${entries.map(e=>{
+      const eAtts=e.attachments||[];
+      const eImgs=eAtts.filter(a=>a.type?.startsWith('image/'));
+      const eAudios=eAtts.filter(a=>a.type?.startsWith('audio/'));
+      const eFiles=eAtts.filter(a=>!a.type?.startsWith('image/')&&!a.type?.startsWith('audio/'));
+      const attHTML=[
+        eImgs.length?`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">${eImgs.map((a,i)=>`<img src="${a.data}" style="width:80px;height:80px;object-fit:cover;border-radius:7px;cursor:pointer;border:1px solid rgba(255,255,255,.1)" onclick="viewImgData('${a.data}')">`).join('')}</div>`:'',
+        eAudios.map(a=>`<div style="margin-top:5px"><audio controls src="${a.data}" style="width:100%;height:32px"></audio></div>`).join(''),
+        eFiles.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${eFiles.map(f=>f.type?.includes('pdf')?`<a href="${f.data}" target="_blank" class="file-action">📄${esc(f.name)}</a>`:`<a href="${f.data}" download="${esc(f.name)}" class="file-action">📎${esc(f.name)}</a>`).join('')}</div>`:''
+      ].filter(Boolean).join('');
+      return`<div style="padding:10px 0;border-bottom:1px solid var(--b1)">
+        <div style="display:flex;align-items:flex-start;gap:9px">
+          <div class="entry-cb${e.done?' on':''}" onclick="viewToggleEntry('${id}','${e.id}')" style="margin-top:2px">${e.done?checkSVG():''}</div>
+          <div style="flex:1">
+            <div style="font-size:14px${e.done?';text-decoration:line-through;opacity:.45':''};direction:auto" dir="auto">${esc(e.text)}</div>
+            <div class="entry-date">${e.date}</div>
+            ${attHTML}
+          </div>
+        </div>
+      </div>`;
+    }).join('')}</div>`;
   }
 
   if(imgs.length) html+=`<div class="view-sec"><div class="view-lbl">Фото (${imgs.length})</div><div style="display:flex;flex-wrap:wrap;gap:7px">${imgs.map((a,i)=>`<img src="${a.data}" style="width:95px;height:95px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid rgba(255,255,255,.1)" onclick="App.viewImg('${id}',${i})">`).join('')}</div></div>`;
@@ -1035,7 +1087,7 @@ function openEdit(id) {
   document.getElementById('p-main').classList.add('on');
 
   document.getElementById('edit-ov').classList.add('on');
-  setTimeout(()=>{document.getElementById('e-title').focus(); originalState=getState();},300);
+  setTimeout(()=>{document.getElementById('e-title').focus(); originalState=getState(); openCardSettingsIfNew();},300);
 }
 
 function getState() {
@@ -1049,8 +1101,87 @@ function getState() {
 function isDirty() { return originalState!==null && getState()!==originalState; }
 
 // ═══════════════════════════════════════════
-//  VOICE RECORDING
+//  QUICK ADD ENTRY
 // ═══════════════════════════════════════════
+let aeCardId = null, aeAtts = [], aeVoiceRecorder = null, aeIsRecording = false;
+
+function openAddEntry(cardId) {
+  aeCardId = cardId;
+  aeAtts = [];
+  const card = cards.find(c=>c.id===cardId);
+  document.getElementById('ae-title').textContent = card ? `＋ Запись в «${card.title.length>20?card.title.slice(0,18)+'…':card.title}»` : '＋ Новая запись';
+  document.getElementById('ae-text').value = '';
+  document.getElementById('ae-att-prev').innerHTML = '';
+  document.getElementById('ae-ov').classList.add('on');
+  setTimeout(()=>{ const ta=document.getElementById('ae-text'); ta.focus(); ta.style.height='auto'; ta.style.height='100px'; },300);
+}
+
+function closeAddEntry() {
+  document.getElementById('ae-ov').classList.remove('on');
+  if(aeIsRecording) stopAEVoice();
+}
+
+function handleAEFiles(inp) {
+  Array.from(inp.files).forEach(f=>{
+    if(f.size>5*1024*1024){alert(f.name+': макс 5МБ');return;}
+    const r=new FileReader(); r.onload=ev=>{aeAtts.push({id:uid(),name:f.name,type:f.type,data:ev.target.result});renderAEAttPrev();}; r.readAsDataURL(f);
+  }); inp.value='';
+}
+
+function renderAEAttPrev() {
+  document.getElementById('ae-att-prev').innerHTML=aeAtts.map(a=>{
+    if(a.type?.startsWith('image/')) return`<div class="att-img"><img src="${a.data}" style="width:68px;height:68px;object-fit:cover;border-radius:7px"><button class="att-del" onclick="aeAtts=aeAtts.filter(x=>x.id!=='${a.id}');renderAEAttPrev()">✕</button></div>`;
+    if(a.type?.startsWith('audio/')) return`<div class="att-file"><span style="color:var(--green)">🎙 ${esc(a.name)}</span><button onclick="aeAtts=aeAtts.filter(x=>x.id!=='${a.id}');renderAEAttPrev()" style="background:none;border:none;cursor:pointer;color:var(--t3);margin-left:4px">✕</button></div>`;
+    return`<div class="att-file">📎${esc(a.name.length>18?a.name.slice(0,16)+'…':a.name)}<button onclick="aeAtts=aeAtts.filter(x=>x.id!=='${a.id}');renderAEAttPrev()" style="background:none;border:none;cursor:pointer;color:var(--t3);margin-left:4px">✕</button></div>`;
+  }).join('');
+}
+
+async function toggleAEVoice() {
+  if(aeIsRecording) { stopAEVoice(); return; }
+  try {
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    const chunks=[];
+    aeVoiceRecorder=new MediaRecorder(stream);
+    aeVoiceRecorder.ondataavailable=e=>chunks.push(e.data);
+    aeVoiceRecorder.onstop=()=>{
+      const blob=new Blob(chunks,{type:'audio/webm'});
+      const r=new FileReader(); r.onload=ev=>{aeAtts.push({id:uid(),name:`Голос_${nowStr().replace(/[,: ]/g,'-')}.webm`,type:'audio/webm',data:ev.target.result});renderAEAttPrev();};
+      r.readAsDataURL(blob); stream.getTracks().forEach(t=>t.stop());
+    };
+    aeVoiceRecorder.start(); aeIsRecording=true;
+    const btn=document.getElementById('ae-voice-btn');
+    btn.classList.add('recording'); btn.innerHTML='⏹';
+  } catch(e){ toast('Нет доступа к микрофону',true); }
+}
+
+function stopAEVoice() {
+  if(aeVoiceRecorder&&aeVoiceRecorder.state!=='inactive') aeVoiceRecorder.stop();
+  aeIsRecording=false;
+  const btn=document.getElementById('ae-voice-btn');
+  btn.classList.remove('recording'); btn.innerHTML='🎙';
+}
+
+async function saveNewEntry() {
+  const text=document.getElementById('ae-text').value.trim();
+  if(!text&&!aeAtts.length){ toast('Введи текст или прикрепи файл',true); return; }
+  const card=cards.find(c=>c.id===aeCardId); if(!card) return;
+  const newEntry={id:uid(),text,date:nowStr(),done:false,attachments:[...aeAtts]};
+  card.entries=[newEntry,...(card.entries||[])];
+  if(card.entries.every(e=>e.done)&&card.entries.length>0) card.status='done';
+  closeAddEntry();
+  render();
+  toast('✓ Запись добавлена');
+  await dbUpdate(card);
+  // Re-open view to show updated card
+  setTimeout(()=>openView(aeCardId),300);
+}
+
+function viewImgData(src) {
+  const img=document.getElementById('viewer-img');
+  img.src=src; img.style.transform='scale(1)'; imgScale=1;
+  document.getElementById('img-viewer').style.display='flex';
+  history.pushState({app:true,viewer:true},'');
+}
 let mediaRecorder=null, audioChunks=[], isRecording=false;
 
 async function toggleVoice() {
@@ -1106,7 +1237,26 @@ window.addEventListener('beforeunload',e=>{
   if(isDirty()){e.preventDefault();e.returnValue=getExitMsg();}
 });
 
-function tryClose() {
+function toggleCardSettings() {
+  const body=document.getElementById('card-settings-body');
+  const arrow=document.getElementById('card-settings-arrow');
+  const isOpen=body.style.display!=='none';
+  body.style.display=isOpen?'none':'flex';
+  arrow.textContent=isOpen?'▶':'▼';
+}
+
+function openCardSettingsIfNew() {
+  // For new cards, show settings expanded
+  if(!editId) {
+    const body=document.getElementById('card-settings-body');
+    const arrow=document.getElementById('card-settings-arrow');
+    if(body) { body.style.display='flex'; arrow.textContent='▼'; }
+  } else {
+    const body=document.getElementById('card-settings-body');
+    const arrow=document.getElementById('card-settings-arrow');
+    if(body) { body.style.display='none'; arrow.textContent='▶'; }
+  }
+}
   if(isDirty()&&!confirm('Есть несохранённые изменения. Выйти?'))return;
   originalState=null;
   document.getElementById('edit-ov').classList.remove('on');
@@ -1555,6 +1705,7 @@ function switchToChecklist() {
 history.pushState({app:true}, '');
 window.addEventListener('popstate', e => {
   // Close whichever modal is open, in priority order
+  if(document.getElementById('ae-ov').classList.contains('on')) { closeAddEntry(); history.pushState({app:true},''); return; }
   if(document.getElementById('view-ov').classList.contains('on')) { closeView(); history.pushState({app:true},''); return; }
   if(document.getElementById('edit-ov').classList.contains('on')) { tryClose(); history.pushState({app:true},''); return; }
   if(document.getElementById('arch-ov').classList.contains('on')) { closeArchive(); history.pushState({app:true},''); return; }
