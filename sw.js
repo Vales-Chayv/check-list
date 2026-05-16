@@ -40,10 +40,16 @@ self.addEventListener('notificationclick', e => {
   e.notification.close();
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      // If app already open — focus and switch to checklist
       for (const c of list) {
-        if (c.url.includes('check-list') && 'focus' in c) return c.focus();
+        if (c.url.includes('check-list') && 'focus' in c) {
+          c.focus();
+          c.postMessage({ type: 'OPEN_CHECKLIST' });
+          return;
+        }
       }
-      return clients.openWindow('https://vales-chayv.github.io/check-list/');
+      // Otherwise open app on checklist
+      return clients.openWindow('https://vales-chayv.github.io/check-list/?view=checklist');
     })
   );
 });
