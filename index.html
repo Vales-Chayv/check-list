@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#0f0f0f">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -152,13 +152,18 @@ body{display:flex;flex-direction:column;overflow:hidden}
 @keyframes spin{to{transform:rotate(360deg)}}
 /* Image viewer */
 .img-viewer{position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:500;display:flex;align-items:center;justify-content:center;cursor:pointer}
-.img-viewer img{max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px}
+.img-viewer img{max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px;touch-action:pinch-zoom}
+.voice-btn{background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px;font-size:13px;color:var(--t2);cursor:pointer;display:flex;align-items:center;gap:6px}
+.voice-btn.recording{background:rgba(232,96,96,.15);border-color:var(--red);color:var(--red);animation:pulse 1s infinite}
+.audio-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(91,184,122,.1);border:1px solid rgba(91,184,122,.2);border-radius:var(--rsm);padding:5px 10px;font-size:12px;color:var(--green)}
+.entry-textarea{background:transparent;border:none;border-bottom:1px solid var(--b1);padding:2px 0;font-size:14px;color:var(--t1);font-family:inherit;width:100%;resize:none;min-height:24px;overflow:hidden;line-height:1.5}
+.entry-textarea:focus{outline:none;border-bottom-color:var(--accent)}
 /* Toast */
 .toast{position:fixed;bottom:calc(76px + var(--safe));left:50%;transform:translateX(-50%) translateY(16px);background:var(--green);color:white;padding:9px 18px;border-radius:18px;font-size:14px;font-weight:600;z-index:600;opacity:0;transition:all .25s;white-space:nowrap;pointer-events:none}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.err{background:var(--red)}
 /* FAB */
-.fab{position:fixed;right:18px;bottom:calc(18px + var(--safe));width:54px;height:54px;background:var(--accent);border:none;border-radius:50%;cursor:pointer;display:none;align-items:center;justify-content:center;font-size:22px;color:#0f0f0f;box-shadow:0 4px 18px rgba(232,197,106,.4);z-index:50}
+.fab{position:fixed;right:18px;bottom:calc(80px + var(--safe));width:54px;height:54px;background:var(--accent);border:none;border-radius:50%;cursor:pointer;display:none;align-items:center;justify-content:center;font-size:22px;color:#0f0f0f;box-shadow:0 4px 18px rgba(232,197,106,.4);z-index:50}
 /* Bottom nav */
 .bnav{display:none;background:var(--s1);border-top:1px solid var(--b1);padding:7px 0 calc(7px + var(--safe));flex-shrink:0}
 .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;cursor:pointer;padding:4px;font-family:inherit}
@@ -244,8 +249,8 @@ body{display:flex;flex-direction:column;overflow:hidden}
       </div>
       <div class="fld">
         <label>Записи <span style="font-size:10px;font-weight:400;color:var(--t3)">— каждая со своей датой и галочкой</span></label>
+        <button onclick="addEntry()" style="background:var(--s2);border:1px dashed var(--b2);border-radius:var(--rsm);padding:8px;font-size:13px;color:var(--accent);cursor:pointer;font-family:inherit;margin-bottom:4px">＋ Добавить запись</button>
         <div id="e-entries" style="background:var(--s2);border-radius:var(--rsm);padding:2px 12px;min-height:36px"></div>
-        <button onclick="addEntry()" style="background:var(--s2);border:1px dashed var(--b2);border-radius:var(--rsm);padding:8px;font-size:13px;color:var(--accent);cursor:pointer;font-family:inherit">＋ Добавить запись</button>
       </div>
       <div class="fld">
         <label>Заметка</label>
@@ -305,6 +310,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
         <div style="display:flex;gap:7px">
           <button onclick="document.getElementById('f-cam').click()" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px;font-size:13px;color:var(--t2);cursor:pointer">📷 Камера/Фото</button>
           <button onclick="document.getElementById('f-file').click()" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px;font-size:13px;color:var(--t2);cursor:pointer">📎 Файл</button>
+          <button id="voice-btn" onclick="toggleVoice()" class="voice-btn">🎙</button>
         </div>
       </div>
       <div style="background:var(--s2);border-radius:var(--rsm);padding:12px 13px">
@@ -751,15 +757,31 @@ function renderMain() {
 }
 
 function renderCards() {
-  const el = document.getElementById('scroll');
-  const PO = {urgent:0,high:1,normal:2};
-  const filtered = cards.filter(c => c.status!=='done' && (filterCat==='all'||c.category===filterCat));
+  const el=document.getElementById('scroll');
+  const PO={urgent:0,high:1,normal:2};
+  const filtered=cards.filter(c=>c.status!=='done'&&(filterCat==='all'||c.category===filterCat));
   if(!filtered.length){el.innerHTML=emptyHTML('Нет карточек','Создай первую карточку');return;}
+
+  // Separate urgent/high from normal
+  const priority=filtered.filter(c=>c.priority==='urgent'||c.priority==='high')
+    .sort((a,b)=>PO[a.priority]-PO[b.priority]);
+  const normal=filtered.filter(c=>!c.priority||c.priority==='normal');
+
+  let html='';
+
+  // Priority section always on top
+  if(priority.length){
+    html+=`<div class="date-lbl" style="color:var(--red)">🔥 Срочные и важные</div>`;
+    html+=priority.map(c=>cardHTML(c)).join('');
+  }
+
+  // Normal cards grouped by date
   const grouped={};
-  filtered.forEach(c=>{const d=(c.created_at||today()).slice(0,10);(grouped[d]=grouped[d]||[]).push(c);});
-  Object.values(grouped).forEach(arr=>arr.sort((a,b)=>(PO[a.priority||'normal'])-(PO[b.priority||'normal'])));
+  normal.forEach(c=>{const d=(c.created_at||today()).slice(0,10);(grouped[d]=grouped[d]||[]).push(c);});
   const dates=Object.keys(grouped).sort((a,b)=>b.localeCompare(a));
-  el.innerHTML=dates.map(d=>`<div class="date-lbl">${fmtDate(d)}</div>${grouped[d].map(c=>cardHTML(c)).join('')}`).join('');
+  html+=dates.map(d=>`<div class="date-lbl">${fmtDate(d)}</div>${grouped[d].map(c=>cardHTML(c)).join('')}`).join('');
+
+  el.innerHTML=html;
 }
 
 function renderChecklist() {
@@ -775,12 +797,13 @@ function renderChecklist() {
       const col=catColor(card.category);
       const bg=hex2rgba(col,.12), border=hex2rgba(col,.3);
       const done=card.status==='done';
-      return`<div class="cl-item" style="background:${bg};border-color:${border}" onclick="App.openView('${card.id}')">
+      const pBorder=card.priority==='urgent'?';border-left:4px solid var(--red)':card.priority==='high'?';border-left:4px solid var(--accent)':'';
+      return`<div class="cl-item" style="background:${bg};border-color:${border}${pBorder}" onclick="App.openView('${card.id}')">
         <div class="cl-cb${done?' on':''}" onclick="event.stopPropagation();App.toggleDone('${card.id}')">
           ${done?checkSVG():''}
         </div>
         <div style="flex:1">
-          <div class="cl-title${done?' done':''}" style="color:${col}">${esc(card.title)}</div>
+          <div class="cl-title${done?' done':''}" style="color:${col}">${card.priority==='urgent'?'🔥 ':card.priority==='high'?'⚡ ':''}${esc(card.title)}</div>
           ${card.category?`<div style="font-size:12px;opacity:.6;margin-top:2px">${esc(card.category)}</div>`:''}
         </div>
         <span class="badge" style="color:${col}">${ST_LABELS[card.status]||''}</span>
@@ -892,6 +915,7 @@ function openView(id) {
       <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
         <button onclick="closeView()" style="background:var(--s2);border:none;color:var(--t2);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px">✕</button>
         <button onclick="closeView();setTimeout(()=>openEdit('${id}'),200)" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:7px;padding:5px 11px;font-size:13px;font-weight:700;cursor:pointer">✏️ Изменить</button>
+        <button onclick="if(confirm(getExitMsg().replace('выйти','удалить карточку').replace('לצאת','למחוק כרטיס').replace('exit','delete'))){closeView();deleteCardById('${id}')}" style="background:rgba(232,96,96,.15);color:var(--red);border:1px solid rgba(232,96,96,.25);border-radius:7px;padding:5px 11px;font-size:13px;cursor:pointer">🗑</button>
       </div>
     </div>
   </div>`;
@@ -909,7 +933,11 @@ function openView(id) {
 
   if(imgs.length) html+=`<div class="view-sec"><div class="view-lbl">Фото (${imgs.length})</div><div style="display:flex;flex-wrap:wrap;gap:7px">${imgs.map((a,i)=>`<img src="${a.data}" style="width:95px;height:95px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid rgba(255,255,255,.1)" onclick="App.viewImg('${id}',${i})">`).join('')}</div></div>`;
 
-  if(files.length) html+=`<div class="view-sec"><div class="view-lbl">Файлы</div><div style="display:flex;flex-wrap:wrap">${files.map(f=>f.type?.includes('pdf')?`<a href="${f.data}" target="_blank" class="file-action">📄${esc(f.name)}</a>`:`<a href="${f.data}" download="${esc(f.name)}" class="file-action">📎${esc(f.name)} ⬇</a>`).join('')}</div></div>`;
+  if(files.length) html+=`<div class="view-sec"><div class="view-lbl">Файлы</div><div style="display:flex;flex-wrap:wrap;gap:7px">${files.map(f=>{
+    if(f.type?.startsWith('audio/')) return`<div style="width:100%"><div style="font-size:12px;color:var(--t3);margin-bottom:4px">🎙 ${esc(f.name)}</div><audio controls src="${f.data}" style="width:100%;height:36px"></audio></div>`;
+    if(f.type?.includes('pdf')) return`<a href="${f.data}" target="_blank" class="file-action">📄${esc(f.name)}</a>`;
+    return`<a href="${f.data}" download="${esc(f.name)}" class="file-action">📎${esc(f.name)} ⬇</a>`;
+  }).join('')}</div></div>`;
 
   if(related.length) {
     const chips=related.map(rid=>{const rc=cards.find(x=>x.id===rid);if(!rc)return'';const rc_col=catColor(rc.category);return`<div onclick="closeView();setTimeout(()=>openView('${rid}'),200)" style="cursor:pointer;padding:4px 11px;border-radius:18px;font-size:13px;background:${hex2rgba(rc_col,.15)};border:1px solid ${hex2rgba(rc_col,.35)};color:${rc_col}">🔗${esc(rc.title)}</div>`;}).join('');
@@ -988,7 +1016,63 @@ function getState() {
 
 function isDirty() { return originalState!==null && getState()!==originalState; }
 
-window.addEventListener('beforeunload',e=>{ if(isDirty()){e.preventDefault();e.returnValue='';} });
+// ═══════════════════════════════════════════
+//  VOICE RECORDING
+// ═══════════════════════════════════════════
+let mediaRecorder=null, audioChunks=[], isRecording=false;
+
+async function toggleVoice() {
+  if(isRecording) {
+    stopVoice();
+  } else {
+    try {
+      const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      audioChunks=[];
+      mediaRecorder=new MediaRecorder(stream);
+      mediaRecorder.ondataavailable=e=>audioChunks.push(e.data);
+      mediaRecorder.onstop=()=>{
+        const blob=new Blob(audioChunks,{type:'audio/webm'});
+        const r=new FileReader();
+        r.onload=ev=>{
+          tempAtt.push({id:uid(),name:`Голосовое_${nowStr().replace(/[,:]/g,'-')}.webm`,type:'audio/webm',data:ev.target.result});
+          renderAttPrev();
+        };
+        r.readAsDataURL(blob);
+        stream.getTracks().forEach(t=>t.stop());
+      };
+      mediaRecorder.start();
+      isRecording=true;
+      const btn=document.getElementById('voice-btn');
+      btn.classList.add('recording');
+      btn.innerHTML='⏹ Стоп';
+    } catch(e) { toast('Нет доступа к микрофону',true); }
+  }
+}
+
+function stopVoice() {
+  if(mediaRecorder&&mediaRecorder.state!=='inactive') mediaRecorder.stop();
+  isRecording=false;
+  const btn=document.getElementById('voice-btn');
+  btn.classList.remove('recording');
+  btn.innerHTML='🎙';
+}
+
+// ═══════════════════════════════════════════
+//  EXIT WARNING (system language)
+// ═══════════════════════════════════════════
+const EXIT_MSGS = {
+  ru:'Вы действительно хотите выйти?',
+  he:'האם אתה בטוח שברצונך לצאת?',
+  en:'Are you sure you want to exit?',
+  ar:'هل أنت متأكد أنك تريد الخروج؟',
+};
+function getExitMsg() {
+  const lang=(navigator.language||'en').slice(0,2);
+  return EXIT_MSGS[lang]||EXIT_MSGS.en;
+}
+window.addEventListener('beforeunload',e=>{
+  if(isDirty()){e.preventDefault();e.returnValue=getExitMsg();}
+});
 
 function tryClose() {
   if(isDirty()&&!confirm('Есть несохранённые изменения. Выйти?'))return;
@@ -1063,26 +1147,42 @@ function handleFiles(inp) {
     const r=new FileReader(); r.onload=ev=>{tempAtt.push({id:uid(),name:f.name,type:f.type,data:ev.target.result});renderAttPrev();}; r.readAsDataURL(f);
   }); inp.value='';
 }
+async function deleteCardById(id) {
+  cards=cards.filter(c=>c.id!==id);
+  render(); toast('Карточка удалена');
+  await dbDelete(id);
+}
+
 function renderAttPrev() {
-  document.getElementById('att-prev').innerHTML=tempAtt.map(a=>
-    a.type?.startsWith('image/')?`<div class="att-img"><img src="${a.data}"><button class="att-del" onclick="rmAtt('${a.id}')">✕</button></div>`
-    :`<div class="att-file">📎${esc(a.name.length>20?a.name.slice(0,18)+'…':a.name)}<button onclick="rmAtt('${a.id}')" style="background:none;border:none;cursor:pointer;color:var(--t3);margin-left:4px">✕</button></div>`
-  ).join('');
+  document.getElementById('att-prev').innerHTML=tempAtt.map(a=>{
+    if(a.type?.startsWith('image/'))
+      return`<div class="att-img"><img src="${a.data}"><button class="att-del" onclick="rmAtt('${a.id}')">✕</button></div>`;
+    if(a.type?.startsWith('audio/'))
+      return`<div class="att-file"><span class="audio-chip">🎙 ${esc(a.name)}</span><button onclick="rmAtt('${a.id}')" style="background:none;border:none;cursor:pointer;color:var(--t3);margin-left:4px">✕</button></div>`;
+    return`<div class="att-file">📎${esc(a.name.length>20?a.name.slice(0,18)+'…':a.name)}<button onclick="rmAtt('${a.id}')" style="background:none;border:none;cursor:pointer;color:var(--t3);margin-left:4px">✕</button></div>`;
+  }).join('');
 }
 function rmAtt(id) { tempAtt=tempAtt.filter(a=>a.id!==id); renderAttPrev(); }
 
 // Entries
 function renderEntriesEdit() {
   const el=document.getElementById('e-entries');
-  if(!tempEntries.length){el.innerHTML='<div style="padding:8px 0;font-size:13px;color:var(--t3)">Нет записей — нажми «+ Добавить запись»</div>';return;}
+  if(!tempEntries.length){el.innerHTML='<div style="padding:8px 0;font-size:13px;color:var(--t3)">Нет записей</div>';return;}
   el.innerHTML=tempEntries.map(e=>`<div class="entry-row">
     <div class="entry-cb${e.done?' on':''}" onclick="toggleEditEntry('${e.id}')">${e.done?checkSVG():''}</div>
     <div style="flex:1">
-      <input class="entry-text-inp" value="${esc(e.text)}" oninput="updateEntry('${e.id}',this.value)" placeholder="Текст записи...">
+      <textarea class="entry-textarea" oninput="autoResize(this);updateEntry('${e.id}',this.value)" placeholder="Текст записи...">${esc(e.text)}</textarea>
       <div class="entry-date">${e.date}</div>
     </div>
     <button class="entry-del" onclick="rmEntry('${e.id}')">✕</button>
   </div>`).join('');
+  // Auto-resize all textareas
+  el.querySelectorAll('.entry-textarea').forEach(t=>autoResize(t));
+}
+
+function autoResize(el) {
+  el.style.height='auto';
+  el.style.height=el.scrollHeight+'px';
 }
 function addEntry() { tempEntries.push({id:uid(),text:'',date:nowStr(),done:false}); renderEntriesEdit(); setTimeout(()=>{const ins=document.querySelectorAll('#e-entries .entry-text-inp');if(ins.length)ins[ins.length-1].focus();},50); }
 function toggleEditEntry(id) { const e=tempEntries.find(x=>x.id===id);if(e){e.done=!e.done;renderEntriesEdit();} }
