@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════
 //  INDEXEDDB — LOCAL STORAGE
 // ═══════════════════════════════════════════
-const DB_NAME = 'mycards-db', DB_VER = 1;
+const DB_NAME = 'mycards-db', DB_VER = 2;
 let db = null;
 
 function openDB() {
@@ -132,7 +132,7 @@ async function loadData() {
 }
 
 async function syncFromServer() {
-  if (!navigator.onLine) { setSyncDot('err'); return; }
+  if (!navigator.onLine) { setSyncDot('err'); render(); return; }
   try {
     const [cr,kr] = await Promise.all([
       sb.from('cards').select('*').order('created_at',{ascending:false}),
@@ -140,7 +140,6 @@ async function syncFromServer() {
     ]);
     if(cr.error) throw cr.error;
     if(kr.error) throw kr.error;
-    // Update local
     await local.clear('cards');
     await local.clear('categories');
     if(cr.data?.length) await local.putAll('cards', cr.data);
@@ -148,7 +147,13 @@ async function syncFromServer() {
     cards = cr.data||[];
     cats = kr.data?.length ? kr.data : [{name:'Работа',color:'#e8c56a'},{name:'Личное',color:'#5b9ee8'},{name:'Проекты',color:'#5bb87a'}];
     setSyncDot('ok'); render();
-  } catch(e) { setSyncDot('err'); }
+  } catch(e) {
+    console.log('Server sync error:', e.message);
+    setSyncDot('err');
+    // Still render what we have (even if empty)
+    if (!cats.length) cats = [{name:'Работа',color:'#e8c56a'},{name:'Личное',color:'#5b9ee8'},{name:'Проекты',color:'#5bb87a'}];
+    render();
+  }
 }
 
 async function dbInsert(card) {
