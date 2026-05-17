@@ -31,6 +31,7 @@ function switchToChecklist() {
 history.pushState({app:true}, '');
 window.addEventListener('popstate', e => {
   // Close whichever modal is open, in priority order
+  if(document.getElementById('ae-ov').classList.contains('on')) { closeAddEntry(); history.pushState({app:true},''); return; }
   if(document.getElementById('view-ov').classList.contains('on')) { closeView(); history.pushState({app:true},''); return; }
   if(document.getElementById('edit-ov').classList.contains('on')) { tryClose(); history.pushState({app:true},''); return; }
   if(document.getElementById('arch-ov').classList.contains('on')) { closeArchive(); history.pushState({app:true},''); return; }

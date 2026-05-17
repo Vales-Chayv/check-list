@@ -25,8 +25,9 @@ function openView(id) {
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
         <button onclick="closeView()" style="background:var(--s2);border:none;color:var(--t2);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px">✕</button>
-        <button onclick="closeView();setTimeout(()=>openEdit('${id}'),200)" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:7px;padding:5px 11px;font-size:13px;font-weight:700;cursor:pointer">✏️ Изменить</button>
-        <button onclick="if(confirm(getExitMsg().replace('выйти','удалить карточку').replace('לצאת','למחוק כרטיס').replace('exit','delete'))){closeView();deleteCardById('${id}')}" style="background:rgba(232,96,96,.15);color:var(--red);border:1px solid rgba(232,96,96,.25);border-radius:7px;padding:5px 11px;font-size:13px;cursor:pointer">🗑</button>
+        <button onclick="closeView();setTimeout(()=>openAddEntry('${id}'),200)" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:7px;padding:7px 16px;font-size:20px;font-weight:700;cursor:pointer">＋</button>
+        <button onclick="closeView();setTimeout(()=>openEdit('${id}'),200)" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:7px;padding:5px 11px;font-size:14px;cursor:pointer" title="Настройки карточки">⚙️</button>
+        <button onclick="if(confirm('Удалить карточку?')){closeView();deleteCardById('${id}')}" style="background:rgba(232,96,96,.15);color:var(--red);border:1px solid rgba(232,96,96,.25);border-radius:7px;padding:5px 11px;font-size:13px;cursor:pointer">🗑</button>
       </div>
     </div>
   </div>`;
@@ -75,3 +76,86 @@ async function viewToggleEntry(cardId, entryId) {
   try{await dbUpdate(card);}catch(err){toast('Ошибка синхронизации',true);}
 }
 
+
+// ─── QUICK ADD ENTRY ───────────────────────
+let aeCardId = null, aeAtts = [], aeIsVoice = false, aeVoiceRec = null;
+
+function openAddEntry(cardId) {
+  aeCardId = cardId;
+  aeAtts = [];
+  const card = cards.find(c => c.id === cardId);
+  const title = card ? (card.title.length > 22 ? card.title.slice(0,20)+'…' : card.title) : '';
+  document.getElementById('ae-card-title').textContent = '＋ Запись' + (title ? ' в «'+title+'»' : '');
+  document.getElementById('ae-text').value = '';
+  document.getElementById('ae-att-prev').innerHTML = '';
+  document.getElementById('ae-ov').classList.add('on');
+  setTimeout(() => { const ta = document.getElementById('ae-text'); ta.style.height='100px'; ta.focus(); }, 300);
+}
+
+function closeAddEntry() {
+  document.getElementById('ae-ov').classList.remove('on');
+  if (aeIsVoice) stopAEVoice();
+}
+
+function handleAEFiles(inp) {
+  Array.from(inp.files).forEach(f => {
+    if (f.size > 5*1024*1024) { alert(f.name+': макс 5МБ'); return; }
+    const r = new FileReader();
+    r.onload = ev => { aeAtts.push({id:uid(), name:f.name, type:f.type, data:ev.target.result}); renderAEPrev(); };
+    r.readAsDataURL(f);
+  });
+  inp.value = '';
+}
+
+function renderAEPrev() {
+  document.getElementById('ae-att-prev').innerHTML = aeAtts.map(a => {
+    if (a.type?.startsWith('image/')) return `<div class="att-img"><img src="${a.data}" style="width:68px;height:68px;object-fit:cover;border-radius:7px"><button class="att-del" onclick="aeAtts=aeAtts.filter(x=>x.id!=='${a.id}');renderAEPrev()">✕</button></div>`;
+    if (a.type?.startsWith('audio/')) return `<div class="att-file"><span style="color:var(--green)">🎙 ${esc(a.name)}</span></div>`;
+    return `<div class="att-file">📎${esc(a.name.length>18?a.name.slice(0,16)+'…':a.name)}</div>`;
+  }).join('');
+}
+
+function toggleAEVoice() {
+  if (aeIsVoice) { stopAEVoice(); return; }
+  navigator.mediaDevices.getUserMedia({audio:true}).then(stream => {
+    const chunks = [];
+    aeVoiceRec = new MediaRecorder(stream);
+    aeVoiceRec.ondataavailable = e => chunks.push(e.data);
+    aeVoiceRec.onstop = () => {
+      const blob = new Blob(chunks, {type:'audio/webm'});
+      const r = new FileReader();
+      r.onload = ev => { aeAtts.push({id:uid(), name:'Голос.webm', type:'audio/webm', data:ev.target.result}); renderAEPrev(); };
+      r.readAsDataURL(blob);
+      stream.getTracks().forEach(t => t.stop());
+    };
+    aeVoiceRec.start(); aeIsVoice = true;
+    const btn = document.getElementById('ae-voice-btn');
+    btn.classList.add('recording'); btn.innerHTML = '⏹';
+  }).catch(() => toast('Нет доступа к микрофону', true));
+}
+
+function stopAEVoice() {
+  if (aeVoiceRec && aeVoiceRec.state !== 'inactive') aeVoiceRec.stop();
+  aeIsVoice = false;
+  const btn = document.getElementById('ae-voice-btn');
+  btn.classList.remove('recording'); btn.innerHTML = '🎙';
+}
+
+async function saveAddEntry() {
+  const text = document.getElementById('ae-text').value.trim();
+  if (!text && !aeAtts.length) { toast('Введи текст или прикрепи файл', true); return; }
+  const card = cards.find(c => c.id === aeCardId); if (!card) return;
+  const entry = {id:uid(), text, date:nowStr(), done:false, attachments:[...aeAtts]};
+  card.entries = [entry, ...(card.entries||[])];
+  closeAddEntry();
+  render();
+  toast('✓ Запись добавлена');
+  await dbUpdate(card);
+  setTimeout(() => openView(aeCardId), 300);
+}
+
+async function deleteCardById(id) {
+  cards = cards.filter(c => c.id !== id);
+  render(); toast('Карточка удалена');
+  await dbDelete(id);
+}

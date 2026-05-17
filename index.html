@@ -199,6 +199,30 @@
   <div class="sheet"><div class="sheet-handle"></div><div id="view-content"></div></div>
 </div>
 
+<!-- Quick Add Entry -->
+<div class="overlay" id="ae-ov" onclick="if(event.target===this)closeAddEntry()">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title" id="ae-card-title">＋ Запись</span>
+      <button class="close-btn" onclick="closeAddEntry()">✕</button>
+    </div>
+    <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
+      <textarea id="ae-text" placeholder="Текст записи..." dir="auto" oninput="autoResize(this)"
+        style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:11px 12px;font-size:16px;color:var(--t1);font-family:inherit;resize:none;min-height:100px;line-height:1.6;width:100%"></textarea>
+      <input type="file" id="ae-cam" multiple accept="image/*,video/*,.pdf,.doc,.docx" style="display:none" onchange="handleAEFiles(this)">
+      <input type="file" id="ae-file" multiple accept="*/*" style="display:none" onchange="handleAEFiles(this)">
+      <div id="ae-att-prev" class="att-prev"></div>
+      <div style="display:flex;gap:7px">
+        <button onclick="document.getElementById('ae-cam').click()" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px;font-size:13px;color:var(--t2);cursor:pointer">📷 Фото</button>
+        <button onclick="document.getElementById('ae-file').click()" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px;font-size:13px;color:var(--t2);cursor:pointer">📎 Файл</button>
+        <button id="ae-voice-btn" onclick="toggleAEVoice()" class="voice-btn">🎙</button>
+      </div>
+      <button onclick="saveAddEntry()" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:14px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit">Сохранить запись</button>
+    </div>
+  </div>
+</div>
+
 <!-- Archive modal -->
 <div class="overlay" id="arch-ov" onclick="if(event.target===this)closeArchive()">
   <div class="sheet">
