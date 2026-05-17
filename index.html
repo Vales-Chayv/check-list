@@ -219,6 +219,44 @@
         <button id="ae-voice-btn" onclick="toggleAEVoice()" class="voice-btn">🎙</button>
       </div>
       <button onclick="saveAddEntry()" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:14px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit">Сохранить запись</button>
+      <!-- Expandable card settings -->
+      <div>
+        <button onclick="toggleAEExtra(this)" style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;padding:0;font-family:inherit;display:flex;align-items:center;gap:5px;width:100%">
+          <span id="ae-extra-arrow">▼</span> Рубрика, статус, приоритет и другие настройки
+        </button>
+        <div id="ae-extra" style="display:none;flex-direction:column;gap:11px;margin-top:10px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px">
+            <div class="fld"><label>Рубрика</label><select id="ae-cat"></select></div>
+            <div class="fld"><label>Статус</label>
+              <select id="ae-status">
+                <option value="new">Новая</option>
+                <option value="in_progress">В процессе</option>
+                <option value="waiting">Ожидание</option>
+                <option value="done">Готово</option>
+              </select>
+            </div>
+            <div class="fld"><label>Приоритет</label>
+              <select id="ae-priority">
+                <option value="normal">Обычный</option>
+                <option value="high">⚡ Важное</option>
+                <option value="urgent">🔥 Срочное</option>
+              </select>
+            </div>
+          </div>
+          <div class="fld">
+            <label>Срок выполнения</label>
+            <input id="ae-deadline" type="date">
+          </div>
+          <div class="fld">
+            <label>На чьей стороне мяч</label>
+            <div class="seg" id="ae-seg-ball">
+              <button class="seg-btn on" data-ball="">—</button>
+              <button class="seg-btn" data-ball="mine">⚽ У меня</button>
+              <button class="seg-btn" data-ball="theirs">⚽ У них</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>

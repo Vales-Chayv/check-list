@@ -25,9 +25,8 @@ function openView(id) {
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
         <button onclick="closeView()" style="background:var(--s2);border:none;color:var(--t2);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px">✕</button>
-        <button onclick="closeView();setTimeout(()=>openAddEntry('${id}'),200)" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:7px;padding:7px 16px;font-size:20px;font-weight:700;cursor:pointer">＋</button>
-        <button onclick="closeView();setTimeout(()=>openEdit('${id}'),200)" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:7px;padding:5px 11px;font-size:14px;cursor:pointer" title="Настройки карточки">⚙️</button>
-        <button onclick="if(confirm('Удалить карточку?')){closeView();deleteCardById('${id}')}" style="background:rgba(232,96,96,.15);color:var(--red);border:1px solid rgba(232,96,96,.25);border-radius:7px;padding:5px 11px;font-size:13px;cursor:pointer">🗑</button>
+        <button onclick="closeView();setTimeout(()=>openAddEntry('${id}'),200)" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:8px;padding:9px 16px;font-size:15px;font-weight:700;cursor:pointer">＋ Запись</button>
+        <button onclick="if(confirm('Удалить карточку?')){closeView();deleteCardById('${id}')}" style="background:rgba(232,96,96,.15);color:var(--red);border:1px solid rgba(232,96,96,.25);border-radius:8px;padding:9px 16px;font-size:15px;cursor:pointer">🗑 Удалить</button>
       </div>
     </div>
   </div>`;
@@ -36,11 +35,24 @@ function openView(id) {
 
   if(entries.length) {
     const dc=entries.filter(e=>e.done).length;
-    html+=`<div class="view-sec"><div class="view-lbl">Записи (${dc}/${entries.length})</div>${entries.map(e=>`
-      <div class="entry-row">
+    html+=`<div class="view-sec"><div class="view-lbl">Записи (${dc}/${entries.length})</div>${entries.map(e=>{
+      const eAtts = e.attachments||[];
+      const eImgs = eAtts.filter(a=>a.type?.startsWith('image/'));
+      const eAudios = eAtts.filter(a=>a.type?.startsWith('audio/'));
+      const eFiles = eAtts.filter(a=>!a.type?.startsWith('image/')&&!a.type?.startsWith('audio/'));
+      let attHTML = '';
+      if(eImgs.length) attHTML += `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">${eImgs.map((a,i)=>`<img src="${a.data}" style="width:80px;height:80px;object-fit:cover;border-radius:7px;cursor:pointer" onclick="App.viewImg('${id}',${i})">`).join('')}</div>`;
+      if(eAudios.length) attHTML += eAudios.map(a=>`<audio controls src="${a.data}" style="width:100%;height:32px;margin-top:5px"></audio>`).join('');
+      if(eFiles.length) attHTML += `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${eFiles.map(f=>`<a href="${f.data}" download="${esc(f.name)}" class="file-action">📎${esc(f.name)}</a>`).join('')}</div>`;
+      return `<div class="entry-row">
         <div class="entry-cb${e.done?' on':''}" onclick="viewToggleEntry('${id}','${e.id}')">${e.done?checkSVG():''}</div>
-        <div style="flex:1"><div style="font-size:14px${e.done?';text-decoration:line-through;opacity:.45':''}">${esc(e.text)}</div><div class="entry-date">${e.date}</div></div>
-      </div>`).join('')}</div>`;
+        <div style="flex:1">
+          <div style="font-size:14px${e.done?';text-decoration:line-through;opacity:.45':''}" dir="auto">${esc(e.text)}</div>
+          <div class="entry-date">${e.date}</div>
+          ${attHTML}
+        </div>
+      </div>`;
+    }).join('')}</div>`;
   }
 
   if(imgs.length) html+=`<div class="view-sec"><div class="view-lbl">Фото (${imgs.length})</div><div style="display:flex;flex-wrap:wrap;gap:7px">${imgs.map((a,i)=>`<img src="${a.data}" style="width:95px;height:95px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid rgba(255,255,255,.1)" onclick="App.viewImg('${id}',${i})">`).join('')}</div></div>`;
@@ -88,8 +100,32 @@ function openAddEntry(cardId) {
   document.getElementById('ae-card-title').textContent = '＋ Запись' + (title ? ' в «'+title+'»' : '');
   document.getElementById('ae-text').value = '';
   document.getElementById('ae-att-prev').innerHTML = '';
+
+  // Populate extra fields with current card values
+  if(card) {
+    const catSel = document.getElementById('ae-cat');
+    catSel.innerHTML = cats.map(c=>`<option value="${esc(c.name)}"${c.name===card.category?' selected':''}>${esc(c.name)}</option>`).join('');
+    document.getElementById('ae-status').value = card.status||'new';
+    document.getElementById('ae-priority').value = card.priority||'normal';
+    document.getElementById('ae-deadline').value = card.deadline||'';
+    // Ball
+    document.querySelectorAll('#ae-seg-ball .seg-btn').forEach(b=>b.classList.toggle('on', b.dataset.ball===(card.ball||'')));
+  }
+
+  // Hide extra section
+  document.getElementById('ae-extra').style.display = 'none';
+  document.getElementById('ae-extra-arrow').textContent = '▼';
+
   document.getElementById('ae-ov').classList.add('on');
   setTimeout(() => { const ta = document.getElementById('ae-text'); ta.style.height='100px'; ta.focus(); }, 300);
+}
+
+function toggleAEExtra(btn) {
+  const el = document.getElementById('ae-extra');
+  const arrow = document.getElementById('ae-extra-arrow');
+  const isOpen = el.style.display !== 'none';
+  el.style.display = isOpen ? 'none' : 'flex';
+  arrow.textContent = isOpen ? '▼' : '▲';
 }
 
 function closeAddEntry() {
@@ -145,8 +181,24 @@ async function saveAddEntry() {
   const text = document.getElementById('ae-text').value.trim();
   if (!text && !aeAtts.length) { toast('Введи текст или прикрепи файл', true); return; }
   const card = cards.find(c => c.id === aeCardId); if (!card) return;
+
+  // Save entry
   const entry = {id:uid(), text, date:nowStr(), done:false, attachments:[...aeAtts]};
   card.entries = [entry, ...(card.entries||[])];
+
+  // Save extra settings if expanded
+  if(document.getElementById('ae-extra').style.display !== 'none') {
+    card.category = document.getElementById('ae-cat').value;
+    card.status = document.getElementById('ae-status').value;
+    card.priority = document.getElementById('ae-priority').value;
+    card.deadline = document.getElementById('ae-deadline').value || null;
+    const ballBtn = document.querySelector('#ae-seg-ball .seg-btn.on');
+    if(ballBtn) card.ball = ballBtn.dataset.ball;
+  }
+
+  // Auto-done if all entries checked
+  if((card.entries||[]).length && (card.entries||[]).every(e=>e.done)) card.status='done';
+
   closeAddEntry();
   render();
   toast('✓ Запись добавлена');
@@ -159,3 +211,10 @@ async function deleteCardById(id) {
   render(); toast('Карточка удалена');
   await dbDelete(id);
 }
+
+// Ball segment in ae panel
+document.getElementById('ae-seg-ball').addEventListener('click', e => {
+  const btn = e.target.closest('.seg-btn'); if(!btn) return;
+  document.querySelectorAll('#ae-seg-ball .seg-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+});
