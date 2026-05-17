@@ -6,50 +6,32 @@ self.addEventListener('install', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil(
-    Promise.all([
-      clients.claim(),
-      caches.keys().then(keys =>
-        Promise.all(keys.map(k => caches.delete(k)))
-      )
-    ])
+    caches.keys().then(keys =>
+      Promise.all(keys.map(k => caches.delete(k)))
+    ).then(() => clients.claim())
   );
 });
 
-// Always fetch fresh — no caching of HTML
+// Всегда загружать свежее с сервера
 self.addEventListener('fetch', e => {
   e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
 });
 
 self.addEventListener('push', e => {
-  let data = { title: '🔔 Напоминание', body: 'Есть карточки на сегодня' };
-  try { if (e.data) data = e.data.json(); } catch {}
-  e.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: 'https://vales-chayv.github.io/check-list/icon-192.png',
-      badge: 'https://vales-chayv.github.io/check-list/icon-192.png',
-      vibrate: [200, 100, 200],
-      tag: 'reminders',
-      renotify: true,
-      data: { url: 'https://vales-chayv.github.io/check-list/' }
-    })
-  );
+  let data = {title:'🔔 Напоминания', body:'Есть карточки на сегодня'};
+  try { if(e.data) data = e.data.json(); } catch{}
+  e.waitUntil(self.registration.showNotification(data.title, {
+    body: data.body,
+    icon: 'https://vales-chayv.github.io/check-list/icon-192.png',
+    tag: 'reminders', renotify: true,
+    data: {url: 'https://vales-chayv.github.io/check-list/'}
+  }));
 });
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  e.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-      // If app already open — focus and switch to checklist
-      for (const c of list) {
-        if (c.url.includes('check-list') && 'focus' in c) {
-          c.focus();
-          c.postMessage({ type: 'OPEN_CHECKLIST' });
-          return;
-        }
-      }
-      // Otherwise open app on checklist
-      return clients.openWindow('https://vales-chayv.github.io/check-list/?view=checklist');
-    })
-  );
+  e.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(list => {
+    for(const c of list) if(c.url.includes('check-list') && 'focus' in c) return c.focus();
+    return clients.openWindow('https://vales-chayv.github.io/check-list/?view=checklist');
+  }));
 });
