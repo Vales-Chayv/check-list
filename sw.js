@@ -1,4 +1,4 @@
-const CACHE = 'mc-v5';
+const CACHE = 'mc-v6';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
