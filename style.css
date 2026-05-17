@@ -138,13 +138,11 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .spinner{width:26px;height:26px;border:2px solid var(--b2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 /* Image viewer */
-.img-viewer{position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:500;display:flex;align-items:center;justify-content:center;cursor:pointer}
-.img-viewer img{max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px;touch-action:pinch-zoom}
+/* Image viewer with pinch zoom */
+.img-viewer{position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:500;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:none;cursor:pointer}
+.img-viewer img{max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px;transform-origin:center;transition:transform 0.1s}
 .voice-btn{background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px 14px;font-size:20px;color:var(--t2);cursor:pointer;display:flex;align-items:center;justify-content:center;min-width:52px}
 .voice-btn.recording{background:rgba(232,96,96,.15);border-color:var(--red);color:var(--red);animation:pulse 1s infinite}
-/* Image viewer with pinch zoom */
-.img-viewer{position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:500;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:none}
-.img-viewer img{max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px;transform-origin:center;transition:transform 0.1s}
 /* RTL support */
 [dir="rtl"] {text-align:right}
 .audio-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(91,184,122,.1);border:1px solid rgba(91,184,122,.2);border-radius:var(--rsm);padding:5px 10px;font-size:12px;color:var(--green)}

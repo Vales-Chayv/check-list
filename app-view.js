@@ -41,7 +41,7 @@ function openView(id) {
       const eAudios = eAtts.filter(a=>a.type?.startsWith('audio/'));
       const eFiles = eAtts.filter(a=>!a.type?.startsWith('image/')&&!a.type?.startsWith('audio/'));
       let attHTML = '';
-      if(eImgs.length) attHTML += `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">${eImgs.map((a,i)=>`<img src="${a.data}" style="width:80px;height:80px;object-fit:cover;border-radius:7px;cursor:pointer" onclick="App.viewImg('${id}',${i})">`).join('')}</div>`;
+      if(eImgs.length) attHTML += `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">${eImgs.map(a=>`<img src="${a.data}" style="width:80px;height:80px;object-fit:cover;border-radius:7px;cursor:pointer" onclick="openImgDirect('${a.data}')">`).join('')}</div>`;
       if(eAudios.length) attHTML += eAudios.map(a=>`<audio controls src="${a.data}" style="width:100%;height:32px;margin-top:5px"></audio>`).join('');
       if(eFiles.length) attHTML += `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${eFiles.map(f=>`<a href="${f.data}" download="${esc(f.name)}" class="file-action">📎${esc(f.name)}</a>`).join('')}</div>`;
       return `<div class="entry-row">
@@ -75,6 +75,14 @@ function openView(id) {
 }
 
 function closeView() { document.getElementById('view-ov').classList.remove('on'); }
+
+function openImgDirect(src) {
+  imgScale = 1;
+  const img = document.getElementById('viewer-img');
+  img.src = src;
+  img.style.transform = 'scale(1)';
+  document.getElementById('img-viewer').style.display = 'flex';
+}
 
 async function viewToggleEntry(cardId, entryId) {
   const card=cards.find(c=>c.id===cardId); if(!card)return;
