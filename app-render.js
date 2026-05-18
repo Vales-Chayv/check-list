@@ -48,6 +48,7 @@ function renderCards() {
   const grouped={};
   normal.forEach(c=>{const d=(c.created_at||today()).slice(0,10);(grouped[d]=grouped[d]||[]).push(c);});
   const dates=Object.keys(grouped).sort((a,b)=>b.localeCompare(a));
+  if(priority.length && normal.length) html+=`<div style="height:1px;background:var(--b1);margin:4px 0 8px"></div>`;
   html+=dates.map(d=>grouped[d].map(c=>cardHTML(c)).join('')).join('');
 
   el.innerHTML=html;
