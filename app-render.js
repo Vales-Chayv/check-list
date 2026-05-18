@@ -48,7 +48,7 @@ function renderCards() {
   const grouped={};
   normal.forEach(c=>{const d=(c.created_at||today()).slice(0,10);(grouped[d]=grouped[d]||[]).push(c);});
   const dates=Object.keys(grouped).sort((a,b)=>b.localeCompare(a));
-  html+=dates.map(d=>`<div class="date-lbl">${fmtDate(d)}</div>${grouped[d].map(c=>cardHTML(c)).join('')}`).join('');
+  html+=dates.map(d=>grouped[d].map(c=>cardHTML(c)).join('')).join('');
 
   el.innerHTML=html;
 }
@@ -87,7 +87,7 @@ function renderDone() {
   const grouped={};
   done.forEach(c=>{const d=(c.created_at||today()).slice(0,10);(grouped[d]=grouped[d]||[]).push(c);});
   const dates=Object.keys(grouped).sort((a,b)=>b.localeCompare(a));
-  el.innerHTML=dates.map(d=>`<div class="date-lbl">${fmtDate(d)}</div>${grouped[d].map(c=>cardHTML(c,true)).join('')}`).join('');
+  el.innerHTML=dates.map(d=>grouped[d].map(c=>cardHTML(c,true)).join('')).join('');
 }
 
 function emptyHTML(h,p) {

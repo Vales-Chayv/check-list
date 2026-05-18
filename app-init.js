@@ -56,6 +56,14 @@ function doLogin(){
 }
 function unlock(){const l=document.getElementById('lock');l.style.transition='opacity .25s';l.style.opacity='0';setTimeout(()=>{l.style.display='none';loadData().then(()=>checkURLParams());},250);}
 (function(){
-  if(localStorage.getItem(PWD)){document.getElementById('lock-sub').textContent='Введи пароль для входа';document.getElementById('lock-note').textContent='';}
+  const hasPwd = localStorage.getItem(PWD);
+  if(!hasPwd) {
+    // No password — skip lock screen
+    document.getElementById('lock').style.display='none';
+    loadData().then(()=>checkURLParams());
+    return;
+  }
+  document.getElementById('lock-sub').textContent='Введи пароль для входа';
+  document.getElementById('lock-note').textContent='';
   setTimeout(()=>document.getElementById('lock-inp').focus(),200);
 })();

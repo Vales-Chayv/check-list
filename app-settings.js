@@ -11,6 +11,7 @@ async function openSettings() {
     }
   }catch{}
   checkPushStatus();
+  updatePwdUI();
   document.getElementById('set-ov').classList.add('on');
 }
 function closeSettings() { document.getElementById('set-ov').classList.remove('on'); }
@@ -31,7 +32,22 @@ async function saveSettings() {
 function changePwd() {
   const v=document.getElementById('set-pwd').value.trim(); if(!v)return;
   localStorage.setItem('mc_pwd',v); document.getElementById('set-pwd').value='';
-  toast('✓ Пароль изменён');
+  updatePwdUI();
+  toast('✓ Пароль сохранён');
+}
+
+function removePwd() {
+  if(!confirm('Убрать пароль? Приложение будет открываться без пароля.')) return;
+  localStorage.removeItem('mc_pwd');
+  updatePwdUI();
+  toast('✓ Пароль убран');
+}
+
+function updatePwdUI() {
+  const hasPwd = !!localStorage.getItem('mc_pwd');
+  document.getElementById('pwd-label').textContent = hasPwd ? 'Сменить пароль' : 'Добавить пароль';
+  const removeBtn = document.getElementById('pwd-remove-btn');
+  if(removeBtn) removeBtn.style.display = hasPwd ? 'block' : 'none';
 }
 
 // ═══════════════════════════════════════════
