@@ -1,7 +1,16 @@
 // ═══════════════════════════════════════════
 //  RENDER
 // ═══════════════════════════════════════════
-function render() { renderCats(); renderMain(); }
+function render() {
+  // Inject pulse animation once
+  if(!document.getElementById('dl-pulse-style')) {
+    const s = document.createElement('style');
+    s.id = 'dl-pulse-style';
+    s.textContent = '@keyframes dl-pulse{0%,100%{opacity:1}50%{opacity:.35}} .dl-pulse{animation:dl-pulse 1.8s ease-in-out infinite}';
+    document.head.appendChild(s);
+  }
+  renderCats(); renderMain();
+}
 
 function renderCats() {
   const bar = document.getElementById('cats');
@@ -48,7 +57,6 @@ function renderCards() {
   const grouped={};
   normal.forEach(c=>{const d=(c.created_at||today()).slice(0,10);(grouped[d]=grouped[d]||[]).push(c);});
   const dates=Object.keys(grouped).sort((a,b)=>b.localeCompare(a));
-  if(priority.length && normal.length) html+=`<div style="height:1px;background:var(--b1);margin:4px 0 8px"></div>`;
   html+=dates.map(d=>grouped[d].map(c=>cardHTML(c)).join('')).join('');
 
   el.innerHTML=html;
@@ -56,29 +64,48 @@ function renderCards() {
 
 function renderChecklist() {
   const el = document.getElementById('scroll');
+  const PO = {urgent:0, high:1, normal:2};
   const rem = cards.filter(c=>c.reminder?.enabled && c.status!=='done' && (filterCat==='all'||c.category===filterCat));
   if(!rem.length){el.innerHTML=emptyHTML('Чек-лист пуст','Включи напоминание в карточке');return;}
-  const byFreq={daily:[],weekly:[],custom:[]};
-  rem.forEach(c=>{ byFreq[c.reminder?.freq||'daily'].push(c); });
-  const labels={daily:'Каждый день',weekly:'Каждую неделю',custom:'По расписанию'};
-  el.innerHTML=['daily','weekly','custom'].filter(k=>byFreq[k].length).map(k=>`
-    <div class="cl-group"><div class="cl-lbl">${labels[k]}</div>
-    ${byFreq[k].map(card=>{
-      const col=catColor(card.category);
-      const bg=hex2rgba(col,.12), border=hex2rgba(col,.3);
-      const done=card.status==='done';
-      const pBorder=card.priority==='urgent'?';border-left:4px solid var(--red)':card.priority==='high'?';border-left:4px solid var(--accent)':'';
-      return`<div class="cl-item" style="background:${bg};border-color:${border}${pBorder}" onclick="App.openView('${card.id}')">
-        <div class="cl-cb${done?' on':''}" onclick="event.stopPropagation();App.toggleDone('${card.id}')">
-          ${done?checkSVG():''}
+
+  // Sort: urgent/high first, then by deadline
+  rem.sort((a,b) => {
+    const pa = PO[a.priority||'normal'], pb = PO[b.priority||'normal'];
+    if(pa !== pb) return pa - pb;
+    const da = a.deadline||'9999', db = b.deadline||'9999';
+    return da.localeCompare(db);
+  });
+
+  const priority = rem.filter(c=>c.priority==='urgent'||c.priority==='high');
+  const normal = rem.filter(c=>!c.priority||c.priority==='normal');
+
+  function clItemHTML(card) {
+    const col = catColor(card.category);
+    const bg = hex2rgba(col,.12), border = hex2rgba(col,.3);
+    const done = card.status==='done';
+    const dl = deadlineInfo(card.deadline);
+    const pBorder = card.priority==='urgent'?';border-left:4px solid var(--red)':card.priority==='high'?';border-left:4px solid var(--accent)':'';
+    return `<div class="cl-item" style="background:${bg};border-color:${border}${pBorder}" onclick="App.openView('${card.id}')">
+      <div class="cl-cb${done?' on':''}" onclick="event.stopPropagation();App.toggleDone('${card.id}')">${done?checkSVG():''}</div>
+      <div style="flex:1">
+        <div class="cl-title${done?' done':''}" style="color:${col}">${card.priority==='urgent'?'🔥 ':card.priority==='high'?'⚡ ':''}${esc(card.title)}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:3px">
+          ${card.category?`<span style="font-size:11px;opacity:.6">${esc(card.category)}</span>`:''}
+          ${dl?`<span class="dl-badge ${dl.cls}${dl.days<=3?' dl-pulse':''}" style="font-size:11px">${dl.text}</span>`:''}
         </div>
-        <div style="flex:1">
-          <div class="cl-title${done?' done':''}" style="color:${col}">${card.priority==='urgent'?'🔥 ':card.priority==='high'?'⚡ ':''}${esc(card.title)}</div>
-          ${card.category?`<div style="font-size:12px;opacity:.6;margin-top:2px">${esc(card.category)}</div>`:''}
-        </div>
-        <span class="badge" style="color:${col}">${ST_LABELS[card.status]||''}</span>
-      </div>`;
-    }).join('')}</div>`).join('');
+      </div>
+      <span class="badge" style="color:${col}">${ST_LABELS[card.status]||''}</span>
+    </div>`;
+  }
+
+  let html = '';
+  if(priority.length) {
+    html += `<div class="date-lbl" style="color:var(--red)">🔥 Срочные и важные</div>`;
+    html += priority.map(clItemHTML).join('');
+    if(normal.length) html += `<div style="height:1px;background:var(--b1);margin:4px 0 8px"></div>`;
+  }
+  html += normal.map(clItemHTML).join('');
+  el.innerHTML = html;
 }
 
 function renderDone() {
@@ -124,7 +151,7 @@ function cardHTML(card, isDone=false) {
         ${bodyHTML}${entriesHTML}${imgsHTML}${filesHTML}
         <div class="card-meta">
           ${card.category?`<span class="cat-tag">${esc(card.category)}</span>`:''}
-          ${dl&&!isDone?`<span class="dl-badge ${dl.cls}">${dl.text}</span>`:''}
+          ${dl&&!isDone?`<span class="dl-badge ${dl.cls}${dl.days<=3?' dl-pulse':''}">${dl.text}</span>`:''}
           ${card.ball==='mine'?'<span style="font-size:11px;opacity:.7">⚽ У меня</span>':card.ball==='theirs'?'<span style="font-size:11px;opacity:.7">⚽ У них</span>':''}
           ${lastChg}
         </div>
