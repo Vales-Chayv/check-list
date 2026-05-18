@@ -22,6 +22,11 @@ function openView(id) {
           ${dl?`<span class="dl-badge ${dl.cls}">${dl.text}</span>`:''}
           ${card.ball==='mine'?'<span style="font-size:12px;opacity:.7">⚽ У меня</span>':card.ball==='theirs'?'<span style="font-size:12px;opacity:.7">⚽ У них</span>':''}
         </div>
+        <div style="display:flex;gap:5px;margin-top:8px">
+          <button onclick="toggleBall('${id}','')" style="padding:3px 10px;border-radius:12px;font-size:12px;cursor:pointer;border:1px solid var(--b2);background:${!card.ball?'var(--s2)':'transparent'};color:${!card.ball?'var(--t1)':'var(--t3)'}">—</button>
+          <button onclick="toggleBall('${id}','mine')" style="padding:3px 10px;border-radius:12px;font-size:12px;cursor:pointer;border:1px solid var(--b2);background:${card.ball==='mine'?'var(--s2)':'transparent'};color:${card.ball==='mine'?'var(--t1)':'var(--t3)'}">⚽ У меня</button>
+          <button onclick="toggleBall('${id}','theirs')" style="padding:3px 10px;border-radius:12px;font-size:12px;cursor:pointer;border:1px solid var(--b2);background:${card.ball==='theirs'?'var(--s2)':'transparent'};color:${card.ball==='theirs'?'var(--t1)':'var(--t3)'}">⚽ У них</button>
+        </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
         <button onclick="closeView()" style="background:var(--s2);border:none;color:var(--t2);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px">✕</button>
@@ -35,7 +40,8 @@ function openView(id) {
 
   if(entries.length) {
     const dc=entries.filter(e=>e.done).length;
-    html+=`<div class="view-sec"><div class="view-lbl">Записи (${dc}/${entries.length})</div>${entries.map(e=>{
+    const sorted=[...entries.filter(e=>!e.done), ...entries.filter(e=>e.done)];
+    html+=`<div class="view-sec"><div class="view-lbl">Записи (${dc}/${entries.length})</div>${sorted.map(e=>{
       const eAtts = e.attachments||[];
       const eImgs = eAtts.filter(a=>a.type?.startsWith('image/'));
       const eAudios = eAtts.filter(a=>a.type?.startsWith('audio/'));
@@ -68,13 +74,18 @@ function openView(id) {
     if(chips) html+=`<div class="view-sec"><div class="view-lbl">Связанные</div><div style="display:flex;flex-wrap:wrap;gap:5px">${chips}</div></div>`;
   }
 
-  if(hist.length) html+=`<div class="view-sec"><div class="view-lbl">История</div>${hist.slice().reverse().slice(0,6).map(h=>`<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--b1)"><div style="width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:5px"></div><div><div style="font-size:13px">${esc(h.text)}</div><div style="font-size:11px;color:var(--t3)">${h.date}</div></div></div>`).join('')}</div>`;
-
   document.getElementById('view-content').innerHTML=html;
   document.getElementById('view-ov').classList.add('on');
 }
 
 function closeView() { document.getElementById('view-ov').classList.remove('on'); }
+
+async function toggleBall(cardId, val) {
+  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  card.ball = val;
+  render(); openView(cardId);
+  try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
+}
 
 function openImgDirect(src) {
   imgScale = 1;
