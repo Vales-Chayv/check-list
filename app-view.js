@@ -109,7 +109,7 @@ async function viewToggleEntry(cardId, entryId) {
 
 
 // ─── QUICK ADD ENTRY ───────────────────────
-let aeCardId = null, aeAtts = [], aeIsVoice = false, aeVoiceRec = null;
+let aeCardId = null, aeAtts = [], aeIsVoice = false, aeVoiceRec = null, aeWakeLock = null;
 
 function openAddEntry(cardId) {
   aeCardId = cardId;
@@ -184,6 +184,10 @@ function toggleAEVoice() {
       stream.getTracks().forEach(t => t.stop());
     };
     aeVoiceRec.start(); aeIsVoice = true;
+    // Keep screen awake during recording
+    if('wakeLock' in navigator) {
+      navigator.wakeLock.request('screen').then(wl => { aeWakeLock = wl; }).catch(()=>{});
+    }
     const btn = document.getElementById('ae-voice-btn');
     btn.classList.add('recording'); btn.innerHTML = '⏹';
   }).catch(() => toast('Нет доступа к микрофону', true));
@@ -192,6 +196,7 @@ function toggleAEVoice() {
 function stopAEVoice() {
   if (aeVoiceRec && aeVoiceRec.state !== 'inactive') aeVoiceRec.stop();
   aeIsVoice = false;
+  if (aeWakeLock) { aeWakeLock.release(); aeWakeLock = null; }
   const btn = document.getElementById('ae-voice-btn');
   btn.classList.remove('recording'); btn.innerHTML = '🎙';
 }
