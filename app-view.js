@@ -109,7 +109,7 @@ async function viewToggleEntry(cardId, entryId) {
 
 
 // ─── QUICK ADD ENTRY ───────────────────────
-let aeCardId = null, aeAtts = [], aeIsVoice = false, aeVoiceRec = null, aeWakeLock = null;
+let aeCardId = null, aeAtts = [], aeIsVoice = false, aeVoiceRec = null, aeWakeLock = null, aeStopResolve = null;
 
 function openAddEntry(cardId) {
   aeCardId = cardId;
@@ -179,12 +179,15 @@ function toggleAEVoice() {
     aeVoiceRec.onstop = () => {
       const blob = new Blob(chunks, {type:'audio/webm'});
       const r = new FileReader();
-      r.onload = ev => { aeAtts.push({id:uid(), name:'Голос.webm', type:'audio/webm', data:ev.target.result}); renderAEPrev(); };
+      r.onload = ev => {
+        aeAtts.push({id:uid(), name:'Голос.webm', type:'audio/webm', data:ev.target.result});
+        renderAEPrev();
+        if(aeStopResolve) { aeStopResolve(); aeStopResolve = null; }
+      };
       r.readAsDataURL(blob);
       stream.getTracks().forEach(t => t.stop());
     };
     aeVoiceRec.start(); aeIsVoice = true;
-    // Keep screen awake during recording
     if('wakeLock' in navigator) {
       navigator.wakeLock.request('screen').then(wl => { aeWakeLock = wl; }).catch(()=>{});
     }
@@ -202,6 +205,14 @@ function stopAEVoice() {
 }
 
 async function saveAddEntry() {
+  // If recording — stop and wait for audio to be added to aeAtts
+  if (aeIsVoice) {
+    await new Promise(resolve => {
+      aeStopResolve = resolve;
+      stopAEVoice();
+    });
+  }
+
   const text = document.getElementById('ae-text').value.trim();
   if (!text && !aeAtts.length) { toast('Введи текст или прикрепи файл', true); return; }
   const card = cards.find(c => c.id === aeCardId); if (!card) return;
