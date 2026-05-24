@@ -16,7 +16,12 @@
 <body>
 
 <div class="topbar">
-  <h1>Мои карточки <span class="sdot" id="sdot"></span></h1>
+  <h1>
+    <button onclick="switchSpace()" style="background:none;border:none;color:var(--t1);font-size:19px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;padding:0;font-family:inherit;letter-spacing:-.5px">
+      🗂️ <span id="current-space-name">...</span> <span style="font-size:13px;opacity:.5">▾</span>
+    </button>
+    <span class="sdot" id="sdot"></span>
+  </h1>
   <div style="display:flex;gap:7px;align-items:center">
     <button onclick="openArchive()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:18px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit">📦</button>
     <button onclick="openSettings()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:18px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit">⚙️</button>
@@ -335,6 +340,71 @@
   <img id="viewer-img">
 </div>
 
+<!-- Space Selector -->
+<div id="space-selector" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:998;flex-direction:column;align-items:center;justify-content:center;padding:30px 20px">
+  <div style="width:100%;max-width:400px">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-size:40px;margin-bottom:10px">🗂️</div>
+      <div style="font-size:22px;font-weight:700">Мои карточки</div>
+      <div style="font-size:14px;color:var(--t2);margin-top:5px">Выбери кабинет</div>
+    </div>
+    <div id="spaces-list"></div>
+    <button onclick="openCreateSpace()" style="width:100%;background:transparent;border:1px dashed var(--b2);border-radius:var(--r);padding:14px;font-size:15px;color:var(--t2);cursor:pointer;font-family:inherit;margin-top:4px">＋ Создать кабинет</button>
+  </div>
+</div>
+
+<!-- Space Password -->
+<div class="overlay" id="space-pwd-ov">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title" id="space-pwd-name"></span>
+      <button class="close-btn" onclick="document.getElementById('space-pwd-ov').classList.remove('on')">✕</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:12px">
+      <div class="fld">
+        <label>Пароль кабинета</label>
+        <input id="space-pwd-inp" type="password" placeholder="Введи пароль..." onkeydown="if(event.key==='Enter')enterSpacePwd()">
+        <div id="space-pwd-err" style="font-size:13px;color:var(--red);min-height:16px"></div>
+      </div>
+      <button onclick="enterSpacePwd()" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:13px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit">Войти</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Space -->
+<div class="overlay" id="create-space-ov" onclick="if(event.target===this)closeCreateSpace()">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title">Новый кабинет</span>
+      <button class="close-btn" onclick="closeCreateSpace()">✕</button>
+    </div>
+    <div style="padding:16px 20px;display:flex;flex-direction:column;gap:13px">
+      <div class="fld"><label>Название</label><input id="new-space-name" placeholder="Например: Наша семья" dir="auto"></div>
+      <div class="fld">
+        <label>Тип</label>
+        <select id="new-space-type" onchange="document.getElementById('members-section').style.display=this.value==='family'?'flex':'none'">
+          <option value="personal">🗂️ Личный</option>
+          <option value="family">👨‍👩‍👧 Семейный / Групповой</option>
+        </select>
+      </div>
+      <div id="members-section" style="display:none;flex-direction:column;gap:8px">
+        <div class="fld">
+          <label>Участники</label>
+          <div style="display:flex;gap:7px">
+            <input id="new-member-inp" placeholder="Имя участника..." dir="auto" onkeydown="if(event.key==='Enter'){addNewMember();event.preventDefault()}">
+            <button onclick="addNewMember()" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px 14px;cursor:pointer;color:var(--t2);font-size:16px">＋</button>
+          </div>
+          <div id="new-members-list" style="margin-top:5px"></div>
+        </div>
+      </div>
+      <div class="fld"><label>Пароль (необязательно)</label><input id="new-space-pwd" type="password" placeholder="Защити кабинет паролем"></div>
+      <button onclick="createSpace()" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:13px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit">Создать</button>
+    </div>
+  </div>
+</div>
+
 <!-- Lock -->
 <div class="lock" id="lock">
   <div class="lock-card">
@@ -362,6 +432,7 @@
 <!-- App modules — load in order -->
 <script src="app-config.js"></script>
 <script src="app-utils.js"></script>
+<script src="app-spaces.js"></script>
 <script src="app-db.js"></script>
 <script src="app-render.js"></script>
 <script src="app-view.js"></script>

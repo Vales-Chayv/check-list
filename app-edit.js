@@ -318,7 +318,7 @@ async function saveCard() {
     toast('✓ Сохранено');
     await dbUpdate(card);
   } else {
-    const card={id:uid(),created_at:today(),...data};
+    const card={id:uid(),created_at:today(),space_id:currentSpaceId||'personal',...data};
     cards.unshift(card);
     originalState=null;
     document.getElementById('edit-ov').classList.remove('on');

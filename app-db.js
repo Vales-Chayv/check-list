@@ -134,10 +134,9 @@ async function loadData() {
 async function syncFromServer() {
   if (!navigator.onLine) { setSyncDot('err'); render(); return; }
   try {
-    const [cr,kr] = await Promise.all([
-      sb.from('cards').select('*').order('created_at',{ascending:false}),
-      sb.from('categories').select('*')
-    ]);
+    let cardsQuery = sb.from('cards').select('*').order('created_at',{ascending:false});
+    if(currentSpaceId) cardsQuery = cardsQuery.eq('space_id', currentSpaceId);
+    const [cr,kr] = await Promise.all([cardsQuery, sb.from('categories').select('*')]);
     if(cr.error) throw cr.error;
     if(kr.error) throw kr.error;
     await local.clear('cards');

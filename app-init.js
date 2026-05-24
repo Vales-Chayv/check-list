@@ -42,7 +42,7 @@ window.addEventListener('popstate', e => {
 });
 
 // ═══════════════════════════════════════════
-//  LOCK
+//  LOCK (personal space password — handled by spaces)
 // ═══════════════════════════════════════════
 const PWD='mc_pwd';
 function onLockInput(){document.getElementById('lock-btn').disabled=!document.getElementById('lock-inp').value;document.getElementById('lock-err').textContent='';document.getElementById('lock-inp').classList.remove('err');}
@@ -54,16 +54,10 @@ function doLogin(){
   else if(v===s){unlock();}
   else{const i=document.getElementById('lock-inp');i.classList.add('err');document.getElementById('lock-err').textContent='❌ Неверный пароль';i.value='';document.getElementById('lock-btn').disabled=true;setTimeout(()=>i.classList.remove('err'),600);}
 }
-function unlock(){const l=document.getElementById('lock');l.style.transition='opacity .25s';l.style.opacity='0';setTimeout(()=>{l.style.display='none';loadData().then(()=>checkURLParams());},250);}
-(function(){
-  const hasPwd = localStorage.getItem(PWD);
-  if(!hasPwd) {
-    // No password — skip lock screen
-    document.getElementById('lock').style.display='none';
-    loadData().then(()=>checkURLParams());
-    return;
-  }
-  document.getElementById('lock-sub').textContent='Введи пароль для входа';
-  document.getElementById('lock-note').textContent='';
-  setTimeout(()=>document.getElementById('lock-inp').focus(),200);
-})();
+function unlock(){const l=document.getElementById('lock');l.style.transition='opacity .25s';l.style.opacity='0';setTimeout(()=>{l.style.display='none';},250);}
+
+// Hide lock screen — spaces handle authentication now
+document.getElementById('lock').style.display='none';
+
+// Start with space selector
+initSpaces();
