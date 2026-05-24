@@ -6,42 +6,57 @@ let pendingSpaceId = null;
 
 // ─── INIT ───────────────────────────────────
 async function initSpaces() {
-  // Check if opened via share link
+  // Check for invite link
   const urlToken = new URLSearchParams(window.location.search).get('space');
 
+  // Show user name in lobby
+  if(currentUser) {
+    const el = document.getElementById('lobby-user');
+    if(el) el.textContent = 'Привет, ' + (currentUser.display_name||'') + ' 👋';
+  }
+
   try {
-    const {data, error} = await sb.from('spaces').select('*').order('created_at');
+    // Load only my spaces + joined spaces
+    const joinedIds = JSON.parse(localStorage.getItem('mc_joined_spaces')||'[]');
+    let query = sb.from('spaces').select('*').order('created_at');
+    if(currentUser) {
+      query = query.or(`owner_id.eq.${currentUser.id}${joinedIds.length?',id.in.('+joinedIds.join(',')+')'  :''}`);
+    }
+    const {data, error} = await query;
     if(error) throw error;
     spaces = data || [];
-    const personalPwd = localStorage.getItem('mc_pwd');
-    const personal = spaces.find(s=>s.id==='personal');
-    if(personal && !personal.password && personalPwd) {
-      personal.password = personalPwd;
-      await sb.from('spaces').update({password:personalPwd}).eq('id','personal');
-    }
   } catch(e) {
     spaces = JSON.parse(localStorage.getItem('mc_spaces')||'[]');
-    if(!spaces.length) spaces = [{id:'personal',name:'Личный',type:'personal',password:localStorage.getItem('mc_pwd'),members:[]}];
+    if(!spaces.length) spaces = [{id:'personal',name:'Личный',type:'personal',members:[]}];
   }
   localStorage.setItem('mc_spaces', JSON.stringify(spaces));
 
-  // If opened via share link — go directly to that space
+  // Handle invite link
   if(urlToken) {
-    const space = spaces.find(s=>s.share_token===urlToken);
-    if(space) {
-      if(space.password) {
-        pendingSpaceId = space.id;
-        document.getElementById('space-pwd-name').textContent = space.name;
-        document.getElementById('space-pwd-inp').value = '';
-        document.getElementById('space-pwd-err').textContent = '';
-        document.getElementById('space-pwd-ov').classList.add('on');
-        setTimeout(()=>document.getElementById('space-pwd-inp').focus(), 300);
-        return;
-      } else {
-        setCurrentSpace(space.id, true);
-        return;
+    try {
+      const {data} = await sb.from('spaces').select('*').eq('share_token', urlToken).single();
+      if(data) {
+        // Add to joined if not already there
+        const joined = JSON.parse(localStorage.getItem('mc_joined_spaces')||'[]');
+        if(!joined.includes(data.id)) {
+          joined.push(data.id);
+          localStorage.setItem('mc_joined_spaces', JSON.stringify(joined));
+        }
+        if(!spaces.find(s=>s.id===data.id)) spaces.push(data);
+        if(data.password) {
+          pendingSpaceId = data.id;
+          document.getElementById('space-pwd-name').textContent = data.name;
+          document.getElementById('space-pwd-inp').value = '';
+          document.getElementById('space-pwd-err').textContent = '';
+          document.getElementById('space-pwd-ov').classList.add('on');
+          setTimeout(()=>document.getElementById('space-pwd-inp').focus(), 300);
+          return;
+        } else {
+          setCurrentSpace(data.id, true);
+          return;
+        }
       }
-    }
+    } catch(e) {}
   }
 
   // Restore last used space
@@ -68,16 +83,13 @@ function renderSpacesList() {
   list.innerHTML = spaces.map(s => {
     const icon = s.type==='family' ? '👨‍👩‍👧' : '🗂️';
     const members = (s.members||[]).length;
-    return `<div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:18px 16px;cursor:pointer;display:flex;align-items:center;gap:14px;margin-bottom:10px">
-      <div onclick="onSpaceClick('${s.id}')" style="display:flex;align-items:center;gap:14px;flex:1">
-        <div style="font-size:32px">${icon}</div>
-        <div style="flex:1">
-          <div style="font-size:17px;font-weight:700">${esc(s.name)}</div>
-          ${s.type==='family'&&members?`<div style="font-size:12px;color:var(--t3);margin-top:2px">👥 ${members} участников</div>`:''}
-        </div>
-        ${s.password?'<span style="font-size:16px;opacity:.5">🔒</span>':'<span style="font-size:12px;color:var(--t3)">Открыть</span>'}
+    return `<div onclick="onSpaceClick('${s.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:18px 16px;cursor:pointer;display:flex;align-items:center;gap:14px;margin-bottom:10px">
+      <div style="font-size:32px">${icon}</div>
+      <div style="flex:1">
+        <div style="font-size:17px;font-weight:700">${esc(s.name)}</div>
+        ${s.type==='family'&&members?`<div style="font-size:12px;color:var(--t3);margin-top:2px">👥 ${members} участников</div>`:''}
       </div>
-      ${s.type==='family'&&s.share_token?`<button onclick="event.stopPropagation();showShareLink(${JSON.stringify(s).replace(/"/g,'&quot;')})" style="background:rgba(232,197,106,.15);border:1px solid rgba(232,197,106,.3);border-radius:7px;padding:5px 9px;font-size:13px;color:var(--accent);cursor:pointer">🔗</button>`:''}
+      ${s.password?'<span style="font-size:16px;opacity:.5">🔒</span>':'<span style="font-size:12px;color:var(--t3)">Открыть</span>'}
     </div>`;
   }).join('');
 }
@@ -165,10 +177,11 @@ function renderNewMembersEdit() {
 async function createSpace() {
   const name = document.getElementById('new-space-name').value.trim(); if(!name) return;
   const type = document.getElementById('new-space-type').value;
-  const pwd = document.getElementById('new-space-pwd').value.trim() || null;
-  const id = 'sp_' + uid();
-  const share_token = uid().slice(0, 12);
-  const space = {id, name, type, password:pwd, members:newSpaceMembers, share_token};
+  const pwd  = document.getElementById('new-space-pwd').value.trim() || null;
+  const id   = 'sp_' + uid();
+  const share_token = uid().slice(0,12);
+  const owner_id = currentUser?.id || null;
+  const space = {id, name, type, password:pwd, members:newSpaceMembers, share_token, owner_id};
   try {
     const {error} = await sb.from('spaces').insert(space);
     if(error) throw error;
@@ -177,25 +190,22 @@ async function createSpace() {
     closeCreateSpace();
     renderSpacesList();
     toast('✓ Кабинет «'+name+'» создан');
-    // Show share link for family/group spaces
     if(type === 'family') showShareLink(space);
   } catch(e) { toast('Ошибка: '+e.message, true); }
 }
 
 function showShareLink(space) {
   const link = `${location.origin}${location.pathname}?space=${space.share_token}`;
-  const msg = `Кабинет «${space.name}» создан!\n\nСсылка для входа:\n${link}\n${space.password?'\nПароль: '+space.password:''}`;
-  // Show in a simple overlay
   const div = document.createElement('div');
-  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1001;display:flex;align-items:center;justify-content:center;padding:20px';
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:24px;max-width:380px;width:100%">
-    <div style="font-size:18px;font-weight:700;margin-bottom:12px">🔗 Поделиться кабинетом</div>
-    <div style="font-size:14px;color:var(--t2);margin-bottom:12px">Отправь эту ссылку участникам — они сразу попадут в «${esc(space.name)}»</div>
-    <div style="background:var(--s2);border-radius:var(--rsm);padding:11px 13px;font-size:13px;word-break:break-all;color:var(--accent);margin-bottom:12px">${link}</div>
-    ${space.password?`<div style="font-size:13px;color:var(--t2);margin-bottom:12px">🔒 Пароль: <strong>${esc(space.password)}</strong></div>`:''}
+    <div style="font-size:18px;font-weight:700;margin-bottom:10px">🔗 Пригласить в «${esc(space.name)}»</div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:12px">Отправь ссылку — человек сразу попадёт в этот кабинет</div>
+    <div style="background:var(--s2);border-radius:var(--rsm);padding:11px;font-size:12px;word-break:break-all;color:var(--accent);margin-bottom:10px">${link}</div>
+    ${space.password?`<div style="font-size:13px;color:var(--t2);margin-bottom:12px">🔒 Пароль: <strong style="color:var(--t1)">${esc(space.password)}</strong></div>`:''}
     <div style="display:flex;gap:8px">
-      <button onclick="navigator.clipboard.writeText('${link}').then(()=>toast('✓ Ссылка скопирована'))" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:11px;font-size:14px;font-weight:700;cursor:pointer">Скопировать ссылку</button>
-      <button onclick="this.closest('div[style*=fixed]').remove()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px 16px;font-size:14px;cursor:pointer">Закрыть</button>
+      <button onclick="navigator.clipboard.writeText('${link}').then(()=>toast('✓ Скопировано'))" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:11px;font-size:14px;font-weight:700;cursor:pointer">Скопировать</button>
+      <button onclick="this.closest('[style*=fixed]').remove()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px 16px;font-size:14px;cursor:pointer">Закрыть</button>
     </div>
   </div>`;
   document.body.appendChild(div);

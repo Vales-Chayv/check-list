@@ -56,8 +56,8 @@ function doLogin(){
 }
 function unlock(){const l=document.getElementById('lock');l.style.transition='opacity .25s';l.style.opacity='0';setTimeout(()=>{l.style.display='none';},250);}
 
-// Hide lock screen — spaces handle authentication now
+// Hide lock screen — auth handles login now
 document.getElementById('lock').style.display='none';
 
-// Start with space selector
-initSpaces();
+// Start with auth check
+initAuth();

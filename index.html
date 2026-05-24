@@ -340,16 +340,58 @@
   <img id="viewer-img">
 </div>
 
+<!-- Auth Screen -->
+<div id="auth-screen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:1000;flex-direction:column;align-items:center;justify-content:center;padding:30px 20px;overflow-y:auto">
+  <div style="width:100%;max-width:360px">
+
+    <!-- Register -->
+    <div id="auth-reg" style="display:flex;flex-direction:column;gap:14px">
+      <div style="text-align:center;margin-bottom:10px">
+        <div style="font-size:44px;margin-bottom:10px">🗂️</div>
+        <div style="font-size:22px;font-weight:700">Мои карточки</div>
+        <div style="font-size:14px;color:var(--t2);margin-top:5px">Создай аккаунт</div>
+      </div>
+      <div class="fld"><label>Твоё имя</label><input id="auth-name" placeholder="Как тебя зовут?" dir="auto" onkeydown="if(event.key==='Enter')document.getElementById('auth-pwd').focus()"></div>
+      <div class="fld"><label>Пароль</label><input id="auth-pwd" type="password" placeholder="Придумай пароль" onkeydown="if(event.key==='Enter')document.getElementById('auth-pwd2').focus()"></div>
+      <div class="fld"><label>Повтори пароль</label><input id="auth-pwd2" type="password" placeholder="Ещё раз" onkeydown="if(event.key==='Enter')doRegister()"></div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--t2);cursor:pointer">
+        <input type="checkbox" id="auth-remember" checked> Запомнить меня
+      </label>
+      <div id="auth-reg-err" style="font-size:13px;color:var(--red);min-height:16px"></div>
+      <button id="auth-reg-btn" onclick="doRegister()" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:14px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit">Создать аккаунт</button>
+      <button onclick="switchToLogin()" style="background:none;border:none;color:var(--t2);font-size:14px;cursor:pointer;font-family:inherit;padding:6px">Уже есть аккаунт → Войти</button>
+    </div>
+
+    <!-- Login -->
+    <div id="auth-log" style="display:none;flex-direction:column;gap:14px">
+      <div style="text-align:center;margin-bottom:10px">
+        <div style="font-size:44px;margin-bottom:10px">👋</div>
+        <div style="font-size:22px;font-weight:700">Привет, <span id="auth-log-name"></span>!</div>
+        <div style="font-size:14px;color:var(--t2);margin-top:5px">Введи пароль для входа</div>
+      </div>
+      <div class="fld"><label>Пароль</label><input id="auth-log-pwd" type="password" placeholder="Твой пароль" onkeydown="if(event.key==='Enter')doLoginAuth()"></div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--t2);cursor:pointer">
+        <input type="checkbox" id="auth-log-remember" checked> Запомнить меня
+      </label>
+      <div id="auth-log-err" style="font-size:13px;color:var(--red);min-height:16px"></div>
+      <button id="auth-log-btn" onclick="doLoginAuth()" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:14px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit">Войти</button>
+      <button onclick="switchToRegister()" style="background:none;border:none;color:var(--t2);font-size:14px;cursor:pointer;font-family:inherit;padding:6px">Другой аккаунт → Зарегистрироваться</button>
+    </div>
+
+  </div>
+</div>
+
 <!-- Space Selector -->
 <div id="space-selector" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:998;flex-direction:column;align-items:center;justify-content:center;padding:30px 20px">
   <div style="width:100%;max-width:400px">
     <div style="text-align:center;margin-bottom:28px">
       <div style="font-size:40px;margin-bottom:10px">🗂️</div>
       <div style="font-size:22px;font-weight:700">Мои карточки</div>
-      <div style="font-size:14px;color:var(--t2);margin-top:5px">Выбери кабинет</div>
+      <div id="lobby-user" style="font-size:14px;color:var(--t2);margin-top:5px"></div>
     </div>
     <div id="spaces-list"></div>
     <button onclick="openCreateSpace()" style="width:100%;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);padding:14px;font-size:15px;font-weight:600;color:var(--accent);cursor:pointer;font-family:inherit;margin-top:4px">＋ Создать кабинет</button>
+    <button onclick="logoutUser()" style="width:100%;background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;font-family:inherit;margin-top:14px;padding:6px">Выйти из аккаунта</button>
   </div>
 </div>
 
@@ -432,6 +474,7 @@
 <!-- App modules — load in order -->
 <script src="app-config.js"></script>
 <script src="app-utils.js"></script>
+<script src="app-auth.js"></script>
 <script src="app-spaces.js"></script>
 <script src="app-db.js"></script>
 <script src="app-render.js"></script>
