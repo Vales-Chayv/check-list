@@ -111,6 +111,7 @@ function openCreateSpace() {
   document.getElementById('new-space-name').value = '';
   document.getElementById('new-space-pwd').value = '';
   document.getElementById('new-space-type').value = 'personal';
+  document.getElementById('members-section').style.display = 'none';
   renderNewMembersList();
   document.getElementById('create-space-ov').classList.add('on');
   setTimeout(()=>document.getElementById('new-space-name').focus(), 300);
