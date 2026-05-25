@@ -185,7 +185,18 @@ const App = {
   },
   openView(id) { openView(id); },
   toggleDone(id) { toggleDone(id); },
-  toggleEntry(cardId,entryId) { toggleEntry(cardId,entryId); },
+  toggleEntry(cardId,entryId) {
+    if(currentSpace?.type==='family') {
+      const card = cards.find(c=>c.id===cardId);
+      if(card?.assigned_to) {
+        const myName = currentUser?.display_name||'';
+        if(myName.toLowerCase() !== card.assigned_to.toLowerCase()) {
+          toast('Эта задача для ' + card.assigned_to, true); return;
+        }
+      }
+    }
+    toggleEntry(cardId,entryId);
+  },
 };
 
 function closeImgViewer() { document.getElementById('img-viewer').style.display='none'; imgScale=1; imgTransX=0; imgTransY=0; }
