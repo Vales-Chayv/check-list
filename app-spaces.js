@@ -83,13 +83,16 @@ function renderSpacesList() {
   list.innerHTML = spaces.map(s => {
     const icon = s.type==='family' ? '👨‍👩‍👧' : '🗂️';
     const members = (s.members||[]).length;
-    return `<div onclick="onSpaceClick('${s.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:18px 16px;cursor:pointer;display:flex;align-items:center;gap:14px;margin-bottom:10px">
-      <div style="font-size:32px">${icon}</div>
-      <div style="flex:1">
-        <div style="font-size:17px;font-weight:700">${esc(s.name)}</div>
-        ${s.type==='family'&&members?`<div style="font-size:12px;color:var(--t3);margin-top:2px">👥 ${members} участников</div>`:''}
+    return `<div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:18px 16px;display:flex;align-items:center;gap:14px;margin-bottom:10px">
+      <div onclick="onSpaceClick('${s.id}')" style="display:flex;align-items:center;gap:14px;flex:1;cursor:pointer">
+        <div style="font-size:32px">${icon}</div>
+        <div style="flex:1">
+          <div style="font-size:17px;font-weight:700">${esc(s.name)}</div>
+          ${s.type==='family'&&members?`<div style="font-size:12px;color:var(--t3);margin-top:2px">👥 ${members} участников</div>`:''}
+        </div>
+        ${s.password?'<span style="font-size:16px;opacity:.5">🔒</span>':'<span style="font-size:12px;color:var(--t3)">Открыть</span>'}
       </div>
-      ${s.password?'<span style="font-size:16px;opacity:.5">🔒</span>':'<span style="font-size:12px;color:var(--t3)">Открыть</span>'}
+      ${s.type==='family'?`<button onclick="getShareLink('${s.id}')" style="background:rgba(232,197,106,.15);border:1px solid rgba(232,197,106,.3);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--accent);cursor:pointer" title="Пригласить">🔗</button>`:''}
     </div>`;
   }).join('');
 }
@@ -214,4 +217,15 @@ function showShareLink(space) {
 // ─── SPACE MEMBERS ───────────────────────────
 function getSpaceMembers() {
   return (currentSpace?.members||[]).map(m=>m.name);
+}
+
+async function getShareLink(spaceId) {
+  let space = spaces.find(s=>s.id===spaceId); if(!space) return;
+  // Generate token if missing
+  if(!space.share_token) {
+    space.share_token = uid().slice(0,12);
+    await sb.from('spaces').update({share_token:space.share_token}).eq('id',spaceId);
+    localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+  }
+  showShareLink(space);
 }
