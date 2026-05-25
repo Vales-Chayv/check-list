@@ -13,13 +13,29 @@ function openEdit(id) {
   freqVal=card?.reminder?.freq||'daily';
   customDays=[...(card?.reminder?.days||[])];
 
+  const isFamily = currentSpace?.type === 'family';
+
   document.getElementById('edit-title').textContent=card?'Редактировать':'Новая карточка';
   document.getElementById('e-title').value=card?.title||'';
   document.getElementById('e-body').value=card?.body||'';
   document.getElementById('e-deadline').value=card?.deadline||'';
-  document.getElementById('e-status').value=card?.status||'new';
   document.getElementById('e-priority').value=card?.priority||'normal';
   populateCatSel(card?.category);
+
+  // Family vs personal fields
+  document.getElementById('status-fld').style.display   = isFamily ? 'none' : '';
+  document.getElementById('assigned-fld').style.display = isFamily ? '' : 'none';
+  document.getElementById('ball-fld').style.display     = isFamily ? 'none' : '';
+
+  if(isFamily) {
+    const members = getSpaceMembers();
+    const sel = document.getElementById('e-assigned');
+    sel.innerHTML = '<option value="">👨‍👩‍👧 Для всех</option>' +
+      members.map(m=>`<option value="${esc(m)}"${card?.assigned_to===m?' selected':''}>${esc(m)}</option>`).join('');
+  } else {
+    document.getElementById('e-status').value=card?.status||'new';
+  }
+
   renderBall();
   renderAttPrev();
   renderEntriesEdit();
@@ -290,7 +306,9 @@ function renderRelatedList() {
 async function saveCard() {
   const title=document.getElementById('e-title').value.trim(); if(!title)return;
   const catVal=document.getElementById('e-cat').value==='__new'?(cats[0]?.name||''):document.getElementById('e-cat').value;
-  const newStatus=document.getElementById('e-status').value;
+  const isFamily = currentSpace?.type === 'family';
+  const newStatus = isFamily ? (document.getElementById('e-status')?.value||'new') : document.getElementById('e-status').value;
+  const assignedTo = isFamily ? (document.getElementById('e-assigned').value||null) : null;
   const oldCard=editId?cards.find(c=>c.id===editId):null;
   const oldStatus=oldCard?.status;
   const hist=[...tempHist];
@@ -298,13 +316,15 @@ async function saveCard() {
   else if(oldStatus&&oldStatus!==newStatus) hist.push({date:nowStr(),text:`Статус: ${ST_LABELS[oldStatus]} → ${ST_LABELS[newStatus]}`,type:'status'});
   else hist.push({date:nowStr(),text:'Обновлено',type:'note'});
   const cleanEntries=tempEntries.filter(e=>e.text.trim()).map(({_saved,...e})=>e);
-  let finalStatus=newStatus;
+  let finalStatus=isFamily ? 'new' : newStatus;
   if(cleanEntries.length>0&&cleanEntries.every(e=>e.done)) finalStatus='done';
   const data={
     title,body:document.getElementById('e-body').value.trim(),category:catVal,
     status:finalStatus,priority:document.getElementById('e-priority').value||'normal',
     deadline:document.getElementById('e-deadline').value||null,
-    ball:ballVal,attachments:tempAtt,entries:cleanEntries,
+    ball:isFamily?'':ballVal,
+    assigned_to:assignedTo,
+    attachments:tempAtt,entries:cleanEntries,
     reminder:{enabled:remOn,freq:freqVal,days:customDays},
     history:hist,related_ids:tempRelIds
   };

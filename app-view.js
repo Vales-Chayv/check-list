@@ -22,11 +22,12 @@ function openView(id) {
           ${dl?`<span class="dl-badge ${dl.cls}">${dl.text}</span>`:''}
           ${card.ball==='mine'?'<span style="font-size:12px;opacity:.7">⚽ У меня</span>':card.ball==='theirs'?'<span style="font-size:12px;opacity:.7">⚽ У них</span>':''}
         </div>
-        <div style="display:flex;gap:5px;margin-top:8px">
+        ${currentSpace?.type!=='family'?`<div style="display:flex;gap:5px;margin-top:8px">
           <button onclick="toggleBall('${id}','')" style="padding:3px 10px;border-radius:12px;font-size:12px;cursor:pointer;border:1px solid var(--b2);background:${!card.ball?'var(--s2)':'transparent'};color:${!card.ball?'var(--t1)':'var(--t3)'}">—</button>
           <button onclick="toggleBall('${id}','mine')" style="padding:3px 10px;border-radius:12px;font-size:12px;cursor:pointer;border:1px solid var(--b2);background:${card.ball==='mine'?'var(--s2)':'transparent'};color:${card.ball==='mine'?'var(--t1)':'var(--t3)'}">⚽ У меня</button>
           <button onclick="toggleBall('${id}','theirs')" style="padding:3px 10px;border-radius:12px;font-size:12px;cursor:pointer;border:1px solid var(--b2);background:${card.ball==='theirs'?'var(--s2)':'transparent'};color:${card.ball==='theirs'?'var(--t1)':'var(--t3)'}">⚽ У них</button>
-        </div>
+        </div>`:''}
+        ${currentSpace?.type==='family'?`<div style="margin-top:8px;font-size:13px;color:var(--t2)">👤 ${card.assigned_to?`Задача для: <strong style="color:var(--accent)">${esc(card.assigned_to)}</strong>`:'<span style="opacity:.6">Для всех</span>'}</div>`:''}
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
         <button onclick="closeView()" style="background:var(--s2);border:none;color:var(--t2);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px">✕</button>
@@ -97,6 +98,13 @@ function openImgDirect(src) {
 
 async function viewToggleEntry(cardId, entryId) {
   const card=cards.find(c=>c.id===cardId); if(!card)return;
+  // In family space: only assigned person (or everyone if null) can toggle
+  if(currentSpace?.type==='family' && card.assigned_to) {
+    const myName = currentUser?.display_name||'';
+    if(myName.toLowerCase() !== card.assigned_to.toLowerCase()) {
+      toast('Эта задача для ' + card.assigned_to, true); return;
+    }
+  }
   const e=(card.entries||[]).find(x=>x.id===entryId); if(!e)return;
   e.done=!e.done;
   if((card.entries||[]).length>0&&(card.entries||[]).every(x=>x.done)){

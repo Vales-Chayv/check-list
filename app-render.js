@@ -152,7 +152,9 @@ function cardHTML(card, isDone=false) {
         <div class="card-meta">
           ${card.category?`<span class="cat-tag">${esc(card.category)}</span>`:''}
           ${dl&&!isDone?`<span class="dl-badge ${dl.cls}${dl.days<=3?' dl-pulse':''}">${dl.text}</span>`:''}
-          ${card.ball==='mine'?'<span style="font-size:11px;opacity:.7">⚽ У меня</span>':card.ball==='theirs'?'<span style="font-size:11px;opacity:.7">⚽ У них</span>':''}
+          ${currentSpace?.type==='family'
+            ? (card.assigned_to?`<span style="font-size:11px;background:rgba(232,197,106,.15);color:var(--accent);padding:2px 8px;border-radius:10px">👤 ${esc(card.assigned_to)}</span>`:'<span style="font-size:11px;opacity:.5">👨‍👩‍👧 Для всех</span>')
+            : (card.ball==='mine'?'<span style="font-size:11px;opacity:.7">⚽ У меня</span>':card.ball==='theirs'?'<span style="font-size:11px;opacity:.7">⚽ У них</span>':'')}
           ${lastChg}
         </div>
       </div>
