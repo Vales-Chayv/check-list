@@ -368,6 +368,12 @@ async function toggleDone(id) {
 
 async function toggleEntry(cardId,entryId) {
   const card=cards.find(c=>c.id===cardId); if(!card)return;
+  if(currentSpace?.type==='family' && card.assigned_to) {
+    const myName = currentUser?.display_name||'';
+    if(myName.toLowerCase() !== card.assigned_to.toLowerCase()) {
+      toast('Эта задача для ' + card.assigned_to, true); return;
+    }
+  }
   const e=(card.entries||[]).find(x=>x.id===entryId); if(!e)return;
   e.done=!e.done;
   if((card.entries||[]).length>0&&(card.entries||[]).every(x=>x.done)){
