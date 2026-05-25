@@ -136,7 +136,10 @@ async function syncFromServer() {
   try {
     let cardsQuery = sb.from('cards').select('*').order('created_at',{ascending:false});
     if(currentSpaceId) cardsQuery = cardsQuery.eq('space_id', currentSpaceId);
-    const [cr,kr] = await Promise.all([cardsQuery, sb.from('categories').select('*')]);
+    let catsQuery = sb.from('categories').select('*');
+    if(currentSpaceId) catsQuery = catsQuery.eq('space_id', currentSpaceId);
+    else catsQuery = catsQuery.is('space_id', null);
+    const [cr,kr] = await Promise.all([cardsQuery, catsQuery]);
     if(cr.error) throw cr.error;
     if(kr.error) throw kr.error;
     await local.clear('cards');
@@ -144,7 +147,9 @@ async function syncFromServer() {
     if(cr.data?.length) await local.putAll('cards', cr.data);
     if(kr.data?.length) await local.putAll('categories', kr.data);
     cards = cr.data||[];
-    cats = kr.data?.length ? kr.data : [{name:'Работа',color:'#e8c56a'},{name:'Личное',color:'#5b9ee8'},{name:'Проекты',color:'#5bb87a'}];
+    cats = kr.data?.length ? kr.data : (currentSpace?.type==='family'
+      ? [{name:'Еда',color:'#5bb87a'},{name:'Уборка',color:'#5b9ee8'},{name:'Дети',color:'#a07de8'},{name:'Покупки',color:'#e8c56a'},{name:'Финансы',color:'#e88a3a'},{name:'Ремонт',color:'#e86060'}]
+      : [{name:'Работа',color:'#e8c56a'},{name:'Личное',color:'#5b9ee8'},{name:'Проекты',color:'#5bb87a'}]);
     setSyncDot('ok'); render();
   } catch(e) {
     console.log('Server sync error:', e.message);
@@ -186,10 +191,11 @@ async function dbDelete(id) {
 }
 
 async function dbAddCat(cat) {
-  await local.put('categories', cat);
+  const catWithSpace = {...cat, space_id: currentSpaceId||null};
+  await local.put('categories', catWithSpace);
   if (navigator.onLine) {
-    const {error}=await sb.from('categories').insert(cat);
-    if(error && error.code!=='23505') await queueOp({type:'insert_cat',data:cat});
-  } else { await queueOp({type:'insert_cat',data:cat}); }
+    const {error}=await sb.from('categories').insert(catWithSpace);
+    if(error && error.code!=='23505') await queueOp({type:'insert_cat',data:catWithSpace});
+  } else { await queueOp({type:'insert_cat',data:catWithSpace}); }
 }
 
