@@ -14,7 +14,6 @@ function render() {
 
 function renderCats() {
   const bar = document.getElementById('cats');
-  // Build HTML with index-based onclick — no escaping issues
   const all = filterCat==='all';
   let html = `<button class="cat-btn${all?' on':''}" style="${all?'border-color:rgba(255,255,255,.25)':''}" onclick="App.setCat(-1)">Все</button>`;
   cats.forEach((c,i) => {
@@ -22,7 +21,10 @@ function renderCats() {
     const active = filterCat===c.name;
     const bg = active ? hex2rgba(col,.15) : 'transparent';
     const border = active ? hex2rgba(col,.5) : 'rgba(255,255,255,.08)';
-    html += `<button class="cat-btn${active?' on':''}" style="background:${bg};border-color:${border}" onclick="App.setCat(${i})">
+    html += `<button class="cat-btn${active?' on':''}" style="background:${bg};border-color:${border}"
+      onclick="App.setCat(${i})"
+      oncontextmenu="event.preventDefault();App.deleteCat(${i})"
+      ontouchstart="App.startCatHold(${i},this)" ontouchend="App.cancelCatHold()" ontouchmove="App.cancelCatHold()">
       <span class="cat-dot" style="background:${col}"></span>${esc(c.name)}</button>`;
   });
   bar.innerHTML = html;
@@ -171,6 +173,26 @@ function cardHTML(card, isDone=false) {
 // ═══════════════════════════════════════════
 const App = {
   setCat(idx) { filterCat = idx===-1 ? 'all' : cats[idx].name; render(); },
+  _catHoldTimer: null,
+  startCatHold(idx, el) {
+    App._catHoldTimer = setTimeout(() => { App._catHoldTimer=null; App.deleteCat(idx); }, 600);
+  },
+  cancelCatHold() {
+    if(App._catHoldTimer) { clearTimeout(App._catHoldTimer); App._catHoldTimer=null; }
+  },
+  deleteCat(idx) {
+    const cat = cats[idx]; if(!cat) return;
+    const active = cards.filter(c=>c.category===cat.name && c.status!=='done');
+    if(active.length) { toast('Нельзя удалить — есть ' + active.length + ' активных карточек', true); return; }
+    if(!confirm('Удалить рубрику «' + cat.name + '»?')) return;
+    cats.splice(idx, 1);
+    if(filterCat === cat.name) filterCat = 'all';
+    render();
+    // Remove from DB
+    sb.from('categories').delete().eq('name', cat.name).then(()=>{});
+    local.delete('categories', cat.name);
+    toast('Рубрика удалена');
+  },
   toggleExpand(id) { expandedCards.has(id)?expandedCards.delete(id):expandedCards.add(id); render(); },
   viewImg(cardId,i) {
     const card=cards.find(c=>c.id===cardId); if(!card)return;
