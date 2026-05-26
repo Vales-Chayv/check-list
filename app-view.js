@@ -131,7 +131,8 @@ function openAddEntry(cardId) {
   document.getElementById('ae-card-title').textContent = '＋ Запись' + (title ? ' в «'+title+'»' : '');
   document.getElementById('ae-text').value = '';
   document.getElementById('ae-att-prev').innerHTML = '';
-  document.getElementById('ae-entry-deadline').value = '';
+  const dlEl = document.getElementById('ae-entry-deadline');
+  if(dlEl) dlEl.value = '';
 
   // Populate extra fields with current card values
   if(card) {
@@ -231,7 +232,7 @@ async function saveAddEntry() {
   const card = cards.find(c => c.id === aeCardId); if (!card) return;
 
   // Save entry
-  const entry = {id:uid(), text, date:nowStr(), done:false, attachments:[...aeAtts], deadline: document.getElementById('ae-entry-deadline').value||null};
+  const entry = {id:uid(), text, date:nowStr(), done:false, attachments:[...aeAtts], deadline: document.getElementById('ae-entry-deadline')?.value||null};
   card.entries = [entry, ...(card.entries||[])];
 
   // Save extra settings if expanded
