@@ -126,7 +126,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .btn-d{background:rgba(232,96,96,.1);color:var(--red);border:1px solid rgba(232,96,96,.2);border-radius:var(--rsm);padding:13px 18px;font-size:15px;cursor:pointer;font-family:inherit}
 /* Color palette */
 .pal{display:flex;gap:7px;flex-wrap:wrap}
-.swatch{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent}
+.swatch{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent;position:relative;overflow:hidden}
 .swatch.on{border-color:white;transform:scale(1.15)}
 /* Sync dot */
 .sdot{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}

@@ -141,7 +141,13 @@ function populateCatSel(sel) {
 }
 function onCatChange() { if(document.getElementById('e-cat').value==='__new'){document.getElementById('new-cat-box').style.display='flex';initPalette();} }
 function initPalette() {
-  document.getElementById('cat-pal').innerHTML=COLORS.map(c=>`<div class="swatch${c===newCatColor?' on':''}" style="background:${c}" onclick="pickColor('${c}',this)"></div>`).join('');
+  const usedColors = new Set(cats.map(c=>c.color));
+  document.getElementById('cat-pal').innerHTML = COLORS.map(c => {
+    const used = usedColors.has(c);
+    return `<div class="swatch${c===newCatColor?' on':''}" style="background:${c};${used?'box-shadow:inset 0 0 0 2px rgba(255,255,255,.5);':''}" onclick="pickColor('${c}',this)" title="${used?'Уже используется':''}">
+      ${used?'<div style="position:absolute;bottom:1px;right:1px;width:6px;height:6px;background:white;border-radius:50%;opacity:.8"></div>':''}
+    </div>`;
+  }).join('');
 }
 function pickColor(c,el) { newCatColor=c; document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('on')); el.classList.add('on'); }
 async function addCat() {
