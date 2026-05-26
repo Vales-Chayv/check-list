@@ -8,7 +8,8 @@ function openView(id) {
   const atts = card.attachments||[];
   const imgs = atts.filter(a=>a.type?.startsWith('image/'));
   const files = atts.filter(a=>!a.type?.startsWith('image/'));
-  const dl = deadlineInfo(card.deadline);
+  const allDeadlines = [card.deadline, ...(card.entries||[]).filter(e=>!e.done&&e.deadline).map(e=>e.deadline)].filter(Boolean).sort();
+  const dl = allDeadlines.length ? deadlineInfo(allDeadlines[0]) : null;
   const related = card.related_ids||[];
   const hist = card.history||[];
 
@@ -132,7 +133,7 @@ function openAddEntry(cardId) {
   document.getElementById('ae-text').value = '';
   document.getElementById('ae-att-prev').innerHTML = '';
   const dlEl = document.getElementById('ae-entry-deadline');
-  if(dlEl) dlEl.value = '';
+  if(dlEl) dlEl.value = card?.deadline||'';
 
   // Populate extra fields with current card values
   if(card) {
