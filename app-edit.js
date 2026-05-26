@@ -137,7 +137,7 @@ function setSaveBtns(en) { ['save-btn','save-btn2','save-btn3'].forEach(id=>{con
 // Cat select
 function populateCatSel(sel) {
   const s=document.getElementById('e-cat');
-  s.innerHTML=cats.map(c=>`<option value="${esc(c.name)}"${c.name===sel?' selected':''}>${esc(c.name)}</option>`).join('')+'<option value="__new">+ Новая рубрика</option>';
+  s.innerHTML=cats.map(c=>`<option value="${c.name}"${c.name===sel?' selected':''}>${esc(c.name)}</option>`).join('')+'<option value="__new">+ Новая рубрика</option>';
 }
 function onCatChange() { if(document.getElementById('e-cat').value==='__new'){document.getElementById('new-cat-box').style.display='flex';initPalette();} }
 function initPalette() {
@@ -368,12 +368,6 @@ async function toggleDone(id) {
 
 async function toggleEntry(cardId,entryId) {
   const card=cards.find(c=>c.id===cardId); if(!card)return;
-  if(currentSpace?.type==='family' && card.assigned_to) {
-    const myName = currentUser?.display_name||'';
-    if(myName.toLowerCase() !== card.assigned_to.toLowerCase()) {
-      toast('Эта задача для ' + card.assigned_to, true); return;
-    }
-  }
   const e=(card.entries||[]).find(x=>x.id===entryId); if(!e)return;
   e.done=!e.done;
   if((card.entries||[]).length>0&&(card.entries||[]).every(x=>x.done)){
