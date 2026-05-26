@@ -230,47 +230,44 @@ function renderEntriesEdit() {
   const existing = tempEntries.filter(e => e._saved);
   const newEntries = tempEntries.filter(e => !e._saved);
 
-  // Existing entries at bottom
+  const entryRowHTML = (e) => `<div class="entry-row">
+    <div class="entry-cb${e.done?' on':''}" onclick="toggleEditEntry('${e.id}')">${e.done?checkSVG():''}</div>
+    <div style="flex:1">
+      <textarea class="entry-textarea" oninput="autoResize(this);updateEntry('${e.id}',this.value)" placeholder="Текст записи..." dir="auto">${esc(e.text)}</textarea>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:3px">
+        <div class="entry-date" style="flex:1">${e.date}</div>
+        <input type="date" value="${e.deadline||''}" onchange="updateEntryDeadline('${e.id}',this.value)"
+          style="background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t3);font-size:11px;font-family:inherit;padding:1px 2px;width:130px">
+      </div>
+    </div>
+    <button class="entry-del" onclick="rmEntry('${e.id}')">✕</button>
+  </div>`;
+
   if(existing.length) {
     wrap.style.display='block';
-    el.innerHTML=existing.map(e=>`<div class="entry-row">
-      <div class="entry-cb${e.done?' on':''}" onclick="toggleEditEntry('${e.id}')">${e.done?checkSVG():''}</div>
-      <div style="flex:1">
-        <textarea class="entry-textarea" oninput="autoResize(this);updateEntry('${e.id}',this.value)" dir="auto">${esc(e.text)}</textarea>
-        <div class="entry-date">${e.date}</div>
-      </div>
-      <button class="entry-del" onclick="rmEntry('${e.id}')">✕</button>
-    </div>`).join('');
+    el.innerHTML=existing.map(entryRowHTML).join('');
     el.querySelectorAll('.entry-textarea').forEach(t=>autoResize(t));
   } else {
     wrap.style.display='none';
     el.innerHTML='';
   }
 
-  // New entries above notes
   if(newEntries.length) {
-    newArea.innerHTML=`<div style="background:var(--s2);border-radius:var(--rsm);padding:2px 12px;margin-bottom:4px">${
-      newEntries.map(e=>`<div class="entry-row">
-        <div class="entry-cb${e.done?' on':''}" onclick="toggleEditEntry('${e.id}')">${e.done?checkSVG():''}</div>
-        <div style="flex:1">
-          <textarea class="entry-textarea" oninput="autoResize(this);updateEntry('${e.id}',this.value)" placeholder="Текст записи..." dir="auto">${esc(e.text)}</textarea>
-          <div class="entry-date">${e.date}</div>
-        </div>
-        <button class="entry-del" onclick="rmEntry('${e.id}')">✕</button>
-      </div>`).join('')
-    }</div>`;
+    newArea.innerHTML=`<div style="background:var(--s2);border-radius:var(--rsm);padding:2px 12px;margin-bottom:4px">${newEntries.map(entryRowHTML).join('')}</div>`;
     newArea.querySelectorAll('.entry-textarea').forEach(t=>autoResize(t));
   } else {
     newArea.innerHTML='';
   }
 }
 function addEntry() {
-  tempEntries.unshift({id:uid(),text:'',date:nowStr(),done:false,_saved:false});
+  const cardDeadline = document.getElementById('e-deadline')?.value || null;
+  tempEntries.unshift({id:uid(),text:'',date:nowStr(),done:false,_saved:false,deadline:cardDeadline});
   renderEntriesEdit();
   setTimeout(()=>{const ta=document.querySelector('#e-new-entry-area .entry-textarea');if(ta)ta.focus();},50);
 }
 function toggleEditEntry(id) { const e=tempEntries.find(x=>x.id===id);if(e){e.done=!e.done;renderEntriesEdit();} }
 function updateEntry(id,val) { const e=tempEntries.find(x=>x.id===id);if(e)e.text=val; }
+function updateEntryDeadline(id,val) { const e=tempEntries.find(x=>x.id===id);if(e)e.deadline=val||null; }
 function rmEntry(id) { tempEntries=tempEntries.filter(e=>e.id!==id); renderEntriesEdit(); }
 
 // History
