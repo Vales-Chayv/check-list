@@ -51,10 +51,14 @@ function openView(id) {
       if(eImgs.length) attHTML += `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">${eImgs.map(a=>`<img src="${a.data}" style="width:80px;height:80px;object-fit:cover;border-radius:7px;cursor:pointer" onclick="openImgDirect('${a.data}')">`).join('')}</div>`;
       if(eAudios.length) attHTML += eAudios.map(a=>`<audio controls src="${a.data}" style="width:100%;height:32px;margin-top:5px"></audio>`).join('');
       if(eFiles.length) attHTML += `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${eFiles.map(f=>`<a href="${f.data}" download="${esc(f.name)}" class="file-action">📎${esc(f.name)}</a>`).join('')}</div>`;
+      const eDl = e.deadline ? deadlineInfo(e.deadline) : null;
       return `<div class="entry-row">
         <div class="entry-cb${e.done?' on':''}" onclick="viewToggleEntry('${id}','${e.id}')">${e.done?checkSVG():''}</div>
         <div style="flex:1">
-          <div style="font-size:14px${e.done?';text-decoration:line-through;opacity:.45':''}" dir="auto">${esc(e.text)}</div>
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px">
+            <div style="font-size:14px${e.done?';text-decoration:line-through;opacity:.45':''};flex:1" dir="auto">${esc(e.text)}</div>
+            ${eDl?`<span class="dl-badge ${eDl.cls}${eDl.days<=3?' dl-pulse':''}" style="font-size:11px;white-space:nowrap;flex-shrink:0">⏰ ${eDl.text}</span>`:''}
+          </div>
           <div class="entry-date">${e.date}</div>
           ${attHTML}
         </div>
@@ -127,6 +131,7 @@ function openAddEntry(cardId) {
   document.getElementById('ae-card-title').textContent = '＋ Запись' + (title ? ' в «'+title+'»' : '');
   document.getElementById('ae-text').value = '';
   document.getElementById('ae-att-prev').innerHTML = '';
+  document.getElementById('ae-entry-deadline').value = '';
 
   // Populate extra fields with current card values
   if(card) {
@@ -226,7 +231,7 @@ async function saveAddEntry() {
   const card = cards.find(c => c.id === aeCardId); if (!card) return;
 
   // Save entry
-  const entry = {id:uid(), text, date:nowStr(), done:false, attachments:[...aeAtts]};
+  const entry = {id:uid(), text, date:nowStr(), done:false, attachments:[...aeAtts], deadline: document.getElementById('ae-entry-deadline').value||null};
   card.entries = [entry, ...(card.entries||[])];
 
   // Save extra settings if expanded
