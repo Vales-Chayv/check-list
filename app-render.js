@@ -23,7 +23,7 @@ function renderCats() {
     const border = active ? hex2rgba(col,.5) : 'rgba(255,255,255,.08)';
     html += `<button class="cat-btn${active?' on':''}" style="background:${bg};border-color:${border}"
       onclick="App.setCat(${i})"
-      oncontextmenu="event.preventDefault();event.stopPropagation();return false"
+      oncontextmenu="event.preventDefault();event.stopPropagation();App.deleteCat(${i});return false"
       ontouchstart="App.startCatHold(${i},this)" ontouchend="App.cancelCatHold()" ontouchmove="App.cancelCatHold()">
       <span class="cat-dot" style="background:${col}"></span>${esc(c.name)}</button>`;
   });
