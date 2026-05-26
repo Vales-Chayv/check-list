@@ -132,7 +132,10 @@ function cardHTML(card, isDone=false) {
   const border = hex2rgba(col, isDone?.2:.35);
   const entries = card.entries||[];
   const doneEntries = entries.filter(e=>e.done).length;
-  const dl = deadlineInfo(card.deadline);
+  // Find nearest deadline among card and all undone entries
+  const allDeadlines = [card.deadline, ...entries.filter(e=>!e.done).map(e=>e.deadline)]
+    .filter(Boolean).sort();
+  const dl = allDeadlines.length ? deadlineInfo(allDeadlines[0]) : null;
   const pcls = card.priority==='urgent'?'p-urgent':card.priority==='high'?'p-high':'';
   const pBadge = card.priority==='urgent'?'🔥':card.priority==='high'?'⚡':'';
   const isExp = expandedCards.has(card.id);
