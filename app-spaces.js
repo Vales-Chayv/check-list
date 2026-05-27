@@ -89,7 +89,7 @@ function onSpaceClick(id) {
     document.getElementById('space-pwd-ov').classList.add('on');
     setTimeout(()=>document.getElementById('space-pwd-inp').focus(), 300);
   } else {
-    setCurrentSpace(id, true);
+    afterPasswordOrDirect(id);
   }
 }
 function enterSpacePwd() {
@@ -97,7 +97,7 @@ function enterSpacePwd() {
   const v = document.getElementById('space-pwd-inp').value;
   if(v === space.password) {
     document.getElementById('space-pwd-ov').classList.remove('on');
-    setCurrentSpace(pendingSpaceId, true);
+    afterPasswordOrDirect(pendingSpaceId);
   } else {
     document.getElementById('space-pwd-err').textContent = '❌ Неверный пароль';
     const inp = document.getElementById('space-pwd-inp');
@@ -111,11 +111,13 @@ function setCurrentSpace(id, loadNew) {
   localStorage.setItem('mc_current_space', id);
   hideSpaceSelector();
   document.getElementById('space-pwd-ov').classList.remove('on');
+  document.getElementById('space-member-ov').classList.remove('on');
   document.getElementById('current-space-name').textContent = currentSpace.name;
   if(loadNew) { cards=[]; cats=[]; render(); loadData(); }
 }
 function switchSpace() {
   localStorage.removeItem('mc_current_space');
+  localStorage.removeItem('mc_current_member');
   currentSpaceId = null; currentSpace = null;
   cards = []; cats = [];
   render();
@@ -186,6 +188,30 @@ function showShareLink(space) {
     </div>
   </div>`;
   document.body.appendChild(div);
+}
+// ─── MEMBER SELECTOR ────────────────────────
+function afterPasswordOrDirect(id) {
+  const space = spaces.find(s=>s.id===id); if(!space) return;
+  const members = space.members||[];
+  if(space.type==='family' && members.length > 0) {
+    showMemberSelector(id);
+  } else {
+    setCurrentSpace(id, true);
+  }
+}
+function showMemberSelector(id) {
+  const space = spaces.find(s=>s.id===id); if(!space) return;
+  pendingSpaceId = id;
+  document.getElementById('space-member-name').textContent = space.name;
+  const list = document.getElementById('space-member-list');
+  list.innerHTML = (space.members||[]).map(m =>
+    `<button onclick="selectMember('${esc(m.name)}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:13px 16px;font-size:16px;font-weight:600;color:var(--t1);cursor:pointer;font-family:inherit;text-align:left">${esc(m.name)}</button>`
+  ).join('');
+  document.getElementById('space-member-ov').classList.add('on');
+}
+function selectMember(name) {
+  localStorage.setItem('mc_current_member', name);
+  setCurrentSpace(pendingSpaceId, true);
 }
 // ─── SPACE MEMBERS ───────────────────────────
 function getSpaceMembers() {

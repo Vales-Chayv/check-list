@@ -424,6 +424,21 @@
   </div>
 </div>
 
+<!-- Space Member Selector -->
+<div class="overlay" id="space-member-ov">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title" id="space-member-name"></span>
+      <button class="close-btn" onclick="document.getElementById('space-member-ov').classList.remove('on')">✕</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:14px;color:var(--t2);margin-bottom:4px">Кто сейчас работает?</div>
+      <div id="space-member-list" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Create Space -->
 <div class="overlay" id="create-space-ov" onclick="if(event.target===this)closeCreateSpace()" style="z-index:999">
   <div class="sheet">
