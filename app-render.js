@@ -1,6 +1,12 @@
 // ═══════════════════════════════════════════
 //  RENDER
 // ═══════════════════════════════════════════
+let memberFilterOn = false;
+function applyMemberFilter(arr) {
+  if(!memberFilterOn) return arr;
+  const name = localStorage.getItem('mc_current_member')||'';
+  return arr.filter(c => c.assigned_to === name);
+}
 function render() {
   // Inject pulse animation once
   if(!document.getElementById('dl-pulse-style')) {
@@ -39,7 +45,7 @@ function renderMain() {
 function renderCards() {
   const el=document.getElementById('scroll');
   const PO={urgent:0,high:1,normal:2};
-  const filtered=cards.filter(c=>c.status!=='done'&&(filterCat==='all'||c.category===filterCat));
+  const filtered=applyMemberFilter(cards.filter(c=>c.status!=='done'&&(filterCat==='all'||c.category===filterCat)));
   if(!filtered.length){el.innerHTML=emptyHTML('Нет карточек','Создай первую карточку');return;}
 
   // Separate urgent/high from normal
@@ -67,7 +73,7 @@ function renderCards() {
 function renderChecklist() {
   const el = document.getElementById('scroll');
   const PO = {urgent:0, high:1, normal:2};
-  const rem = cards.filter(c=>c.reminder?.enabled && c.status!=='done' && (filterCat==='all'||c.category===filterCat));
+  const rem = applyMemberFilter(cards.filter(c=>c.reminder?.enabled && c.status!=='done' && (filterCat==='all'||c.category===filterCat)));
   if(!rem.length){el.innerHTML=emptyHTML('Чек-лист пуст','Включи напоминание в карточке');return;}
 
   // Sort: urgent/high first, then by deadline
@@ -112,7 +118,7 @@ function renderChecklist() {
 
 function renderDone() {
   const el = document.getElementById('scroll');
-  const done = cards.filter(c=>c.status==='done'&&(filterCat==='all'||c.category===filterCat));
+  const done = applyMemberFilter(cards.filter(c=>c.status==='done'&&(filterCat==='all'||c.category===filterCat)));
   if(!done.length){el.innerHTML=emptyHTML('Нет выполненных','Карточки со статусом «Готово» появятся здесь');return;}
   const grouped={};
   done.forEach(c=>{const d=(c.created_at||today()).slice(0,10);(grouped[d]=grouped[d]||[]).push(c);});

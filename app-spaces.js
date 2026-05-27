@@ -229,7 +229,10 @@ function selectMember(name) {
 }
 function switchMember() {
   if(!currentSpaceId) return;
-  showMemberSelector(currentSpaceId);
+  memberFilterOn = !memberFilterOn;
+  const btn = document.getElementById('current-member-btn');
+  if(btn) btn.style.background = memberFilterOn ? 'rgba(232,197,106,.4)' : 'rgba(232,197,106,.15)';
+  render();
 }
 // ─── SPACE MEMBERS ───────────────────────────
 function getSpaceMembers() {
