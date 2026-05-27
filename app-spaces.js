@@ -75,7 +75,7 @@ function renderSpacesList() {
         </div>
         ${s.password?'<span style="font-size:16px;opacity:.5">🔒</span>':'<span style="font-size:12px;color:var(--t3)">Открыть</span>'}
       </div>
-      ${s.type==='family'?`<button onclick="getShareLink('${s.id}')" style="background:rgba(232,197,106,.15);border:1px solid rgba(232,197,106,.3);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--accent);cursor:pointer" title="Пригласить">🔗</button>`:''}
+      ${s.type==='family'?`<button onclick="getShareLink('${s.id}')" style="background:rgba(232,197,106,.15);border:1px solid rgba(232,197,106,.3);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--accent);cursor:pointer" title="Пригласить">🔗</button><button onclick="openManageMembers('${s.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--t2);cursor:pointer" title="Участники">✏️</button>`:''}
     </div>`;
   }).join('');
 }
@@ -113,17 +113,6 @@ function setCurrentSpace(id, loadNew) {
   document.getElementById('space-pwd-ov').classList.remove('on');
   document.getElementById('space-member-ov').classList.remove('on');
   document.getElementById('current-space-name').textContent = currentSpace.name;
-  const btn = document.getElementById('current-member-btn');
-  const lbl = document.getElementById('current-member-label');
-  if(btn && lbl) {
-    const member = localStorage.getItem('mc_current_member');
-    if(currentSpace.type === 'family' && member) {
-      lbl.textContent = member + ' онлайн';
-      btn.style.display = 'inline-flex';
-    } else {
-      btn.style.display = 'none';
-    }
-  }
   if(loadNew) { cards=[]; cats=[]; render(); loadData(); }
 }
 function switchSpace() {
@@ -222,17 +211,56 @@ function showMemberSelector(id) {
 }
 function selectMember(name) {
   localStorage.setItem('mc_current_member', name);
-  const btn = document.getElementById('current-member-btn');
-  const lbl = document.getElementById('current-member-label');
-  if(btn && lbl) { lbl.textContent = name + ' онлайн'; btn.style.display = 'inline-flex'; }
   setCurrentSpace(pendingSpaceId, true);
 }
-function switchMember() {
-  if(!currentSpaceId) return;
-  memberFilterOn = !memberFilterOn;
-  const btn = document.getElementById('current-member-btn');
-  if(btn) btn.style.background = memberFilterOn ? 'rgba(232,197,106,.4)' : 'rgba(232,197,106,.15)';
-  render();
+// ─── MANAGE MEMBERS ─────────────────────────
+let managingSpaceId = null;
+function openManageMembers(id) {
+  managingSpaceId = id;
+  const space = spaces.find(s=>s.id===id); if(!space) return;
+  document.getElementById('manage-members-title').textContent = space.name + ' — Участники';
+  document.getElementById('manage-member-inp').value = '';
+  renderManageMembersList();
+  document.getElementById('manage-members-ov').classList.add('on');
+}
+function renderManageMembersList() {
+  const space = spaces.find(s=>s.id===managingSpaceId); if(!space) return;
+  const el = document.getElementById('manage-members-list');
+  const members = space.members||[];
+  if(!members.length) { el.innerHTML = '<div style="font-size:14px;color:var(--t3)">Нет участников</div>'; return; }
+  el.innerHTML = members.map(m =>
+    `<div style="display:flex;align-items:center;justify-content:space-between;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:11px 14px">
+      <span style="font-size:15px">${esc(m.name)}</span>
+      <button onclick="removeMemberFromSpace('${esc(m.name)}')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:18px;padding:0 4px">✕</button>
+    </div>`
+  ).join('');
+}
+async function addMemberToSpace() {
+  const inp = document.getElementById('manage-member-inp');
+  const name = inp.value.trim(); if(!name) return;
+  const space = spaces.find(s=>s.id===managingSpaceId); if(!space) return;
+  if((space.members||[]).find(m=>m.name===name)) { toast('Участник уже есть', true); inp.value=''; return; }
+  space.members = [...(space.members||[]), {name}];
+  inp.value = '';
+  renderManageMembersList();
+  renderSpacesList();
+  try {
+    await sb.from('spaces').update({members: space.members}).eq('id', managingSpaceId);
+    localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+    toast('✓ Участник добавлен');
+  } catch(e) { toast('Ошибка: '+e.message, true); }
+}
+async function removeMemberFromSpace(name) {
+  if(!confirm('Удалить участника «'+name+'»?')) return;
+  const space = spaces.find(s=>s.id===managingSpaceId); if(!space) return;
+  space.members = (space.members||[]).filter(m=>m.name!==name);
+  renderManageMembersList();
+  renderSpacesList();
+  try {
+    await sb.from('spaces').update({members: space.members}).eq('id', managingSpaceId);
+    localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+    toast('✓ Участник удалён');
+  } catch(e) { toast('Ошибка: '+e.message, true); }
 }
 // ─── SPACE MEMBERS ───────────────────────────
 function getSpaceMembers() {
