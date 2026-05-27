@@ -113,6 +113,17 @@ function setCurrentSpace(id, loadNew) {
   document.getElementById('space-pwd-ov').classList.remove('on');
   document.getElementById('space-member-ov').classList.remove('on');
   document.getElementById('current-space-name').textContent = currentSpace.name;
+  const btn = document.getElementById('current-member-btn');
+  const lbl = document.getElementById('current-member-label');
+  if(btn && lbl) {
+    const member = localStorage.getItem('mc_current_member');
+    if(currentSpace.type === 'family' && member) {
+      lbl.textContent = member + ' онлайн';
+      btn.style.display = 'inline-flex';
+    } else {
+      btn.style.display = 'none';
+    }
+  }
   if(loadNew) { cards=[]; cats=[]; render(); loadData(); }
 }
 function switchSpace() {
@@ -211,7 +222,14 @@ function showMemberSelector(id) {
 }
 function selectMember(name) {
   localStorage.setItem('mc_current_member', name);
+  const btn = document.getElementById('current-member-btn');
+  const lbl = document.getElementById('current-member-label');
+  if(btn && lbl) { lbl.textContent = name + ' онлайн'; btn.style.display = 'inline-flex'; }
   setCurrentSpace(pendingSpaceId, true);
+}
+function switchMember() {
+  if(!currentSpaceId) return;
+  showMemberSelector(currentSpaceId);
 }
 // ─── SPACE MEMBERS ───────────────────────────
 function getSpaceMembers() {
