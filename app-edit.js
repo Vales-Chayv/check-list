@@ -30,8 +30,9 @@ function openEdit(id) {
   if(isFamily) {
     const members = getSpaceMembers();
     const sel = document.getElementById('e-assigned');
+    const defaultMember = card ? card.assigned_to : (localStorage.getItem('mc_current_member')||'');
     sel.innerHTML = '<option value="">👨‍👩‍👧 Для всех</option>' +
-      members.map(m=>`<option value="${esc(m)}"${card?.assigned_to===m?' selected':''}>${esc(m)}</option>`).join('');
+      members.map(m=>`<option value="${esc(m)}"${defaultMember===m?' selected':''}>${esc(m)}</option>`).join('');
   } else {
     document.getElementById('e-status').value=card?.status||'new';
   }
