@@ -213,6 +213,21 @@ function selectMember(name) {
   localStorage.setItem('mc_current_member', name);
   setCurrentSpace(pendingSpaceId, true);
 }
+// ─── DELETE SPACE ────────────────────────────
+async function deleteSpace(id) {
+  const space = spaces.find(s=>s.id===id); if(!space) return;
+  if(!confirm('Удалить кабинет «'+space.name+'»? Все карточки будут удалены.')) return;
+  try {
+    await sb.from('cards').delete().eq('space_id', id);
+    await sb.from('spaces').delete().eq('id', id);
+    spaces = spaces.filter(s=>s.id!==id);
+    localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+    document.getElementById('manage-members-ov').classList.remove('on');
+    if(currentSpaceId===id) switchSpace();
+    else renderSpacesList();
+    toast('✓ Кабинет удалён');
+  } catch(e) { toast('Ошибка: '+e.message, true); }
+}
 // ─── MANAGE MEMBERS ─────────────────────────
 let managingSpaceId = null;
 function openManageMembers(id) {
