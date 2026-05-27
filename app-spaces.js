@@ -3,20 +3,14 @@
 // ═══════════════════════════════════════════
 let spaces = [], currentSpaceId = null, currentSpace = null;
 let pendingSpaceId = null;
-
 // ─── INIT ───────────────────────────────────
 async function initSpaces() {
-  // Check for invite link
   const urlToken = new URLSearchParams(window.location.search).get('space');
-
-  // Show user name in lobby
   if(currentUser) {
     const el = document.getElementById('lobby-user');
     if(el) el.textContent = 'Привет, ' + (currentUser.display_name||'') + ' 👋';
   }
-
   try {
-    // Load only my spaces + joined spaces
     const joinedIds = JSON.parse(localStorage.getItem('mc_joined_spaces')||'[]');
     let query = sb.from('spaces').select('*').order('created_at');
     if(currentUser) {
@@ -30,13 +24,11 @@ async function initSpaces() {
     if(!spaces.length) spaces = [{id:'personal',name:'Личный',type:'personal',members:[]}];
   }
   localStorage.setItem('mc_spaces', JSON.stringify(spaces));
-
   // Handle invite link
   if(urlToken) {
     try {
       const {data} = await sb.from('spaces').select('*').eq('share_token', urlToken).single();
       if(data) {
-        // Add to joined if not already there
         const joined = JSON.parse(localStorage.getItem('mc_joined_spaces')||'[]');
         if(!joined.includes(data.id)) {
           joined.push(data.id);
@@ -58,26 +50,17 @@ async function initSpaces() {
       }
     } catch(e) {}
   }
-
-  // Restore last used space
-  const saved = localStorage.getItem('mc_current_space');
-  if(saved && spaces.find(s=>s.id===saved)) {
-    setCurrentSpace(saved, false);
-  } else {
-    showSpaceSelector();
-  }
+  // Always show lobby — no auto-enter
+  showSpaceSelector();
 }
-
 // ─── SELECTOR ───────────────────────────────
 function showSpaceSelector() {
   renderSpacesList();
   document.getElementById('space-selector').style.display = 'flex';
 }
-
 function hideSpaceSelector() {
   document.getElementById('space-selector').style.display = 'none';
 }
-
 function renderSpacesList() {
   const list = document.getElementById('spaces-list');
   list.innerHTML = spaces.map(s => {
@@ -96,7 +79,6 @@ function renderSpacesList() {
     </div>`;
   }).join('');
 }
-
 function onSpaceClick(id) {
   const space = spaces.find(s=>s.id===id); if(!space) return;
   if(space.password) {
@@ -110,7 +92,6 @@ function onSpaceClick(id) {
     setCurrentSpace(id, true);
   }
 }
-
 function enterSpacePwd() {
   const space = spaces.find(s=>s.id===pendingSpaceId); if(!space) return;
   const v = document.getElementById('space-pwd-inp').value;
@@ -124,18 +105,15 @@ function enterSpacePwd() {
     setTimeout(()=>inp.classList.remove('err'), 600);
   }
 }
-
 function setCurrentSpace(id, loadNew) {
   currentSpaceId = id;
   currentSpace = spaces.find(s=>s.id===id);
   localStorage.setItem('mc_current_space', id);
   hideSpaceSelector();
   document.getElementById('space-pwd-ov').classList.remove('on');
-  // Update header
   document.getElementById('current-space-name').textContent = currentSpace.name;
   if(loadNew) { cards=[]; cats=[]; render(); loadData(); }
 }
-
 function switchSpace() {
   localStorage.removeItem('mc_current_space');
   currentSpaceId = null; currentSpace = null;
@@ -144,7 +122,6 @@ function switchSpace() {
   renderSpacesList();
   showSpaceSelector();
 }
-
 // ─── CREATE SPACE ────────────────────────────
 function openCreateSpace() {
   document.getElementById('new-space-name').value = '';
@@ -156,7 +133,6 @@ function openCreateSpace() {
   setTimeout(()=>document.getElementById('new-space-name').focus(), 300);
 }
 function closeCreateSpace() { document.getElementById('create-space-ov').classList.remove('on'); }
-
 let newSpaceMembers = [];
 function renderNewMembersList() {
   const el = document.getElementById('new-members-list');
@@ -176,7 +152,6 @@ function renderNewMembersEdit() {
   const el = document.getElementById('new-members-list');
   el.innerHTML = newSpaceMembers.map((m,i)=>`<div style="display:inline-flex;align-items:center;gap:5px;background:var(--s2);border:1px solid var(--b1);border-radius:18px;padding:4px 10px;margin:3px;font-size:13px">${esc(m.name)}<button onclick="newSpaceMembers.splice(${i},1);renderNewMembersEdit()" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:11px;margin-left:2px">✕</button></div>`).join('');
 }
-
 async function createSpace() {
   const name = document.getElementById('new-space-name').value.trim(); if(!name) return;
   const type = document.getElementById('new-space-type').value;
@@ -196,7 +171,6 @@ async function createSpace() {
     if(type === 'family') showShareLink(space);
   } catch(e) { toast('Ошибка: '+e.message, true); }
 }
-
 function showShareLink(space) {
   const link = `${location.origin}${location.pathname}?space=${space.share_token}`;
   const div = document.createElement('div');
@@ -213,15 +187,12 @@ function showShareLink(space) {
   </div>`;
   document.body.appendChild(div);
 }
-
 // ─── SPACE MEMBERS ───────────────────────────
 function getSpaceMembers() {
   return (currentSpace?.members||[]).map(m=>m.name);
 }
-
 async function getShareLink(spaceId) {
   let space = spaces.find(s=>s.id===spaceId); if(!space) return;
-  // Generate token if missing
   if(!space.share_token) {
     space.share_token = uid().slice(0,12);
     await sb.from('spaces').update({share_token:space.share_token}).eq('id',spaceId);
