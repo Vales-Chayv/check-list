@@ -246,6 +246,9 @@ async function saveAddEntry() {
     if(ballBtn) card.ball = ballBtn.dataset.ball;
   }
 
+  // Move to in_progress if status is new
+  if(card.status === 'new') card.status = 'in_progress';
+
   // Auto-done if all entries checked
   if((card.entries||[]).length && (card.entries||[]).every(e=>e.done)) card.status='done';
 

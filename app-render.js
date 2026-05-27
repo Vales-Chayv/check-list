@@ -58,7 +58,7 @@ function renderCards() {
   // Normal cards grouped by date
   const grouped={};
   normal.forEach(c=>{const d=(c.created_at||today()).slice(0,10);(grouped[d]=grouped[d]||[]).push(c);});
-  const dates=Object.keys(grouped).sort((a,b)=>b.localeCompare(a));
+  const dates=Object.keys(grouped).sort((a,b)=>a.localeCompare(b));
   html+=dates.map(d=>grouped[d].map(c=>cardHTML(c)).join('')).join('');
 
   el.innerHTML=html;
