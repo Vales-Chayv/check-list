@@ -328,5 +328,31 @@ function updatePresenceUI() {
   const allNames = Object.values(state).flatMap(arr => arr.map(p => p.name));
   const others = [...new Set(allNames)].filter(n => n !== myName);
   const lbl = document.getElementById('current-member-label');
-  if(lbl) lbl.textContent = myName + (others.length > 0 ? ` +${others.length}` : ' онлайн');
+  const countBtn = document.getElementById('presence-count-btn');
+  if(lbl) lbl.textContent = '👤 ' + myName;
+  if(countBtn) {
+    if(others.length > 0) {
+      countBtn.textContent = '+' + others.length;
+      countBtn.style.display = 'block';
+      countBtn._others = others;
+    } else {
+      countBtn.style.display = 'none';
+    }
+  }
+}
+function showOnlineList() {
+  const btn = document.getElementById('presence-count-btn');
+  const others = btn?._others || [];
+  if(!others.length) return;
+  const existing = document.getElementById('online-dropdown');
+  if(existing) { existing.remove(); return; }
+  const div = document.createElement('div');
+  div.id = 'online-dropdown';
+  div.style.cssText = 'position:fixed;top:52px;right:60px;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:8px;z-index:1000;min-width:140px;box-shadow:0 4px 20px rgba(0,0,0,.4)';
+  div.innerHTML = '<div style="font-size:12px;color:var(--t3);margin-bottom:6px">Сейчас онлайн:</div>' +
+    others.map(n => `<div style="font-size:14px;padding:4px 0">🟢 ${esc(n)}</div>`).join('');
+  document.body.appendChild(div);
+  setTimeout(() => document.addEventListener('click', function handler() {
+    div.remove(); document.removeEventListener('click', handler);
+  }), 100);
 }
