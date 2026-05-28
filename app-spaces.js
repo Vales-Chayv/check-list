@@ -113,7 +113,18 @@ function setCurrentSpace(id, loadNew) {
   hideSpaceSelector();
   document.getElementById('space-pwd-ov').classList.remove('on');
   document.getElementById('space-member-ov').classList.remove('on');
-  document.getElementById('current-space-name').textContent = currentSpace.name;
+document.getElementById('current-space-name').textContent = currentSpace.name;
+  const btn = document.getElementById('current-member-btn');
+  const lbl = document.getElementById('current-member-label');
+  if(btn && lbl) {
+    const member = localStorage.getItem('mc_current_member');
+    if(currentSpace.type === 'family' && member) {
+      lbl.textContent = member + ' онлайн';
+      btn.style.display = 'inline-flex';
+    } else {
+      btn.style.display = 'none';
+    }
+  }
   if(loadNew) { cards=[]; cats=[]; render(); loadData(); }
   if(currentSpace?.type === 'family') {
     subscribeRealtimeCards(id);
