@@ -231,6 +231,13 @@ function selectMember(name) {
   localStorage.setItem('mc_current_member', name);
   setCurrentSpace(pendingSpaceId, true);
 }
+function switchMember() {
+  if(!currentSpaceId) return;
+  memberFilterOn = !memberFilterOn;
+  const btn = document.getElementById('current-member-btn');
+  if(btn) btn.style.background = memberFilterOn ? 'rgba(232,197,106,.4)' : 'rgba(232,197,106,.15)';
+  render();
+}
 // ─── DELETE SPACE ────────────────────────────
 async function deleteSpace(id) {
   const space = spaces.find(s=>s.id===id); if(!space) return;
