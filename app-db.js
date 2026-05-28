@@ -199,3 +199,37 @@ async function dbAddCat(cat) {
   } else { await queueOp({type:'insert_cat',data:catWithSpace}); }
 }
 
+// ═══════════════════════════════════════════
+//  REALTIME — AUTO SYNC CARDS
+// ═══════════════════════════════════════════
+let realtimeCardChannel = null;
+
+function subscribeRealtimeCards(spaceId) {
+  unsubscribeRealtimeCards();
+  realtimeCardChannel = sb.channel('cards:' + spaceId)
+    .on('postgres_changes', {
+      event: '*', schema: 'public', table: 'cards',
+      filter: `space_id=eq.${spaceId}`
+    }, payload => handleRealtimeCard(payload))
+    .subscribe();
+}
+
+function unsubscribeRealtimeCards() {
+  if(realtimeCardChannel) { sb.removeChannel(realtimeCardChannel); realtimeCardChannel = null; }
+}
+
+function handleRealtimeCard(payload) {
+  const { eventType, new: n, old: o } = payload;
+  if(eventType === 'INSERT') {
+    if(!cards.find(c => c.id === n.id)) { cards.unshift(n); local.put('cards', n); }
+  } else if(eventType === 'UPDATE') {
+    const idx = cards.findIndex(c => c.id === n.id);
+    if(idx !== -1) { cards[idx] = n; local.put('cards', n); }
+    else { cards.unshift(n); local.put('cards', n); }
+  } else if(eventType === 'DELETE') {
+    cards = cards.filter(c => c.id !== o.id);
+    local.delete('cards', o.id);
+  }
+  render();
+}
+

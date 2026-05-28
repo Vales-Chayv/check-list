@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════
 let spaces = [], currentSpaceId = null, currentSpace = null;
 let pendingSpaceId = null;
+let presenceChannel = null;
 // ─── INIT ───────────────────────────────────
 async function initSpaces() {
   const urlToken = new URLSearchParams(window.location.search).get('space');
@@ -114,10 +115,16 @@ function setCurrentSpace(id, loadNew) {
   document.getElementById('space-member-ov').classList.remove('on');
   document.getElementById('current-space-name').textContent = currentSpace.name;
   if(loadNew) { cards=[]; cats=[]; render(); loadData(); }
+  if(currentSpace?.type === 'family') {
+    subscribeRealtimeCards(id);
+    subscribePresence(id);
+  }
 }
 function switchSpace() {
   localStorage.removeItem('mc_current_space');
   localStorage.removeItem('mc_current_member');
+  unsubscribeRealtimeCards();
+  unsubscribePresence();
   currentSpaceId = null; currentSpace = null;
   cards = []; cats = [];
   render();
@@ -289,4 +296,25 @@ async function getShareLink(spaceId) {
     localStorage.setItem('mc_spaces', JSON.stringify(spaces));
   }
   showShareLink(space);
+}
+// ─── PRESENCE ────────────────────────────────
+function subscribePresence(spaceId) {
+  unsubscribePresence();
+  const myName = localStorage.getItem('mc_current_member') || '';
+  presenceChannel = sb.channel('presence:' + spaceId)
+    .on('presence', { event: 'sync' }, () => updatePresenceUI())
+    .subscribe(async status => {
+      if(status === 'SUBSCRIBED') await presenceChannel.track({ name: myName });
+    });
+}
+function unsubscribePresence() {
+  if(presenceChannel) { sb.removeChannel(presenceChannel); presenceChannel = null; }
+}
+function updatePresenceUI() {
+  if(!presenceChannel) return;
+  const myName = localStorage.getItem('mc_current_member') || '';
+  const state = presenceChannel.presenceState();
+  const others = Object.keys(state).filter(k => k !== myName).length;
+  const lbl = document.getElementById('current-member-label');
+  if(lbl) lbl.textContent = myName + (others > 0 ? ` +${others}` : ' онлайн');
 }
