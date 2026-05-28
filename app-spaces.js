@@ -325,7 +325,8 @@ function updatePresenceUI() {
   if(!presenceChannel) return;
   const myName = localStorage.getItem('mc_current_member') || '';
   const state = presenceChannel.presenceState();
-  const others = Object.keys(state).filter(k => k !== myName).length;
+  const allNames = Object.values(state).flatMap(arr => arr.map(p => p.name));
+  const others = [...new Set(allNames)].filter(n => n !== myName);
   const lbl = document.getElementById('current-member-label');
-  if(lbl) lbl.textContent = myName + (others > 0 ? ` +${others}` : ' онлайн');
+  if(lbl) lbl.textContent = myName + (others.length > 0 ? ` +${others.length}` : ' онлайн');
 }
