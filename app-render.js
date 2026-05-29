@@ -50,6 +50,12 @@ function renderCards() {
 
   // Separate urgent/high from normal
   const priority=filtered.filter(c=>c.priority==='urgent'||c.priority==='high')
+    .sort((a,b)=>{
+      const pd=PO[a.priority]-PO[b.priority];
+      if(pd!==0) return pd;
+      const da=a.deadline||'9999', db=b.deadline||'9999';
+      return da.localeCompare(db);
+    });
     .sort((a,b)=>PO[a.priority]-PO[b.priority]);
   const normal=filtered.filter(c=>!c.priority||c.priority==='normal');
 
