@@ -56,7 +56,6 @@ function renderCards() {
       const da=a.deadline||'9999', db=b.deadline||'9999';
       return da.localeCompare(db);
     });
-    .sort((a,b)=>PO[a.priority]-PO[b.priority]);
   const normal=filtered.filter(c=>!c.priority||c.priority==='normal');
 
   let html='';
