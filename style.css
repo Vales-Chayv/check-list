@@ -109,7 +109,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .entry-del{background:none;border:none;cursor:pointer;color:var(--t3);font-size:13px;padding:2px}
 .entry-date{font-size:10px;color:var(--t3);margin-top:1px}
 /* View sheet */
-.view-sec{padding:13px 20px;border-bottom:1px solid var(--b1)}
+.view-sec{padding:13px 20px}
 .view-lbl{font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px}
 .file-action{display:inline-flex;align-items:center;gap:5px;background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:6px 11px;font-size:13px;cursor:pointer;color:var(--t2);text-decoration:none;margin:3px}
 /* Attach preview */
