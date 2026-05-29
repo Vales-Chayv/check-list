@@ -454,7 +454,8 @@
     <div style="padding:20px;display:flex;flex-direction:column;gap:12px">
       <div id="manage-members-list" style="display:flex;flex-direction:column;gap:8px"></div>
       <div style="display:flex;gap:7px;margin-top:4px">
-        <input id="manage-member-inp" placeholder="Имя нового участника..." dir="auto" onkeydown="if(event.key==='Enter'){addMemberToSpace();event.preventDefault()}">
+        <input id="manage-member-inp" placeholder="Имя участника..." dir="auto" onkeydown="if(event.key==='Enter'){addMemberToSpace();event.preventDefault()}">
+<input id="manage-member-email" placeholder="Email (необязательно)" type="email" style="margin-top:6px">
         <button onclick="addMemberToSpace()" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px 14px;cursor:pointer;color:var(--accent);font-size:16px">＋</button>
       </div>
 	   <button onclick="deleteSpace(managingSpaceId)" style="background:none;border:1px solid var(--red);border-radius:var(--rsm);padding:11px;font-size:14px;color:var(--red);cursor:pointer;font-family:inherit;margin-top:8px">🗑 Удалить кабинет</button>

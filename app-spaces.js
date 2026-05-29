@@ -162,6 +162,7 @@ function renderNewMembersList() {
 function addNewMember() {
   const inp = document.getElementById('new-member-inp');
   const name = inp.value.trim(); if(!name) return;
+const email = (document.getElementById('manage-member-email')?.value||'').trim().toLowerCase();
   if(newSpaceMembers.find(m=>m.name===name)) { inp.value=''; return; }
   newSpaceMembers.push({name});
   inp.value='';
@@ -211,8 +212,15 @@ function showShareLink(space) {
 function afterPasswordOrDirect(id) {
   const space = spaces.find(s=>s.id===id); if(!space) return;
   const members = space.members||[];
-  if(space.type==='family' && members.length > 0) {
-    showMemberSelector(id);
+ if(space.type==='family' && members.length > 0) {
+    const userEmail = currentUser?.email?.toLowerCase()||'';
+    const matched = members.find(m => m.email && m.email.toLowerCase() === userEmail);
+    if(matched) {
+      localStorage.setItem('mc_current_member', matched.name);
+      setCurrentSpace(id, true);
+    } else {
+      showMemberSelector(id);
+    }
   } else {
     setCurrentSpace(id, true);
   }
@@ -280,8 +288,9 @@ async function addMemberToSpace() {
   const name = inp.value.trim(); if(!name) return;
   const space = spaces.find(s=>s.id===managingSpaceId); if(!space) return;
   if((space.members||[]).find(m=>m.name===name)) { toast('Участник уже есть', true); inp.value=''; return; }
-  space.members = [...(space.members||[]), {name}];
-  inp.value = '';
+space.members = [...(space.members||[]), {name, email: email||null}];
+inp.value = '';
+document.getElementById('manage-member-email').value = '';
   renderManageMembersList();
   renderSpacesList();
   try {
