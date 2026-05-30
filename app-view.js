@@ -222,8 +222,11 @@ function aeAddEntryRow() {
   const wrap = document.getElementById('ae-entries-list'); if(!wrap) return;
   const div = document.createElement('div');
   div.className = 'entry-row';
-  div.innerHTML = `<div class="entry-cb"></div>
-    <textarea dir="auto" placeholder="Текст записи..." oninput="autoResize(this)" style="background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t1);font-size:14px;font-family:inherit;resize:none;min-height:36px;line-height:1.6;width:100%;padding:4px 0"></textarea>
+ div.innerHTML = `<div class="entry-cb"></div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+      <textarea dir="auto" placeholder="Текст записи..." oninput="autoResize(this)" style="background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t1);font-size:14px;font-family:inherit;resize:none;min-height:36px;line-height:1.6;width:100%;padding:4px 0"></textarea>
+      <textarea dir="auto" placeholder="Заметка к записи..." oninput="autoResize(this)" style="background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t2);font-size:13px;font-family:inherit;resize:none;min-height:28px;line-height:1.5;width:100%;padding:3px 0"></textarea>
+    </div>
     <button onclick="this.closest('.entry-row').remove()" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:16px;padding:0 4px">✕</button>`;
   wrap.appendChild(div);
   setTimeout(()=>{ const ta=div.querySelector('textarea'); if(ta){ta.focus();autoResize(ta);} },50);
@@ -245,12 +248,16 @@ async function saveAddEntry() {
   const card = cards.find(c => c.id === aeCardId); if (!card) return;
 
   // Save note
-  if(note) card.body = card.body ? card.body + '\n\n' + note : note;
+if(note) card.body = note;
 
   // Save entries
-  entryTexts.forEach(text => {
-    const entry = {id:uid(), text, date:nowStr(), done:false, attachments:[], deadline: document.getElementById('ae-entry-deadline')?.value||null};
-    card.entries = [entry, ...(card.entries||[])];
+ [...entryRows].forEach(row => {
+    const text = row.querySelectorAll('textarea')[0]?.value?.trim();
+    const note = row.querySelectorAll('textarea')[1]?.value?.trim();
+    if(text) {
+      const entry = {id:uid(), text, note:note||null, date:nowStr(), done:false, attachments:[], deadline: document.getElementById('ae-entry-deadline')?.value||null};
+      card.entries = [entry, ...(card.entries||[])];
+    }
   });
 
   // Save attachments to last entry or card
