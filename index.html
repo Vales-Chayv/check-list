@@ -147,7 +147,6 @@
             <button class="seg-btn on" data-freq="daily">Каждый день</button>
             <button class="seg-btn" data-freq="weekly">Раз в неделю</button>
             <button class="seg-btn" data-freq="custom">Свои дни</button>
-			<button class="seg-btn" data-freq="interval">Интервал</button>
           </div>
           <div id="day-picker" style="display:none">
             <div class="days" id="days-row">
@@ -160,19 +159,6 @@
               <button class="day-btn" data-d="6">Вс</button>
             </div>
           </div>
-		  <div id="interval-picker" style="display:none;flex-direction:column;gap:8px">
-  <div class="seg" id="seg-interval" style="flex-wrap:wrap">
-    <button class="seg-btn" data-min="10">10 мин</button>
-    <button class="seg-btn" data-min="30">30 мин</button>
-    <button class="seg-btn" data-min="60">1 ч</button>
-    <button class="seg-btn" data-min="180">3 ч</button>
-    <button class="seg-btn" data-min="360">6 ч</button>
-  </div>
-  <div style="display:flex;align-items:center;gap:8px">
-    <input id="interval-custom" type="number" min="1" max="1440" placeholder="Свой (мин)" style="width:120px;font-size:13px">
-    <span style="font-size:12px;color:var(--t3)">минут</span>
-  </div>
-</div>
         </div>
       </div>
       <div class="btn-row" style="margin-top:4px">

@@ -61,31 +61,3 @@ document.getElementById('lock').style.display='none';
 
 // Start with auth check
 initAuth();
-// ═══════════════════════════════════════════
-//  INTERVAL REMINDERS
-// ═══════════════════════════════════════════
-let _intervalRemTimer = null;
-
-function startIntervalReminders() {
-  if(_intervalRemTimer) clearInterval(_intervalRemTimer);
-  _intervalRemTimer = setInterval(() => {
-    if(!cards) return;
-    const now = Date.now();
-    cards.forEach(card => {
-      if(!card.reminder?.enabled || card.reminder?.freq !== 'interval') return;
-      if(card.status === 'done') return;
-      const mins = card.reminder.intervalMin || 30;
-      const key = 'rem_last_' + card.id;
-      const last = parseInt(localStorage.getItem(key)||'0');
-      if(now - last >= mins * 60 * 1000) {
-        localStorage.setItem(key, now);
-        if(Notification.permission === 'granted') {
-          new Notification('🔔 Мои карточки', {
-            body: card.title,
-            icon: 'https://vales-chayv.github.io/check-list/icon-192.png'
-          });
-        }
-      }
-    });
-  }, 60 * 1000); // проверка каждую минуту
-}
