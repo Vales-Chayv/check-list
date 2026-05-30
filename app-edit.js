@@ -174,6 +174,7 @@ document.getElementById('seg-ball').addEventListener('click',e=>{
 });
 
 // Reminder
+function toggleRem() { remOn=!remOn; updateRemUI(); }
 function updateRemUI() {
   const track=document.getElementById('rem-track');
   track.querySelector('.tog-knob').style.left=remOn?'23px':'3px';
