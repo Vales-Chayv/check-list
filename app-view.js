@@ -28,7 +28,7 @@ function openView(id) {
           <button onclick="toggleBall('${id}','mine')" style="padding:3px 10px;border-radius:12px;font-size:12px;cursor:pointer;border:1px solid var(--b2);background:${card.ball==='mine'?'var(--s2)':'transparent'};color:${card.ball==='mine'?'var(--t1)':'var(--t3)'}">⚽ У меня</button>
           <button onclick="toggleBall('${id}','theirs')" style="padding:3px 10px;border-radius:12px;font-size:12px;cursor:pointer;border:1px solid var(--b2);background:${card.ball==='theirs'?'var(--s2)':'transparent'};color:${card.ball==='theirs'?'var(--t1)':'var(--t3)'}">⚽ У них</button>
         </div>`:''}
-        ${currentSpace?.type==='family'?`<div style="margin-top:8px;font-size:13px;color:var(--t2)">👤 ${card.assigned_to?`Задача для: <strong style="color:var(--accent)">${esc(card.assigned_to)}</strong>`:'<span style="opacity:.6">Для всех</span>'}${card.created_by?`<span style="opacity:.5;margin-left:10px">✍️ ${esc(card.created_by)}</span>`:''}</div>`:''}
+        ${currentSpace?.type==='family'?`<div style="margin-top:8px;font-size:13px;color:var(--t2)">👤 ${card.assigned_to?`Задача для: <strong style="color:var(--accent)">${esc(card.assigned_to)}</strong>`:'<span style="opacity:.6">Для всех</span>'}</div>`:''}
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
         <button onclick="closeView()" style="background:var(--s2);border:none;color:var(--t2);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px">✕</button>
@@ -130,7 +130,9 @@ function openAddEntry(cardId) {
   const card = cards.find(c => c.id === cardId);
   const title = card ? (card.title.length > 22 ? card.title.slice(0,20)+'…' : card.title) : '';
   document.getElementById('ae-card-title').textContent = '＋ Запись' + (title ? ' в «'+title+'»' : '');
-  document.getElementById('ae-text').value = '';
+  const noteEl = document.getElementById('ae-note');
+  if(noteEl) { noteEl.value = card?.body||''; autoResize(noteEl); }
+  document.getElementById('ae-entries-list').innerHTML = '';
   document.getElementById('ae-att-prev').innerHTML = '';
   const dlEl = document.getElementById('ae-entry-deadline');
   if(dlEl) dlEl.value = card?.deadline||'';
@@ -142,16 +144,13 @@ function openAddEntry(cardId) {
     document.getElementById('ae-status').value = card.status||'new';
     document.getElementById('ae-priority').value = card.priority||'normal';
     document.getElementById('ae-deadline').value = card.deadline||'';
-    // Ball
     document.querySelectorAll('#ae-seg-ball .seg-btn').forEach(b=>b.classList.toggle('on', b.dataset.ball===(card.ball||'')));
   }
 
-  // Hide extra section
   document.getElementById('ae-extra').style.display = 'none';
   document.getElementById('ae-extra-arrow').textContent = '▼';
-
   document.getElementById('ae-ov').classList.add('on');
-  setTimeout(() => { const ta = document.getElementById('ae-text'); ta.style.height='100px'; ta.focus(); }, 300);
+  setTimeout(() => { if(noteEl) { noteEl.focus(); } }, 300);
 }
 
 function toggleAEExtra(btn) {
@@ -219,6 +218,17 @@ function stopAEVoice() {
   btn.classList.remove('recording'); btn.innerHTML = '🎙';
 }
 
+function aeAddEntryRow() {
+  const wrap = document.getElementById('ae-entries-list'); if(!wrap) return;
+  const div = document.createElement('div');
+  div.className = 'entry-row';
+  div.innerHTML = `<div class="entry-cb"></div>
+    <textarea dir="auto" placeholder="Текст записи..." oninput="autoResize(this)" style="background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t1);font-size:14px;font-family:inherit;resize:none;min-height:36px;line-height:1.6;width:100%;padding:4px 0"></textarea>
+    <button onclick="this.closest('.entry-row').remove()" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:16px;padding:0 4px">✕</button>`;
+  wrap.appendChild(div);
+  setTimeout(()=>{ const ta=div.querySelector('textarea'); if(ta){ta.focus();autoResize(ta);} },50);
+}
+
 async function saveAddEntry() {
   // If recording — stop and wait for audio to be added to aeAtts
   if (aeIsVoice) {
@@ -228,13 +238,29 @@ async function saveAddEntry() {
     });
   }
 
-  const text = document.getElementById('ae-text').value.trim();
-  if (!text && !aeAtts.length) { toast('Введи текст или прикрепи файл', true); return; }
+  const note = (document.getElementById('ae-note')?.value||'').trim();
+  const entryRows = document.getElementById('ae-entries-list')?.querySelectorAll('.entry-row')||[];
+  const entryTexts = [...entryRows].map(r=>r.querySelector('textarea')?.value?.trim()).filter(Boolean);
+  if(!note && !entryTexts.length && !aeAtts.length) { toast('Введи заметку или добавь запись', true); return; }
   const card = cards.find(c => c.id === aeCardId); if (!card) return;
 
-  // Save entry
-  const entry = {id:uid(), text, date:nowStr(), done:false, attachments:[...aeAtts], deadline: document.getElementById('ae-entry-deadline')?.value||null};
-  card.entries = [entry, ...(card.entries||[])];
+  // Save note
+  if(note) card.body = note;
+
+  // Save entries
+  entryTexts.forEach(text => {
+    const entry = {id:uid(), text, date:nowStr(), done:false, attachments:[], deadline: document.getElementById('ae-entry-deadline')?.value||null};
+    card.entries = [entry, ...(card.entries||[])];
+  });
+
+  // Save attachments to last entry or card
+  if(aeAtts.length) {
+    if(card.entries?.length) {
+      card.entries[0].attachments = [...aeAtts];
+    } else {
+      card.attachments = [...(card.attachments||[]), ...aeAtts];
+    }
+  }
 
   // Save extra settings if expanded
   if(document.getElementById('ae-extra').style.display !== 'none') {
