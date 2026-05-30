@@ -28,7 +28,7 @@ function openView(id) {
           <button onclick="toggleBall('${id}','mine')" style="padding:3px 10px;border-radius:12px;font-size:12px;cursor:pointer;border:1px solid var(--b2);background:${card.ball==='mine'?'var(--s2)':'transparent'};color:${card.ball==='mine'?'var(--t1)':'var(--t3)'}">⚽ У меня</button>
           <button onclick="toggleBall('${id}','theirs')" style="padding:3px 10px;border-radius:12px;font-size:12px;cursor:pointer;border:1px solid var(--b2);background:${card.ball==='theirs'?'var(--s2)':'transparent'};color:${card.ball==='theirs'?'var(--t1)':'var(--t3)'}">⚽ У них</button>
         </div>`:''}
-        ${currentSpace?.type==='family'?`<div style="margin-top:8px;font-size:13px;color:var(--t2)">👤 ${card.assigned_to?`Задача для: <strong style="color:var(--accent)">${esc(card.assigned_to)}</strong>`:'<span style="opacity:.6">Для всех</span>'}${card.created_by?`<span style="opacity:.5;margin-left:10px">✍️ ${esc(card.created_by)}</span>`:''}</div>`:''}
+        ${currentSpace?.type==='family'?`<div style="margin-top:8px;font-size:13px;color:var(--t2)">👤 ${card.assigned_to?`Задача для: <strong style="color:var(--accent)">${esc(card.assigned_to)}</strong>`:'<span style="opacity:.6">Для всех</span>'}</div>`:''}
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
         <button onclick="closeView()" style="background:var(--s2);border:none;color:var(--t2);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px">✕</button>
@@ -38,7 +38,7 @@ function openView(id) {
     </div>
   </div>`;
 
-  if(card.body) html+=`<div class="view-sec"><div class="view-lbl">Заметка</div><div style="font-size:15px;line-height:1.6;color:var(--t2)">${esc(card.body)}</div></div>`;
+  html+=`<div class="view-sec"><div class="view-lbl">Заметка</div><textarea id="view-note-inp" dir="auto" placeholder="Подробности..." oninput="autoResize(this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:11px 12px;font-size:15px;color:var(--t1);font-family:inherit;resize:none;min-height:60px;line-height:1.6;width:100%">${esc(card.body||'')}</textarea></div>`;
 
   if(entries.length) {
     const dc=entries.filter(e=>e.done).length;
@@ -80,11 +80,53 @@ function openView(id) {
     if(chips) html+=`<div class="view-sec"><div class="view-lbl">Связанные</div><div style="display:flex;flex-wrap:wrap;gap:5px">${chips}</div></div>`;
   }
 
+  html+=`<div class="view-sec">
+    <button onclick="viewAddQuickEntry()" style="width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:11px;font-size:15px;color:var(--accent);cursor:pointer;font-family:inherit;text-align:left">＋ Добавить запись</button>
+    <div id="view-quick-entries" style="display:flex;flex-direction:column;gap:0"></div>
+  </div>
+  <div style="padding:12px 20px">
+    <button onclick="viewSaveQuick('${id}')" style="width:100%;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:13px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Сохранить</button>
+  </div>`;
+
   document.getElementById('view-content').innerHTML=html;
   document.getElementById('view-ov').classList.add('on');
 }
 
 function closeView() { document.getElementById('view-ov').classList.remove('on'); }
+
+function viewAddQuickEntry() {
+  const wrap = document.getElementById('view-quick-entries'); if(!wrap) return;
+  const id = uid();
+  const div = document.createElement('div');
+  div.className = 'entry-row';
+  div.dataset.eid = id;
+  div.innerHTML = `<div class="entry-cb"></div>
+    <textarea class="entry-textarea" dir="auto" placeholder="Текст записи..." oninput="autoResize(this)" style="background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t1);font-size:14px;font-family:inherit;resize:none;min-height:36px;line-height:1.6;width:100%;padding:4px 0"></textarea>
+    <button onclick="this.closest('.entry-row').remove()" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:16px;padding:0 4px">✕</button>`;
+  wrap.appendChild(div);
+  setTimeout(()=>{ const ta=div.querySelector('textarea'); if(ta){ta.focus();autoResize(ta);} },50);
+}
+
+async function viewSaveQuick(cardId) {
+  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  const noteInp = document.getElementById('view-note-inp');
+  if(noteInp) card.body = noteInp.value.trim();
+  const wrap = document.getElementById('view-quick-entries');
+  if(wrap) {
+    const rows = wrap.querySelectorAll('.entry-row');
+    rows.forEach(row => {
+      const text = row.querySelector('textarea')?.value?.trim();
+      if(text) {
+        card.entries = [...(card.entries||[]), {id:uid(), text, date:nowStr(), done:false, _saved:true}];
+      }
+    });
+  }
+  try {
+    await dbUpdate(card);
+    render(); openView(cardId);
+    toast('✓ Сохранено');
+  } catch(e) { toast('Ошибка синхронизации', true); }
+}
 
 async function toggleBall(cardId, val) {
   const card = cards.find(c=>c.id===cardId); if(!card) return;
