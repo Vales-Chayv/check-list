@@ -197,7 +197,6 @@ document.getElementById('seg-freq').addEventListener('click',e=>{
   document.getElementById('day-picker').style.display=freqVal==='custom'?'flex':'none';
 document.getElementById('interval-picker').style.display=freqVal==='interval'?'flex':'none';
 });
-});
 document.getElementById('seg-interval').addEventListener('click', e => {
   const btn = e.target.closest('.seg-btn'); if(!btn) return;
   intervalMin = parseInt(btn.dataset.min);
