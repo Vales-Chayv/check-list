@@ -9,9 +9,11 @@ function openEdit(id) {
   tempHist=JSON.parse(JSON.stringify(card?.history||[]));
   tempRelIds=[...(card?.related_ids||[])];
   remOn=card?.reminder?.enabled||false;
+  let intervalMin = 30;
   ballVal=card?.ball||'';
   freqVal=card?.reminder?.freq||'daily';
   customDays=[...(card?.reminder?.days||[])];
+  intervalMin = card?.reminder?.intervalMin || 30;
 
   const isFamily = currentSpace?.type === 'family';
 
@@ -181,6 +183,11 @@ function updateRemUI() {
   if(remOn){
     document.querySelectorAll('#seg-freq .seg-btn').forEach(b=>b.classList.toggle('on',b.dataset.freq===freqVal));
     document.getElementById('day-picker').style.display=freqVal==='custom'?'flex':'none';
+    document.getElementById('interval-picker').style.display=freqVal==='interval'?'flex':'none';
+    if(freqVal==='interval'){
+      document.querySelectorAll('#seg-interval .seg-btn').forEach(b=>b.classList.toggle('on',parseInt(b.dataset.min)===intervalMin));
+      document.getElementById('interval-custom').value=[10,30,60,180,360].includes(intervalMin)?'':intervalMin;
+    }
     document.querySelectorAll('.day-btn').forEach(b=>b.classList.toggle('on',customDays.includes(+b.dataset.d)));
   }
 }
@@ -189,6 +196,17 @@ document.getElementById('seg-freq').addEventListener('click',e=>{
   freqVal=btn.dataset.freq;
   document.querySelectorAll('#seg-freq .seg-btn').forEach(b=>b.classList.toggle('on',b===btn));
   document.getElementById('day-picker').style.display=freqVal==='custom'?'flex':'none';
+document.getElementById('interval-picker').style.display=freqVal==='interval'?'flex':'none';
+});
+document.getElementById('seg-interval').addEventListener('click', e => {
+  const btn = e.target.closest('.seg-btn'); if(!btn) return;
+  intervalMin = parseInt(btn.dataset.min);
+  document.getElementById('interval-custom').value = '';
+  document.querySelectorAll('#seg-interval .seg-btn').forEach(b=>b.classList.toggle('on', b===btn));
+});
+document.getElementById('interval-custom').addEventListener('input', e => {
+  const v = parseInt(e.target.value);
+  if(v > 0) { intervalMin = v; document.querySelectorAll('#seg-interval .seg-btn').forEach(b=>b.classList.remove('on')); }
 });
 document.getElementById('days-row').addEventListener('click',e=>{
   const btn=e.target.closest('.day-btn'); if(!btn)return;
@@ -329,7 +347,7 @@ async function saveCard() {
     ball:isFamily?'':ballVal,
     assigned_to:assignedTo,
     attachments:tempAtt,entries:cleanEntries,
-    reminder:{enabled:remOn,freq:freqVal,days:customDays},
+    reminder:{enabled:remOn,freq:freqVal,days:customDays,intervalMin:freqVal==='interval'?intervalMin:null},
     history:hist,related_ids:tempRelIds
   };
   setSaveBtns(false);
