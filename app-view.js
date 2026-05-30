@@ -28,7 +28,7 @@ function openView(id) {
           <button onclick="toggleBall('${id}','mine')" style="padding:3px 10px;border-radius:12px;font-size:12px;cursor:pointer;border:1px solid var(--b2);background:${card.ball==='mine'?'var(--s2)':'transparent'};color:${card.ball==='mine'?'var(--t1)':'var(--t3)'}">⚽ У меня</button>
           <button onclick="toggleBall('${id}','theirs')" style="padding:3px 10px;border-radius:12px;font-size:12px;cursor:pointer;border:1px solid var(--b2);background:${card.ball==='theirs'?'var(--s2)':'transparent'};color:${card.ball==='theirs'?'var(--t1)':'var(--t3)'}">⚽ У них</button>
         </div>`:''}
-        ${currentSpace?.type==='family'?`<div style="margin-top:8px;font-size:13px;color:var(--t2)">👤 ${card.assigned_to?`Задача для: <strong style="color:var(--accent)">${esc(card.assigned_to)}</strong>`:'<span style="opacity:.6">Для всех</span>'}</div>`:''}
+        ${currentSpace?.type==='family'?`<div style="margin-top:8px;font-size:13px;color:var(--t2)">👤 ${card.assigned_to?`Задача для: <strong style="color:var(--accent)">${esc(card.assigned_to)}</strong>`:'<span style="opacity:.6">Для всех</span>'}${card.created_by?`<span style="opacity:.5;margin-left:10px">✍️ ${esc(card.created_by)}</span>`:''}</div>`:''}
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
         <button onclick="closeView()" style="background:var(--s2);border:none;color:var(--t2);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px">✕</button>
@@ -42,7 +42,7 @@ function openView(id) {
 
   if(entries.length) {
     const dc = entries.filter(e=>e.done).length;
-    // Group by sessionId
+    // Group by sessionId (entries without sessionId = individual groups)
     const sessionMap = new Map();
     entries.forEach(e => {
       const sid = e.sessionId || e.id;
@@ -50,9 +50,10 @@ function openView(id) {
       sessionMap.get(sid).entries.push(e);
     });
     const sessions = [...sessionMap.values()];
-    function entryHTML(e) {
+    function entryRowHTML(e) {
       const eDl = e.deadline ? deadlineInfo(e.deadline) : null;
-      return e.text ? `<div class="entry-row">
+      if(!e.text) return '';
+      return `<div class="entry-row">
         <div class="entry-cb${e.done?' on':''}" onclick="viewToggleEntry('${id}','${e.id}')">${e.done?checkSVG():''}</div>
         <div style="flex:1">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px">
@@ -61,23 +62,23 @@ function openView(id) {
           </div>
           <div class="entry-date">${e.date}</div>
         </div>
-      </div>` : '';
+      </div>`;
     }
     const sessionsHTML = sessions.map((s, si) => {
       const sep = si > 0 ? '<div style="height:1px;background:var(--b1);margin:8px 0"></div>' : '';
       const noteHTML = s.note ? `<div style="font-size:13px;color:var(--t2);padding:5px 0 4px;font-style:italic">${esc(s.note)}</div>` : '';
-      const entriesHTML = s.entries.map(entryHTML).join('');
+      const entriesHTML = s.entries.map(entryRowHTML).join('');
       const sAtts = s.atts||[];
       const sImgs = sAtts.filter(a=>a.type?.startsWith('image/'));
       const sAudios = sAtts.filter(a=>a.type?.startsWith('audio/'));
       const sFiles = sAtts.filter(a=>!a.type?.startsWith('image/')&&!a.type?.startsWith('audio/'));
       let sAttHTML = '';
-      if(sImgs.length) sAttHTML += `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">${sImgs.map(a=>`<img src="${a.data}" style="width:80px;height:80px;object-fit:cover;border-radius:7px;cursor:pointer" onclick="openImgDirect('${a.data}')">`).join('')}</div>`;
-      if(sAudios.length) sAttHTML += sAudios.map(a=>`<audio controls src="${a.data}" style="width:100%;height:32px;margin-top:5px"></audio>`).join('');
-      if(sFiles.length) sAttHTML += `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${sFiles.map(f=>`<a href="${f.data}" download="${esc(f.name)}" class="file-action">📎${esc(f.name)}</a>`).join('')}</div>`;
+      if(sImgs.length) sAttHTML+=`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">${sImgs.map(a=>`<img src="${a.data}" style="width:80px;height:80px;object-fit:cover;border-radius:7px;cursor:pointer" onclick="openImgDirect('${a.data}')">`).join('')}</div>`;
+      if(sAudios.length) sAttHTML+=sAudios.map(a=>`<audio controls src="${a.data}" style="width:100%;height:32px;margin-top:5px"></audio>`).join('');
+      if(sFiles.length) sAttHTML+=`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${sFiles.map(f=>`<a href="${f.data}" download="${esc(f.name)}" class="file-action">📎${esc(f.name)}</a>`).join('')}</div>`;
       return sep + noteHTML + entriesHTML + sAttHTML;
     }).join('');
-    html+=`<div class="view-sec"><div class="view-lbl">Записи (${dc}/${entries.length})</div>${sessionsHTML}</div>`;
+    html+=`<div class="view-sec"><div class="view-lbl">Записи (${dc}/${entries.filter(e=>e.text).length})</div>${sessionsHTML}</div>`;
   }
 
   if(imgs.length) html+=`<div class="view-sec"><div class="view-lbl">Фото (${imgs.length})</div><div style="display:flex;flex-wrap:wrap;gap:7px">${imgs.map((a,i)=>`<img src="${a.data}" style="width:95px;height:95px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid rgba(255,255,255,.1)" onclick="App.viewImg('${id}',${i})">`).join('')}</div></div>`;
@@ -144,13 +145,13 @@ function openAddEntry(cardId) {
   const title = card ? (card.title.length > 22 ? card.title.slice(0,20)+'…' : card.title) : '';
   document.getElementById('ae-card-title').textContent = '＋ Запись' + (title ? ' в «'+title+'»' : '');
   const noteEl = document.getElementById('ae-note');
-  if(noteEl) { noteEl.value = card?.body||''; autoResize(noteEl); }
-  document.getElementById('ae-entries-list').innerHTML = '';
+  if(noteEl) { noteEl.value = ''; }
+  const listEl = document.getElementById('ae-entries-list');
+  if(listEl) { listEl.innerHTML = ''; }
   document.getElementById('ae-att-prev').innerHTML = '';
   const dlEl = document.getElementById('ae-entry-deadline');
   if(dlEl) dlEl.value = card?.deadline||'';
 
-  // Populate extra fields with current card values
   if(card) {
     const catSel = document.getElementById('ae-cat');
     catSel.innerHTML = cats.map(c=>`<option value="${esc(c.name)}"${c.name===card.category?' selected':''}>${esc(c.name)}</option>`).join('');
@@ -163,7 +164,7 @@ function openAddEntry(cardId) {
   document.getElementById('ae-extra').style.display = 'none';
   document.getElementById('ae-extra-arrow').textContent = '▼';
   document.getElementById('ae-ov').classList.add('on');
-  setTimeout(() => { if(noteEl) { noteEl.focus(); } }, 300);
+  setTimeout(() => { if(noteEl) noteEl.focus(); }, 300);
 }
 
 function toggleAEExtra(btn) {
@@ -245,12 +246,8 @@ function aeAddEntryRow() {
 }
 
 async function saveAddEntry() {
-  // If recording — stop and wait for audio to be added to aeAtts
   if (aeIsVoice) {
-    await new Promise(resolve => {
-      aeStopResolve = resolve;
-      stopAEVoice();
-    });
+    await new Promise(resolve => { aeStopResolve = resolve; stopAEVoice(); });
   }
 
   const sessionNote = (document.getElementById('ae-note')?.value||'').trim();
@@ -259,15 +256,20 @@ async function saveAddEntry() {
   if(!sessionNote && !entryTexts.length && !aeAtts.length) { toast('Введи заметку или добавь запись', true); return; }
   const card = cards.find(c => c.id === aeCardId); if (!card) return;
 
-  // Build session entries
+  // Build session
   const sessionId = uid();
   const deadline = document.getElementById('ae-entry-deadline')?.value||null;
   const sessionEntries = [];
-  const firstText = entryTexts[0]||'';
-  sessionEntries.push({id:uid(), text:firstText, date:nowStr(), done:false, attachments:[], sessionId, sessionNote:sessionNote||null, sessionAtts:[...aeAtts], deadline});
-  for(let i=1;i<entryTexts.length;i++) {
-    sessionEntries.push({id:uid(), text:entryTexts[i], date:nowStr(), done:false, attachments:[], sessionId, sessionNote:null, sessionAtts:[], deadline});
-  }
+  const texts = entryTexts.length ? entryTexts : [''];
+  texts.forEach((text, i) => {
+    sessionEntries.push({
+      id: uid(), text, date: nowStr(), done: false, attachments: [],
+      sessionId,
+      sessionNote: i === 0 ? (sessionNote||null) : null,
+      sessionAtts: i === 0 ? [...aeAtts] : [],
+      deadline
+    });
+  });
   card.entries = [...sessionEntries, ...(card.entries||[])];
 
   // Save extra settings if expanded
@@ -280,15 +282,12 @@ async function saveAddEntry() {
     if(ballBtn) card.ball = ballBtn.dataset.ball;
   }
 
-  // Move to in_progress if status is new
   if(card.status === 'new') card.status = 'in_progress';
-
-  // Auto-done if all entries checked
-  if((card.entries||[]).length && (card.entries||[]).every(e=>e.done)) card.status='done';
+  if((card.entries||[]).filter(e=>e.text).length && (card.entries||[]).filter(e=>e.text).every(e=>e.done)) card.status='done';
 
   closeAddEntry();
   render();
-  toast('✓ Запись добавлена');
+  toast('✓ Сохранено');
   await dbUpdate(card);
   setTimeout(() => openView(aeCardId), 300);
 }
