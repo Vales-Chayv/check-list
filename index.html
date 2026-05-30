@@ -70,12 +70,12 @@
         <label>Заголовок</label>
         <input id="e-title" placeholder="О чём карточка?" oninput="checkDirty()" dir="auto">
       </div>
-      <button onclick="addEntry()" style="background:var(--s2);border:1px dashed var(--b2);border-radius:var(--rsm);padding:11px;font-size:14px;color:var(--accent);cursor:pointer;font-family:inherit;font-weight:600;text-align:left">＋ Добавить запись</button>
-      <div id="e-new-entry-area"></div>
-      <div class="fld">
+	   <div class="fld">
         <label>Заметка</label>
         <textarea id="e-body" placeholder="Подробности..." dir="auto"></textarea>
       </div>
+      <button onclick="addEntry()" style="background:var(--s2);border:1px dashed var(--b2);border-radius:var(--rsm);padding:11px;font-size:14px;color:var(--accent);cursor:pointer;font-family:inherit;font-weight:600;text-align:left">＋ Добавить запись</button>
+      <div id="e-new-entry-area"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px">
         <div class="fld">
           <label>Рубрика</label>
