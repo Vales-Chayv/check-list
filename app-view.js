@@ -46,21 +46,13 @@ function openView(id) {
     const sessionMap = new Map();
     entries.forEach(e => {
       const sid = e.sessionId || e.id;
-      if(!sessionMap.has(sid)) sessionMap.set(sid, {note: e.sessionNote||null, entries:[]});
+      if(!sessionMap.has(sid)) sessionMap.set(sid, {note:e.sessionNote||null, atts:e.sessionAtts||[], entries:[]});
       sessionMap.get(sid).entries.push(e);
     });
     const sessions = [...sessionMap.values()];
     function entryHTML(e) {
-      const eAtts = e.attachments||[];
-      const eImgs = eAtts.filter(a=>a.type?.startsWith('image/'));
-      const eAudios = eAtts.filter(a=>a.type?.startsWith('audio/'));
-      const eFiles = eAtts.filter(a=>!a.type?.startsWith('image/')&&!a.type?.startsWith('audio/'));
-      let attHTML = '';
-      if(eImgs.length) attHTML += `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">${eImgs.map(a=>`<img src="${a.data}" style="width:80px;height:80px;object-fit:cover;border-radius:7px;cursor:pointer" onclick="openImgDirect('${a.data}')">`).join('')}</div>`;
-      if(eAudios.length) attHTML += eAudios.map(a=>`<audio controls src="${a.data}" style="width:100%;height:32px;margin-top:5px"></audio>`).join('');
-      if(eFiles.length) attHTML += `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${eFiles.map(f=>`<a href="${f.data}" download="${esc(f.name)}" class="file-action">📎${esc(f.name)}</a>`).join('')}</div>`;
       const eDl = e.deadline ? deadlineInfo(e.deadline) : null;
-      return `<div class="entry-row">
+      return e.text ? `<div class="entry-row">
         <div class="entry-cb${e.done?' on':''}" onclick="viewToggleEntry('${id}','${e.id}')">${e.done?checkSVG():''}</div>
         <div style="flex:1">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px">
@@ -68,14 +60,22 @@ function openView(id) {
             ${eDl?`<span class="dl-badge ${eDl.cls}${eDl.days<=3?' dl-pulse':''}" style="font-size:11px;white-space:nowrap;flex-shrink:0">⏰ ${eDl.text}</span>`:''}
           </div>
           <div class="entry-date">${e.date}</div>
-          ${attHTML}
         </div>
-      </div>`;
+      </div>` : '';
     }
     const sessionsHTML = sessions.map((s, si) => {
       const sep = si > 0 ? '<div style="height:1px;background:var(--b1);margin:8px 0"></div>' : '';
       const noteHTML = s.note ? `<div style="font-size:13px;color:var(--t2);padding:5px 0 4px;font-style:italic">${esc(s.note)}</div>` : '';
-      return sep + noteHTML + s.entries.map(entryHTML).join('');
+      const entriesHTML = s.entries.map(entryHTML).join('');
+      const sAtts = s.atts||[];
+      const sImgs = sAtts.filter(a=>a.type?.startsWith('image/'));
+      const sAudios = sAtts.filter(a=>a.type?.startsWith('audio/'));
+      const sFiles = sAtts.filter(a=>!a.type?.startsWith('image/')&&!a.type?.startsWith('audio/'));
+      let sAttHTML = '';
+      if(sImgs.length) sAttHTML += `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">${sImgs.map(a=>`<img src="${a.data}" style="width:80px;height:80px;object-fit:cover;border-radius:7px;cursor:pointer" onclick="openImgDirect('${a.data}')">`).join('')}</div>`;
+      if(sAudios.length) sAttHTML += sAudios.map(a=>`<audio controls src="${a.data}" style="width:100%;height:32px;margin-top:5px"></audio>`).join('');
+      if(sFiles.length) sAttHTML += `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${sFiles.map(f=>`<a href="${f.data}" download="${esc(f.name)}" class="file-action">📎${esc(f.name)}</a>`).join('')}</div>`;
+      return sep + noteHTML + entriesHTML + sAttHTML;
     }).join('');
     html+=`<div class="view-sec"><div class="view-lbl">Записи (${dc}/${entries.length})</div>${sessionsHTML}</div>`;
   }
@@ -235,10 +235,9 @@ function aeAddEntryRow() {
   const wrap = document.getElementById('ae-entries-list'); if(!wrap) return;
   const div = document.createElement('div');
   div.className = 'entry-row';
- div.innerHTML = `<div class="entry-cb"></div>
-    <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+  div.innerHTML = `<div class="entry-cb"></div>
+    <div style="flex:1">
       <textarea dir="auto" placeholder="Текст записи..." oninput="autoResize(this)" style="background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t1);font-size:14px;font-family:inherit;resize:none;min-height:36px;line-height:1.6;width:100%;padding:4px 0"></textarea>
-      <textarea dir="auto" placeholder="Заметка к записи..." oninput="autoResize(this)" style="background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t2);font-size:13px;font-family:inherit;resize:none;min-height:28px;line-height:1.5;width:100%;padding:3px 0"></textarea>
     </div>
     <button onclick="this.closest('.entry-row').remove()" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:16px;padding:0 4px">✕</button>`;
   wrap.appendChild(div);
@@ -254,33 +253,22 @@ async function saveAddEntry() {
     });
   }
 
-  const note = (document.getElementById('ae-note')?.value||'').trim();
+  const sessionNote = (document.getElementById('ae-note')?.value||'').trim();
   const entryRows = document.getElementById('ae-entries-list')?.querySelectorAll('.entry-row')||[];
   const entryTexts = [...entryRows].map(r=>r.querySelector('textarea')?.value?.trim()).filter(Boolean);
-  if(!note && !entryTexts.length && !aeAtts.length) { toast('Введи заметку или добавь запись', true); return; }
+  if(!sessionNote && !entryTexts.length && !aeAtts.length) { toast('Введи заметку или добавь запись', true); return; }
   const card = cards.find(c => c.id === aeCardId); if (!card) return;
 
-  // Save note
-if(note) card.body = note;
-
-  // Save entries
- [...entryRows].forEach(row => {
-    const text = row.querySelectorAll('textarea')[0]?.value?.trim();
-    const note = row.querySelectorAll('textarea')[1]?.value?.trim();
-    if(text) {
-      const entry = {id:uid(), text, note:note||null, date:nowStr(), done:false, attachments:[], deadline: document.getElementById('ae-entry-deadline')?.value||null};
-      card.entries = [entry, ...(card.entries||[])];
-    }
-  });
-
-  // Save attachments to last entry or card
-  if(aeAtts.length) {
-    if(card.entries?.length) {
-      card.entries[0].attachments = [...aeAtts];
-    } else {
-      card.attachments = [...(card.attachments||[]), ...aeAtts];
-    }
+  // Build session entries
+  const sessionId = uid();
+  const deadline = document.getElementById('ae-entry-deadline')?.value||null;
+  const sessionEntries = [];
+  const firstText = entryTexts[0]||'';
+  sessionEntries.push({id:uid(), text:firstText, date:nowStr(), done:false, attachments:[], sessionId, sessionNote:sessionNote||null, sessionAtts:[...aeAtts], deadline});
+  for(let i=1;i<entryTexts.length;i++) {
+    sessionEntries.push({id:uid(), text:entryTexts[i], date:nowStr(), done:false, attachments:[], sessionId, sessionNote:null, sessionAtts:[], deadline});
   }
+  card.entries = [...sessionEntries, ...(card.entries||[])];
 
   // Save extra settings if expanded
   if(document.getElementById('ae-extra').style.display !== 'none') {
