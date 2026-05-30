@@ -43,7 +43,16 @@ function openView(id) {
   if(entries.length) {
     const dc=entries.filter(e=>e.done).length;
     const sorted=[...entries.filter(e=>!e.done), ...entries.filter(e=>e.done)];
-    html+=`<div class="view-sec"><div class="view-lbl">Записи (${dc}/${entries.length})</div>${sorted.map(e=>{
+    // Group by sessionId
+    const sessions=[];
+    const seen={};
+    sorted.forEach(e=>{
+      const sid=e.sessionId||e.id;
+      if(!seen[sid]){seen[sid]=true;sessions.push({sid,note:e.sessionNote||null,entries:[]});}
+      sessions[sessions.length-1].entries.push(e);
+    });
+    html+=`<div class="view-sec"><div class="view-lbl">Записи (${dc}/${entries.length})</div>${sessions.map((s,si)=>{
+      const sessionHTML = s.entries.map(e=>{
       const eAtts = e.attachments||[];
       const eImgs = eAtts.filter(a=>a.type?.startsWith('image/'));
       const eAudios = eAtts.filter(a=>a.type?.startsWith('audio/'));
@@ -64,6 +73,8 @@ function openView(id) {
           ${attHTML}
         </div>
       </div>`;
+    }).join('');
+      return `${si>0?'<div style="height:1px;background:var(--b1);margin:8px 0"></div>':''}${s.note?`<div style="font-size:13px;color:var(--t2);padding:6px 0;font-style:italic">${esc(s.note)}</div>`:''}${sessionHTML}`;
     }).join('')}</div>`;
   }
 
@@ -247,14 +258,15 @@ async function saveAddEntry() {
   if(!note && !entryTexts.length && !aeAtts.length) { toast('Введи заметку или добавь запись', true); return; }
   const card = cards.find(c => c.id === aeCardId); if (!card) return;
 
-  // Save note
-if(note) card.body = note;if(note) card.body = card.body ? card.body + '\n─────\n' + note : note;
   // Save entries
- [...entryRows].forEach(row => {
+ const sessionId = uid();
+const sessionNote = (document.getElementById('ae-note')?.value||'').trim();
+let isFirst = true;
+[...entryRows].forEach(row => {
     const text = row.querySelectorAll('textarea')[0]?.value?.trim();
-    const note = row.querySelectorAll('textarea')[1]?.value?.trim();
     if(text) {
-      const entry = {id:uid(), text, note:note||null, date:nowStr(), done:false, attachments:[], deadline: document.getElementById('ae-entry-deadline')?.value||null};
+      const entry = {id:uid(), text, date:nowStr(), done:false, attachments:[], deadline: document.getElementById('ae-entry-deadline')?.value||null, sessionId, sessionNote: isFirst ? sessionNote : null};
+      isFirst = false;
       card.entries = [entry, ...(card.entries||[])];
     }
   });
