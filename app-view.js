@@ -38,7 +38,6 @@ function openView(id) {
     </div>
   </div>`;
 
-  if(card.body) html+=`<div class="view-sec"><div class="view-lbl">Заметка</div><div style="font-size:15px;line-height:1.6;color:var(--t2)">${esc(card.body)}</div></div>`;
 
   if(entries.length) {
     const dc = entries.filter(e=>e.done).length;
@@ -50,6 +49,7 @@ function openView(id) {
       sessionMap.get(sid).entries.push(e);
     });
     const sessions = [...sessionMap.values()];
+	if(card.body && sessions.length) sessions[sessions.length-1].note = sessions[sessions.length-1].note || card.body;
     function entryRowHTML(e) {
       const eDl = e.deadline ? deadlineInfo(e.deadline) : null;
       if(!e.text) return '';
