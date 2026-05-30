@@ -174,7 +174,6 @@ document.getElementById('seg-ball').addEventListener('click',e=>{
 });
 
 // Reminder
-function toggleRem() { remOn=!remOn; updateRemUI(); }
 function updateRemUI() {
   const track=document.getElementById('rem-track');
   track.querySelector('.tog-knob').style.left=remOn?'23px':'3px';
@@ -183,11 +182,11 @@ function updateRemUI() {
   if(remOn){
     document.querySelectorAll('#seg-freq .seg-btn').forEach(b=>b.classList.toggle('on',b.dataset.freq===freqVal));
     document.getElementById('day-picker').style.display=freqVal==='custom'?'flex':'none';
-document.getElementById('interval-picker').style.display=freqVal==='interval'?'flex':'none';
-if(freqVal==='interval') {
-  document.querySelectorAll('#seg-interval .seg-btn').forEach(b=>b.classList.toggle('on', parseInt(b.dataset.min)===intervalMin));
-  document.getElementById('interval-custom').value = [10,30,60,180,360].includes(intervalMin) ? '' : intervalMin;
-}
+    document.getElementById('interval-picker').style.display=freqVal==='interval'?'flex':'none';
+    if(freqVal==='interval'){
+      document.querySelectorAll('#seg-interval .seg-btn').forEach(b=>b.classList.toggle('on',parseInt(b.dataset.min)===intervalMin));
+      document.getElementById('interval-custom').value=[10,30,60,180,360].includes(intervalMin)?'':intervalMin;
+    }
     document.querySelectorAll('.day-btn').forEach(b=>b.classList.toggle('on',customDays.includes(+b.dataset.d)));
   }
 }
