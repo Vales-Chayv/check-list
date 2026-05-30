@@ -245,7 +245,7 @@ async function saveAddEntry() {
   const card = cards.find(c => c.id === aeCardId); if (!card) return;
 
   // Save note
-  if(note) card.body = note;
+  if(note) card.body = card.body ? card.body + '\n\n' + note : note;
 
   // Save entries
   entryTexts.forEach(text => {
