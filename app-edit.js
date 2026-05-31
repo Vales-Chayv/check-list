@@ -231,11 +231,7 @@ async function handleFiles(inp) {
     }
   }
 }
-  Array.from(inp.files).forEach(f=>{
-    if(f.size>5*1024*1024){alert(f.name+': макс 5МБ');return;}
-    const r=new FileReader(); r.onload=ev=>{tempAtt.push({id:uid(),name:f.name,type:f.type,data:ev.target.result});renderAttPrev();}; r.readAsDataURL(f);
-  }); inp.value='';
-}
+ 
 async function deleteCardById(id) {
   cards=cards.filter(c=>c.id!==id);
   render(); toast('Карточка удалена');
