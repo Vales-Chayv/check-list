@@ -180,14 +180,19 @@ function closeAddEntry() {
   if (aeIsVoice) stopAEVoice();
 }
 
-function handleAEFiles(inp) {
-  Array.from(inp.files).forEach(f => {
-    if (f.size > 5*1024*1024) { alert(f.name+': макс 5МБ'); return; }
-    const r = new FileReader();
-    r.onload = ev => { aeAtts.push({id:uid(), name:f.name, type:f.type, data:ev.target.result}); renderAEPrev(); };
-    r.readAsDataURL(f);
-  });
+async function handleAEFiles(inp) {
+  const files = Array.from(inp.files);
   inp.value = '';
+  for(const f of files) {
+    try {
+      toast('⏳ Загрузка ' + f.name + '...');
+      const att = await uploadToStorage(f);
+      aeAtts.push(att);
+      renderAEPrev();
+    } catch(e) {
+      toast('Ошибка загрузки: ' + e.message, true);
+    }
+  }
 }
 
 function renderAEPrev() {
@@ -204,17 +209,20 @@ function toggleAEVoice() {
     const chunks = [];
     aeVoiceRec = new MediaRecorder(stream);
     aeVoiceRec.ondataavailable = e => chunks.push(e.data);
-    aeVoiceRec.onstop = () => {
-      const blob = new Blob(chunks, {type:'audio/webm'});
-      const r = new FileReader();
-      r.onload = ev => {
-        aeAtts.push({id:uid(), name:'Голос.webm', type:'audio/webm', data:ev.target.result});
-        renderAEPrev();
-        if(aeStopResolve) { aeStopResolve(); aeStopResolve = null; }
-      };
-      r.readAsDataURL(blob);
-      stream.getTracks().forEach(t => t.stop());
-    };
+    aeVoiceRec.onstop = async () => {
+  const blob = new Blob(chunks, {type:'audio/webm'});
+  stream.getTracks().forEach(t => t.stop());
+  try {
+    const name = `Голос_${nowStr().replace(/[,:]/g,'-')}.webm`;
+    const file = new File([blob], name, {type:'audio/webm'});
+    const att = await uploadToStorage(file);
+    aeAtts.push(att);
+    renderAEPrev();
+  } catch(e) {
+    toast('Ошибка загрузки голоса: ' + e.message, true);
+  }
+  if(aeStopResolve) { aeStopResolve(); aeStopResolve = null; }
+};
     aeVoiceRec.start(); aeIsVoice = true;
     if('wakeLock' in navigator) {
       navigator.wakeLock.request('screen').then(wl => { aeWakeLock = wl; }).catch(()=>{});

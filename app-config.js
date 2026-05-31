@@ -26,3 +26,13 @@ let remOn = false, ballVal = '', freqVal = 'daily', customDays = [];
 let newCatColor = COLORS[0], notifEnabled = true;
 let expandedCards = new Set(), originalState = null;
 
+// ═══════════════════════════════════════════
+//  SUPABASE STORAGE
+// ═══════════════════════════════════════════
+async function uploadToStorage(file) {
+  const path = uid() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const { data, error } = await sb.storage.from('attachments').upload(path, file);
+  if(error) throw error;
+  const { data: { publicUrl } } = sb.storage.from('attachments').getPublicUrl(path);
+  return { id: uid(), name: file.name, type: file.type, data: publicUrl };
+}

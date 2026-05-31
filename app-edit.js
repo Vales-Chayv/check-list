@@ -86,8 +86,13 @@ async function toggleVoice() {
       mediaRecorder.onstop=()=>{
         const blob=new Blob(audioChunks,{type:'audio/webm'});
         const r=new FileReader();
-        r.onload=ev=>{
-          tempAtt.push({id:uid(),name:`Голосовое_${nowStr().replace(/[,:]/g,'-')}.webm`,type:'audio/webm',data:ev.target.result});
+r.onload=async ev=>{
+  const blob2=new Blob([blob],{type:'audio/webm'});
+  try {
+    const name=`Голосовое_${nowStr().replace(/[,:]/g,'-')}.webm`;
+    const file=new File([blob2],name,{type:'audio/webm'});
+    const att=await uploadToStorage(file);
+    tempAtt.push(att);
           renderAttPrev();
         };
         r.readAsDataURL(blob);
@@ -216,7 +221,20 @@ document.getElementById('days-row').addEventListener('click',e=>{
 });
 
 // Files
-function handleFiles(inp) {
+async function handleFiles(inp) {
+  const files = Array.from(inp.files);
+  inp.value = '';
+  for(const f of files) {
+    try {
+      toast('⏳ Загрузка ' + f.name + '...');
+      const att = await uploadToStorage(f);
+      tempAtt.push(att);
+      renderAttPrev();
+    } catch(e) {
+      toast('Ошибка загрузки: ' + e.message, true);
+    }
+  }
+}
   Array.from(inp.files).forEach(f=>{
     if(f.size>5*1024*1024){alert(f.name+': макс 5МБ');return;}
     const r=new FileReader(); r.onload=ev=>{tempAtt.push({id:uid(),name:f.name,type:f.type,data:ev.target.result});renderAttPrev();}; r.readAsDataURL(f);
