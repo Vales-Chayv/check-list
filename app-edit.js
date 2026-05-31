@@ -83,20 +83,16 @@ async function toggleVoice() {
       audioChunks=[];
       mediaRecorder=new MediaRecorder(stream);
       mediaRecorder.ondataavailable=e=>audioChunks.push(e.data);
-      mediaRecorder.onstop=()=>{
+     mediaRecorder.onstop=async()=>{
         const blob=new Blob(audioChunks,{type:'audio/webm'});
-        const r=new FileReader();
-r.onload=async ev=>{
-  const blob2=new Blob([blob],{type:'audio/webm'});
-  try {
-    const name=`Голосовое_${nowStr().replace(/[,:]/g,'-')}.webm`;
-    const file=new File([blob2],name,{type:'audio/webm'});
-    const att=await uploadToStorage(file);
-    tempAtt.push(att);
-          renderAttPrev();
-        };
-        r.readAsDataURL(blob);
         stream.getTracks().forEach(t=>t.stop());
+        try {
+          const name=`Голосовое_${nowStr().replace(/[,:]/g,'-')}.webm`;
+          const file=new File([blob],name,{type:'audio/webm'});
+          const att=await uploadToStorage(file);
+          tempAtt.push(att);
+          renderAttPrev();
+        } catch(e) { toast('Ошибка загрузки голоса: '+e.message,true); }
       };
       mediaRecorder.start();
       isRecording=true;
