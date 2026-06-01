@@ -4,6 +4,19 @@
 let currentUser = null;
 
 async function initAuth() {
+  // Офлайн режим — используем сохранённые данные
+  if(!navigator.onLine) {
+    const savedLogin = localStorage.getItem('mc_login');
+    const savedName = localStorage.getItem('mc_display_name');
+    if(savedLogin && savedName) {
+      currentUser = { display_name: savedName, login: savedLogin, id: localStorage.getItem('mc_user_id')||'' };
+      hideAuthScreen();
+      initSpaces();
+      return;
+    }
+    showLoginScreen(savedLogin);
+    return;
+  }
   // Check for existing Supabase session
   const {data:{session}} = await sb.auth.getSession();
   if(session) {
@@ -135,6 +148,7 @@ async function doLoginAuth() {
 
     if(remember) {
       localStorage.setItem('mc_login',        login);
+	  localStorage.setItem('mc_user_id', data.user.id);
       localStorage.setItem('mc_display_name', profile.display_name);
     } else {
       localStorage.removeItem('mc_login');
