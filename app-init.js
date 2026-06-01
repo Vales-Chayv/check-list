@@ -89,3 +89,14 @@ function startIntervalReminders() {
     });
   }, 60 * 1000); // проверка каждую минуту
 }
+function askPushPermission() {
+  const div = document.createElement('div');
+  div.style.cssText = 'position:fixed;bottom:80px;left:16px;right:16px;background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:16px;z-index:1000;box-shadow:0 4px 20px rgba(0,0,0,.4)';
+  div.innerHTML = `<div style="font-size:15px;font-weight:700;margin-bottom:6px">🔔 Включить уведомления?</div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:12px">Получай напоминания о важных карточках</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="subscribePush();this.closest('div[style*=fixed]').remove()" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:10px;font-size:14px;font-weight:700;cursor:pointer">Включить</button>
+      <button onclick="toast('Можно включить в настройках ⚙️');this.closest('div[style*=fixed]').remove()" style="background:var(--s1);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:10px 14px;font-size:14px;cursor:pointer">Не сейчас</button>
+    </div>`;
+  document.body.appendChild(div);
+}

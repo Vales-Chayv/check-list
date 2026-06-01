@@ -376,6 +376,11 @@ async function saveCard() {
     document.getElementById('edit-ov').classList.remove('on');
     render();
     toast('✓ Карточка создана');
+	// Push уведомления при первой карточке
+if(cards.length === 1 && !localStorage.getItem('mc_push_asked')) {
+  localStorage.setItem('mc_push_asked', '1');
+  setTimeout(() => askPushPermission(), 500);
+}
     await dbInsert(card);
   }
   setSaveBtns(true);
