@@ -7,6 +7,12 @@ let presenceChannel = null;
 // ─── INIT ───────────────────────────────────
 async function initSpaces() {
   const urlToken = new URLSearchParams(window.location.search).get('space');
+  if(!navigator.onLine) {
+    const saved = JSON.parse(localStorage.getItem('mc_spaces')||'[]');
+    spaces = Array.isArray(saved) ? saved : [{id:'personal',name:'Личный',type:'personal',members:[]}];
+    showSpaceSelector();
+    return;
+  }
   if(currentUser) {
     const el = document.getElementById('lobby-user');
     if(el) el.textContent = 'Привет, ' + (currentUser.display_name||'') + ' 👋';
