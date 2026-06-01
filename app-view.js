@@ -13,7 +13,7 @@ function openView(id) {
   const related = card.related_ids||[];
   const hist = card.history||[];
 
-  let html = `<div style="background:${hex2rgba(col,.15)};border-bottom:3px solid ${hex2rgba(col,.5)};padding:16px 20px">
+  let html = `<div style="background:${hex2rgba(col,.15)};border-bottom:3px solid ${hex2rgba(col,.5)};padding:16px 20px;position:sticky;top:0;z-index:10">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:9px">
       <div style="flex:1">
         <div style="font-size:18px;font-weight:700;color:${col};line-height:1.3">${esc(card.title)}</div>
