@@ -1,20 +1,53 @@
-const CACHE = 'mc-v6';
+const CACHE = 'mc-v7';
+const APP_FILES = [
+  '/check-list/',
+  '/check-list/index.html',
+  '/check-list/style.css',
+  '/check-list/app-config.js',
+  '/check-list/app-auth.js',
+  '/check-list/app-spaces.js',
+  '/check-list/app-db.js',
+  '/check-list/app-render.js',
+  '/check-list/app-view.js',
+  '/check-list/app-edit.js',
+  '/check-list/app-archive.js',
+  '/check-list/app-settings.js',
+  '/check-list/app-init.js',
+  '/check-list/app-utils.js',
+];
 
 self.addEventListener('install', e => {
   self.skipWaiting();
+  e.waitUntil(
+    caches.open(CACHE).then(cache => cache.addAll(APP_FILES).catch(()=>{}))
+  );
 });
 
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.map(k => caches.delete(k)))
+      Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))
     ).then(() => clients.claim())
   );
 });
 
-// Всегда загружать свежее с сервера
 self.addEventListener('fetch', e => {
-  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+  const url = new URL(e.request.url);
+  // Supabase API — network only, no cache
+  if(url.hostname.includes('supabase.co')) {
+    e.respondWith(fetch(e.request).catch(()=>new Response('{}',{headers:{'Content-Type':'application/json'}})));
+    return;
+  }
+  // App files — cache first, update in background
+  e.respondWith(
+    caches.match(e.request).then(cached => {
+      const network = fetch(e.request).then(res => {
+        if(res.ok) caches.open(CACHE).then(c=>c.put(e.request,res.clone()));
+        return res;
+      }).catch(()=>cached);
+      return cached || network;
+    })
+  );
 });
 
 self.addEventListener('push', e => {
