@@ -66,7 +66,7 @@ function openView(id) {
     }
     const sessionsHTML = sessions.map((s, si) => {
       const sep = si > 0 ? '<div style="height:1px;background:var(--b1);margin:8px 0"></div>' : '';
-      const noteHTML = s.note ? `<div style="font-size:13px;color:var(--t2);padding:5px 0 4px;font-style:italic">${esc(s.note)}</div>` : '';
+      const noteHTML = s.note ? `<div style="font-size:13px;color:var(--t1);padding:5px 0 4px;font-style:italic">${esc(s.note)}</div>` : '';
       const entriesHTML = s.entries.map(entryRowHTML).join('');
       const sAtts = s.atts||[];
       const sImgs = sAtts.filter(a=>a.type?.startsWith('image/'));
