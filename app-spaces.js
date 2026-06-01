@@ -20,9 +20,11 @@ async function initSpaces() {
     const {data, error} = await query;
     if(error) throw error;
     spaces = data || [];
-  } catch(e) {
+ } catch(e) {
     spaces = JSON.parse(localStorage.getItem('mc_spaces')||'[]');
     if(!spaces.length) spaces = [{id:'personal',name:'Личный',type:'personal',members:[]}];
+    showSpaceSelector();
+    return;
   }
   localStorage.setItem('mc_spaces', JSON.stringify(spaces));
   // Handle invite link
