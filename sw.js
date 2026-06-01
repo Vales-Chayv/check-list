@@ -45,7 +45,7 @@ self.addEventListener('fetch', e => {
         if(res.ok) { const clone = res.clone(); caches.open(CACHE).then(c=>c.put(e.request,clone)); }
 return res;
       }).catch(()=>cached);
-      return cached || network;
+      return cached || network.catch(()=>new Response('', {status: 404}));
     })
   );
 });
