@@ -141,7 +141,7 @@ function cardHTML(card, isDone=false) {
   const col = catColor(card.category);
   const bg = hex2rgba(col, isDone?.09:.13);
   const border = hex2rgba(col, isDone?.2:.35);
-  const entries = card.entries||[];
+  const entries = [...(card.entries||[])].sort((a,b)=>(a.done===b.done)?0:a.done?1:-1);
   const doneEntries = entries.filter(e=>e.done).length;
   // Find nearest deadline among card and all undone entries
   const allDeadlines = [card.deadline, ...entries.filter(e=>!e.done).map(e=>e.deadline)]
