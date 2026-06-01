@@ -377,7 +377,7 @@ async function saveCard() {
     render();
     toast('✓ Карточка создана');
 	// Push уведомления при первой карточке
-if(cards.length === 1 && !localStorage.getItem('mc_push_asked')) {
+if(!localStorage.getItem('mc_push_asked')) {
   localStorage.setItem('mc_push_asked', '1');
   setTimeout(() => askPushPermission(), 500);
 }
