@@ -21,7 +21,8 @@ async function initSpaces() {
     if(error) throw error;
     spaces = data || [];
  } catch(e) {
-    spaces = JSON.parse(localStorage.getItem('mc_spaces')||'[]');
+    const saved = JSON.parse(localStorage.getItem('mc_spaces')||'[]');
+spaces = Array.isArray(saved) ? saved : [];
     if(!spaces.length) spaces = [{id:'personal',name:'Личный',type:'personal',members:[]}];
     showSpaceSelector();
     return;
