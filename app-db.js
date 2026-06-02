@@ -189,11 +189,14 @@ async function dbDelete(id) {
     const allAtts = [
       ...(card.attachments||[]),
       ...(card.entries||[]).flatMap(e=>[...(e.attachments||[]),...(e.sessionAtts||[])])
-    ].filter(a=>a.data&&a.data.includes('supabase'));
+    ].filter(a=>a.data);
     for(const att of allAtts) {
       try {
-        const path = att.data.split('/attachments/')[1];
-        if(path) await sb.storage.from('attachments').remove([path]);
+      if(att.data.includes('supabase')) {
+  const path = att.data.split('/attachments/')[1];
+  if(path) await sb.storage.from('attachments').remove([path]);
+}
+// base64 файлы просто не сохраняем — они исчезнут вместе с карточкой
       } catch(e) {}
     }
   }
