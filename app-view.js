@@ -130,6 +130,9 @@ async function viewToggleEntry(cardId, entryId) {
   }
   const e=(card.entries||[]).find(x=>x.id===entryId); if(!e)return;
   e.done=!e.done;
+  // Обновляем дедлайн карточки на ближайший среди невыполненных записей
+const activeDls = (card.entries||[]).filter(x=>!x.done&&x.deadline).map(x=>x.deadline).sort();
+if(activeDls.length) card.deadline = activeDls[0];
   if((card.entries||[]).length>0&&(card.entries||[]).every(x=>x.done)){
     card.status='done';
     card.history=[...(card.history||[]),{date:nowStr(),text:'Все записи выполнены → Готово',type:'status'}];
