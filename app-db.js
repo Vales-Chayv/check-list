@@ -152,8 +152,7 @@ async function syncFromServer() {
     cats = kr.data?.length ? kr.data : (currentSpace?.type==='family'
       ? [{name:'Еда',color:'#5bb87a'},{name:'Уборка',color:'#5b9ee8'},{name:'Дети',color:'#a07de8'},{name:'Покупки',color:'#e8c56a'},{name:'Финансы',color:'#e88a3a'},{name:'Ремонт',color:'#e86060'}]
       : [{name:'Работа',color:'#e8c56a'},{name:'Личное',color:'#5b9ee8'},{name:'Проекты',color:'#5bb87a'}]);
-    // Автопометка карточек с дедлайном сегодня
-const todayStr = new Date().toISOString().slice(0,10);
+    const todayStr = new Date().toISOString().slice(0,10);
 cards.forEach(c => { if(c.deadline===todayStr && !c.today) c.today = true; });
 applyCatsOrder(); setSyncDot('ok'); render(); startIntervalReminders();
   } catch(e) {
