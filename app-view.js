@@ -33,7 +33,7 @@ function openView(id) {
       <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
         <button onclick="closeView()" style="background:var(--s2);border:none;color:var(--t2);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px">✕</button>
         <button onclick="closeView();setTimeout(()=>openAddEntry('${id}'),200)" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:8px;padding:9px 16px;font-size:15px;font-weight:700;cursor:pointer">＋ Запись</button>
-		${card.status!=='done'?`<button onclick="toggleToday('${id}')" style="background:${card.today?'rgba(232,197,106,.3)':'rgba(232,197,106,.1)'};color:var(--accent);border:1px solid rgba(232,197,106,.3);border-radius:8px;padding:9px 16px;font-size:15px;cursor:pointer">${card.today?'✕ Убрать из списка':'☆ На сегодня'}</button>`:''}
+		${card.status!=='done'&&view!=='today'?`<button onclick="toggleToday('${id}')" style="background:${card.today?'rgba(232,197,106,.3)':'rgba(232,197,106,.1)'};color:var(--accent);border:1px solid rgba(232,197,106,.3);border-radius:8px;padding:9px 16px;font-size:15px;cursor:pointer">${card.today?'✕ Убрать из списка':'☆ На сегодня'}</button>`:''}
 		${card.status==='done'?`<button onclick="restoreCard('${id}')" style="background:rgba(91,184,122,.15);color:var(--green);border:1px solid rgba(91,184,122,.25);border-radius:8px;padding:9px 16px;font-size:15px;cursor:pointer">↩ Вернуть</button>`:''}
         ${(currentSpace?.type!=='family'||(card.created_by&&card.created_by===localStorage.getItem('mc_current_member')))?
   (view==='today'
