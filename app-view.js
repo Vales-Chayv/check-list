@@ -150,8 +150,9 @@ function openAddEntry(cardId) {
   document.getElementById('ae-card-title').textContent = '＋ Запись' + (title ? ' в «'+title+'»' : '');
   const noteEl = document.getElementById('ae-note');
   if(noteEl) { noteEl.value = ''; }
-  const noteFld = noteEl?.closest('div') || noteEl?.parentElement;
-if(noteFld) noteFld.style.display = currentSpace?.type==='family' ? 'block' : 'none';
+ if(noteEl) noteEl.style.display = currentSpace?.type==='family' ? 'block' : 'none';
+const noteLbl = noteEl?.previousElementSibling;
+if(noteLbl) noteLbl.style.display = currentSpace?.type==='family' ? 'block' : 'none';
   const listEl = document.getElementById('ae-entries-list');
   if(listEl) { listEl.innerHTML = ''; }
   document.getElementById('ae-att-prev').innerHTML = '';
