@@ -27,10 +27,15 @@ function renderCats() {
     const active = filterCat===c.name;
     const bg = active ? hex2rgba(col,.15) : 'transparent';
     const border = active ? hex2rgba(col,.5) : 'rgba(255,255,255,.08)';
-    html += `<button class="cat-btn${active?' on':''}" style="background:${bg};border-color:${border}"
+    html += `<button class="cat-btn${active?' on':''}" style="background:${bg};border-color:${border}" draggable="true"
       onclick="App.setCat(${i})"
       oncontextmenu="event.preventDefault();event.stopPropagation();App.deleteCat(${i});return false"
-      ontouchstart="App.startCatHold(${i},this)" ontouchend="App.cancelCatHold()" ontouchmove="App.cancelCatHold()">
+      ondragstart="App.startCatDrag(${i})"
+      ondragover="event.preventDefault();App.dragCatOver(${i})"
+      ondrop="event.preventDefault();App.dropCat(${i})"
+      ontouchstart="App.startCatHold(${i},this);App.touchStartCat(${i},event)"
+      ontouchend="App.cancelCatHold();App.touchEndCat(event)"
+      ontouchmove="App.cancelCatHold();App.touchMoveCat(event)">
       <span class="cat-dot" style="background:${col}"></span>${esc(c.name)}</button>`;
   });
   bar.innerHTML = html;
@@ -188,6 +193,45 @@ function cardHTML(card, isDone=false) {
 const App = {
   setCat(idx) { filterCat = idx===-1 ? 'all' : cats[idx].name; render(); },
   _catHoldTimer: null,
+  _dragIdx: null,
+  _touchDragIdx: null, _touchStartX: 0, _touchStartY: 0, _touchDragging: false, _touchOverIdx: undefined,
+  startCatDrag(idx) { App._dragIdx = idx; },
+  dragCatOver(idx) { App._dragOverIdx = idx; },
+  dropCat(idx) {
+    if(App._dragIdx === null || App._dragIdx === idx) { App._dragIdx = null; return; }
+    const moved = cats.splice(App._dragIdx, 1)[0];
+    cats.splice(idx, 0, moved);
+    App._dragIdx = null;
+    render(); saveCatsOrder();
+  },
+  touchStartCat(idx, e) {
+    App._touchDragIdx = idx;
+    App._touchStartX = e.touches[0].clientX;
+    App._touchStartY = e.touches[0].clientY;
+    App._touchDragging = false;
+  },
+  touchMoveCat(e) {
+    if(App._touchDragIdx === null) return;
+    const dx = e.touches[0].clientX - App._touchStartX;
+    const dy = e.touches[0].clientY - App._touchStartY;
+    if(Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+      App._touchDragging = true;
+      const el = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY);
+      const btn = el?.closest('.cat-btn');
+      if(btn) {
+        const btns = [...document.querySelectorAll('#cats .cat-btn')].slice(1);
+        App._touchOverIdx = btns.indexOf(btn);
+      }
+    }
+  },
+  touchEndCat(e) {
+    if(App._touchDragging && App._touchDragIdx !== null && App._touchOverIdx !== undefined && App._touchOverIdx !== -1 && App._touchDragIdx !== App._touchOverIdx) {
+      const moved = cats.splice(App._touchDragIdx, 1)[0];
+      cats.splice(App._touchOverIdx, 0, moved);
+      render(); saveCatsOrder();
+    }
+    App._touchDragIdx = null; App._touchDragging = false; App._touchOverIdx = undefined;
+  },
   startCatHold(idx, el) {
     App._catHoldTimer = setTimeout(() => { App._catHoldTimer=null; App.deleteCat(idx); }, 600);
   },
@@ -236,6 +280,24 @@ const App = {
 };
 
 function closeImgViewer() { document.getElementById('img-viewer').style.display='none'; imgScale=1; imgTransX=0; imgTransY=0; }
+
+function saveCatsOrder() {
+  const key = 'mc_cats_order_' + (currentSpaceId||'personal');
+  localStorage.setItem(key, JSON.stringify(cats.map(c=>c.name)));
+}
+
+function applyCatsOrder() {
+  const key = 'mc_cats_order_' + (currentSpaceId||'personal');
+  const order = JSON.parse(localStorage.getItem(key)||'[]');
+  if(!order.length) return;
+  cats.sort((a,b) => {
+    const ia = order.indexOf(a.name), ib = order.indexOf(b.name);
+    if(ia===-1&&ib===-1) return 0;
+    if(ia===-1) return 1;
+    if(ib===-1) return -1;
+    return ia-ib;
+  });
+}
 
 // Pinch zoom for image viewer
 let imgScale=1, imgLastDist=0;
