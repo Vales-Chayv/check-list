@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════
 //  INDEXEDDB — LOCAL STORAGE
 // ═══════════════════════════════════════════
-const DB_NAME = 'mycards-db', DB_VER = 2;
+const DB_NAME = 'mycards-db', DB_VER = 3;
 let db = null;
 
 function openDB() {
@@ -12,8 +12,9 @@ function openDB() {
       const d = e.target.result;
       if (!d.objectStoreNames.contains('cards')) d.createObjectStore('cards', {keyPath:'id'});
       if (!d.objectStoreNames.contains('categories')) d.createObjectStore('categories', {keyPath:'name'});
-      if (!d.objectStoreNames.contains('queue')) d.createObjectStore('queue', {keyPath:'id', autoIncrement:true});
-      if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta', {keyPath:'key'});
+     if (!d.objectStoreNames.contains('queue')) d.createObjectStore('queue', {keyPath:'id', autoIncrement:true});
+if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta', {keyPath:'key'});
+if (!d.objectStoreNames.contains('offline_files')) d.createObjectStore('offline_files', {keyPath:'tempId'});
     };
     req.onsuccess = e => { db = e.target.result; resolve(db); };
     req.onerror = () => reject(req.error);
@@ -108,6 +109,7 @@ async function processSyncQueue() {
 window.addEventListener('online', async () => {
   setSyncDot('sync');
   await processSyncQueue();
+  await syncOfflineFiles();
   await syncFromServer();
   setSyncDot('ok');
 });
@@ -231,5 +233,54 @@ function handleRealtimeCard(payload) {
     local.delete('cards', o.id);
   }
   render();
+}
+// ═══════════════════════════════════════════
+//  OFFLINE FILES
+// ═══════════════════════════════════════════
+async function saveOfflineFile(tempId, cardId, entryId, file, base64) {
+  const d = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = d.transaction('offline_files', 'readwrite');
+    const s = tx.objectStore('offline_files');
+    const req = s.put({tempId, cardId, entryId, name:file.name, type:file.type, base64});
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function getOfflineFiles() {
+  return dbLocal('offline_files', 'readonly', s => s.getAll());
+}
+
+async function deleteOfflineFile(tempId) {
+  return dbLocal('offline_files', 'readwrite', s => s.delete(tempId));
+}
+
+async function syncOfflineFiles() {
+  if(!navigator.onLine) return;
+  const files = await getOfflineFiles();
+  if(!files.length) return;
+  for(const f of files) {
+    try {
+      const blob = await fetch(f.base64).then(r=>r.blob());
+      const file = new File([blob], f.name, {type:f.type});
+      const att = await uploadToStorage(file);
+      // Update card entry with real URL
+      const card = cards.find(c=>c.id===f.cardId);
+      if(card) {
+        const entries = card.entries||[];
+        const entry = entries.find(e=>e.id===f.entryId);
+        if(entry) {
+          entry.sessionAtts = (entry.sessionAtts||[]).map(a=>a.data===f.base64?att:a);
+        } else {
+          card.attachments = (card.attachments||[]).map(a=>a.data===f.base64?att:a);
+        }
+        await dbUpdate(card);
+      }
+      await deleteOfflineFile(f.tempId);
+    } catch(e) {
+      console.log('Offline file sync error:', e.message);
+    }
+  }
 }
 

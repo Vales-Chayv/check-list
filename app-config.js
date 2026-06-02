@@ -29,7 +29,19 @@ let expandedCards = new Set(), originalState = null;
 // ═══════════════════════════════════════════
 //  SUPABASE STORAGE
 // ═══════════════════════════════════════════
-async function uploadToStorage(file) {
+async function uploadToStorage(file, cardId, entryId) {
+  if(!navigator.onLine) {
+    // Сохраняем офлайн во временное хранилище
+    const tempId = uid();
+    const base64 = await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = ev => resolve(ev.target.result);
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+    await saveOfflineFile(tempId, cardId||null, entryId||null, file, base64);
+    return { id: tempId, name: file.name, type: file.type, data: base64, offline: true };
+  }
   const path = uid() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const { data, error } = await sb.storage.from('attachments').upload(path, file);
   if(error) throw error;
