@@ -80,6 +80,19 @@ function renderCards() {
 
   el.innerHTML=html;
 }
+function renderToday() {
+  const el = document.getElementById('scroll');
+  const todayCards = applyMemberFilter(cards.filter(c=>c.today && c.status!=='done'));
+  if(!todayCards.length) { el.innerHTML = emptyHTML('Нет задач на сегодня', 'Добавь карточки кнопкой ☆ На сегодня'); return; }
+  const PO = {urgent:0, high:1, normal:2};
+  const priority = todayCards.filter(c=>c.priority==='urgent'||c.priority==='high')
+    .sort((a,b)=>{ const pd=PO[a.priority]-PO[b.priority]; if(pd!==0) return pd; return (a.deadline||'9999').localeCompare(b.deadline||'9999'); });
+  const normal = todayCards.filter(c=>!c.priority||c.priority==='normal');
+  let html = '';
+  if(priority.length) { html += `<div class="date-lbl" style="color:var(--red)">🔥 Срочные и важные</div>`; html += priority.map(c=>cardHTML(c)).join(''); }
+  html += normal.map(c=>cardHTML(c)).join('');
+  el.innerHTML = html;
+}
 
 function renderChecklist() {
   const el = document.getElementById('scroll');
