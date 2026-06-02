@@ -233,7 +233,7 @@ const App = {
     App._touchDragIdx = null; App._touchDragging = false; App._touchOverIdx = undefined;
   },
   startCatHold(idx, el) {
-    App._catHoldTimer = setTimeout(() => { App._catHoldTimer=null; App.deleteCat(idx); }, 600);
+    App._catHoldTimer = setTimeout(() => { App._catHoldTimer=null; App.deleteCat(idx); }, 1800);
   },
   cancelCatHold() {
     if(App._catHoldTimer) { clearTimeout(App._catHoldTimer); App._catHoldTimer=null; }
