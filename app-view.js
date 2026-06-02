@@ -13,7 +13,7 @@ function openView(id) {
   const related = card.related_ids||[];
   const hist = card.history||[];
 
-  let html = `<div style="background:${hex2rgba(col,.15)};border-bottom:3px solid ${hex2rgba(col,.5)};padding:16px 20px;position:sticky;top:0;z-index:10">
+  let html = `<div class="view-header" style="background:${hex2rgba(col,.15)};border-bottom:3px solid ${hex2rgba(col,.5)};padding:16px 20px;position:sticky;top:0;z-index:10">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:9px">
       <div style="flex:1">
         <div style="font-size:18px;font-weight:700;color:${col};line-height:1.3">${esc(card.title)}</div>
@@ -99,6 +99,16 @@ if(sAudios.length) sAttHTML+=sAudios.map(a=>`<audio controls src="${a.data}" sty
   }
 
   document.getElementById('view-content').innerHTML=html;
+  // Fade effect under header
+setTimeout(()=>{
+  const sheet = document.querySelector('#view-ov .sheet');
+  const header = document.querySelector('#view-ov .view-header');
+  if(sheet && header) {
+    const h = header.offsetHeight;
+    sheet.style.webkitMaskImage = `linear-gradient(to bottom, transparent ${h-20}px, black ${h+20}px)`;
+    sheet.style.maskImage = `linear-gradient(to bottom, transparent ${h-20}px, black ${h+20}px)`;
+  }
+},50);
   document.getElementById('view-ov').classList.add('on');
 }
 
