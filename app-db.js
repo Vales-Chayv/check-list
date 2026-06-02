@@ -183,6 +183,20 @@ async function dbUpdate(card) {
 }
 
 async function dbDelete(id) {
+  // Удаляем файлы из Storage
+  const card = cards.find(c=>c.id===id);
+  if(card && navigator.onLine) {
+    const allAtts = [
+      ...(card.attachments||[]),
+      ...(card.entries||[]).flatMap(e=>[...(e.attachments||[]),...(e.sessionAtts||[])])
+    ].filter(a=>a.data&&a.data.includes('supabase'));
+    for(const att of allAtts) {
+      try {
+        const path = att.data.split('/attachments/')[1];
+        if(path) await sb.storage.from('attachments').remove([path]);
+      } catch(e) {}
+    }
+  }
   await local.delete('cards', id);
   if (navigator.onLine) {
     setSyncDot('sync');
