@@ -176,7 +176,7 @@ function cardHTML(card, isDone=false) {
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0">
         <span class="badge" style="color:${col}">${ST_LABELS[card.status]||''}</span>
         ${dl&&!isDone?`<span class="dl-badge ${dl.cls}${dl.days<=3?' dl-pulse':''}" style="font-size:11px">${dl.text}</span>`:''}
-        <button class="edit-btn" onclick="event.stopPropagation();openEdit('${card.id}')">✏️</button>
+        ${(currentSpace?.type!=='family'||(card.created_by&&card.created_by===localStorage.getItem('mc_current_member')))?`<button class="edit-btn" onclick="event.stopPropagation();openEdit('${card.id}')">✏️</button>`:''}
       </div>
     </div>
   </div>`;
