@@ -21,9 +21,7 @@ function render() {
 function renderCats() {
   const bar = document.getElementById('cats');
   const all = filterCat==='all';
-  const hasToday = cards.some(c=>c.today && c.status!=='done');
-let html = `<button class="cat-btn${all?' on':''}" style="${all?'border-color:rgba(255,255,255,.25)':''}" onclick="App.setCat(-1)">Все</button>`;
-if(hasToday) html += `<button class="cat-btn${filterCat==='__today__'?' on':''}" style="${filterCat==='__today__'?'border-color:rgba(232,197,106,.5);background:rgba(232,197,106,.15)':''}" onclick="App.setCat('__today__')">⭐ Сегодня</button>`;
+  let html = `<button class="cat-btn${all?' on':''}" style="${all?'border-color:rgba(255,255,255,.25)':''}" onclick="App.setCat(-1)">Все</button>`;
   cats.forEach((c,i) => {
     const col = c.color||'#888';
     const active = filterCat===c.name;
@@ -45,6 +43,7 @@ if(hasToday) html += `<button class="cat-btn${filterCat==='__today__'?' on':''}"
 
 function renderMain() {
   if(view==='cards') renderCards();
+  else if(view==='today') renderToday();
   else if(view==='checklist') renderChecklist();
   else renderDone();
 }
@@ -52,7 +51,7 @@ function renderMain() {
 function renderCards() {
   const el=document.getElementById('scroll');
   const PO={urgent:0,high:1,normal:2};
-  const filtered=applyMemberFilter(cards.filter(c=>c.status!=='done'&&(filterCat==='all'||(filterCat==='__today__'?c.today:c.category===filterCat))));
+  const filtered=applyMemberFilter(cards.filter(c=>c.status!=='done'&&(filterCat==='all'||c.category===filterCat)));
   if(!filtered.length){el.innerHTML=emptyHTML('Нет карточек','Создай первую карточку');return;}
 
   // Separate urgent/high from normal
@@ -85,7 +84,7 @@ function renderCards() {
 function renderChecklist() {
   const el = document.getElementById('scroll');
   const PO = {urgent:0, high:1, normal:2};
-  const rem = applyMemberFilter(cards.filter(c=>c.reminder?.enabled && c.status!=='done' && (filterCat==='all'||(filterCat==='__today__'?c.today:c.category===filterCat))));
+  const rem = applyMemberFilter(cards.filter(c=>c.reminder?.enabled && c.status!=='done' && (filterCat==='all'||c.category===filterCat)));
   if(!rem.length){el.innerHTML=emptyHTML('Чек-лист пуст','Включи напоминание в карточке');return;}
 
   // Sort: urgent/high first, then by deadline
@@ -130,7 +129,7 @@ function renderChecklist() {
 
 function renderDone() {
   const el = document.getElementById('scroll');
-  const done = applyMemberFilter(cards.filter(c=>c.status==='done'&&(filterCat==='all'||(filterCat==='__today__'?c.today:c.category===filterCat))));
+  const done = applyMemberFilter(cards.filter(c=>c.status==='done'&&(filterCat==='all'||c.category===filterCat)));
   if(!done.length){el.innerHTML=emptyHTML('Нет выполненных','Карточки со статусом «Готово» появятся здесь');return;}
   const grouped={};
   done.forEach(c=>{const d=(c.created_at||today()).slice(0,10);(grouped[d]=grouped[d]||[]).push(c);});
@@ -193,7 +192,7 @@ function cardHTML(card, isDone=false) {
 //  APP ACTIONS (called from inline HTML via App.*)
 // ═══════════════════════════════════════════
 const App = {
-  setCat(idx) { filterCat = idx===-1 ? 'all' : idx==='__today__' ? '__today__' : cats[idx].name; render(); },
+  setCat(idx) { filterCat = idx===-1 ? 'all' : cats[idx].name; render(); },
   _catHoldTimer: null,
   _dragIdx: null,
   _touchDragIdx: null, _touchStartX: 0, _touchStartY: 0, _touchDragging: false, _touchOverIdx: undefined,
