@@ -325,7 +325,7 @@ async function saveAddEntry() {
   const texts = entryTexts.length ? entryTexts : [''];
   texts.forEach((text, i) => {
    sessionEntries.push({
-  id: uid(), text: firstText, date: nowStr(), done: false, attachments: [],
+  id: uid(), text: text, date: nowStr(), done: false, attachments: [],
   sessionId,
   sessionNote: sessionNote||null,
   sessionAtts: [...aeAtts],
