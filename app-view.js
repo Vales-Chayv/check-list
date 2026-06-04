@@ -121,7 +121,7 @@ function openView(id) {
           </div>
           <!-- Bottom layer peek + content -->
           ${hasFiles?`
-            <div style="height:14px;background:${bottomColor};border-radius:0 0 8px 8px;transform:rotate(-1.5deg);transform-origin:left bottom;margin-top:-4px;position:relative;z-index:1"></div>
+            <div style="height:20px;background:${bottomColor};border-radius:0 0 10px 10px;transform:rotate(-2deg);transform-origin:left bottom;margin-top:-6px;position:relative;z-index:1;box-shadow:1px 3px 6px rgba(0,0,0,.2)"></div>
             <div id="${stkId}" style="display:none;background:${bottomColor};border-radius:0 0 10px 10px;padding:12px 14px;position:relative;z-index:1;margin-top:-4px">${filesHTML}</div>
           `:''}
         </div>
