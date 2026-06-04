@@ -100,6 +100,7 @@ function openView(id) {
             ${creator?`<div style="font-size:10px;font-weight:700;color:rgba(0,0,0,.5);margin-bottom:6px;margin-top:6px">${esc(creator)} • ${s.date}</div>`:'<div style="margin-top:14px"></div>'}
             ${s.note?`<div style="font-size:13px;color:rgba(0,0,0,.75);margin-bottom:8px;font-style:italic;line-height:1.5" dir="auto">${esc(s.note)}</div>`:''}
             ${s.entries.map(e=>entryRowHTML(e,'rgba(0,0,0,0.75)')).join('')}
+            ${isMe?`<button onclick="openAddEntry('${id}','${s.sid}')" style="margin-top:8px;background:rgba(0,0,0,.1);border:none;border-radius:20px;padding:4px 12px;font-size:12px;color:rgba(0,0,0,.6);cursor:pointer;font-family:inherit">＋ Добавить</button>`:''}
             ${hasFiles?`<div onclick="toggleStickerFiles('${stkId}')" style="position:absolute;bottom:0;right:0;width:0;height:0;border-style:solid;border-width:0 0 26px 26px;border-color:transparent transparent rgba(0,0,0,.3) transparent;cursor:pointer;border-radius:0 0 8px 0" title="Файлы"></div>`:''}
           </div>
           ${hasFiles?`<div id="${stkId}" style="display:none;background:${memberColor}dd;border-radius:0 0 10px 10px;padding:10px 14px;border-top:1px solid rgba(0,0,0,.15)">${filesHTML}</div>`:''}
@@ -188,9 +189,11 @@ if(activeDls.length) card.deadline = activeDls[0];
 
 // ─── QUICK ADD ENTRY ───────────────────────
 let aeCardId = null, aeAtts = [], aeIsVoice = false, aeVoiceRec = null, aeWakeLock = null, aeStopResolve = null;
+let aeStickerSessionId = null;
 
-function openAddEntry(cardId) {
+function openAddEntry(cardId, sessionId = null) {
   aeCardId = cardId;
+  aeStickerSessionId = sessionId;
   aeAtts = [];
   const card = cards.find(c => c.id === cardId);
   const title = card ? (card.title.length > 22 ? card.title.slice(0,20)+'…' : card.title) : '';
@@ -319,19 +322,20 @@ async function saveAddEntry() {
   const card = cards.find(c => c.id === aeCardId); if (!card) return;
 
   // Build session
-  const sessionId = uid();
+  const sessionId = aeStickerSessionId || uid();
+  const isNewSession = !aeStickerSessionId;
   const deadline = document.getElementById('ae-entry-deadline')?.value||null;
   const sessionEntries = [];
   const texts = entryTexts.length ? entryTexts : [''];
   texts.forEach((text, i) => {
-   sessionEntries.push({
-  id: uid(), text: text, date: nowStr(), done: false, attachments: [],
-  sessionId,
-  sessionNote: sessionNote||null,
-  sessionAtts: [...aeAtts],
-  sessionCreator: localStorage.getItem('mc_current_member')||currentUser?.display_name||'',
-  deadline
-});
+    sessionEntries.push({
+      id: uid(), text: text, date: nowStr(), done: false, attachments: [],
+      sessionId,
+      sessionNote: (i === 0 && isNewSession) ? (sessionNote||null) : null,
+      sessionAtts: (i === 0) ? [...aeAtts] : [],
+      sessionCreator: isNewSession ? (localStorage.getItem('mc_current_member')||currentUser?.display_name||'') : null,
+      deadline
+    });
   });
   card.entries = [...sessionEntries, ...(card.entries||[])];
 
