@@ -110,11 +110,10 @@ function openView(id) {
 
       return `<div style="display:flex;justify-content:${align};margin:12px 0 4px">
         <div style="max-width:88%;min-width:55%;position:relative">
-          ${hasFiles?`<div id="${stkId}" style="display:none;position:absolute;bottom:-8px;left:-8px;right:8px;background:${bottomColor};border-radius:10px;padding:12px 14px;box-shadow:1px 2px 6px rgba(0,0,0,.25);transform:rotate(-1.5deg);z-index:0">${filesHTML}</div>`:''}
+          ${hasFiles?`<div id="${stkId}_back" style="position:absolute;bottom:-6px;left:-8px;right:8px;height:20px;background:${bottomColor};border-radius:10px;transform:rotate(-2deg);z-index:0;pointer-events:none"></div>
+<div id="${stkId}" style="display:none;position:relative;background:${bottomColor};border-radius:0 0 10px 10px;padding:12px 14px;margin-top:0;box-shadow:1px 2px 6px rgba(0,0,0,.25);z-index:0">${filesHTML}</div>`:''}
           <div style="background:${memberColor};border-radius:10px;padding:14px 14px 16px;box-shadow:2px 3px 10px rgba(0,0,0,.3);position:relative;z-index:1">
-            <div style="position:absolute;top:-12px;${isMe?'left:14px':'right:14px'};font-size:22px;transform:rotate(${isMe?'-12':'12'}deg)">
-              <span style="display:inline-block;background:${clipColor};border-radius:50%;width:22px;height:22px;text-align:center;line-height:22px;font-size:14px;box-shadow:1px 1px 3px rgba(0,0,0,.3)">📎</span>
-            </div>
+           <div style="position:absolute;top:-13px;${isMe?'left:14px':'right:14px'};font-size:26px;transform:rotate(${isMe?'-12':'12'}deg);filter:drop-shadow(1px 1px 2px rgba(0,0,0,.3))">📎</div>
             ${creator?`<div style="font-size:10px;font-weight:700;color:rgba(0,0,0,.5);margin-bottom:6px;margin-top:8px">${esc(creator)} • ${s.date}</div>`:'<div style="margin-top:16px"></div>'}
             ${s.note?`<div style="font-size:13px;color:rgba(0,0,0,.75);margin-bottom:8px;font-style:italic;line-height:1.5;word-break:break-word;white-space:pre-wrap" dir="auto">${esc(s.note)}</div>`:''}
             ${s.entries.map(e=>entryRowHTML(e,'rgba(0,0,0,0.75)')).join('')}
