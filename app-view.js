@@ -108,20 +108,22 @@ function openView(id) {
         <div style="position:absolute;bottom:2px;right:2px;width:0;height:0;border-style:solid;border-width:24px 24px 0 0;border-color:transparent ${bottomColor} transparent transparent"></div>
       </div>` : '';
 
-      return `<div style="display:flex;justify-content:${align};margin:12px 0 4px">
-        <div style="max-width:88%;min-width:55%;position:relative">
-         <div style="background:${memberColor};border-radius:10px;padding:14px 14px 16px;...">
-            ...
-          </div>
-          ${hasFiles?`<div id="${stkId}_back" style="height:14px;background:${bottomColor};border-radius:0 0 10px 10px;transform:rotate(-1deg);margin-top:-4px;position:relative;z-index:0"></div>
-<div id="${stkId}" style="display:none;background:${bottomColor};border-radius:0 0 10px 10px;padding:12px 14px;box-shadow:1px 2px 6px rgba(0,0,0,.25)">${filesHTML}</div>`:''}	
-           <div style="position:absolute;top:-13px;${isMe?'left:14px':'right:14px'};font-size:26px;transform:rotate(${isMe?'-12':'12'}deg);filter:drop-shadow(1px 1px 2px rgba(0,0,0,.3))">📎</div>
+      return `<div style="display:flex;justify-content:${align};margin:16px 0 4px">
+        <div style="max-width:88%;min-width:55%">
+          <!-- Top sticker -->
+          <div style="background:${memberColor};border-radius:10px;padding:14px 14px 16px;box-shadow:2px 3px 10px rgba(0,0,0,.3);position:relative;z-index:2">
+            <div style="position:absolute;top:-13px;${isMe?'left:14px':'right:14px'};font-size:26px;transform:rotate(${isMe?'-12':'12'}deg);filter:drop-shadow(1px 1px 2px rgba(0,0,0,.3))">📎</div>
             ${creator?`<div style="font-size:10px;font-weight:700;color:rgba(0,0,0,.5);margin-bottom:6px;margin-top:8px">${esc(creator)} • ${s.date}</div>`:'<div style="margin-top:16px"></div>'}
             ${s.note?`<div style="font-size:13px;color:rgba(0,0,0,.75);margin-bottom:8px;font-style:italic;line-height:1.5;word-break:break-word;white-space:pre-wrap" dir="auto">${esc(s.note)}</div>`:''}
             ${s.entries.map(e=>entryRowHTML(e,'rgba(0,0,0,0.75)')).join('')}
             ${showAddBtn?`<button onclick="openAddEntry('${id}','${s.sid}',true)" style="margin-top:8px;background:rgba(0,0,0,.1);border:none;border-radius:20px;padding:4px 12px;font-size:12px;color:rgba(0,0,0,.6);cursor:pointer;font-family:inherit">＋ Добавить</button>`:''}
             ${cornerHTML}
           </div>
+          <!-- Bottom layer peek + content -->
+          ${hasFiles?`
+            <div style="height:14px;background:${bottomColor};border-radius:0 0 8px 8px;transform:rotate(-1.5deg);transform-origin:left bottom;margin-top:-4px;position:relative;z-index:1"></div>
+            <div id="${stkId}" style="display:none;background:${bottomColor};border-radius:0 0 10px 10px;padding:12px 14px;position:relative;z-index:1;margin-top:-4px">${filesHTML}</div>
+          `:''}
         </div>
       </div>`;
     }
