@@ -75,35 +75,52 @@ function openView(id) {
       </div>`;
     }
 
+    // Color pairs: top → bottom
+    const colorPairs = {'#5bb87a':'#e85bb0','#a07de8':'#5bb87a','#e8c56a':'#e86060','#5b9ee8':'#e8a83a','#e85bb0':'#5bc8e8','#e86060':'#a07de8','#5bc8e8':'#e8c56a','#e8a83a':'#5b9ee8'};
+    const clipColors = ['#e8c56a','#e86060','#5b9ee8','#a07de8','#e85bb0','#5bc8e8','#5bb87a','#e8a83a'];
+    // Find index of last "my" sticker
+    const myLastIdx = sessions.reduce((last, s, i) => (!s.creator||s.creator===myName) ? i : last, -1);
+
     function stickerHTML(s, si) {
       const creator = s.creator||'';
       const isMe = !creator || creator===myName;
       const memberColor = isMe ? '#5bb87a' : ((currentSpace?.members||[]).find(m=>m.name===creator)?.color||'#5b9ee8');
+      const bottomColor = colorPairs[memberColor] || '#e8c56a';
+      const clipColor = clipColors.find(c=>c!==memberColor&&c!==bottomColor) || '#e8c56a';
       const align = isMe ? 'flex-start' : 'flex-end';
       const sAtts = s.atts||[];
       const hasFiles = sAtts.length > 0;
       const stkId = 'stk_'+id+'_'+si;
+      const showAddBtn = isMe && si === myLastIdx;
       const sImgs = sAtts.filter(a=>a.type?.startsWith('image/'));
       const sVideos = sAtts.filter(a=>a.type?.startsWith('video/'));
       const sAudios = sAtts.filter(a=>a.type?.startsWith('audio/'));
       const sFiles = sAtts.filter(a=>!a.type?.startsWith('image/')&&!a.type?.startsWith('video/')&&!a.type?.startsWith('audio/'));
       let filesHTML = '';
-      if(sImgs.length) filesHTML+=`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:4px">${sImgs.map(a=>`<img src="${a.data}" style="width:70px;height:70px;object-fit:cover;border-radius:6px;cursor:pointer" onclick="openImgDirect('${a.data}')">`).join('')}</div>`;
+      if(sImgs.length) filesHTML+=`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px">${sImgs.map(a=>`<img src="${a.data}" style="width:70px;height:70px;object-fit:cover;border-radius:6px;cursor:pointer" onclick="openImgDirect('${a.data}')">`).join('')}</div>`;
       if(sVideos.length) filesHTML+=sVideos.map(a=>`<div style="width:80px;height:80px;border-radius:6px;overflow:hidden;cursor:pointer;position:relative;display:inline-block;margin:3px" onclick="openVideoViewer('${a.data}')"><video src="${a.data}" style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.3);font-size:20px">▶</div></div>`).join('');
       if(sAudios.length) filesHTML+=sAudios.map(a=>`<audio controls src="${a.data}" style="width:100%;height:32px;margin-top:4px"></audio>`).join('');
       if(sFiles.length) filesHTML+=`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${sFiles.map(f=>`<a href="${f.data}" download="${esc(f.name)}" style="font-size:12px;color:rgba(0,0,0,.7);background:rgba(0,0,0,.1);padding:3px 8px;border-radius:10px;text-decoration:none">📎${esc(f.name)}</a>`).join('')}</div>`;
 
-      return `<div style="display:flex;justify-content:${align};margin:8px 0">
+      // Folded corner SVG
+      const cornerHTML = hasFiles ? `<div onclick="toggleStickerFiles('${stkId}')" style="position:absolute;bottom:0;right:0;width:28px;height:28px;cursor:pointer;overflow:hidden;border-radius:0 0 10px 0">
+        <div style="position:absolute;bottom:0;right:0;width:0;height:0;border-style:solid;border-width:28px 28px 0 0;border-color:transparent rgba(0,0,0,.25) transparent transparent"></div>
+        <div style="position:absolute;bottom:2px;right:2px;width:0;height:0;border-style:solid;border-width:24px 24px 0 0;border-color:transparent ${bottomColor} transparent transparent"></div>
+      </div>` : '';
+
+      return `<div style="display:flex;justify-content:${align};margin:12px 0 4px">
         <div style="max-width:88%;min-width:55%;position:relative">
-          <div style="background:${memberColor};border-radius:10px 10px ${hasFiles?'0 0':'10px 10px'};padding:14px 14px 12px;box-shadow:2px 3px 10px rgba(0,0,0,.3);position:relative">
-            <div style="position:absolute;top:-10px;${isMe?'left:14px':'right:14px'};font-size:22px;transform:rotate(${isMe?'-10':'10'}deg);filter:drop-shadow(1px 1px 2px rgba(0,0,0,.3))">📎</div>
-            ${creator?`<div style="font-size:10px;font-weight:700;color:rgba(0,0,0,.5);margin-bottom:6px;margin-top:6px">${esc(creator)} • ${s.date}</div>`:'<div style="margin-top:14px"></div>'}
-            ${s.note?`<div style="font-size:13px;color:rgba(0,0,0,.75);margin-bottom:8px;font-style:italic;line-height:1.5" dir="auto">${esc(s.note)}</div>`:''}
+          ${hasFiles?`<div id="${stkId}" style="display:none;position:absolute;bottom:-8px;left:-8px;right:8px;background:${bottomColor};border-radius:10px;padding:12px 14px;box-shadow:1px 2px 6px rgba(0,0,0,.25);transform:rotate(-1.5deg);z-index:0">${filesHTML}</div>`:''}
+          <div style="background:${memberColor};border-radius:10px;padding:14px 14px 16px;box-shadow:2px 3px 10px rgba(0,0,0,.3);position:relative;z-index:1">
+            <div style="position:absolute;top:-12px;${isMe?'left:14px':'right:14px'};font-size:22px;transform:rotate(${isMe?'-12':'12'}deg)">
+              <span style="display:inline-block;background:${clipColor};border-radius:50%;width:22px;height:22px;text-align:center;line-height:22px;font-size:14px;box-shadow:1px 1px 3px rgba(0,0,0,.3)">📎</span>
+            </div>
+            ${creator?`<div style="font-size:10px;font-weight:700;color:rgba(0,0,0,.5);margin-bottom:6px;margin-top:8px">${esc(creator)} • ${s.date}</div>`:'<div style="margin-top:16px"></div>'}
+            ${s.note?`<div style="font-size:13px;color:rgba(0,0,0,.75);margin-bottom:8px;font-style:italic;line-height:1.5;word-break:break-word;white-space:pre-wrap" dir="auto">${esc(s.note)}</div>`:''}
             ${s.entries.map(e=>entryRowHTML(e,'rgba(0,0,0,0.75)')).join('')}
-            ${isMe?`<button onclick="openAddEntry('${id}','${s.sid}')" style="margin-top:8px;background:rgba(0,0,0,.1);border:none;border-radius:20px;padding:4px 12px;font-size:12px;color:rgba(0,0,0,.6);cursor:pointer;font-family:inherit">＋ Добавить</button>`:''}
-            ${hasFiles?`<div onclick="toggleStickerFiles('${stkId}')" style="position:absolute;bottom:0;right:0;width:0;height:0;border-style:solid;border-width:0 0 26px 26px;border-color:transparent transparent rgba(0,0,0,.3) transparent;cursor:pointer;border-radius:0 0 8px 0" title="Файлы"></div>`:''}
+            ${showAddBtn?`<button onclick="openAddEntry('${id}','${s.sid}',true)" style="margin-top:8px;background:rgba(0,0,0,.1);border:none;border-radius:20px;padding:4px 12px;font-size:12px;color:rgba(0,0,0,.6);cursor:pointer;font-family:inherit">＋ Добавить</button>`:''}
+            ${cornerHTML}
           </div>
-          ${hasFiles?`<div id="${stkId}" style="display:none;background:${memberColor}dd;border-radius:0 0 10px 10px;padding:10px 14px;border-top:1px solid rgba(0,0,0,.15)">${filesHTML}</div>`:''}
         </div>
       </div>`;
     }
@@ -191,7 +208,7 @@ if(activeDls.length) card.deadline = activeDls[0];
 let aeCardId = null, aeAtts = [], aeIsVoice = false, aeVoiceRec = null, aeWakeLock = null, aeStopResolve = null;
 let aeStickerSessionId = null;
 
-function openAddEntry(cardId, sessionId = null) {
+function openAddEntry(cardId, sessionId = null, hideNote = false) {
   aeCardId = cardId;
   aeStickerSessionId = sessionId;
   aeAtts = [];
@@ -200,9 +217,9 @@ function openAddEntry(cardId, sessionId = null) {
   document.getElementById('ae-card-title').textContent = '＋ Запись' + (title ? ' в «'+title+'»' : '');
   const noteEl = document.getElementById('ae-note');
   if(noteEl) { noteEl.value = ''; }
- if(noteEl) noteEl.style.display = currentSpace?.type==='family' ? 'block' : 'none';
-const noteLbl = noteEl?.previousElementSibling;
-if(noteLbl) noteLbl.style.display = currentSpace?.type==='family' ? 'block' : 'none';
+  if(noteEl) noteEl.style.display = (currentSpace?.type==='family' && !hideNote) ? 'block' : 'none';
+  const noteLbl = noteEl?.previousElementSibling;
+  if(noteLbl) noteLbl.style.display = (currentSpace?.type==='family' && !hideNote) ? 'block' : 'none';
   const listEl = document.getElementById('ae-entries-list');
   if(listEl) { listEl.innerHTML = ''; }
   document.getElementById('ae-att-prev').innerHTML = '';
