@@ -110,7 +110,7 @@ function openView(id) {
 
      return `<div style="display:flex;justify-content:${align};margin:16px 0 4px">
         <div style="max-width:88%;min-width:55%;position:relative;${hasFiles?'padding-bottom:14px':''}">
-          ${hasFiles?`<div id="${stkId}_peek" style="position:absolute;bottom:-5px;left:-5px;right:8px;height:110%;background:${bottomColor};border-radius:10px;transform:rotate(-0.5deg);z-index:0"></div>`:''}
+          ${hasFiles?`<div id="${stkId}_peek" style="position:absolute;bottom:-5px;left:-5px;right:8px;height:100%;background:${bottomColor};border-radius:10px;transform:rotate(1.2deg);z-index:0"></div>`:''}
           <div style="position:relative;z-index:1;background:${memberColor};border-radius:10px;padding:14px 14px 16px;box-shadow:2px 3px 10px rgba(0,0,0,.3)">
             <div style="position:absolute;top:-16px;${isMe?'left:14px':'right:14px'};transform:rotate(${isMe?'-12':'12'}deg);filter:drop-shadow(1px 1px 3px rgba(0,0,0,.4))"><svg width="20" height="32" viewBox="0 0 20 32" fill="none"><path d="M10 1C6.1 1 3 4.1 3 8v14c0 3.9 3.1 7 7 7s7-3.1 7-7V6h-2.5v16c0 2.5-2 4.5-4.5 4.5S5.5 24.5 5.5 22V8c0-1.9 1.6-3.5 3.5-3.5S12.5 6.1 12.5 8v14h2.5V8c0-3.9-3.1-7-7-7z" fill="${clipColor}"/></svg></div>
             ${creator?`<div style="font-size:10px;font-weight:700;color:rgba(0,0,0,.5);margin-bottom:6px;margin-top:8px">${esc(creator)} • ${s.date}</div>`:'<div style="margin-top:16px"></div>'}
