@@ -108,8 +108,10 @@ function openView(id) {
         <div style="position:absolute;bottom:2px;right:2px;width:0;height:0;border-style:solid;border-width:24px 24px 0 0;border-color:transparent ${bottomColor} transparent transparent"></div>
       </div>` : '';
 
-      return `<div style="display:flex;justify-content:${align};margin:16px 0 4px">
+     return `<div style="display:flex;justify-content:${align};margin:16px 0 4px">
         <div style="max-width:88%;min-width:55%">
+          <!-- Bottom peek - always behind top -->
+          ${hasFiles?`<div style="height:18px;background:${bottomColor};border-radius:8px;transform:rotate(-2deg);transform-origin:left;margin-bottom:-10px;margin-left:-4px;margin-right:-4px"></div>`:''}
           <!-- Top sticker -->
           <div style="background:${memberColor};border-radius:10px;padding:14px 14px 16px;box-shadow:2px 3px 10px rgba(0,0,0,.3);position:relative">
             <div style="position:absolute;top:-16px;${isMe?'left:14px':'right:14px'};transform:rotate(${isMe?'-12':'12'}deg);filter:drop-shadow(1px 1px 3px rgba(0,0,0,.4))"><svg width="20" height="32" viewBox="0 0 20 32" fill="none"><path d="M10 1C6.1 1 3 4.1 3 8v14c0 3.9 3.1 7 7 7s7-3.1 7-7V6h-2.5v16c0 2.5-2 4.5-4.5 4.5S5.5 24.5 5.5 22V8c0-1.9 1.6-3.5 3.5-3.5S12.5 6.1 12.5 8v14h2.5V8c0-3.9-3.1-7-7-7z" fill="${clipColor}"/></svg></div>
@@ -119,11 +121,8 @@ function openView(id) {
             ${showAddBtn?`<button onclick="openAddEntry('${id}','${s.sid}',true)" style="margin-top:8px;background:rgba(0,0,0,.1);border:none;border-radius:20px;padding:4px 12px;font-size:12px;color:rgba(0,0,0,.6);cursor:pointer;font-family:inherit">＋ Добавить</button>`:''}
             ${cornerHTML}
           </div>
-          <!-- Bottom layer peek + content -->
-          ${hasFiles?`
-            <div style="height:14px;background:${bottomColor};border-radius:0 0 8px 8px;transform:rotate(-1.5deg);transform-origin:left bottom;margin-top:-4px;position:relative;z-index:1"></div>
-            <div id="${stkId}" style="display:none;background:${bottomColor};border-radius:0 0 10px 10px;padding:12px 14px;position:relative;z-index:1;margin-top:-4px">${filesHTML}</div>
-          `:''}
+          <!-- Bottom content -->
+          ${hasFiles?`<div id="${stkId}" style="display:none;background:${bottomColor};border-radius:0 0 10px 10px;padding:12px 14px">${filesHTML}</div>`:''}
         </div>
       </div>`;
     }
