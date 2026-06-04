@@ -297,7 +297,11 @@ async function addMemberToSpace() {
   const name = inp.value.trim(); if(!name) return;
   const space = spaces.find(s=>s.id===managingSpaceId); if(!space) return;
   if((space.members||[]).find(m=>m.name===name)) { toast('Участник уже есть', true); inp.value=''; return; }
-space.members = [...(space.members||[]), {name, email: email||null}];
+const memberColors = ['#e8a83a','#5b9ee8','#a07de8','#5bb87a','#e85bb0','#5bc8e8','#e86060','#c8e85b'];
+const usedColors = (space.members||[]).map(m=>m.color);
+const freeColors = memberColors.filter(c=>!usedColors.includes(c));
+const color = freeColors.length ? freeColors[0] : memberColors[Math.floor(Math.random()*memberColors.length)];
+space.members = [...(space.members||[]), {name, email: email||null, color}];
 inp.value = '';
 document.getElementById('manage-member-email').value = '';
   renderManageMembersList();

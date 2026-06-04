@@ -47,46 +47,85 @@ function openView(id) {
 
   if(entries.length) {
     const dc = entries.filter(e=>e.done).length;
-    // Group by sessionId (entries without sessionId = individual groups)
     const sessionMap = new Map();
     entries.forEach(e => {
       const sid = e.sessionId || e.id;
-      if(!sessionMap.has(sid)) sessionMap.set(sid, {note:e.sessionNote||null, atts:e.sessionAtts||[], entries:[]});
+      if(!sessionMap.has(sid)) sessionMap.set(sid, {sid, note:e.sessionNote||null, atts:e.sessionAtts||[], entries:[], creator:e.sessionCreator||'', date:e.date||''});
       sessionMap.get(sid).entries.push(e);
     });
     const sessions = [...sessionMap.values()];
-	if(card.body && sessions.length) sessions[sessions.length-1].note = sessions[sessions.length-1].note || card.body;
-    function entryRowHTML(e) {
+    if(card.body && sessions.length) sessions[sessions.length-1].note = sessions[sessions.length-1].note || card.body;
+
+    const isFamily = currentSpace?.type==='family' || currentSpace?.type==='group';
+    const myName = localStorage.getItem('mc_current_member')||'';
+
+    function entryRowHTML(e, textColor) {
       const eDl = e.deadline ? deadlineInfo(e.deadline) : null;
       if(!e.text) return '';
-      return `<div class="entry-row">
-        <div class="entry-cb${e.done?' on':''}" onclick="viewToggleEntry('${id}','${e.id}')">${e.done?checkSVG():''}</div>
+      const col = textColor||'var(--t1)';
+      return `<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid rgba(0,0,0,.1)">
+        <div style="width:16px;height:16px;border-radius:3px;border:2px solid rgba(0,0,0,.4);flex-shrink:0;margin-top:2px;background:${e.done?'rgba(0,0,0,.4)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="viewToggleEntry('${id}','${e.id}')">${e.done?'<svg width="10" height="8" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>':''}</div>
         <div style="flex:1">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px">
-            <div style="font-size:14px${e.done?';text-decoration:line-through;opacity:.45':''};flex:1" dir="auto">${esc(e.text)}</div>
-            ${eDl?`<span class="dl-badge ${eDl.cls}${eDl.days<=3?' dl-pulse':''}" style="font-size:11px;white-space:nowrap;flex-shrink:0">⏰ ${eDl.text}</span>`:''}
+          <div style="font-size:13px;color:${col};${e.done?'text-decoration:line-through;opacity:.5':''}" dir="auto">${esc(e.text)}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-size:10px;color:rgba(0,0,0,.4);margin-top:1px">${e.date}</div>
+            ${eDl?`<span style="font-size:10px;opacity:.7">⏰ ${eDl.text}</span>`:''}
           </div>
-          <div class="entry-date">${e.date}</div>
         </div>
       </div>`;
     }
-    const sessionsHTML = sessions.map((s, si) => {
+
+    function stickerHTML(s, si) {
+      const creator = s.creator||'';
+      const isMe = !creator || creator===myName;
+      const memberColor = isMe ? '#5bb87a' : ((currentSpace?.members||[]).find(m=>m.name===creator)?.color||'#5b9ee8');
+      const align = isMe ? 'flex-start' : 'flex-end';
+      const sAtts = s.atts||[];
+      const hasFiles = sAtts.length > 0;
+      const stkId = 'stk_'+id+'_'+si;
+      const sImgs = sAtts.filter(a=>a.type?.startsWith('image/'));
+      const sVideos = sAtts.filter(a=>a.type?.startsWith('video/'));
+      const sAudios = sAtts.filter(a=>a.type?.startsWith('audio/'));
+      const sFiles = sAtts.filter(a=>!a.type?.startsWith('image/')&&!a.type?.startsWith('video/')&&!a.type?.startsWith('audio/'));
+      let filesHTML = '';
+      if(sImgs.length) filesHTML+=`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:4px">${sImgs.map(a=>`<img src="${a.data}" style="width:70px;height:70px;object-fit:cover;border-radius:6px;cursor:pointer" onclick="openImgDirect('${a.data}')">`).join('')}</div>`;
+      if(sVideos.length) filesHTML+=sVideos.map(a=>`<div style="width:80px;height:80px;border-radius:6px;overflow:hidden;cursor:pointer;position:relative;display:inline-block;margin:3px" onclick="openVideoViewer('${a.data}')"><video src="${a.data}" style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.3);font-size:20px">▶</div></div>`).join('');
+      if(sAudios.length) filesHTML+=sAudios.map(a=>`<audio controls src="${a.data}" style="width:100%;height:32px;margin-top:4px"></audio>`).join('');
+      if(sFiles.length) filesHTML+=`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${sFiles.map(f=>`<a href="${f.data}" download="${esc(f.name)}" style="font-size:12px;color:rgba(0,0,0,.7);background:rgba(0,0,0,.1);padding:3px 8px;border-radius:10px;text-decoration:none">📎${esc(f.name)}</a>`).join('')}</div>`;
+
+      return `<div style="display:flex;justify-content:${align};margin:8px 0">
+        <div style="max-width:88%;min-width:55%;position:relative">
+          <div style="background:${memberColor};border-radius:10px 10px ${hasFiles?'0 0':'10px 10px'};padding:14px 14px 12px;box-shadow:2px 3px 10px rgba(0,0,0,.3);position:relative">
+            <div style="position:absolute;top:-10px;${isMe?'left:14px':'right:14px'};font-size:22px;transform:rotate(${isMe?'-10':'10'}deg);filter:drop-shadow(1px 1px 2px rgba(0,0,0,.3))">📎</div>
+            ${creator?`<div style="font-size:10px;font-weight:700;color:rgba(0,0,0,.5);margin-bottom:6px;margin-top:6px">${esc(creator)} • ${s.date}</div>`:'<div style="margin-top:14px"></div>'}
+            ${s.note?`<div style="font-size:13px;color:rgba(0,0,0,.75);margin-bottom:8px;font-style:italic;line-height:1.5" dir="auto">${esc(s.note)}</div>`:''}
+            ${s.entries.map(e=>entryRowHTML(e,'rgba(0,0,0,0.75)')).join('')}
+            ${hasFiles?`<div onclick="toggleStickerFiles('${stkId}')" style="position:absolute;bottom:0;right:0;width:0;height:0;border-style:solid;border-width:0 0 26px 26px;border-color:transparent transparent rgba(0,0,0,.3) transparent;cursor:pointer;border-radius:0 0 8px 0" title="Файлы"></div>`:''}
+          </div>
+          ${hasFiles?`<div id="${stkId}" style="display:none;background:${memberColor}dd;border-radius:0 0 10px 10px;padding:10px 14px;border-top:1px solid rgba(0,0,0,.15)">${filesHTML}</div>`:''}
+        </div>
+      </div>`;
+    }
+
+    function plainSessionHTML(s, si) {
       const sep = si > 0 ? '<div style="height:1px;background:var(--b1);margin:8px 0"></div>' : '';
       const noteHTML = s.note ? `<div style="font-size:13px;color:var(--t1);padding:5px 0 4px;font-style:italic">${esc(s.note)}</div>` : '';
-      const entriesHTML = s.entries.map(entryRowHTML).join('');
+      const entriesHTML = s.entries.map(e=>entryRowHTML(e,null)).join('');
       const sAtts = s.atts||[];
       const sImgs = sAtts.filter(a=>a.type?.startsWith('image/'));
       const sAudios = sAtts.filter(a=>a.type?.startsWith('audio/'));
-      const sFiles = sAtts.filter(a=>!a.type?.startsWith('image/')&&!a.type?.startsWith('audio/'));
+      const sVideos = sAtts.filter(a=>a.type?.startsWith('video/'));
+      const sFiles = sAtts.filter(a=>!a.type?.startsWith('image/')&&!a.type?.startsWith('video/')&&!a.type?.startsWith('audio/'));
       let sAttHTML = '';
       if(sImgs.length) sAttHTML+=`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">${sImgs.map(a=>`<img src="${a.data}" style="width:80px;height:80px;object-fit:cover;border-radius:7px;cursor:pointer" onclick="openImgDirect('${a.data}')">`).join('')}</div>`;
-      const sVideos = sAtts.filter(a=>a.type?.startsWith('video/'));
-if(sVideos.length) sAttHTML+=sVideos.map(a=>`<div style="width:95px;height:95px;border-radius:8px;overflow:hidden;cursor:pointer;position:relative;display:inline-block" onclick="openVideoViewer('${a.data}')"><video src="${a.data}" style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.3);font-size:24px">▶</div></div>`).join('');
-if(sAudios.length) sAttHTML+=sAudios.map(a=>`<audio controls src="${a.data}" style="width:100%;height:32px;margin-top:5px"></audio>`).join('');
+      if(sVideos.length) sAttHTML+=sVideos.map(a=>`<div style="width:95px;height:95px;border-radius:8px;overflow:hidden;cursor:pointer;position:relative;display:inline-block" onclick="openVideoViewer('${a.data}')"><video src="${a.data}" style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.3);font-size:24px">▶</div></div>`).join('');
+      if(sAudios.length) sAttHTML+=sAudios.map(a=>`<audio controls src="${a.data}" style="width:100%;height:32px;margin-top:5px"></audio>`).join('');
       if(sFiles.length) sAttHTML+=`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${sFiles.map(f=>`<a href="${f.data}" download="${esc(f.name)}" class="file-action">📎${esc(f.name)}</a>`).join('')}</div>`;
       return sep + noteHTML + entriesHTML + sAttHTML;
-    }).join('');
-    html+=`<div class="view-sec"><div class="view-lbl">Записи (${dc}/${entries.filter(e=>e.text).length})</div>${sessionsHTML}</div>`;
+    }
+
+    const sessionsHTML = sessions.map((s,si) => isFamily ? stickerHTML(s,si) : plainSessionHTML(s,si)).join('');
+    html+=`<div class="view-sec">${!isFamily?`<div class="view-lbl">Записи (${dc}/${entries.filter(e=>e.text).length})</div>`:''}${sessionsHTML}</div>`;
   }
 
   if(imgs.length) html+=`<div class="view-sec"><div class="view-lbl">Фото (${imgs.length})</div><div style="display:flex;flex-wrap:wrap;gap:7px">${imgs.map((a,i)=>`<img src="${a.data}" style="width:95px;height:95px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid rgba(255,255,255,.1)" onclick="App.viewImg('${id}',${i})">`).join('')}</div></div>`;
@@ -285,13 +324,14 @@ async function saveAddEntry() {
   const sessionEntries = [];
   const texts = entryTexts.length ? entryTexts : [''];
   texts.forEach((text, i) => {
-    sessionEntries.push({
-      id: uid(), text, date: nowStr(), done: false, attachments: [],
-      sessionId,
-      sessionNote: i === 0 ? (sessionNote||null) : null,
-      sessionAtts: i === 0 ? [...aeAtts] : [],
-      deadline
-    });
+   sessionEntries.push({
+  id: uid(), text: firstText, date: nowStr(), done: false, attachments: [],
+  sessionId,
+  sessionNote: sessionNote||null,
+  sessionAtts: [...aeAtts],
+  sessionCreator: localStorage.getItem('mc_current_member')||currentUser?.display_name||'',
+  deadline
+});
   });
   card.entries = [...sessionEntries, ...(card.entries||[])];
 
@@ -327,6 +367,11 @@ document.getElementById('ae-seg-ball').addEventListener('click', e => {
   document.querySelectorAll('#ae-seg-ball .seg-btn').forEach(b=>b.classList.remove('on'));
   btn.classList.add('on');
 });
+function toggleStickerFiles(id) {
+  const el = document.getElementById(id);
+  if(el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
 function openVideoViewer(src) {
   const div = document.createElement('div');
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
