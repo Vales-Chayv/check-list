@@ -417,7 +417,35 @@ function setupEntrySwipe() {
       if(actions) actions.style.opacity = '0';
       swiped = false;
     }
-
+el.addEventListener('mousedown', e => {
+  startX = e.clientX;
+  startY = e.clientY;
+  swiped = false;
+  const onMove = e => {
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if(Math.abs(dy) > Math.abs(dx)) return;
+    if(dx > 0) {
+      el.style.transform = `translateX(${Math.min(dx, 120)}px)`;
+      if(actions) actions.style.opacity = Math.min(dx/THRESHOLD, 1).toString();
+    }
+  };
+  const onUp = e => {
+    const dx = e.clientX - startX;
+    if(dx >= THRESHOLD) {
+      el.style.transform = 'translateX(120px)';
+      if(actions) actions.style.opacity = '1';
+      swiped = true;
+      document.querySelectorAll('.swipe-content').forEach(other => {
+        if(other !== el) { other.style.transform='translateX(0)'; other.closest('.swipe-entry-wrap')?.querySelector('.swipe-actions')?.style.setProperty('opacity','0'); }
+      });
+    } else { reset(); }
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  };
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+});
     el.addEventListener('touchstart', e => {
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
