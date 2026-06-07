@@ -607,4 +607,3 @@ function toggleEntryMenu(btn, cardId, entryId) {
     if(!popup.contains(e.target)&&e.target!==btn){popup.remove();document.removeEventListener('click',h);}
   }), 100);
 }
-}
