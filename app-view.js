@@ -528,7 +528,7 @@ function moveEntry(cardId, entryId) {
   const entry = (card.entries||[]).find(e=>e.id===entryId); if(!entry) return;
   const div = document.createElement('div');
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
-  const catList = cats.map(c=>`<button onclick="selectMoveCat('${cardId}','${entryId}','${esc(c.name)}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.color||'#888'};margin-right:8px"></span>${esc(c.name)}</button>`).join('');
+  const catList = cats.map(c=>`<button onclick="selectMoveCat('${cardId}','${entryId}','${esc(c.name)}',this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.color||'#888'};margin-right:8px"></span>${esc(c.name)}</button>`).join('');
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto">
     <div style="font-size:16px;font-weight:700;margin-bottom:4px">Перенести запись</div>
     <div style="font-size:13px;color:var(--t2);margin-bottom:12px">Выбери рубрику</div>
@@ -539,7 +539,7 @@ function moveEntry(cardId, entryId) {
   document.body.appendChild(div);
 }
 
-function selectMoveCat(cardId, entryId, catName) {
+function selectMoveCat(cardId, entryId, catName, btn) {
   const cardList = document.getElementById('move-card-list'); if(!cardList) return;
   const catCards = cards.filter(c=>c.category===catName && c.id!==cardId && c.status!=='done');
   document.querySelectorAll('#move-cat-list button').forEach(b=>b.style.background='var(--s2)');
