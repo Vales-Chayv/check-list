@@ -40,9 +40,10 @@ function openView(id) {
     ? `<button onclick="toggleToday('${id}');closeView()" style="background:rgba(232,96,96,.15);color:var(--red);border:1px solid rgba(232,96,96,.25);border-radius:8px;padding:9px 16px;font-size:15px;cursor:pointer">✕ Убрать из списка</button>`
     : `<button onclick="if(confirm('Удалить карточку?')){closeView();deleteCardById('${id}')}" style="background:rgba(232,96,96,.15);color:var(--red);border:1px solid rgba(232,96,96,.25);border-radius:8px;padding:9px 16px;font-size:15px;cursor:pointer">🗑 Удалить</button>`)
   :''}
-      </div>
-    </div>
-  </div>`;
+     </div>
+          <button class="entry-menu-btn" onclick="toggleEntryMenu(this,'${id}','${e.id}')">⋮</button>
+        </div>
+      </div>`;
 
 
   if(entries.length) {
@@ -69,14 +70,9 @@ function openView(id) {
           <button onclick="editEntry('${id}','${e.id}')" style="background:rgba(91,158,232,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">📝</button>
           <button onclick="moveEntry('${id}','${e.id}')" style="background:rgba(91,184,122,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">📤</button>
         </div>
-		<div class="swipe-actions-desktop">
-  <button onclick="deleteEntry('${id}','${e.id}')" style="background:rgba(232,96,96,.85);border:none;border-radius:8px;width:32px;height:32px;font-size:16px;cursor:pointer">🗑️</button>
-  <button onclick="editEntry('${id}','${e.id}')" style="background:rgba(91,158,232,.85);border:none;border-radius:8px;width:32px;height:32px;font-size:16px;cursor:pointer">📝</button>
-  <button onclick="moveEntry('${id}','${e.id}')" style="background:rgba(91,184,122,.85);border:none;border-radius:8px;width:32px;height:32px;font-size:16px;cursor:pointer">📤</button>
-</div>
         <div class="swipe-content" data-cardid="${id}" data-entryid="${e.id}" style="position:relative;display:flex;align-items:flex-start;gap:8px;padding:5px 0;background:transparent;will-change:transform;transition:transform .2s">
           <div style="width:16px;height:16px;border-radius:3px;border:2px solid rgba(0,0,0,.4);flex-shrink:0;margin-top:2px;background:${e.done?'rgba(0,0,0,.4)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="viewToggleEntry('${id}','${e.id}')">${e.done?'<svg width="10" height="8" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>':''}</div>
-          <div style="flex:1;padding-right:100px">
+          <div style="flex:1">
             <div style="font-size:13px;color:${col};${e.done?'text-decoration:line-through;opacity:.5':''}" dir="auto">${esc(e.text)}</div>
             <div style="display:flex;justify-content:space-between;align-items:center">
               <div style="font-size:10px;color:rgba(0,0,0,.4);margin-top:1px">${e.date}</div>
@@ -592,4 +588,21 @@ async function toggleToday(id) {
   card.today = !card.today;
   render(); openView(id);
   try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
+  function toggleEntryMenu(btn, cardId, entryId) {
+  // Close any open menus
+  document.querySelectorAll('.entry-menu-popup').forEach(p=>p.remove());
+  const wrap = btn.closest('.swipe-entry-wrap');
+  const popup = document.createElement('div');
+  popup.className = 'entry-menu-popup';
+  popup.innerHTML = `
+    <button onclick="deleteEntry('${cardId}','${entryId}');this.closest('.entry-menu-popup').remove()" style="background:rgba(232,96,96,.85);border:none;border-radius:8px;width:40px;height:40px;font-size:20px;cursor:pointer">🗑️</button>
+    <button onclick="editEntry('${cardId}','${entryId}');this.closest('.entry-menu-popup').remove()" style="background:rgba(91,158,232,.85);border:none;border-radius:8px;width:40px;height:40px;font-size:20px;cursor:pointer">📝</button>
+    <button onclick="moveEntry('${cardId}','${entryId}');this.closest('.entry-menu-popup').remove()" style="background:rgba(91,184,122,.85);border:none;border-radius:8px;width:40px;height:40px;font-size:20px;cursor:pointer">📤</button>
+  `;
+  wrap.style.position = 'relative';
+  wrap.appendChild(popup);
+  setTimeout(()=>document.addEventListener('click', function h(e){
+    if(!popup.contains(e.target)&&e.target!==btn){popup.remove();document.removeEventListener('click',h);}
+  }), 100);
+}
 }
