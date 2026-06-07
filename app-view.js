@@ -80,7 +80,7 @@ function openView(id) {
           </div>
           <button class="entry-menu-btn" onclick="toggleEntryMenu(this,'${id}','${e.id}')">⋮</button>
         </div>
-      </div>`;;
+      </div>`;
     }
 
     // Color pairs: top → bottom
