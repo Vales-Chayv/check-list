@@ -534,13 +534,20 @@ function moveEntry(cardId, entryId) {
   const div = document.createElement('div');
   div.id = 'move-entry-dialog';
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
-  const catList = cats.map(c=>`<button onclick="selectMoveCat('${cardId}','${entryId}','${esc(c.name)}',this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.color||'#888'};margin-right:8px"></span>${esc(c.name)}</button>`).join('');
+  const spaceList = spaces.filter(s=>s.id!==currentSpaceId).map(s=>
+    `<button onclick="selectMoveSpace('${cardId}','${entryId}','${s.id}',this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">${s.type==='family'?'👨‍👩‍👧':'🗂️'} ${esc(s.name)}</button>`
+  ).join('');
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto">
     <div style="font-size:16px;font-weight:700;margin-bottom:4px">Перенести запись</div>
-    <div style="font-size:13px;color:var(--t2);margin-bottom:12px">Выбери рубрику</div>
-    <div style="display:flex;flex-direction:column;gap:6px" id="move-cat-list">${catList}</div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Кабинет</div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
+      <button onclick="selectMoveSpace('${cardId}','${entryId}','${currentSpaceId}',this)" style="background:var(--s2);border:1px solid var(--accent);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--accent);cursor:pointer;text-align:left;font-family:inherit">📂 Текущий кабинет</button>
+      ${spaceList}
+    </div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Рубрика</div>
+    <div style="display:flex;flex-direction:column;gap:6px" id="move-cat-list"></div>
     <div id="move-card-list" style="margin-top:12px;display:flex;flex-direction:column;gap:6px"></div>
-    <button onclick="this.closest('[style*=fixed]').remove()" style="width:100%;margin-top:12px;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;cursor:pointer">Отмена</button>
+    <button onclick="document.getElementById('move-entry-dialog')?.remove()" style="width:100%;margin-top:12px;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;cursor:pointer">Отмена</button>
   </div>`;
   document.body.appendChild(div);
 }
@@ -609,4 +616,54 @@ function toggleEntryMenu(btn, cardId, entryId) {
   setTimeout(()=>document.addEventListener('click', function h(e){
     if(!popup.contains(e.target)&&e.target!==btn){popup.remove();document.removeEventListener('click',h);}
   }), 100);
+}
+async function selectMoveSpace(cardId, entryId, spaceId, btn) {
+  document.querySelectorAll('[onclick*="selectMoveSpace"]').forEach(b=>b.style.borderColor='var(--b1)');
+  btn.style.borderColor = 'var(--accent)';
+  const catListEl = document.getElementById('move-cat-list');
+  const cardListEl = document.getElementById('move-card-list');
+  cardListEl.innerHTML = '';
+  if(spaceId === currentSpaceId) {
+    catListEl.innerHTML = cats.map(c=>`<button onclick="selectMoveCat('${cardId}','${entryId}','${esc(c.name)}',this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.color||'#888'};margin-right:8px"></span>${esc(c.name)}</button>`).join('');
+  } else {
+    catListEl.innerHTML = '<div style="font-size:13px;color:var(--t3)">Загрузка...</div>';
+    try {
+      const {data} = await sb.from('categories').select('*').eq('space_id', spaceId);
+      const spaceCats = data||[];
+      catListEl.innerHTML = spaceCats.length
+        ? spaceCats.map(c=>`<button onclick="selectMoveSpaceCat('${cardId}','${entryId}','${spaceId}','${esc(c.name)}',this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.color||'#888'};margin-right:8px"></span>${esc(c.name)}</button>`).join('')
+        : '<div style="font-size:13px;color:var(--t3)">Нет рубрик</div>';
+    } catch(e) { catListEl.innerHTML = '<div style="font-size:13px;color:var(--red)">Ошибка загрузки</div>'; }
+  }
+}
+
+async function selectMoveSpaceCat(cardId, entryId, spaceId, catName, btn) {
+  document.querySelectorAll('#move-cat-list button').forEach(b=>b.style.background='var(--s2)');
+  btn.style.background='var(--s3,rgba(255,255,255,.1))';
+  const cardListEl = document.getElementById('move-card-list'); if(!cardListEl) return;
+  cardListEl.innerHTML = '<div style="font-size:13px;color:var(--t3)">Загрузка...</div>';
+  try {
+    const {data} = await sb.from('cards').select('id,title').eq('space_id', spaceId).eq('category', catName).neq('status','done');
+    const spaceCards = data||[];
+    cardListEl.innerHTML = spaceCards.length
+      ? `<div style="font-size:12px;color:var(--t3);margin-bottom:4px">Выбери карточку:</div>` +
+        spaceCards.map(c=>`<button onclick="confirmMoveEntryToSpace('${cardId}','${entryId}','${spaceId}','${c.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">${esc(c.title)}</button>`).join('')
+      : '<div style="font-size:13px;color:var(--t3)">Нет карточек</div>';
+  } catch(e) { cardListEl.innerHTML = '<div style="font-size:13px;color:var(--red)">Ошибка загрузки</div>'; }
+}
+
+async function confirmMoveEntryToSpace(fromCardId, entryId, toSpaceId, toCardId) {
+  const fromCard = cards.find(c=>c.id===fromCardId); if(!fromCard) return;
+  const entry = (fromCard.entries||[]).find(e=>e.id===entryId); if(!entry) return;
+  fromCard.entries = (fromCard.entries||[]).filter(e=>e.id!==entryId);
+  try {
+    const {data:toCardData} = await sb.from('cards').select('*').eq('id', toCardId).single();
+    if(!toCardData) { toast('Карточка не найдена', true); return; }
+    const updatedEntries = [entry, ...(toCardData.entries||[])];
+    await sb.from('cards').update({entries: updatedEntries}).eq('id', toCardId);
+    await dbUpdate(fromCard);
+    document.getElementById('move-entry-dialog')?.remove();
+    render(); openView(fromCardId);
+    toast('✓ Запись перенесена');
+  } catch(e) { toast('Ошибка: '+e.message, true); }
 }
