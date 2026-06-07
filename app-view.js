@@ -528,6 +528,7 @@ function moveEntry(cardId, entryId) {
   const card = cards.find(c=>c.id===cardId); if(!card) return;
   const entry = (card.entries||[]).find(e=>e.id===entryId); if(!entry) return;
   const div = document.createElement('div');
+  div.id = 'move-entry-dialog';
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
   const catList = cats.map(c=>`<button onclick="selectMoveCat('${cardId}','${entryId}','${esc(c.name)}',this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.color||'#888'};margin-right:8px"></span>${esc(c.name)}</button>`).join('');
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto">
