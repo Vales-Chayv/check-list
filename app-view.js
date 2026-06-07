@@ -518,7 +518,7 @@ async function saveEntryEdit(cardId, entryId) {
   const txt = document.getElementById('edit-entry-txt')?.value?.trim();
   if(!txt) return;
   entry.text = txt;
-  document.querySelector('[style*="position:fixed"][style*="z-index:2000"]')?.remove();
+  document.querySelectorAll('[style*="position:fixed"]').forEach(el => { if(el.style.zIndex==='2000') el.remove(); });
   render(); openView(cardId);
   try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
 }
@@ -543,6 +543,7 @@ function selectMoveCat(cardId, entryId, catName, btn) {
   const cardList = document.getElementById('move-card-list'); if(!cardList) return;
   const catCards = cards.filter(c=>c.category===catName && c.id!==cardId && c.status!=='done');
   document.querySelectorAll('#move-cat-list button').forEach(b=>b.style.background='var(--s2)');
+if(btn) btn.style.background='var(--s3,rgba(255,255,255,.1))';
   cardList.innerHTML = catCards.length
     ? `<div style="font-size:12px;color:var(--t3);margin-bottom:4px">Выбери карточку:</div>` +
       catCards.map(c=>`<button onclick="confirmMoveEntry('${cardId}','${entryId}','${c.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">${esc(c.title)}</button>`).join('')
@@ -564,7 +565,7 @@ async function confirmMoveEntry(fromCardId, entryId, toCardId) {
     toast('✓ Запись перенесена');
   } catch(e) { toast('Ошибка синхронизации', true); }
 }
-
+				
 function openVideoViewer(src) {
   const div = document.createElement('div');
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
