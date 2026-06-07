@@ -69,6 +69,11 @@ function openView(id) {
           <button onclick="editEntry('${id}','${e.id}')" style="background:rgba(91,158,232,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">📝</button>
           <button onclick="moveEntry('${id}','${e.id}')" style="background:rgba(91,184,122,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">📤</button>
         </div>
+		<div class="swipe-actions-desktop">
+  <button onclick="deleteEntry('${id}','${e.id}')" style="background:rgba(232,96,96,.85);border:none;border-radius:8px;width:32px;height:32px;font-size:16px;cursor:pointer">🗑️</button>
+  <button onclick="editEntry('${id}','${e.id}')" style="background:rgba(91,158,232,.85);border:none;border-radius:8px;width:32px;height:32px;font-size:16px;cursor:pointer">📝</button>
+  <button onclick="moveEntry('${id}','${e.id}')" style="background:rgba(91,184,122,.85);border:none;border-radius:8px;width:32px;height:32px;font-size:16px;cursor:pointer">📤</button>
+</div>
         <div class="swipe-content" data-cardid="${id}" data-entryid="${e.id}" style="position:relative;display:flex;align-items:flex-start;gap:8px;padding:5px 0;background:transparent;will-change:transform;transition:transform .2s">
           <div style="width:16px;height:16px;border-radius:3px;border:2px solid rgba(0,0,0,.4);flex-shrink:0;margin-top:2px;background:${e.done?'rgba(0,0,0,.4)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="viewToggleEntry('${id}','${e.id}')">${e.done?'<svg width="10" height="8" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>':''}</div>
           <div style="flex:1">
