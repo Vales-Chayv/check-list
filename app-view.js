@@ -556,7 +556,7 @@ async function confirmMoveEntry(fromCardId, entryId, toCardId) {
   const entry = (fromCard.entries||[]).find(e=>e.id===entryId); if(!entry) return;
   fromCard.entries = (fromCard.entries||[]).filter(e=>e.id!==entryId);
   toCard.entries = [entry, ...(toCard.entries||[])];
-  document.querySelector('[style*="position:fixed"][style*="z-index:2000"]')?.remove();
+ document.querySelectorAll('[style*="position:fixed"]').forEach(el => { if(el.style.zIndex==='2000') el.remove(); });
   render(); openView(fromCardId);
   try {
     await dbUpdate(fromCard);
