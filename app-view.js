@@ -588,7 +588,9 @@ async function toggleToday(id) {
   card.today = !card.today;
   render(); openView(id);
   try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
-  function toggleEntryMenu(btn, cardId, entryId) {
+}
+
+function toggleEntryMenu(btn, cardId, entryId) {
   // Close any open menus
   document.querySelectorAll('.entry-menu-popup').forEach(p=>p.remove());
   const wrap = btn.closest('.swipe-entry-wrap');
