@@ -486,6 +486,9 @@ el.addEventListener('mousedown', e => {
       });
     }
   });
+  if('ontouchstart' in window) {
+    document.querySelectorAll('.entry-menu-btn').forEach(b=>b.style.display='none');
+  }
 }
 
 async function deleteEntry(cardId, entryId) {
