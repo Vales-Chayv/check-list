@@ -543,7 +543,6 @@ function selectMoveCat(cardId, entryId, catName) {
   const cardList = document.getElementById('move-card-list'); if(!cardList) return;
   const catCards = cards.filter(c=>c.category===catName && c.id!==cardId && c.status!=='done');
   document.querySelectorAll('#move-cat-list button').forEach(b=>b.style.background='var(--s2)');
-	event.target.closest('button').style.background='var(--s3,rgba(255,255,255,.1))';
   cardList.innerHTML = catCards.length
     ? `<div style="font-size:12px;color:var(--t3);margin-bottom:4px">Выбери карточку:</div>` +
       catCards.map(c=>`<button onclick="confirmMoveEntry('${cardId}','${entryId}','${c.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">${esc(c.title)}</button>`).join('')
