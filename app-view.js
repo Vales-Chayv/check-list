@@ -519,7 +519,7 @@ async function saveEntryEdit(cardId, entryId) {
   const txt = document.getElementById('edit-entry-txt')?.value?.trim();
   if(!txt) return;
   entry.text = txt;
-  document.getElementById('edit-entry-dialog')?.remove(); });
+  document.getElementById('edit-entry-dialog')?.remove();
   render(); openView(cardId);
   try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
 }
