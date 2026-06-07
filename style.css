@@ -188,4 +188,6 @@ body{display:flex;flex-direction:column;overflow:hidden}
   .scroll{padding-bottom:80px}
 }
 .swipe-actions-desktop{display:none;position:absolute;right:4px;top:50%;transform:translateY(-50%);gap:4px;align-items:center}
-.swipe-entry-wrap:hover .swipe-actions-desktop{display:flex}
+@media (hover: hover) {
+  .swipe-entry-wrap:hover .swipe-actions-desktop{display:flex}
+}
