@@ -499,7 +499,7 @@ function editEntry(cardId, entryId) {
   const card = cards.find(c=>c.id===cardId); if(!card) return;
   const entry = (card.entries||[]).find(e=>e.id===entryId); if(!entry) return;
   const div = document.createElement('div');
-  div.id = 'move-entry-dialog';
+  div.id = 'edit-entry-dialog';
 div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:420px">
     <div style="font-size:16px;font-weight:700;margin-bottom:12px">Редактировать запись</div>
@@ -519,7 +519,7 @@ async function saveEntryEdit(cardId, entryId) {
   const txt = document.getElementById('edit-entry-txt')?.value?.trim();
   if(!txt) return;
   entry.text = txt;
-  document.querySelectorAll('[style*="position:fixed"]').forEach(el => { if(el.style.zIndex==='2000') el.remove(); });
+  document.getElementById('edit-entry-dialog')?.remove(); });
   render(); openView(cardId);
   try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
 }
