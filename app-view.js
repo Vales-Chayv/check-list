@@ -63,13 +63,20 @@ function openView(id) {
       const eDl = e.deadline ? deadlineInfo(e.deadline) : null;
       if(!e.text) return '';
       const col = textColor||'var(--t1)';
-      return `<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid rgba(0,0,0,.1)">
-        <div style="width:16px;height:16px;border-radius:3px;border:2px solid rgba(0,0,0,.4);flex-shrink:0;margin-top:2px;background:${e.done?'rgba(0,0,0,.4)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="viewToggleEntry('${id}','${e.id}')">${e.done?'<svg width="10" height="8" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>':''}</div>
-        <div style="flex:1">
-          <div style="font-size:13px;color:${col};${e.done?'text-decoration:line-through;opacity:.5':''}" dir="auto">${esc(e.text)}</div>
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <div style="font-size:10px;color:rgba(0,0,0,.4);margin-top:1px">${e.date}</div>
-            ${eDl?`<span style="font-size:10px;opacity:.7">⏰ ${eDl.text}</span>`:''}
+      return `<div class="swipe-entry-wrap" style="position:relative;overflow:hidden;border-bottom:1px solid rgba(0,0,0,.1)">
+        <div class="swipe-actions" style="position:absolute;left:0;top:0;bottom:0;display:flex;align-items:center;gap:4px;padding:0 8px;opacity:0;transition:opacity .2s">
+          <button onclick="deleteEntry('${id}','${e.id}')" style="background:rgba(232,96,96,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">🗑️</button>
+          <button onclick="editEntry('${id}','${e.id}')" style="background:rgba(91,158,232,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">📝</button>
+          <button onclick="moveEntry('${id}','${e.id}')" style="background:rgba(91,184,122,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">📤</button>
+        </div>
+        <div class="swipe-content" data-cardid="${id}" data-entryid="${e.id}" style="position:relative;display:flex;align-items:flex-start;gap:8px;padding:5px 0;background:transparent;will-change:transform;transition:transform .2s">
+          <div style="width:16px;height:16px;border-radius:3px;border:2px solid rgba(0,0,0,.4);flex-shrink:0;margin-top:2px;background:${e.done?'rgba(0,0,0,.4)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="viewToggleEntry('${id}','${e.id}')">${e.done?'<svg width="10" height="8" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>':''}</div>
+          <div style="flex:1">
+            <div style="font-size:13px;color:${col};${e.done?'text-decoration:line-through;opacity:.5':''}" dir="auto">${esc(e.text)}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="font-size:10px;color:rgba(0,0,0,.4);margin-top:1px">${e.date}</div>
+              ${eDl?`<span style="font-size:10px;opacity:.7">⏰ ${eDl.text}</span>`:''}
+            </div>
           </div>
         </div>
       </div>`;
@@ -110,9 +117,9 @@ function openView(id) {
 
      return `<div style="display:flex;justify-content:${align};margin:16px 0 4px">
         <div style="max-width:88%;min-width:55%;position:relative;${hasFiles?'padding-bottom:14px':''}">
-          ${hasFiles?`<div id="${stkId}_peek" style="position:absolute;bottom:-5px;left:-5px;right:8px;height:90%;background:${bottomColor};border-radius:10px;transform:rotate(1.2deg);z-index:0"></div>`:''}
+          ${hasFiles?`<div id="${stkId}_peek" style="position:absolute;bottom:0;left:-8px;right:4px;height:20px;background:${bottomColor};border-radius:8px;transform:rotate(-2deg);z-index:0"></div>`:''}
           <div style="position:relative;z-index:1;background:${memberColor};border-radius:10px;padding:14px 14px 16px;box-shadow:2px 3px 10px rgba(0,0,0,.3)">
-            <div style="position:absolute;top:-12px;${isMe?'left:14px':'right:14px'};transform:rotate(${isMe?'-12':'12'}deg);filter:drop-shadow(1px 1px 3px rgba(0,0,0,.4))"><svg width="20" height="32" viewBox="0 0 20 32" fill="none"><path d="M10 1C6.1 1 3 4.1 3 8v14c0 3.9 3.1 7 7 7s7-3.1 7-7V6h-2.5v16c0 2.5-2 4.5-4.5 4.5S5.5 24.5 5.5 22V8c0-1.9 1.6-3.5 3.5-3.5S12.5 6.1 12.5 8v14h2.5V8c0-3.9-3.1-7-7-7z" fill="${clipColor}"/></svg></div>
+            <div style="position:absolute;top:-16px;${isMe?'left:14px':'right:14px'};transform:rotate(${isMe?'-12':'12'}deg);filter:drop-shadow(1px 1px 3px rgba(0,0,0,.4))"><svg width="20" height="32" viewBox="0 0 20 32" fill="none"><path d="M10 1C6.1 1 3 4.1 3 8v14c0 3.9 3.1 7 7 7s7-3.1 7-7V6h-2.5v16c0 2.5-2 4.5-4.5 4.5S5.5 24.5 5.5 22V8c0-1.9 1.6-3.5 3.5-3.5S12.5 6.1 12.5 8v14h2.5V8c0-3.9-3.1-7-7-7z" fill="${clipColor}"/></svg></div>
             ${creator?`<div style="font-size:10px;font-weight:700;color:rgba(0,0,0,.5);margin-bottom:6px;margin-top:8px">${esc(creator)} • ${s.date}</div>`:'<div style="margin-top:16px"></div>'}
             ${s.note?`<div style="font-size:13px;color:rgba(0,0,0,.75);margin-bottom:8px;font-style:italic;line-height:1.5;word-break:break-word;white-space:pre-wrap" dir="auto">${esc(s.note)}</div>`:''}
             ${s.entries.map(e=>entryRowHTML(e,'rgba(0,0,0,0.75)')).join('')}
@@ -161,6 +168,7 @@ function openView(id) {
 
   document.getElementById('view-content').innerHTML=html;
   document.getElementById('view-ov').classList.add('on');
+  setTimeout(()=>setupEntrySwipe(), 100);
 }
 
 function closeView() { document.getElementById('view-ov').classList.remove('on'); }
@@ -394,6 +402,140 @@ function toggleStickerFiles(id) {
   const isOpen = content.style.display !== 'none';
   content.style.display = isOpen ? 'none' : 'block';
   if(peek) peek.style.display = isOpen ? 'block' : 'none';
+}
+
+// ─── ENTRY SWIPE ─────────────────────────────
+function setupEntrySwipe() {
+  document.querySelectorAll('.swipe-content').forEach(el => {
+    let startX = 0, startY = 0, swiped = false;
+    const wrap = el.closest('.swipe-entry-wrap');
+    const actions = wrap?.querySelector('.swipe-actions');
+    const THRESHOLD = 60;
+
+    function reset() {
+      el.style.transform = 'translateX(0)';
+      if(actions) actions.style.opacity = '0';
+      swiped = false;
+    }
+
+    el.addEventListener('touchstart', e => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      swiped = false;
+    }, {passive:true});
+
+    el.addEventListener('touchmove', e => {
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      if(Math.abs(dy) > Math.abs(dx)) return;
+      if(dx > 0) {
+        el.style.transform = `translateX(${Math.min(dx, 120)}px)`;
+        if(actions) actions.style.opacity = Math.min(dx/THRESHOLD, 1).toString();
+        e.preventDefault();
+      }
+    }, {passive:false});
+
+    el.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - startX;
+      if(dx >= THRESHOLD) {
+        el.style.transform = 'translateX(120px)';
+        if(actions) actions.style.opacity = '1';
+        swiped = true;
+        document.querySelectorAll('.swipe-content').forEach(other => {
+          if(other !== el) { other.style.transform='translateX(0)'; other.closest('.swipe-entry-wrap')?.querySelector('.swipe-actions')?.style.setProperty('opacity','0'); }
+        });
+      } else { reset(); }
+    }, {passive:true});
+  });
+
+  document.getElementById('view-content')?.addEventListener('click', e => {
+    if(!e.target.closest('.swipe-actions') && !e.target.closest('.swipe-content')) return;
+    if(!e.target.closest('.swipe-actions')) {
+      document.querySelectorAll('.swipe-content').forEach(el => {
+        el.style.transform='translateX(0)';
+        el.closest('.swipe-entry-wrap')?.querySelector('.swipe-actions')?.style.setProperty('opacity','0');
+      });
+    }
+  });
+}
+
+async function deleteEntry(cardId, entryId) {
+  if(!confirm('Удалить запись?')) return;
+  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  card.entries = (card.entries||[]).filter(e=>e.id!==entryId);
+  render(); openView(cardId);
+  try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
+}
+
+function editEntry(cardId, entryId) {
+  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  const entry = (card.entries||[]).find(e=>e.id===entryId); if(!entry) return;
+  const div = document.createElement('div');
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
+  div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:420px">
+    <div style="font-size:16px;font-weight:700;margin-bottom:12px">Редактировать запись</div>
+    <textarea id="edit-entry-txt" dir="auto" style="width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px;font-size:15px;color:var(--t1);font-family:inherit;resize:none;min-height:80px">${esc(entry.text)}</textarea>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button onclick="saveEntryEdit('${cardId}','${entryId}')" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:11px;font-size:14px;font-weight:700;cursor:pointer">Сохранить</button>
+      <button onclick="this.closest('[style*=fixed]').remove()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px 16px;cursor:pointer">Отмена</button>
+    </div>
+  </div>`;
+  document.body.appendChild(div);
+  setTimeout(()=>document.getElementById('edit-entry-txt')?.focus(),100);
+}
+
+async function saveEntryEdit(cardId, entryId) {
+  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  const entry = (card.entries||[]).find(e=>e.id===entryId); if(!entry) return;
+  const txt = document.getElementById('edit-entry-txt')?.value?.trim();
+  if(!txt) return;
+  entry.text = txt;
+  document.querySelector('[style*="position:fixed"][style*="z-index:2000"]')?.remove();
+  render(); openView(cardId);
+  try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
+}
+
+function moveEntry(cardId, entryId) {
+  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  const entry = (card.entries||[]).find(e=>e.id===entryId); if(!entry) return;
+  const div = document.createElement('div');
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
+  const catList = cats.map(c=>`<button onclick="selectMoveCat('${cardId}','${entryId}','${esc(c.name)}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.color||'#888'};margin-right:8px"></span>${esc(c.name)}</button>`).join('');
+  div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto">
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">Перенести запись</div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:12px">Выбери рубрику</div>
+    <div style="display:flex;flex-direction:column;gap:6px" id="move-cat-list">${catList}</div>
+    <div id="move-card-list" style="margin-top:12px;display:flex;flex-direction:column;gap:6px"></div>
+    <button onclick="this.closest('[style*=fixed]').remove()" style="width:100%;margin-top:12px;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;cursor:pointer">Отмена</button>
+  </div>`;
+  document.body.appendChild(div);
+}
+
+function selectMoveCat(cardId, entryId, catName) {
+  const cardList = document.getElementById('move-card-list'); if(!cardList) return;
+  const catCards = cards.filter(c=>c.category===catName && c.id!==cardId && c.status!=='done');
+  document.querySelectorAll('#move-cat-list button').forEach(b=>b.style.background='var(--s2)');
+  event.target.closest('button').style.background='var(--s3,rgba(255,255,255,.1))';
+  cardList.innerHTML = catCards.length
+    ? `<div style="font-size:12px;color:var(--t3);margin-bottom:4px">Выбери карточку:</div>` +
+      catCards.map(c=>`<button onclick="confirmMoveEntry('${cardId}','${entryId}','${c.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">${esc(c.title)}</button>`).join('')
+    : '<div style="font-size:13px;color:var(--t3)">Нет карточек в этой рубрике</div>';
+}
+
+async function confirmMoveEntry(fromCardId, entryId, toCardId) {
+  const fromCard = cards.find(c=>c.id===fromCardId);
+  const toCard = cards.find(c=>c.id===toCardId);
+  if(!fromCard||!toCard) return;
+  const entry = (fromCard.entries||[]).find(e=>e.id===entryId); if(!entry) return;
+  fromCard.entries = (fromCard.entries||[]).filter(e=>e.id!==entryId);
+  toCard.entries = [entry, ...(toCard.entries||[])];
+  document.querySelector('[style*="position:fixed"][style*="z-index:2000"]')?.remove();
+  render(); openView(fromCardId);
+  try {
+    await dbUpdate(fromCard);
+    await dbUpdate(toCard);
+    toast('✓ Запись перенесена');
+  } catch(e) { toast('Ошибка синхронизации', true); }
 }
 
 function openVideoViewer(src) {
