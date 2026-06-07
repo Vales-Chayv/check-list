@@ -499,7 +499,8 @@ function editEntry(cardId, entryId) {
   const card = cards.find(c=>c.id===cardId); if(!card) return;
   const entry = (card.entries||[]).find(e=>e.id===entryId); if(!entry) return;
   const div = document.createElement('div');
-  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
+  div.id = 'move-entry-dialog';
+div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:420px">
     <div style="font-size:16px;font-weight:700;margin-bottom:12px">Редактировать запись</div>
     <textarea id="edit-entry-txt" dir="auto" style="width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px;font-size:15px;color:var(--t1);font-family:inherit;resize:none;min-height:80px">${esc(entry.text)}</textarea>
@@ -557,7 +558,7 @@ async function confirmMoveEntry(fromCardId, entryId, toCardId) {
   const entry = (fromCard.entries||[]).find(e=>e.id===entryId); if(!entry) return;
   fromCard.entries = (fromCard.entries||[]).filter(e=>e.id!==entryId);
   toCard.entries = [entry, ...(toCard.entries||[])];
- document.querySelectorAll('[style*="position:fixed"]').forEach(el => { if(el.style.zIndex==='2000') el.remove(); });
+document.getElementById('move-entry-dialog')?.remove();
   render(); openView(fromCardId);
   try {
     await dbUpdate(fromCard);
