@@ -40,10 +40,9 @@ function openView(id) {
     ? `<button onclick="toggleToday('${id}');closeView()" style="background:rgba(232,96,96,.15);color:var(--red);border:1px solid rgba(232,96,96,.25);border-radius:8px;padding:9px 16px;font-size:15px;cursor:pointer">✕ Убрать из списка</button>`
     : `<button onclick="if(confirm('Удалить карточку?')){closeView();deleteCardById('${id}')}" style="background:rgba(232,96,96,.15);color:var(--red);border:1px solid rgba(232,96,96,.25);border-radius:8px;padding:9px 16px;font-size:15px;cursor:pointer">🗑 Удалить</button>`)
   :''}
-     </div>
-          <button class="entry-menu-btn" onclick="toggleEntryMenu(this,'${id}','${e.id}')">⋮</button>
-        </div>
-      </div>`;
+      </div>
+    </div>
+  </div>`;
 
 
   if(entries.length) {
@@ -79,8 +78,9 @@ function openView(id) {
               ${eDl?`<span style="font-size:10px;opacity:.7">⏰ ${eDl.text}</span>`:''}
             </div>
           </div>
+          <button class="entry-menu-btn" onclick="toggleEntryMenu(this,'${id}','${e.id}')">⋮</button>
         </div>
-      </div>`;
+      </div>`;;
     }
 
     // Color pairs: top → bottom
