@@ -674,7 +674,7 @@ async function createCardAndMove(fromCardId, entryId, toSpaceId, catName) {
   const entry = (fromCard.entries||[]).find(e=>e.id===entryId); if(!entry) return;
   const title = prompt('Название новой карточки:');
   if(!title) return;
-  const newCard = {id:uid(), title, category:catName, status:'in_progress', space_id:toSpaceId, created_at:today(), entries:[entry], attachments:[], history:[]};
+  const newCard = {id:uid(), title, category:catName, status:'in_progress', space_id:toSpaceId, created_at:today(), entries:[entry], attachments:[], history:[], created_by:localStorage.getItem('mc_current_member')||currentUser?.display_name||''};
   fromCard.entries = (fromCard.entries||[]).filter(e=>e.id!==entryId);
   try {
     await sb.from('cards').insert(newCard);
