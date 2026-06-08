@@ -560,7 +560,8 @@ if(btn) btn.style.background='var(--s3,rgba(255,255,255,.1))';
   cardList.innerHTML = catCards.length
     ? `<div style="font-size:12px;color:var(--t3);margin-bottom:4px">Выбери карточку:</div>` +
       catCards.map(c=>`<button onclick="confirmMoveEntry('${cardId}','${entryId}','${c.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">${esc(c.title)}</button>`).join('')
-    : '<div style="font-size:13px;color:var(--t3)">Нет карточек в этой рубрике</div>';
+    : `<div style="font-size:13px;color:var(--t3);margin-bottom:8px">Нет карточек в этой рубрике</div>
+   <button onclick="createCardAndMove('${cardId}','${entryId}','${currentSpaceId}','${catName}')" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:10px 14px;font-size:14px;font-weight:700;cursor:pointer;width:100%">＋ Создать карточку и перенести</button>`;
 }
 
 async function confirmMoveEntry(fromCardId, entryId, toCardId) {
@@ -648,7 +649,8 @@ async function selectMoveSpaceCat(cardId, entryId, spaceId, catName, btn) {
     cardListEl.innerHTML = spaceCards.length
       ? `<div style="font-size:12px;color:var(--t3);margin-bottom:4px">Выбери карточку:</div>` +
         spaceCards.map(c=>`<button onclick="confirmMoveEntryToSpace('${cardId}','${entryId}','${spaceId}','${c.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">${esc(c.title)}</button>`).join('')
-      : '<div style="font-size:13px;color:var(--t3)">Нет карточек</div>';
+      : `<div style="font-size:13px;color:var(--t3);margin-bottom:8px">Нет карточек в этой рубрике</div>
+   <button onclick="createCardAndMove('${cardId}','${entryId}','${spaceId}','${catName}')" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:10px 14px;font-size:14px;font-weight:700;cursor:pointer;width:100%">＋ Создать карточку и перенести</button>`;
   } catch(e) { cardListEl.innerHTML = '<div style="font-size:13px;color:var(--red)">Ошибка загрузки</div>'; }
 }
 
@@ -665,5 +667,21 @@ async function confirmMoveEntryToSpace(fromCardId, entryId, toSpaceId, toCardId)
     document.getElementById('move-entry-dialog')?.remove();
     render(); openView(fromCardId);
     toast('✓ Запись перенесена');
+  } catch(e) { toast('Ошибка: '+e.message, true); }
+}
+async function createCardAndMove(fromCardId, entryId, toSpaceId, catName) {
+  const fromCard = cards.find(c=>c.id===fromCardId); if(!fromCard) return;
+  const entry = (fromCard.entries||[]).find(e=>e.id===entryId); if(!entry) return;
+  const title = prompt('Название новой карточки:');
+  if(!title) return;
+  const newCard = {id:uid(), title, category:catName, status:'in_progress', space_id:toSpaceId, created_at:today(), entries:[entry], attachments:[], history:[]};
+  fromCard.entries = (fromCard.entries||[]).filter(e=>e.id!==entryId);
+  try {
+    await sb.from('cards').insert(newCard);
+    await dbUpdate(fromCard);
+    if(toSpaceId===currentSpaceId) { cards.unshift(newCard); }
+    document.getElementById('move-entry-dialog')?.remove();
+    render(); openView(fromCardId);
+    toast('✓ Карточка создана и запись перенесена');
   } catch(e) { toast('Ошибка: '+e.message, true); }
 }
