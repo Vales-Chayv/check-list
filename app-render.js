@@ -348,6 +348,6 @@ function toggleCatsDropdown() {
   d.style.display = isOpen ? 'none' : 'block';
   if(!isOpen) setTimeout(()=>document.addEventListener('click', function h(e){
     if(!d.contains(e.target)){d.style.display='none';document.removeEventListener('click',h);}
-  }), 100);
+  }), 300);
 }
 
