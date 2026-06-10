@@ -384,3 +384,8 @@ async function calOpenCard(cardId) {
     openView(cardId);
   }
 }
+(function updateCalBtn() {
+  const el = document.getElementById('cal-day-num');
+  if(el) el.textContent = new Date().getDate();
+  setTimeout(updateCalBtn, 60000);
+})();
