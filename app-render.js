@@ -21,7 +21,7 @@ function render() {
 function renderCats() {
   const bar = document.getElementById('cats');
   const all = filterCat==='all';
-  let html = `<button class="cat-btn${all?' on':''}" style="${all?'border-color:rgba(255,255,255,.25)':''}" onclick="App.setCat(-1)">Все</button>`;
+  let html = `<button class="cat-btn${all?' on':''}" style="${all?'border-color:rgba(255,255,255,.25)':''}" onclick="handleAllCatClick()">Все ▾</button>`;
   cats.forEach((c,i) => {
     const col = c.color||'#888';
     const active = filterCat===c.name;
@@ -333,4 +333,38 @@ let imgScale=1, imgLastDist=0;
   },{passive:false});
   viewer.addEventListener('click',e=>{if(e.target===viewer)closeImgViewer();});
 })();
+let _allCatClickCount = 0, _allCatClickTimer = null;
+function handleAllCatClick() {
+  _allCatClickCount++;
+  if(_allCatClickTimer) clearTimeout(_allCatClickTimer);
+  _allCatClickTimer = setTimeout(() => {
+    if(_allCatClickCount === 1) { App.setCat(-1); }
+    else { toggleCatsDropdown(); }
+    _allCatClickCount = 0;
+  }, 250);
+}
+function toggleCatsDropdown() {
+  const dropdown = document.getElementById('cats-dropdown');
+  const catsBar = document.getElementById('cats');
+  if(!dropdown) return;
+  if(dropdown.style.display !== 'none') { dropdown.style.display = 'none'; return; }
+  // Fill with categories
+  const all = filterCat==='all';
+  let html = `<button class="cat-btn${all?' on':''}" style="display:block;width:100%;text-align:left;${all?'border-color:rgba(255,255,255,.25)':''}" onclick="App.setCat(-1);document.getElementById('cats-dropdown').style.display='none'">Все</button>`;
+  cats.forEach((c,i) => {
+    const col = c.color||'#888';
+    const active = filterCat===c.name;
+    html += `<button class="cat-btn${active?' on':''}" style="display:block;width:100%;text-align:left;background:${active?hex2rgba(col,.15):'transparent'};border-color:${active?hex2rgba(col,.5):'rgba(255,255,255,.08)'}" onclick="App.setCat(${i});document.getElementById('cats-dropdown').style.display='none'"><span class="cat-dot" style="background:${col}"></span>${esc(c.name)}</button>`;
+  });
+  dropdown.innerHTML = html;
+  // Position below cats bar
+  const rect = catsBar.getBoundingClientRect();
+  dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
+  dropdown.style.left = rect.left + 'px';
+  dropdown.style.display = 'block';
+  // Close on outside click
+  setTimeout(()=>document.addEventListener('click', function h(e){
+    if(!dropdown.contains(e.target)){dropdown.style.display='none';document.removeEventListener('click',h);}
+  }), 150);
+}
 
