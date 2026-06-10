@@ -6,16 +6,26 @@ let calDate = new Date();
 let calFilterCat = 'all';
 let calFilterMember = 'all';
 let calFilterPriority = 'all';
+let calSpaceId = 'current';
+let calAllCards = [];
 
 const CAL_DAYS_RU = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 const CAL_MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 
 // ─── OPEN / CLOSE ────────────────────────────
-function openCalendar() {
+async function openCalendar() {
   calDate = new Date();
+  calSpaceId = 'current';
+  calAllCards = [];
+  document.getElementById('cal-ov').classList.add('on');
+  document.getElementById('cal-body').innerHTML = '<div style="text-align:center;padding:40px;color:var(--t3)">⏳ Загрузка...</div>';
+  try {
+    const ids = spaces.map(s=>s.id);
+    const {data} = await sb.from('cards').select('*').in('space_id', ids).not('deadline','is',null);
+    calAllCards = data||[];
+  } catch(e) { calAllCards = [...cards]; }
   renderCalFilters();
   renderCalendar();
-  document.getElementById('cal-ov').classList.add('on');
 }
 
 function closeCalendar() {
@@ -61,7 +71,13 @@ function renderCalFilters() {
   const el = document.getElementById('cal-filters');
   const members = currentSpace?.type === 'family' ? (currentSpace?.members||[]).map(m=>m.name) : [];
 
-  let html = `<button onclick="calSetFilter('cat','all',this)" class="cal-filter-btn on" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--t1);cursor:pointer;white-space:nowrap;flex-shrink:0">Все рубрики</button>`;
+  let html = `<button onclick="calSetSpace('current',this)" class="cal-filter-space on" style="background:var(--s2);border:1px solid var(--accent);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--accent);cursor:pointer;white-space:nowrap;flex-shrink:0">📂 Текущий</button>`;
+  html += `<button onclick="calSetSpace('all',this)" class="cal-filter-space" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--t2);cursor:pointer;white-space:nowrap;flex-shrink:0">🗂️ Все</button>`;
+  spaces.forEach(s => {
+    if(s.id !== currentSpaceId) html += `<button onclick="calSetSpace('${s.id}',this)" class="cal-filter-space" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--t2);cursor:pointer;white-space:nowrap;flex-shrink:0">${s.type==='family'?'👨‍👩‍👧':'🗂️'} ${esc(s.name)}</button>`;
+  });
+  html += `<div style="width:1px;background:var(--b1);flex-shrink:0;margin:2px 4px"></div>`;
+  html += `<button onclick="calSetFilter('cat','all',this)" class="cal-filter-btn on" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--t1);cursor:pointer;white-space:nowrap;flex-shrink:0">Все рубрики</button>`;
   cats.forEach(c => {
     html += `<button onclick="calSetFilter('cat','${esc(c.name)}',this)" class="cal-filter-btn" style="background:${hex2rgba(c.color||'#888',.15)};border:1px solid ${hex2rgba(c.color||'#888',.4)};border-radius:14px;padding:4px 10px;font-size:12px;color:${c.color||'#888'};cursor:pointer;white-space:nowrap;flex-shrink:0"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${c.color||'#888'};margin-right:4px"></span>${esc(c.name)}</button>`;
   });
@@ -106,7 +122,8 @@ function calSetFilter(type, value, btn) {
 
 // ─── CARD FILTERING ──────────────────────────
 function getCalCards() {
-  return cards.filter(c => {
+  const source = calSpaceId === 'all' ? calAllCards : calSpaceId === 'current' ? calAllCards.filter(c=>c.space_id===currentSpaceId) : calAllCards.filter(c=>c.space_id===calSpaceId);
+  return source.filter(c => {
     if(c.status === 'done') return false;
     if(!c.deadline) return false;
     if(calFilterCat !== 'all' && c.category !== calFilterCat) return false;
@@ -343,4 +360,15 @@ async function calToggleDone(cardId) {
   document.getElementById('cal-popup').style.display='none';
   renderCalendar();
   try { await dbUpdate(card); toast(card.status==='done'?'✓ Выполнено':'↩ Возвращено'); } catch(e) { toast('Ошибка', true); }
+}
+
+function calSetSpace(spaceId, btn) {
+  calSpaceId = spaceId;
+  document.querySelectorAll('.cal-filter-space').forEach(b => {
+    b.style.borderColor = 'var(--b1)';
+    b.style.color = 'var(--t2)';
+  });
+  btn.style.borderColor = 'var(--accent)';
+  btn.style.color = 'var(--accent)';
+  renderCalendar();
 }
