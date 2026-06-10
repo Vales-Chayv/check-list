@@ -21,15 +21,7 @@ function render() {
 function renderCats() {
   const bar = document.getElementById('cats');
   const all = filterCat==='all';
-  let html = `<button class="cat-btn${all?' on':''}" style="${all?'border-color:rgba(255,255,255,.25)':''}" onclick="toggleCatsDropdown()">Все ▾</button>
-<div id="cats-dropdown" style="display:none;position:absolute;top:100%;left:0;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:6px;z-index:999;max-height:220px;overflow-y:auto;min-width:140px;box-shadow:0 4px 16px rgba(0,0,0,.4)">
-  <button class="cat-btn${all?' on':''}" onclick="App.setCat(-1);toggleCatsDropdown()" style="${all?'border-color:rgba(255,255,255,.25)':''}">Все</button>
-  ${cats.map((c,i)=>{
-    const col=c.color||'#888';
-    const active=filterCat===c.name;
-    return `<button class="cat-btn${active?' on':''}" style="display:block;width:100%;text-align:left;background:${active?hex2rgba(col,.15):'transparent'};border-color:${active?hex2rgba(col,.5):'rgba(255,255,255,.08)'}" onclick="App.setCat(${i});toggleCatsDropdown()"><span class="cat-dot" style="background:${col}"></span>${esc(c.name)}</button>`;
-  }).join('')}
-</div>`;
+  let html = `<button class="cat-btn${all?' on':''}" style="${all?'border-color:rgba(255,255,255,.25)':''}" onclick="App.setCat(-1)">Все</button>`;
   cats.forEach((c,i) => {
     const col = c.color||'#888';
     const active = filterCat===c.name;
@@ -203,7 +195,7 @@ function cardHTML(card, isDone=false) {
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0">
         <span class="badge" style="color:${col}">${ST_LABELS[card.status]||''}</span>
         ${dl&&!isDone?`<span class="dl-badge ${dl.cls}${dl.days<=3?' dl-pulse':''}" style="font-size:11px">${dl.text}</span>`:''}
-       ${(currentSpace?.type!=='family'||(card.created_by&&card.created_by.toLowerCase()===localStorage.getItem('mc_current_member')?.toLowerCase()))?`<button class="edit-btn" onclick="event.stopPropagation();openEdit('${card.id}')">✏️</button>`:''}
+        ${(currentSpace?.type!=='family'||(card.created_by&&card.created_by===localStorage.getItem('mc_current_member')))?`<button class="edit-btn" onclick="event.stopPropagation();openEdit('${card.id}')">✏️</button>`:''}
       </div>
     </div>
   </div>`;
@@ -341,13 +333,4 @@ let imgScale=1, imgLastDist=0;
   },{passive:false});
   viewer.addEventListener('click',e=>{if(e.target===viewer)closeImgViewer();});
 })();
-function toggleCatsDropdown() {
-  const d = document.getElementById('cats-dropdown');
-  if(!d) return;
-  const isOpen = d.style.display !== 'none';
-  d.style.display = isOpen ? 'none' : 'block';
-  if(!isOpen) setTimeout(()=>document.addEventListener('click', function h(e){
-    if(!d.contains(e.target)){d.style.display='none';document.removeEventListener('click',h);}
-  }), 300);
-}
 
