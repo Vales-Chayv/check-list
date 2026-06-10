@@ -308,7 +308,7 @@ function calDayClick(dateStr, event) {
 // ─── MINI POPUP ──────────────────────────────
 function showCalPopup(cardId, event) {
   event.stopPropagation();
-  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  const card = calAllCards.find(c=>c.id===cardId) || cards.find(c=>c.id===cardId); if(!card) return;
   const popup = document.getElementById('cal-popup');
   const col = catColor(card.category);
   const dl = card.deadline ? deadlineInfo(card.deadline) : null;
