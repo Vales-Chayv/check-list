@@ -385,7 +385,11 @@ async function calOpenCard(cardId) {
   }
 }
 (function updateCalBtn() {
-  const el = document.getElementById('cal-day-num');
-  if(el) el.textContent = new Date().getDate();
+  const now = new Date();
+  const months = ['ЯНВ','ФЕВ','МАР','АПР','МАЙ','ИЮН','ИЮЛ','АВГ','СЕН','ОКТ','НОЯ','ДЕК'];
+  const dayEl = document.getElementById('cal-day-num');
+  const monEl = document.getElementById('cal-month-txt');
+  if(dayEl) dayEl.textContent = now.getDate();
+  if(monEl) monEl.textContent = months[now.getMonth()] + ' ' + now.getFullYear();
   setTimeout(updateCalBtn, 60000);
 })();
