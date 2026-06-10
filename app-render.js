@@ -22,7 +22,7 @@ function renderCats() {
   const bar = document.getElementById('cats');
   const all = filterCat==='all';
   let html = `<button class="cat-btn${all?' on':''}" style="${all?'border-color:rgba(255,255,255,.25)':''}" onclick="toggleCatsDropdown()">Все ▾</button>
-<div id="cats-dropdown" style="display:none;position:absolute;top:100%;left:0;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:6px;z-index:100;max-height:220px;overflow-y:auto;min-width:140px;box-shadow:0 4px 16px rgba(0,0,0,.4)">
+<div id="cats-dropdown" style="display:none;position:absolute;top:100%;left:0;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:6px;z-index:999;max-height:220px;overflow-y:auto;min-width:140px;box-shadow:0 4px 16px rgba(0,0,0,.4)">
   <button class="cat-btn${all?' on':''}" onclick="App.setCat(-1);toggleCatsDropdown()" style="${all?'border-color:rgba(255,255,255,.25)':''}">Все</button>
   ${cats.map((c,i)=>{
     const col=c.color||'#888';
