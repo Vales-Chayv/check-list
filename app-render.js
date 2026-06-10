@@ -333,15 +333,12 @@ let imgScale=1, imgLastDist=0;
   },{passive:false});
   viewer.addEventListener('click',e=>{if(e.target===viewer)closeImgViewer();});
 })();
-let _allCatClickCount = 0, _allCatClickTimer = null;
 function handleAllCatClick() {
-  _allCatClickCount++;
-  if(_allCatClickTimer) clearTimeout(_allCatClickTimer);
-  _allCatClickTimer = setTimeout(() => {
-    if(_allCatClickCount === 1) { App.setCat(-1); }
-    else { toggleCatsDropdown(); }
-    _allCatClickCount = 0;
-  }, 250);
+  if(filterCat === 'all') {
+    toggleCatsDropdown();
+  } else {
+    App.setCat(-1);
+  }
 }
 function toggleCatsDropdown() {
   const dropdown = document.getElementById('cats-dropdown');
