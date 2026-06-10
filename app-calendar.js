@@ -324,7 +324,7 @@ function showCalPopup(cardId, event) {
       ${card.assigned_to?`<span style="font-size:11px;color:var(--accent)">👤 ${esc(card.assigned_to)}</span>`:''}
     </div>
     <div style="display:flex;gap:6px">
-      <button onclick="closeCalendar();openView('${cardId}')" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:6px;padding:8px;font-size:13px;font-weight:700;cursor:pointer">Открыть</button>
+       <button onclick="calOpenCard('${cardId}')" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:6px;padding:8px;font-size:13px;font-weight:700;cursor:pointer">Открыть</button>
       <button onclick="calChangeDeadline('${cardId}')" style="background:var(--s2);border:1px solid var(--b1);color:var(--t1);border-radius:6px;padding:8px 10px;font-size:13px;cursor:pointer">📅</button>
       <button onclick="calToggleDone('${cardId}')" style="background:var(--s2);border:1px solid var(--b1);color:var(--t1);border-radius:6px;padding:8px 10px;font-size:13px;cursor:pointer">✓</button>
     </div>
@@ -371,4 +371,16 @@ function calSetSpace(spaceId, btn) {
   btn.style.borderColor = 'var(--accent)';
   btn.style.color = 'var(--accent)';
   renderCalendar();
+}
+async function calOpenCard(cardId) {
+  const card = calAllCards.find(c=>c.id===cardId); if(!card) return;
+  // If card is in different space - switch to it first
+  if(card.space_id !== currentSpaceId) {
+    closeCalendar();
+    await setCurrentSpace(card.space_id, true);
+    setTimeout(()=>openView(cardId), 800);
+  } else {
+    closeCalendar();
+    openView(cardId);
+  }
 }
