@@ -94,8 +94,8 @@ function openView(id) {
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
               <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                 <div style="font-size:10px;color:rgba(0,0,0,.4);margin-top:1px">${e.date}</div>
-                ${e.assigned_to&&e.assigned_to!=='all'?`<span style="font-size:10px;color:rgba(0,0,0,.6);font-weight:600">👤 ${esc(e.assigned_to)}</span>`:''}
-                ${isAll?`<div style="display:flex;align-items:center;gap:3px"><span onclick="toggleCompletions('${e.id}')" style="font-size:11px;font-weight:600;color:rgba(0,0,0,.6);cursor:pointer">${doneCount}/${e.completions.length}</span>${circlesHTML}</div>`:''}
+                ${e.assigned_to&&e.assigned_to!=='all'?`<span style="font-size:10px;color:rgba(0,0,0,.6);font-weight:600">👤 ${esc(e.assigned_to)}</span>`:e.assigned_to==='all'?`<span style="font-size:12px">👥</span>`:''}
+                ${isAll?`<div style="display:flex;align-items:center;gap:3px"><span onclick="toggleCompletions('${e.id}')" style="font-size:11px;font-weight:700;color:rgba(0,0,0,.8);cursor:pointer;background:rgba(0,0,0,.12);border-radius:10px;padding:1px 6px">${doneCount}/${e.completions.length}</span>${circlesHTML}</div>`:''}
               </div>
               ${eDl?`<span style="font-size:10px;opacity:.7">⏰ ${eDl.text}</span>`:''}
             </div>
