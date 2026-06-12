@@ -348,11 +348,10 @@ function aeAddEntryRow() {
   const wrap = document.getElementById('ae-entries-list'); if(!wrap) return;
   const div = document.createElement('div');
   div.className = 'entry-row';
-  const memberOptions = currentSpace?.type==='family' ? `<option value="all">👥 Для всех</option>` + (currentSpace?.members||[]).map(m=>`<option value="${esc(m.name)}">${esc(m.name)}</option>`).join('') : '';
 div.innerHTML = `<div class="entry-cb"></div>
     <div style="flex:1">
       <textarea dir="auto" placeholder="Текст записи..." oninput="autoResize(this)" style="background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t1);font-size:14px;font-family:inherit;resize:none;min-height:36px;line-height:1.6;width:100%;padding:4px 0"></textarea>
-      ${memberOptions?`<select style="margin-top:4px;background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t2);font-size:12px;font-family:inherit;width:100%;padding:2px 0"><option value="">👤 Для всех</option>${memberOptions}</select>`:''}
+      ${currentSpace?.type==='family'?`<select style="margin-top:4px;background:var(--s2);border:none;border-bottom:1px solid var(--b1);color:var(--t2);font-size:12px;font-family:inherit;width:100%;padding:2px 0"><option value="">👤 Для всех</option><option value="all">👥 Все участники</option>${(currentSpace?.members||[]).map(m=>`<option value="${esc(m.name)}">${esc(m.name)}</option>`).join('')}</select>`:''}
     </div>
     <button onclick="this.closest('.entry-row').remove()" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:16px;padding:0 4px">✕</button>`;
   wrap.appendChild(div);

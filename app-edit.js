@@ -27,7 +27,7 @@ function openEdit(id) {
 
   // Family vs personal fields
   document.getElementById('status-fld').style.display   = isFamily ? 'none' : '';
-  document.getElementById('assigned-fld').style.display = isFamily ? '' : 'none';
+ document.getElementById('assigned-fld').style.display = 'none';
   document.getElementById('ball-fld').style.display     = isFamily ? 'none' : '';
 
   if(isFamily) {
