@@ -63,6 +63,24 @@ function openView(id) {
       const eDl = e.deadline ? deadlineInfo(e.deadline) : null;
       if(!e.text) return '';
       const col = textColor||'var(--t1)';
+      const myName = (localStorage.getItem('mc_current_member')||'').toLowerCase();
+      const isAll = e.assigned_to==='all' && e.completions?.length;
+      const myComp = isAll ? e.completions.find(c=>c.name.toLowerCase()===myName) : null;
+      const doneCount = isAll ? e.completions.filter(c=>c.done).length : 0;
+
+      // Left checkbox
+      const checkboxHTML = isAll
+        ? (myComp
+            ? `<div onclick="toggleMyCompletion('${id}','${e.id}','${esc(myComp.name)}')" style="width:16px;height:16px;border-radius:3px;border:2px solid rgba(0,0,0,.4);flex-shrink:0;margin-top:2px;background:${myComp.done?'rgba(0,0,0,.4)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer">${myComp.done?'<svg width="10" height="8" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>':''}</div>`
+            : `<div style="font-size:13px;flex-shrink:0;margin-top:1px">👥</div>`)
+        : `<div style="width:16px;height:16px;border-radius:3px;border:2px solid rgba(0,0,0,.4);flex-shrink:0;margin-top:2px;background:${e.done?'rgba(0,0,0,.4)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="viewToggleEntry('${id}','${e.id}')">${e.done?'<svg width="10" height="8" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>':''}</div>`;
+
+      // Circles for completions (read-only, shown on click)
+      const circlesHTML = isAll ? `
+        <div id="comp_${e.id}" style="display:none;flex-direction:row;gap:3px;align-items:center;margin-left:4px">
+          ${e.completions.map(c=>`<div style="width:18px;height:18px;border-radius:50%;background:${c.done?'rgba(0,0,0,.45)':'rgba(0,0,0,.08)'};border:${c.done?'none':'1px dashed rgba(0,0,0,.25)'};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:${c.done?'white':'rgba(0,0,0,.4)'}" title="${esc(c.name)}">${esc(c.name.slice(0,1).toUpperCase())}</div>`).join('')}
+        </div>` : '';
+
       return `<div class="swipe-entry-wrap" style="position:relative;overflow:hidden;border-bottom:1px solid rgba(0,0,0,.1)">
         <div class="swipe-actions" style="position:absolute;left:0;top:0;bottom:0;display:flex;align-items:center;gap:4px;padding:0 8px;opacity:0;transition:opacity .2s">
           <button onclick="deleteEntry('${id}','${e.id}')" style="background:rgba(232,96,96,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">🗑️</button>
@@ -70,26 +88,15 @@ function openView(id) {
           <button onclick="moveEntry('${id}','${e.id}')" style="background:rgba(91,184,122,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">📤</button>
         </div>
         <div class="swipe-content" data-cardid="${id}" data-entryid="${e.id}" style="position:relative;display:flex;align-items:flex-start;gap:8px;padding:5px 0;background:transparent;will-change:transform;transition:transform .2s">
-          ${e.assigned_to==='all' && e.completions
-  ? `<div onclick="toggleCompletions('${e.id}')" style="flex-shrink:0;cursor:pointer;font-size:11px;font-weight:600;color:rgba(0,0,0,.6);min-width:24px;text-align:center">${e.completions.filter(c=>c.done).length}/${e.completions.length}</div>`
-  : `<div style="width:16px;height:16px;border-radius:3px;border:2px solid rgba(0,0,0,.4);flex-shrink:0;margin-top:2px;background:${e.done?'rgba(0,0,0,.4)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="viewToggleEntry('${id}','${e.id}')">${e.done?'<svg width="10" height="8" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>':''}</div>`
-}
+          ${checkboxHTML}
           <div style="flex:1">
             <div style="font-size:13px;color:${col};${e.done?'text-decoration:line-through;opacity:.5':''};word-break:break-word;overflow-wrap:break-word" dir="auto">${esc(e.text)}</div>
-            <div style="display:flex;justify-content:space-between;align-items:center">
-              <div style="display:flex;gap:6px;align-items:center">
-  <div style="font-size:10px;color:rgba(0,0,0,.4);margin-top:1px">${e.date}</div>
-  ${e.assigned_to==='all' && e.completions ? `
-<div id="comp_${e.id}" style="display:none;margin-top:4px;display:none">
-  <div style="display:flex;gap:4px;flex-wrap:wrap">
-    ${e.completions.map(c=>`
-      <div onclick="toggleMyCompletion('${id}','${e.id}','${esc(c.name)}')" style="display:flex;align-items:center;gap:3px;cursor:pointer">
-        <div style="width:20px;height:20px;border-radius:50%;background:${c.done?'rgba(0,0,0,.4)':'rgba(0,0,0,.08)'};border:${c.done?'none':'1px dashed rgba(0,0,0,.25)'};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:500;color:${c.done?'white':'rgba(0,0,0,.4)'}">${esc(c.name.slice(0,1))}</div>
-      </div>`).join('')}
-  </div>
-</div>` : ''}
-  ${e.assigned_to?`<span style="font-size:10px;color:rgba(0,0,0,.6);font-weight:600">👤 ${esc(e.assigned_to)}</span>`:''}
-</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
+              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                <div style="font-size:10px;color:rgba(0,0,0,.4);margin-top:1px">${e.date}</div>
+                ${e.assigned_to&&e.assigned_to!=='all'?`<span style="font-size:10px;color:rgba(0,0,0,.6);font-weight:600">👤 ${esc(e.assigned_to)}</span>`:''}
+                ${isAll?`<div style="display:flex;align-items:center;gap:3px"><span onclick="toggleCompletions('${e.id}')" style="font-size:11px;font-weight:600;color:rgba(0,0,0,.6);cursor:pointer">${doneCount}/${e.completions.length}</span>${circlesHTML}</div>`:''}
+              </div>
               ${eDl?`<span style="font-size:10px;opacity:.7">⏰ ${eDl.text}</span>`:''}
             </div>
           </div>
@@ -385,7 +392,7 @@ const completions = assignedToVal === 'all' ? (currentSpace?.members||[]).map(m=
       sessionId,
       sessionNote: (i === 0 && isNewSession) ? (sessionNote||null) : null,
       sessionAtts: (i === 0) ? [...aeAtts] : [],
-      sessionCreator: isNewSession ? (localStorage.getItem('mc_current_member')||currentUser?.display_name||'') : null,
+      sessionCreator: isNewSession ? (localStorage.getItem('mc_current_member')||currentUser?.display_name||'') : (localStorage.getItem('mc_current_member')||currentUser?.display_name||''),
       assigned_to: assignedTo,
 completions: completions,
       deadline
