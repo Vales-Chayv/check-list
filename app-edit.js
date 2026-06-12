@@ -19,7 +19,7 @@ function openEdit(id) {
 
   document.getElementById('edit-title').textContent=card?'Редактировать':'Новая карточка';
   document.getElementById('e-title').value=card?.title||'';
-  document.getElementById('e-body').closest('.fld').style.display = 'flex';
+document.getElementById('e-body').closest('.fld').style.display = 'flex';
   document.getElementById('e-body').value=card?.body||'';
   document.getElementById('e-deadline').value=card?.deadline||'';
   document.getElementById('e-priority').value=card?.priority||'normal';
@@ -275,6 +275,7 @@ function renderEntriesEdit() {
         <input type="date" value="${e.deadline||''}" onchange="updateEntryDeadline('${e.id}',this.value)"
           style="background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t3);font-size:11px;font-family:inherit;padding:1px 2px;width:130px">
       </div>
+      ${currentSpace?.type==='family'?`<select onchange="updateEntryAssignee('${e.id}',this.value)" style="margin-top:4px;background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t2);font-size:12px;font-family:inherit;width:100%;padding:2px 0"><option value="">👤 Конкретному</option><option value="all"${e.assigned_to==='all'?' selected':''}>👥 Все участники</option>${(currentSpace?.members||[]).map(m=>`<option value="${esc(m.name)}"${e.assigned_to===m.name?' selected':''}>${esc(m.name)}</option>`).join('')}</select>`:''}
     </div>
     <button class="entry-del" onclick="rmEntry('${e.id}')">✕</button>
   </div>`;
@@ -301,6 +302,7 @@ function addEntry() {
   renderEntriesEdit();
   setTimeout(()=>{const ta=document.querySelector('#e-new-entry-area .entry-textarea');if(ta)ta.focus();},50);
 }
+function updateEntryAssignee(id, val) { const e=tempEntries.find(x=>x.id===id); if(e) e.assigned_to = val||null; }
 function toggleEditEntry(id) { const e=tempEntries.find(x=>x.id===id);if(e){e.done=!e.done;renderEntriesEdit();} }
 function updateEntry(id,val) { const e=tempEntries.find(x=>x.id===id);if(e)e.text=val; }
 function updateEntryDeadline(id,val) { const e=tempEntries.find(x=>x.id===id);if(e)e.deadline=val||null; }
@@ -351,15 +353,40 @@ async function saveCard() {
   const cleanEntries=tempEntries.filter(e=>e.text.trim()).map(({_saved,...e})=>e);
   let finalStatus=isFamily ? 'new' : newStatus;
   if(cleanEntries.length>0&&cleanEntries.every(e=>e.done)) finalStatus='done';
+
+  // Family space: wrap body+entries into session
+  let sessionEntries = cleanEntries;
+  const bodyVal = document.getElementById('e-body').value.trim();
+  if(isFamily && !editId) {
+    const sessionId = uid();
+    const sessionCreator = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
+    if(cleanEntries.length > 0) {
+      sessionEntries = cleanEntries.map((e,i) => ({
+        ...e, sessionId,
+        sessionNote: i===0 ? (bodyVal||null) : null,
+        sessionAtts: i===0 ? [...tempAtt] : [],
+        sessionCreator,
+        completions: e.assigned_to==='all' ? (currentSpace?.members||[]).map(m=>({name:m.name,done:false})) : null
+      }));
+    } else if(bodyVal) {
+      sessionEntries = [{
+        id:uid(), text:'', date:nowStr(), done:false, attachments:[],
+        sessionId, sessionNote:bodyVal, sessionAtts:[...tempAtt],
+        sessionCreator, completions:null, assigned_to:null, deadline:null
+      }];
+    }
+  }
+
   const data={
-    title,body:document.getElementById('e-body').value.trim(),category:catVal,
-    status:finalStatus,priority:document.getElementById('e-priority').value||'normal',
+    title, body: isFamily&&!editId ? '' : bodyVal, category:catVal,
+    status:finalStatus, priority:document.getElementById('e-priority').value||'normal',
     deadline:document.getElementById('e-deadline').value||null,
     ball:isFamily?'':ballVal,
     assigned_to:assignedTo,
-    attachments:tempAtt,entries:cleanEntries,
+    attachments: isFamily&&!editId ? [] : tempAtt,
+    entries:sessionEntries,
     reminder:{enabled:remOn,freq:freqVal,days:customDays,intervalMin:freqVal==='interval'?intervalMin:null},
-    history:hist,related_ids:tempRelIds
+    history:hist, related_ids:tempRelIds
   };
   setSaveBtns(false);
   if(editId){
