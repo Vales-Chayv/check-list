@@ -70,12 +70,24 @@ function openView(id) {
           <button onclick="moveEntry('${id}','${e.id}')" style="background:rgba(91,184,122,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">📤</button>
         </div>
         <div class="swipe-content" data-cardid="${id}" data-entryid="${e.id}" style="position:relative;display:flex;align-items:flex-start;gap:8px;padding:5px 0;background:transparent;will-change:transform;transition:transform .2s">
-          <div style="width:16px;height:16px;border-radius:3px;border:2px solid rgba(0,0,0,.4);flex-shrink:0;margin-top:2px;background:${e.done?'rgba(0,0,0,.4)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="viewToggleEntry('${id}','${e.id}')">${e.done?'<svg width="10" height="8" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>':''}</div>
+          ${e.assigned_to==='all' && e.completions
+  ? `<div onclick="toggleCompletions('${e.id}')" style="flex-shrink:0;cursor:pointer;font-size:11px;font-weight:600;color:rgba(0,0,0,.6);min-width:24px;text-align:center">${e.completions.filter(c=>c.done).length}/${e.completions.length}</div>`
+  : `<div style="width:16px;height:16px;border-radius:3px;border:2px solid rgba(0,0,0,.4);flex-shrink:0;margin-top:2px;background:${e.done?'rgba(0,0,0,.4)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="viewToggleEntry('${id}','${e.id}')">${e.done?'<svg width="10" height="8" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>':''}</div>`
+}
           <div style="flex:1">
             <div style="font-size:13px;color:${col};${e.done?'text-decoration:line-through;opacity:.5':''};word-break:break-word;overflow-wrap:break-word" dir="auto">${esc(e.text)}</div>
             <div style="display:flex;justify-content:space-between;align-items:center">
               <div style="display:flex;gap:6px;align-items:center">
   <div style="font-size:10px;color:rgba(0,0,0,.4);margin-top:1px">${e.date}</div>
+  ${e.assigned_to==='all' && e.completions ? `
+<div id="comp_${e.id}" style="display:none;margin-top:4px;display:none">
+  <div style="display:flex;gap:4px;flex-wrap:wrap">
+    ${e.completions.map(c=>`
+      <div onclick="toggleMyCompletion('${id}','${e.id}','${esc(c.name)}')" style="display:flex;align-items:center;gap:3px;cursor:pointer">
+        <div style="width:20px;height:20px;border-radius:50%;background:${c.done?'rgba(0,0,0,.4)':'rgba(0,0,0,.08)'};border:${c.done?'none':'1px dashed rgba(0,0,0,.25)'};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:500;color:${c.done?'white':'rgba(0,0,0,.4)'}">${esc(c.name.slice(0,1))}</div>
+      </div>`).join('')}
+  </div>
+</div>` : ''}
   ${e.assigned_to?`<span style="font-size:10px;color:rgba(0,0,0,.6);font-weight:600">👤 ${esc(e.assigned_to)}</span>`:''}
 </div>
               ${eDl?`<span style="font-size:10px;opacity:.7">⏰ ${eDl.text}</span>`:''}
@@ -336,7 +348,7 @@ function aeAddEntryRow() {
   const wrap = document.getElementById('ae-entries-list'); if(!wrap) return;
   const div = document.createElement('div');
   div.className = 'entry-row';
-  const memberOptions = currentSpace?.type==='family' ? (currentSpace?.members||[]).map(m=>`<option value="${esc(m.name)}">${esc(m.name)}</option>`).join('') : '';
+  const memberOptions = currentSpace?.type==='family' ? `<option value="all">👥 Для всех</option>` + (currentSpace?.members||[]).map(m=>`<option value="${esc(m.name)}">${esc(m.name)}</option>`).join('') : '';
 div.innerHTML = `<div class="entry-cb"></div>
     <div style="flex:1">
       <textarea dir="auto" placeholder="Текст записи..." oninput="autoResize(this)" style="background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t1);font-size:14px;font-family:inherit;resize:none;min-height:36px;line-height:1.6;width:100%;padding:4px 0"></textarea>
@@ -365,8 +377,10 @@ async function saveAddEntry() {
   const sessionEntries = [];
   const texts = entryTexts.length ? entryTexts : [''];
   texts.forEach((text, i) => {
-    const entryRow = [...entryRows][i];
-const assignedTo = entryRow?.querySelector('select')?.value || null;
+   const entryRow = [...entryRows][i];
+const assignedToVal = entryRow?.querySelector('select')?.value || null;
+const assignedTo = assignedToVal || null;
+const completions = assignedToVal === 'all' ? (currentSpace?.members||[]).map(m=>({name:m.name, done:false})) : null;
     sessionEntries.push({
       id: uid(), text: text, date: nowStr(), done: false, attachments: [],
       sessionId,
@@ -374,6 +388,7 @@ const assignedTo = entryRow?.querySelector('select')?.value || null;
       sessionAtts: (i === 0) ? [...aeAtts] : [],
       sessionCreator: isNewSession ? (localStorage.getItem('mc_current_member')||currentUser?.display_name||'') : null,
       assigned_to: assignedTo,
+completions: completions,
       deadline
     });
   });
@@ -699,4 +714,24 @@ async function createCardAndMove(fromCardId, entryId, toSpaceId, catName) {
     render(); openView(fromCardId);
     toast('✓ Карточка создана и запись перенесена');
   } catch(e) { toast('Ошибка: '+e.message, true); }
+}
+function toggleCompletions(entryId) {
+  const el = document.getElementById('comp_'+entryId);
+  if(!el) return;
+  el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+}
+
+async function toggleMyCompletion(cardId, entryId, memberName) {
+  const myName = localStorage.getItem('mc_current_member')||'';
+  if(myName.toLowerCase() !== memberName.toLowerCase()) {
+    toast('Это не твоя галочка', true); return;
+  }
+  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  const entry = (card.entries||[]).find(e=>e.id===entryId); if(!entry) return;
+  const comp = (entry.completions||[]).find(c=>c.name.toLowerCase()===memberName.toLowerCase());
+  if(!comp) return;
+  comp.done = !comp.done;
+  entry.done = entry.completions.every(c=>c.done);
+  render(); openView(cardId);
+  try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
 }
