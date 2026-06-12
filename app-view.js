@@ -28,7 +28,7 @@ function openView(id) {
           <button onclick="toggleBall('${id}','mine')" style="padding:3px 10px;border-radius:12px;font-size:12px;cursor:pointer;border:1px solid var(--b2);background:${card.ball==='mine'?'var(--s2)':'transparent'};color:${card.ball==='mine'?'var(--t1)':'var(--t3)'}">⚽ У меня</button>
           <button onclick="toggleBall('${id}','theirs')" style="padding:3px 10px;border-radius:12px;font-size:12px;cursor:pointer;border:1px solid var(--b2);background:${card.ball==='theirs'?'var(--s2)':'transparent'};color:${card.ball==='theirs'?'var(--t1)':'var(--t3)'}">⚽ У них</button>
         </div>`:''}
-        ${currentSpace?.type==='family'?`<div style="margin-top:8px;font-size:13px;color:var(--t2)">👤 ${card.assigned_to?`Задача для: <strong style="color:var(--accent)">${esc(card.assigned_to)}</strong>`:'<span style="opacity:.6">Для всех</span>'}${card.created_by?`<span style="opacity:.5;margin-left:10px">✍️ ${esc(card.created_by)}</span>`:''}</div>`:''}
+        ${currentSpace?.type==='family'&&card.created_by?`<div style="margin-top:8px;font-size:13px;color:var(--t2)">✍️ ${esc(card.created_by)}</div>`:''}
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
         <button onclick="closeView()" style="background:var(--s2);border:none;color:var(--t2);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px">✕</button>
@@ -72,9 +72,12 @@ function openView(id) {
         <div class="swipe-content" data-cardid="${id}" data-entryid="${e.id}" style="position:relative;display:flex;align-items:flex-start;gap:8px;padding:5px 0;background:transparent;will-change:transform;transition:transform .2s">
           <div style="width:16px;height:16px;border-radius:3px;border:2px solid rgba(0,0,0,.4);flex-shrink:0;margin-top:2px;background:${e.done?'rgba(0,0,0,.4)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="viewToggleEntry('${id}','${e.id}')">${e.done?'<svg width="10" height="8" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>':''}</div>
           <div style="flex:1">
-            <div style="font-size:13px;color:${col};${e.done?'text-decoration:line-through;opacity:.5':''}" dir="auto">${esc(e.text)}</div>
+            <div style="font-size:13px;color:${col};${e.done?'text-decoration:line-through;opacity:.5':''};word-break:break-word;overflow-wrap:break-word" dir="auto">${esc(e.text)}</div>
             <div style="display:flex;justify-content:space-between;align-items:center">
-              <div style="font-size:10px;color:rgba(0,0,0,.4);margin-top:1px">${e.date}</div>
+              <div style="display:flex;gap:6px;align-items:center">
+  <div style="font-size:10px;color:rgba(0,0,0,.4);margin-top:1px">${e.date}</div>
+  ${e.assigned_to?`<span style="font-size:10px;color:rgba(0,0,0,.6);font-weight:600">👤 ${esc(e.assigned_to)}</span>`:''}
+</div>
               ${eDl?`<span style="font-size:10px;opacity:.7">⏰ ${eDl.text}</span>`:''}
             </div>
           </div>
@@ -121,7 +124,8 @@ function openView(id) {
            ${hasFiles?`<div id="${stkId}_peek" style="position:absolute;bottom:-5px;left:-5px;right:8px;height:90%;background:${bottomColor};border-radius:10px;transform:rotate(1.2deg);z-index:0"></div>`:''}
           <div style="position:relative;z-index:1;background:${memberColor};border-radius:10px;padding:14px 14px 16px;box-shadow:2px 3px 10px rgba(0,0,0,.3)">
             <div style="position:absolute;top:-16px;${isMe?'left:14px':'right:14px'};transform:rotate(${isMe?'-12':'12'}deg);filter:drop-shadow(1px 1px 3px rgba(0,0,0,.4))"><svg width="20" height="32" viewBox="0 0 20 32" fill="none"><path d="M10 1C6.1 1 3 4.1 3 8v14c0 3.9 3.1 7 7 7s7-3.1 7-7V6h-2.5v16c0 2.5-2 4.5-4.5 4.5S5.5 24.5 5.5 22V8c0-1.9 1.6-3.5 3.5-3.5S12.5 6.1 12.5 8v14h2.5V8c0-3.9-3.1-7-7-7z" fill="${clipColor}"/></svg></div>
-            ${creator?`<div style="font-size:10px;font-weight:700;color:rgba(0,0,0,.5);margin-bottom:6px;margin-top:8px">${esc(creator)} • ${s.date}</div>`:'<div style="margin-top:16px"></div>'}
+            <div style="font-size:12px;font-weight:700;color:rgba(0,0,0,.7);margin-bottom:6px;margin-top:8px">${creator?esc(creator):'?'}</div>
+<div style="font-size:10px;color:rgba(0,0,0,.45);margin-bottom:4px">${s.date}</div>
             ${s.note?`<div style="font-size:13px;color:rgba(0,0,0,.75);margin-bottom:8px;font-style:italic;line-height:1.5;word-break:break-word;white-space:pre-wrap" dir="auto">${esc(s.note)}</div>`:''}
             ${s.entries.map(e=>entryRowHTML(e,'rgba(0,0,0,0.75)')).join('')}
             ${showAddBtn?`<button onclick="openAddEntry('${id}','${s.sid}',true)" style="margin-top:8px;background:rgba(0,0,0,.1);border:none;border-radius:20px;padding:4px 12px;font-size:12px;color:rgba(0,0,0,.6);cursor:pointer;font-family:inherit">＋ Добавить</button>`:''}
@@ -199,6 +203,12 @@ async function viewToggleEntry(cardId, entryId) {
     }
   }
   const e=(card.entries||[]).find(x=>x.id===entryId); if(!e)return;
+  if(e.assigned_to) {
+  const myName = localStorage.getItem('mc_current_member')||'';
+  if(myName.toLowerCase() !== e.assigned_to.toLowerCase()) {
+    toast('Это задание для ' + e.assigned_to, true); return;
+  }
+}
   e.done=!e.done;
   // Обновляем дедлайн карточки на ближайший среди невыполненных записей
 const activeDls = (card.entries||[]).filter(x=>!x.done&&x.deadline).map(x=>x.deadline).sort();
@@ -326,9 +336,11 @@ function aeAddEntryRow() {
   const wrap = document.getElementById('ae-entries-list'); if(!wrap) return;
   const div = document.createElement('div');
   div.className = 'entry-row';
-  div.innerHTML = `<div class="entry-cb"></div>
+  const memberOptions = currentSpace?.type==='family' ? (currentSpace?.members||[]).map(m=>`<option value="${esc(m.name)}">${esc(m.name)}</option>`).join('') : '';
+div.innerHTML = `<div class="entry-cb"></div>
     <div style="flex:1">
       <textarea dir="auto" placeholder="Текст записи..." oninput="autoResize(this)" style="background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t1);font-size:14px;font-family:inherit;resize:none;min-height:36px;line-height:1.6;width:100%;padding:4px 0"></textarea>
+      ${memberOptions?`<select style="margin-top:4px;background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t2);font-size:12px;font-family:inherit;width:100%;padding:2px 0"><option value="">👤 Для всех</option>${memberOptions}</select>`:''}
     </div>
     <button onclick="this.closest('.entry-row').remove()" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:16px;padding:0 4px">✕</button>`;
   wrap.appendChild(div);
@@ -353,12 +365,15 @@ async function saveAddEntry() {
   const sessionEntries = [];
   const texts = entryTexts.length ? entryTexts : [''];
   texts.forEach((text, i) => {
+    const entryRow = [...entryRows][i];
+const assignedTo = entryRow?.querySelector('select')?.value || null;
     sessionEntries.push({
       id: uid(), text: text, date: nowStr(), done: false, attachments: [],
       sessionId,
       sessionNote: (i === 0 && isNewSession) ? (sessionNote||null) : null,
       sessionAtts: (i === 0) ? [...aeAtts] : [],
       sessionCreator: isNewSession ? (localStorage.getItem('mc_current_member')||currentUser?.display_name||'') : null,
+      assigned_to: assignedTo,
       deadline
     });
   });
