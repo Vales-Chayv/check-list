@@ -358,7 +358,14 @@ function aeAddEntryRow() {
 div.innerHTML = `<div class="entry-cb"></div>
     <div style="flex:1">
       <textarea dir="auto" placeholder="Текст записи..." oninput="autoResize(this)" style="background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t1);font-size:14px;font-family:inherit;resize:none;min-height:36px;line-height:1.6;width:100%;padding:4px 0"></textarea>
-      ${currentSpace?.type==='family'?`<select style="margin-top:4px;background:var(--s2);border:none;border-bottom:1px solid var(--b1);color:var(--t2);font-size:12px;font-family:inherit;width:100%;padding:2px 0"><option value="">👤 Для всех</option><option value="all">👥 Все участники</option>${(currentSpace?.members||[]).map(m=>`<option value="${esc(m.name)}">${esc(m.name)}</option>`).join('')}</select>`:''}
+      ${currentSpace?.type==='family'?`<div style="margin-top:6px">
+  <div style="font-size:11px;color:rgba(var(--t2-rgb),.7);margin-bottom:4px">Назначить:</div>
+  <div style="display:flex;flex-wrap:wrap;gap:4px">
+    <button type="button" class="ae-assign-btn on" data-val="" onclick="aeToggleAssign(this,'',event)" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:var(--accent);color:#0f0f0f;cursor:pointer">👤 Никому</button>
+    <button type="button" class="ae-assign-btn" data-val="all" onclick="aeToggleAssign(this,'all',event)" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:transparent;color:var(--t2);cursor:pointer">👥 Все</button>
+    ${(currentSpace?.members||[]).map(m=>`<button type="button" class="ae-assign-btn" data-val="${esc(m.name)}" onclick="aeToggleAssign(this,'${esc(m.name)}',event)" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:transparent;color:var(--t2);cursor:pointer">${esc(m.name)}</button>`).join('')}
+  </div>
+</div>`:''}
     </div>
     <button onclick="this.closest('.entry-row').remove()" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:16px;padding:0 4px">✕</button>`;
   wrap.appendChild(div);
@@ -383,10 +390,17 @@ async function saveAddEntry() {
   const sessionEntries = [];
   const texts = entryTexts.length ? entryTexts : [''];
   texts.forEach((text, i) => {
-   const entryRow = [...entryRows][i];
-const assignedToVal = entryRow?.querySelector('select')?.value || null;
-const assignedTo = assignedToVal || null;
-const completions = assignedToVal === 'all' ? (currentSpace?.members||[]).map(m=>({name:m.name, done:false})) : null;
+  const entryRow = [...entryRows][i];
+const onBtns = [...(entryRow?.querySelectorAll('.ae-assign-btn.on')||[])];
+const onVals = onBtns.map(b=>b.dataset.val).filter(v=>v);
+let assignedTo = null, completions = null;
+if(onVals.includes('all')) {
+  assignedTo = 'all';
+  completions = (currentSpace?.members||[]).map(m=>({name:m.name, done:false}));
+} else if(onVals.length > 0) {
+  assignedTo = 'all';
+  completions = onVals.map(name=>({name, done:false}));
+}
     sessionEntries.push({
       id: uid(), text: text, date: nowStr(), done: false, attachments: [],
       sessionId,
@@ -740,4 +754,20 @@ async function toggleMyCompletion(cardId, entryId, memberName) {
   entry.done = entry.completions.every(c=>c.done);
   render(); openView(cardId);
   try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
+}
+function aeToggleAssign(btn, val, event) {
+  event.stopPropagation();
+  const wrap = btn.closest('div[style*="margin-top:6px"]');
+  if(!wrap) return;
+  const allBtns = wrap.querySelectorAll('.ae-assign-btn');
+  if(val === '' || val === 'all') {
+    allBtns.forEach(b => { b.style.background='transparent'; b.style.color='var(--t2)'; b.classList.remove('on'); });
+    btn.style.background = 'var(--accent)'; btn.style.color = '#0f0f0f'; btn.classList.add('on');
+  } else {
+    const noneBtns = wrap.querySelectorAll('[data-val=""], [data-val="all"]');
+    noneBtns.forEach(b => { b.style.background='transparent'; b.style.color='var(--t2)'; b.classList.remove('on'); });
+    btn.classList.toggle('on');
+    btn.style.background = btn.classList.contains('on') ? 'var(--accent)' : 'transparent';
+    btn.style.color = btn.classList.contains('on') ? '#0f0f0f' : 'var(--t2)';
+  }
 }

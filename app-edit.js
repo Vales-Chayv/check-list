@@ -275,7 +275,11 @@ function renderEntriesEdit() {
         <input type="date" value="${e.deadline||''}" onchange="updateEntryDeadline('${e.id}',this.value)"
           style="background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t3);font-size:11px;font-family:inherit;padding:1px 2px;width:130px">
       </div>
-      ${currentSpace?.type==='family'?`<select onchange="updateEntryAssignee('${e.id}',this.value)" style="margin-top:4px;background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t2);font-size:12px;font-family:inherit;width:100%;padding:2px 0"><option value="">👤 Конкретному</option><option value="all"${e.assigned_to==='all'?' selected':''}>👥 Все участники</option>${(currentSpace?.members||[]).map(m=>`<option value="${esc(m.name)}"${e.assigned_to===m.name?' selected':''}>${esc(m.name)}</option>`).join('')}</select>`:''}
+      ${currentSpace?.type==='family'?`<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
+  <button type="button" class="ae-assign-btn${!e.assigned_to?' on':''}" data-entryid="${e.id}" data-val="" onclick="editToggleAssign(this,'${e.id}','')" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:${!e.assigned_to?'var(--accent)':'transparent'};color:${!e.assigned_to?'#0f0f0f':'var(--t2)'};cursor:pointer">👤 Никому</button>
+  <button type="button" class="ae-assign-btn${e.assigned_to==='all'?' on':''}" data-entryid="${e.id}" data-val="all" onclick="editToggleAssign(this,'${e.id}','all')" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:${e.assigned_to==='all'?'var(--accent)':'transparent'};color:${e.assigned_to==='all'?'#0f0f0f':'var(--t2)'};cursor:pointer">👥 Все</button>
+  ${(currentSpace?.members||[]).map(m=>`<button type="button" class="ae-assign-btn${e.assigned_to===m.name?' on':''}" data-entryid="${e.id}" data-val="${esc(m.name)}" onclick="editToggleAssign(this,'${e.id}','${esc(m.name)}')" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:${e.assigned_to===m.name?'var(--accent)':'transparent'};color:${e.assigned_to===m.name?'#0f0f0f':'var(--t2)'};cursor:pointer">${esc(m.name)}</button>`).join('')}
+</div>`:''}
     </div>
     <button class="entry-del" onclick="rmEntry('${e.id}')">✕</button>
   </div>`;
@@ -302,7 +306,19 @@ function addEntry() {
   renderEntriesEdit();
   setTimeout(()=>{const ta=document.querySelector('#e-new-entry-area .entry-textarea');if(ta)ta.focus();},50);
 }
-function updateEntryAssignee(id, val) { const e=tempEntries.find(x=>x.id===id); if(e) e.assigned_to = val||null; }
+function updateEntryAssignee(entryId, val) {
+  const e = tempEntries.find(x=>x.id===entryId);
+  if(!e) return;
+  if(!val) { e.assigned_to = null; e._selectedMembers = null; }
+  else if(val === 'all') { e.assigned_to = 'all'; e._selectedMembers = null; }
+  else {
+    try {
+      const arr = JSON.parse(val);
+      if(Array.isArray(arr)) { e.assigned_to = 'all'; e._selectedMembers = arr; return; }
+    } catch(_) {}
+    e.assigned_to = val; e._selectedMembers = null;
+  }
+}
 function toggleEditEntry(id) { const e=tempEntries.find(x=>x.id===id);if(e){e.done=!e.done;renderEntriesEdit();} }
 function updateEntry(id,val) { const e=tempEntries.find(x=>x.id===id);if(e)e.text=val; }
 function updateEntryDeadline(id,val) { const e=tempEntries.find(x=>x.id===id);if(e)e.deadline=val||null; }
@@ -366,7 +382,11 @@ async function saveCard() {
         sessionNote: i===0 ? (bodyVal||null) : null,
         sessionAtts: i===0 ? [...tempAtt] : [],
         sessionCreator,
-        completions: e.assigned_to==='all' ? (currentSpace?.members||[]).map(m=>({name:m.name,done:false})) : null
+        completions: e.assigned_to==='all'
+  ? (e._selectedMembers||[]).length > 0
+    ? e._selectedMembers.map(n=>({name:n,done:false}))
+    : (currentSpace?.members||[]).map(m=>({name:m.name,done:false}))
+  : null
       }));
     } else if(bodyVal) {
       sessionEntries = [{
@@ -465,3 +485,21 @@ document.querySelectorAll('.mtab').forEach(btn=>btn.addEventListener('click',()=
   if(btn.dataset.panel==='p-history') renderHistList();
   if(btn.dataset.panel==='p-related') renderRelatedList();
 }));
+function editToggleAssign(btn, entryId, val) {
+  const wrap = btn.closest('div[style*="margin-top:6px"]');
+  if(!wrap) return;
+  const allBtns = wrap.querySelectorAll('.ae-assign-btn');
+  if(val === '' || val === 'all') {
+    allBtns.forEach(b => { b.style.background='transparent'; b.style.color='var(--t2)'; b.classList.remove('on'); });
+    btn.style.background = 'var(--accent)'; btn.style.color = '#0f0f0f'; btn.classList.add('on');
+    updateEntryAssignee(entryId, val);
+  } else {
+    const noneBtns = wrap.querySelectorAll('[data-val=""], [data-val="all"]');
+    noneBtns.forEach(b => { b.style.background='transparent'; b.style.color='var(--t2)'; b.classList.remove('on'); });
+    btn.classList.toggle('on');
+    btn.style.background = btn.classList.contains('on') ? 'var(--accent)' : 'transparent';
+    btn.style.color = btn.classList.contains('on') ? '#0f0f0f' : 'var(--t2)';
+    const selected = [...wrap.querySelectorAll('.ae-assign-btn.on')].map(b=>b.dataset.val).filter(v=>v);
+    updateEntryAssignee(entryId, selected.length === 1 ? selected[0] : selected.length > 1 ? JSON.stringify(selected) : null);
+  }
+}
