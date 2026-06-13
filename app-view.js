@@ -556,6 +556,10 @@ div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:420px">
     <div style="font-size:16px;font-weight:700;margin-bottom:12px">Редактировать запись</div>
     <textarea id="edit-entry-txt" dir="auto" style="width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px;font-size:15px;color:var(--t1);font-family:inherit;resize:none;min-height:80px">${esc(entry.text)}</textarea>
+    <div style="margin-top:8px">
+      <label style="font-size:12px;color:var(--t2)">Срок выполнения</label>
+      <input type="date" id="edit-entry-dl" value="${entry.deadline||''}" style="width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:8px;font-size:14px;color:var(--t1);font-family:inherit;margin-top:4px">
+    </div>
     <div style="display:flex;gap:8px;margin-top:12px">
       <button onclick="saveEntryEdit('${cardId}','${entryId}')" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:11px;font-size:14px;font-weight:700;cursor:pointer">Сохранить</button>
       <button onclick="this.closest('[style*=fixed]').remove()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px 16px;cursor:pointer">Отмена</button>
@@ -571,6 +575,8 @@ async function saveEntryEdit(cardId, entryId) {
   const txt = document.getElementById('edit-entry-txt')?.value?.trim();
   if(!txt) return;
   entry.text = txt;
+  const dl = document.getElementById('edit-entry-dl')?.value;
+entry.deadline = dl || null;
   document.getElementById('edit-entry-dialog')?.remove();
   render(); openView(cardId);
   try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }

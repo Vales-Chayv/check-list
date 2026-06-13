@@ -19,7 +19,7 @@ function openEdit(id) {
 
   document.getElementById('edit-title').textContent=card?'Редактировать':'Новая карточка';
   document.getElementById('e-title').value=card?.title||'';
-document.getElementById('e-body').closest('.fld').style.display = currentSpace?.type==='family' ? 'flex' : 'none';
+document.getElementById('e-body').closest('.fld').style.display = 'flex';
   document.getElementById('e-body').value=card?.body||'';
   document.getElementById('e-deadline').value=card?.deadline||'';
   document.getElementById('e-priority').value=card?.priority||'normal';
@@ -273,7 +273,7 @@ function renderEntriesEdit() {
       <div style="display:flex;align-items:center;gap:8px;margin-top:3px">
         <div class="entry-date" style="flex:1">${e.date}</div>
         <input type="date" value="${e.deadline||''}" onchange="updateEntryDeadline('${e.id}',this.value)"
-          style="background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t3);font-size:11px;font-family:inherit;padding:1px 2px;width:130px">
+          style="background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t1);font-size:11px;font-family:inherit;padding:1px 2px;width:130px">
       </div>
       ${currentSpace?.type==='family'?`<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
   <button type="button" class="ae-assign-btn${!e.assigned_to?' on':''}" data-entryid="${e.id}" data-val="" onclick="editToggleAssign(this,'${e.id}','')" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:${!e.assigned_to?'var(--accent)':'transparent'};color:${!e.assigned_to?'#0f0f0f':'var(--t2)'};cursor:pointer">👤 Никому</button>
