@@ -64,7 +64,7 @@ function openView(id) {
       if(!e.text) return '';
       const col = textColor||'var(--t1)';
 	  const borderCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t2)';
-const doneCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--accent)';
+const doneCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--green)';
 const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
       const myName = (localStorage.getItem('mc_current_member')||'').toLowerCase();
       const isAll = e.assigned_to==='all' && e.completions?.length;
