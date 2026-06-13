@@ -214,13 +214,7 @@ function openImgDirect(src) {
 
 async function viewToggleEntry(cardId, entryId) {
   const card=cards.find(c=>c.id===cardId); if(!card)return;
-  // In family space: only assigned person (or everyone if null) can toggle
-  if(currentSpace?.type==='family' && card.assigned_to) {
-    const myName = currentUser?.display_name||'';
-    if(myName.toLowerCase() !== card.assigned_to.toLowerCase()) {
-      toast('Эта задача для ' + card.assigned_to, true); return;
-    }
-  }
+ 
   const e=(card.entries||[]).find(x=>x.id===entryId); if(!e)return;
  if(e.assigned_to && e.assigned_to !== 'all') {
   const myName = localStorage.getItem('mc_current_member')||'';
