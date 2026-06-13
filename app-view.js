@@ -214,18 +214,16 @@ function openImgDirect(src) {
 
 async function viewToggleEntry(cardId, entryId) {
   const card=cards.find(c=>c.id===cardId); if(!card)return;
-}
   const e=(card.entries||[]).find(x=>x.id===entryId); if(!e)return;
- if(e.assigned_to && e.assigned_to !== 'all') {
-  const myName = localStorage.getItem('mc_current_member')||'';
-  if(myName.toLowerCase() !== e.assigned_to.toLowerCase()) {
-    toast('Эта задача для ' + e.assigned_to, true); return;
+  if(e.assigned_to && e.assigned_to !== 'all') {
+    const myName = localStorage.getItem('mc_current_member')||'';
+    if(myName.toLowerCase() !== e.assigned_to.toLowerCase()) {
+      toast('Эта задача для ' + e.assigned_to, true); return;
+    }
   }
-}
   e.done=!e.done;
-  // Обновляем дедлайн карточки на ближайший среди невыполненных записей
-const activeDls = (card.entries||[]).filter(x=>!x.done&&x.deadline).map(x=>x.deadline).sort();
-if(activeDls.length) card.deadline = activeDls[0];
+  const activeDls = (card.entries||[]).filter(x=>!x.done&&x.deadline).map(x=>x.deadline).sort();
+  if(activeDls.length) card.deadline = activeDls[0];
   if((card.entries||[]).length>0&&(card.entries||[]).every(x=>x.done)){
     card.status='done';
     card.history=[...(card.history||[]),{date:nowStr(),text:'Все записи выполнены → Готово',type:'status'}];
