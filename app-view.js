@@ -222,10 +222,10 @@ async function viewToggleEntry(cardId, entryId) {
     }
   }
   const e=(card.entries||[]).find(x=>x.id===entryId); if(!e)return;
-  if(e.assigned_to) {
+ if(e.assigned_to && e.assigned_to !== 'all') {
   const myName = localStorage.getItem('mc_current_member')||'';
   if(myName.toLowerCase() !== e.assigned_to.toLowerCase()) {
-    toast('Это задание для ' + e.assigned_to, true); return;
+    toast('Эта задача для ' + e.assigned_to, true); return;
   }
 }
   e.done=!e.done;
