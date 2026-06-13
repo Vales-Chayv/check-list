@@ -344,7 +344,7 @@ function stopAEVoice() {
 }
 
 function aeAddEntryRow() {
-  const wrap = document.getElementById('ae-entries-list'); if(!wrap) return;
+  const wrap = document.getElementById('ae-new-entry'); if(!wrap) return;
   const div = document.createElement('div');
   div.className = 'entry-row';
 div.innerHTML = `<div class="entry-cb"></div>
