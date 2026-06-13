@@ -389,9 +389,12 @@ let assignedTo = null, completions = null;
 if(onVals.includes('all')) {
   assignedTo = 'all';
   completions = (currentSpace?.members||[]).map(m=>({name:m.name, done:false}));
-} else if(onVals.length > 0) {
+} else if(onVals.length > 1) {
   assignedTo = 'all';
   completions = onVals.map(name=>({name, done:false}));
+} else if(onVals.length === 1) {
+  assignedTo = onVals[0];
+  completions = null;
 }
     sessionEntries.push({
       id: uid(), text: text, date: nowStr(), done: false, attachments: [],
