@@ -615,6 +615,11 @@ async function confirmMoveEntry(fromCardId, entryId, toCardId) {
   if(!fromCard||!toCard) return;
   const entry = (fromCard.entries||[]).find(e=>e.id===entryId); if(!entry) return;
   fromCard.entries = (fromCard.entries||[]).filter(e=>e.id!==entryId);
+  if((fromCard.entries||[]).length === 0) {
+  if(confirm('Карточка «' + fromCard.title + '» пуста. Удалить её?')) {
+    deleteCardById(fromCard.id);
+  }
+}
   toCard.entries = [entry, ...(toCard.entries||[])];
 document.getElementById('move-entry-dialog')?.remove();
   render(); openView(fromCardId);
@@ -703,6 +708,11 @@ async function confirmMoveEntryToSpace(fromCardId, entryId, toSpaceId, toCardId)
   const fromCard = cards.find(c=>c.id===fromCardId); if(!fromCard) return;
   const entry = (fromCard.entries||[]).find(e=>e.id===entryId); if(!entry) return;
   fromCard.entries = (fromCard.entries||[]).filter(e=>e.id!==entryId);
+  if((fromCard.entries||[]).length === 0) {
+  if(confirm('Карточка «' + fromCard.title + '» пуста. Удалить её?')) {
+    deleteCardById(fromCard.id);
+  }
+}
   try {
     const {data:toCardData} = await sb.from('cards').select('*').eq('id', toCardId).single();
     if(!toCardData) { toast('Карточка не найдена', true); return; }
