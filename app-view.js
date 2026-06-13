@@ -251,8 +251,6 @@ function openAddEntry(cardId, sessionId = null, hideNote = false) {
   if(noteLbl) noteLbl.style.display = (currentSpace?.type==='family' && !hideNote) ? 'block' : 'none';
   const listEl = document.getElementById('ae-entries-list');
   if(listEl) { listEl.innerHTML = ''; }
-  const newEntryEl = document.getElementById('ae-new-entry');
-if(newEntryEl) { newEntryEl.innerHTML = ''; }
   document.getElementById('ae-att-prev').innerHTML = '';
   const dlEl = document.getElementById('ae-entry-deadline');
   if(dlEl) dlEl.value = card?.deadline||'';
