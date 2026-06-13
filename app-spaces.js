@@ -85,7 +85,8 @@ function renderSpacesList() {
         </div>
         ${s.password?'<span style="font-size:16px;opacity:.5">🔒</span>':'<span style="font-size:12px;color:var(--t3)">Открыть</span>'}
       </div>
-      ${s.type==='family'?`<button onclick="getShareLink('${s.id}')" style="background:rgba(232,197,106,.15);border:1px solid rgba(232,197,106,.3);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--accent);cursor:pointer" title="Пригласить">🔗</button><button onclick="openManageMembers('${s.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--t2);cursor:pointer" title="Участники">✏️</button>`:''}
+      ${s.type==='family'?`<button onclick="getShareLink('${s.id}')" style="background:rgba(232,197,106,.15);border:1px solid rgba(232,197,106,.3);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--accent);cursor:pointer" title="Пригласить">🔗</button><button onclick="openManageMembers('${s.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--t2);cursor:pointer" title="Участники">👥</button>`:''}
+<button onclick="openEditSpace('${s.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--t2);cursor:pointer" title="Редактировать">✏️</button>utton onclick="getShareLink('${s.id}')" style="background:rgba(232,197,106,.15);border:1px solid rgba(232,197,106,.3);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--accent);cursor:pointer" title="Пригласить">🔗</button><button onclick="openManageMembers('${s.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--t2);cursor:pointer" title="Участники">✏️</button>`:''}
     </div>`;
   }).join('');
 }
@@ -384,4 +385,35 @@ function showOnlineList() {
   setTimeout(() => document.addEventListener('click', function handler() {
     div.remove(); document.removeEventListener('click', handler);
   }), 100);
+}
+function openEditSpace(id) {
+  const space = spaces.find(s=>s.id===id); if(!space) return;
+  const div = document.createElement('div');
+  div.id = 'edit-space-dialog';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
+  div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:420px">
+    <div style="font-size:16px;font-weight:700;margin-bottom:12px">Редактировать кабинет</div>
+    <input id="edit-space-name-inp" value="${esc(space.name)}" dir="auto" style="width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px;font-size:15px;color:var(--t1);font-family:inherit;margin-bottom:12px">
+    <div style="display:flex;gap:8px">
+      <button onclick="saveSpaceName('${id}')" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:11px;font-size:14px;font-weight:700;cursor:pointer">Сохранить</button>
+      <button onclick="document.getElementById('edit-space-dialog')?.remove()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px 16px;cursor:pointer">Отмена</button>
+    </div>
+    <button onclick="deleteSpace('${id}')" style="width:100%;margin-top:10px;background:rgba(232,96,96,.15);color:var(--red);border:1px solid rgba(232,96,96,.25);border-radius:var(--rsm);padding:11px;font-size:14px;cursor:pointer">🗑 Удалить кабинет</button>
+  </div>`;
+  document.body.appendChild(div);
+  setTimeout(()=>document.getElementById('edit-space-name-inp')?.focus(), 100);
+}
+
+async function saveSpaceName(id) {
+  const space = spaces.find(s=>s.id===id); if(!space) return;
+  const name = document.getElementById('edit-space-name-inp')?.value?.trim();
+  if(!name) return;
+  space.name = name;
+  document.getElementById('edit-space-dialog')?.remove();
+  localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+  renderSpacesList();
+  try {
+    await sb.from('spaces').update({name}).eq('id', id);
+    toast('✓ Название изменено');
+  } catch(e) { toast('Ошибка: '+e.message, true); }
 }
