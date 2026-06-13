@@ -85,9 +85,8 @@ function renderSpacesList() {
         </div>
         ${s.password?'<span style="font-size:16px;opacity:.5">🔒</span>':'<span style="font-size:12px;color:var(--t3)">Открыть</span>'}
       </div>
-      ${s.type==='family'?`<button onclick="getShareLink('${s.id}')" style="background:rgba(232,197,106,.15);border:1px solid rgba(232,197,106,.3);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--accent);cursor:pointer" title="Пригласить">🔗</button><button onclick="openManageMembers('${s.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--t2);cursor:pointer" title="Участники">👥</button>`:''}
-<button onclick="openEditSpace('${s.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--t2);cursor:pointer" title="Редактировать">✏️</button>utton onclick="getShareLink('${s.id}')" style="background:rgba(232,197,106,.15);border:1px solid rgba(232,197,106,.3);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--accent);cursor:pointer" title="Пригласить">🔗</button><button onclick="openManageMembers('${s.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--t2);cursor:pointer" title="Участники">✏️</button>`:''}
-    </div>`;
+${s.type==='family'?`<button onclick="getShareLink('${s.id}')" style="background:rgba(232,197,106,.15);border:1px solid rgba(232,197,106,.3);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--accent);cursor:pointer" title="Пригласить">🔗</button><button onclick="openManageMembers('${s.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--t2);cursor:pointer" title="Участники">👥</button>`:''}
+<button onclick="openEditSpace('${s.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--t2);cursor:pointer" title="Редактировать">✏️</button>
   }).join('');
 }
 function onSpaceClick(id) {
