@@ -109,7 +109,7 @@ function openView(id) {
     const colorPairs = {'#5bb87a':'#e85bb0','#a07de8':'#5bb87a','#e8c56a':'#e86060','#5b9ee8':'#e8a83a','#e85bb0':'#5bc8e8','#e86060':'#a07de8','#5bc8e8':'#e8c56a','#e8a83a':'#5b9ee8'};
     const clipColors = ['#e8c56a','#e86060','#5b9ee8','#a07de8','#e85bb0','#5bc8e8','#5bb87a','#e8a83a'];
     // Find index of last "my" sticker
-    const myLastIdx = sessions.reduce((last, s, i) => (!s.creator||s.creator===myName) ? i : last, -1);
+    const myLastIdx = sessions.reduce((first, s, i) => (first===-1 && (!s.creator||s.creator===myName)) ? i : first, -1);
 
     function stickerHTML(s, si) {
       const creator = s.creator||'';
@@ -214,7 +214,7 @@ function openImgDirect(src) {
 
 async function viewToggleEntry(cardId, entryId) {
   const card=cards.find(c=>c.id===cardId); if(!card)return;
- 
+}
   const e=(card.entries||[]).find(x=>x.id===entryId); if(!e)return;
  if(e.assigned_to && e.assigned_to !== 'all') {
   const myName = localStorage.getItem('mc_current_member')||'';
