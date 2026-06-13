@@ -360,7 +360,7 @@ div.innerHTML = `<div class="entry-cb"></div>
 </div>`:''}
     </div>
     <button onclick="this.closest('.entry-row').remove()" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:16px;padding:0 4px">✕</button>`;
-  wrap.appendChild(div);
+  wrap.prepend(div);
   setTimeout(()=>{ const ta=div.querySelector('textarea'); if(ta){ta.focus();autoResize(ta);} },50);
 }
 
