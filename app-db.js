@@ -121,7 +121,7 @@ async function loadData() {
     const [localCards, localCats] = await Promise.all([local.getAll('cards'), local.getAll('categories')]);
     if (localCards.length || localCats.length) {
       cards = localCards.sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''));
-      cats = localCats.length ? localCats : [{name:'Работа',color:'#e8c56a'},{name:'Личное',color:'#5b9ee8'},{name:'Проекты',color:'#5bb87a'}];
+      cats = localCats || [];
       render();
     } else {
       document.getElementById('scroll').innerHTML='<div class="loading"><div class="spinner"></div><span>Загрузка...</span></div>';
@@ -149,9 +149,7 @@ async function syncFromServer() {
     if(cr.data?.length) await local.putAll('cards', cr.data);
     if(kr.data?.length) await local.putAll('categories', kr.data);
     cards = cr.data||[];
-    cats = kr.data?.length ? kr.data : (currentSpace?.type==='family'
-      ? [{name:'Еда',color:'#5bb87a'},{name:'Уборка',color:'#5b9ee8'},{name:'Дети',color:'#a07de8'},{name:'Покупки',color:'#e8c56a'},{name:'Финансы',color:'#e88a3a'},{name:'Ремонт',color:'#e86060'}]
-      : [{name:'Работа',color:'#e8c56a'},{name:'Личное',color:'#5b9ee8'},{name:'Проекты',color:'#5bb87a'}]);
+    cats = kr.data || [];
     const todayStr = new Date().toISOString().slice(0,10);
 cards.forEach(c => { if(c.deadline===todayStr && !c.today) c.today = true; });
 applyCatsOrder(); setSyncDot('ok'); render(); startIntervalReminders();
