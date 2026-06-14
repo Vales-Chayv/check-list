@@ -261,7 +261,8 @@ const App = {
     if(filterCat === cat.name) filterCat = 'all';
     render();
     // Remove from DB
-    sb.from('categories').delete().eq('name', cat.name).then(()=>{});
+    const delCat = sb.from('categories').delete().eq('name', cat.name);
+    (currentSpaceId ? delCat.eq('space_id', currentSpaceId) : delCat.is('space_id', null)).then(()=>{});
     local.delete('categories', cat.name);
     toast('Рубрика удалена');
   },
