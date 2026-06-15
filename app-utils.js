@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 const today = () => new Date().toISOString().slice(0,10);
-const nowStr = () => new Date().toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+const nowStr = () => new Date().toLocaleString(langLocale(),{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
 const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const hex2rgba = (h,a) => { const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16); return `rgba(${r},${g},${b},${a})`; };
 const catColor = name => (cats.find(c=>c.name===name)||{}).color || '#666';
@@ -64,7 +64,7 @@ function applyFmt(cmd, value) {
 function fmtDate(s) {
   const d=new Date(s+'T12:00:00'),t=today(),y=new Date(Date.now()-86400000).toISOString().slice(0,10);
   if(s===t)return'Сегодня'; if(s===y)return'Вчера';
-  return d.toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
+  return d.toLocaleDateString(langLocale(),{day:'numeric',month:'long'});
 }
 
 function deadlineInfo(dl) {
