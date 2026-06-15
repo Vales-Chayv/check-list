@@ -553,6 +553,9 @@ async function deleteEntry(cardId, entryId) {
   if(!confirm('Удалить запись?')) return;
   const card = cards.find(c=>c.id===cardId); if(!card) return;
   card.entries = (card.entries||[]).filter(e=>e.id!==entryId);
+  if(!card.entries.length && confirm('Записей в карточке не осталось. Удалить карточку?')) {
+    closeView(); deleteCardById(cardId); return;
+  }
   render(); openView(cardId);
   try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
 }
