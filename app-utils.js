@@ -8,6 +8,42 @@ const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g
 const hex2rgba = (h,a) => { const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16); return `rgba(${r},${g},${b},${a})`; };
 const catColor = name => (cats.find(c=>c.name===name)||{}).color || '#666';
 
+// ─── Оформление текста записей: разрешаем только жирный/подчёркивание/цвет/размер ───
+// stripTags — убрать все теги, вернуть чистый текст (для превью карточки)
+function stripTags(html) {
+  const doc = new DOMParser().parseFromString(html || '', 'text/html');
+  return doc.body.textContent || '';
+}
+// sanitizeRich — оставить только разрешённое оформление, вырезать всё опасное (защита от XSS)
+function sanitizeRich(html) {
+  const okColor = v => /^(#[0-9a-f]{3,8}|rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)|[a-z]+)$/i.test(v);
+  const okSize  = v => /^[\d.]+(px|em|rem|%|pt)$/i.test(v);
+  const doc = new DOMParser().parseFromString(html || '', 'text/html');
+  function walk(node) {
+    let out = '';
+    node.childNodes.forEach(n => {
+      if (n.nodeType === 3) { out += esc(n.nodeValue); return; }
+      if (n.nodeType !== 1) return;
+      const tag = n.tagName;
+      if (tag === 'BR') { out += '<br>'; return; }
+      if (tag === 'B' || tag === 'STRONG') { out += '<b>' + walk(n) + '</b>'; return; }
+      if (tag === 'U') { out += '<u>' + walk(n) + '</u>'; return; }
+      if (tag === 'SPAN') {
+        let st = '';
+        const c  = n.style.getPropertyValue('color');
+        const fs = n.style.getPropertyValue('font-size');
+        if (c  && okColor(c))  st += 'color:' + c + ';';
+        if (fs && okSize(fs))  st += 'font-size:' + fs + ';';
+        out += st ? '<span style="' + st + '">' + walk(n) + '</span>' : walk(n);
+        return;
+      }
+      out += walk(n); // неразрешённый тег → оставляем только его текст
+    });
+    return out;
+  }
+  return walk(doc.body);
+}
+
 function fmtDate(s) {
   const d=new Date(s+'T12:00:00'),t=today(),y=new Date(Date.now()-86400000).toISOString().slice(0,10);
   if(s===t)return'Сегодня'; if(s===y)return'Вчера';
