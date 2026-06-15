@@ -25,11 +25,6 @@ async function initSpaces() {
     }
     const {data, error} = await query;
     if(error) throw error;
-	// Стартовые рубрики нового кабинета — записываем в базу как реальные
-    const defaultCats = type === 'family'
-      ? [{name:'Еда',color:'#5bb87a'},{name:'Уборка',color:'#5b9ee8'},{name:'Дети',color:'#a07de8'},{name:'Покупки',color:'#e8c56a'},{name:'Финансы',color:'#e88a3a'},{name:'Ремонт',color:'#e86060'}]
-      : [{name:'Работа',color:'#e8c56a'},{name:'Личное',color:'#5b9ee8'},{name:'Проекты',color:'#5bb87a'}];
-    await sb.from('categories').insert(defaultCats.map(c => ({...c, space_id: id})));
     spaces = data || [];
  } catch(e) {
     const saved = JSON.parse(localStorage.getItem('mc_spaces')||'[]');
@@ -199,6 +194,11 @@ async function createSpace() {
   try {
     const {error} = await sb.from('spaces').insert(space);
     if(error) throw error;
+    // Стартовые рубрики нового кабинета — записываем в базу как реальные
+    const defaultCats = type === 'family'
+      ? [{name:'Еда',color:'#5bb87a'},{name:'Уборка',color:'#5b9ee8'},{name:'Дети',color:'#a07de8'},{name:'Покупки',color:'#e8c56a'},{name:'Финансы',color:'#e88a3a'},{name:'Ремонт',color:'#e86060'}]
+      : [{name:'Работа',color:'#e8c56a'},{name:'Личное',color:'#5b9ee8'},{name:'Проекты',color:'#5bb87a'}];
+    await sb.from('categories').insert(defaultCats.map(c => ({...c, space_id: id})));
     spaces.push(space);
     localStorage.setItem('mc_spaces', JSON.stringify(spaces));
     closeCreateSpace();
