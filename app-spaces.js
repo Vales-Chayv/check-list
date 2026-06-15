@@ -270,7 +270,8 @@ async function deleteSpace(id) {
     await sb.from('spaces').delete().eq('id', id);
     spaces = spaces.filter(s=>s.id!==id);
     localStorage.setItem('mc_spaces', JSON.stringify(spaces));
-    document.getElementById('manage-members-ov').classList.remove('on');
+document.getElementById('edit-space-dialog')?.remove();
+    document.getElementById('manage-members-ov')?.classList.remove('on');
     if(currentSpaceId===id) switchSpace();
     else renderSpacesList();
     toast('✓ Кабинет удалён');
