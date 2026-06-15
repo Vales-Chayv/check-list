@@ -268,7 +268,7 @@ function renderEntriesEdit() {
   const entryRowHTML = (e) => `<div class="entry-row">
     <div class="entry-cb${e.done?' on':''}" onclick="toggleEditEntry('${e.id}')">${e.done?checkSVG():''}</div>
     <div style="flex:1">
-      <textarea class="entry-textarea" oninput="autoResize(this);updateEntry('${e.id}',this.value)" placeholder="Текст записи..." dir="auto">${esc(e.text)}</textarea>
+      <div class="entry-textarea" contenteditable="true" oninput="updateEntry('${e.id}',this.innerHTML)" dir="auto">${sanitizeRich(e.text)}</div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:3px">
         <div class="entry-date" style="flex:1">${e.date}</div>
         <input type="date" value="${e.deadline||''}" onchange="updateEntryDeadline('${e.id}',this.value)"
@@ -283,18 +283,28 @@ function renderEntriesEdit() {
     <button class="entry-del" onclick="rmEntry('${e.id}')">✕</button>
   </div>`;
 
+  const fmtBar = `<div style="display:flex;gap:6px;margin:2px 0 6px;flex-wrap:wrap;align-items:center">
+    <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('bold')" title="Жирный" style="background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:5px 9px;color:var(--t1);cursor:pointer;font-family:inherit;font-size:13px;min-width:30px"><b>Ж</b></button>
+    <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('underline')" title="Подчеркнуть" style="background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:5px 9px;color:var(--t1);cursor:pointer;font-family:inherit;font-size:13px;min-width:30px"><u>Ч</u></button>
+    <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('fontSize','5')" title="Крупнее" style="background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:5px 9px;color:var(--t1);cursor:pointer;font-family:inherit;font-size:13px;min-width:30px">A↑</button>
+    <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('foreColor','#e8c56a')" title="Жёлтый" style="width:20px;height:20px;border-radius:50%;border:1px solid var(--b1);cursor:pointer;padding:0;background:#e8c56a"></button>
+    <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('foreColor','#e86060')" title="Красный" style="width:20px;height:20px;border-radius:50%;border:1px solid var(--b1);cursor:pointer;padding:0;background:#e86060"></button>
+    <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('foreColor','#5bb87a')" title="Зелёный" style="width:20px;height:20px;border-radius:50%;border:1px solid var(--b1);cursor:pointer;padding:0;background:#5bb87a"></button>
+    <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('foreColor','#5b9ee8')" title="Синий" style="width:20px;height:20px;border-radius:50%;border:1px solid var(--b1);cursor:pointer;padding:0;background:#5b9ee8"></button>
+    <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('foreColor','#a07de8')" title="Фиолетовый" style="width:20px;height:20px;border-radius:50%;border:1px solid var(--b1);cursor:pointer;padding:0;background:#a07de8"></button>
+    <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('removeFormat')" title="Убрать оформление" style="background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:5px 9px;color:var(--t2);cursor:pointer;font-family:inherit;font-size:13px;min-width:30px">⌫</button>
+  </div>`;
+
   if(existing.length) {
     wrap.style.display='block';
     el.innerHTML=existing.map(entryRowHTML).join('');
-    el.querySelectorAll('.entry-textarea').forEach(t=>autoResize(t));
   } else {
     wrap.style.display='none';
     el.innerHTML='';
   }
 
   if(newEntries.length) {
-    newArea.innerHTML=`<div style="background:var(--s2);border-radius:var(--rsm);padding:2px 12px;margin-bottom:4px">${newEntries.map(entryRowHTML).join('')}</div>`;
-    newArea.querySelectorAll('.entry-textarea').forEach(t=>autoResize(t));
+    newArea.innerHTML=`<div style="background:var(--s2);border-radius:var(--rsm);padding:8px 12px;margin-bottom:4px">${fmtBar}${newEntries.map(entryRowHTML).join('')}</div>`;
   } else {
     newArea.innerHTML='';
   }
@@ -364,7 +374,7 @@ async function saveCard() {
   if(!editId) hist.push({date:nowStr(),text:'Карточка создана',type:'created'});
   else if(oldStatus&&oldStatus!==newStatus) hist.push({date:nowStr(),text:`Статус: ${ST_LABELS[oldStatus]} → ${ST_LABELS[newStatus]}`,type:'status'});
   else hist.push({date:nowStr(),text:'Обновлено',type:'note'});
-  const cleanEntries=tempEntries.filter(e=>e.text.trim()).map(({_saved,...e})=>e);
+  const cleanEntries=tempEntries.map(({_saved,...e})=>({...e,text:sanitizeRich(e.text)})).filter(e=>stripTags(e.text).trim());
   let finalStatus=isFamily ? 'new' : newStatus;
   if(cleanEntries.length>0&&cleanEntries.every(e=>e.done)) finalStatus='done';
 
