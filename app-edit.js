@@ -19,7 +19,7 @@ function openEdit(id) {
 
   document.getElementById('edit-title').textContent=card?'Редактировать':'Новая карточка';
   document.getElementById('e-title').value=card?.title||'';
-document.getElementById('e-body').closest('.fld').style.display = 'flex';
+document.getElementById('e-body').closest('.fld').style.display = isFamily ? 'flex' : 'none';
   document.getElementById('e-body').value=card?.body||'';
   document.getElementById('e-priority').value=card?.priority||'normal';
   populateCatSel(card?.category);
