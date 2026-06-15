@@ -554,7 +554,18 @@ function editEntry(cardId, entryId) {
 div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:420px">
     <div style="font-size:16px;font-weight:700;margin-bottom:12px">Редактировать запись</div>
-    <textarea id="edit-entry-txt" dir="auto" style="width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px;font-size:15px;color:var(--t1);font-family:inherit;resize:none;min-height:80px">${esc(entry.text)}</textarea>
+    <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
+      <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('bold')" title="Жирный" style="background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:6px 10px;color:var(--t1);cursor:pointer;font-family:inherit;font-size:14px;min-width:32px"><b>Ж</b></button>
+      <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('underline')" title="Подчеркнуть" style="background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:6px 10px;color:var(--t1);cursor:pointer;font-family:inherit;font-size:14px;min-width:32px"><u>Ч</u></button>
+      <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('fontSize','5')" title="Крупнее" style="background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:6px 10px;color:var(--t1);cursor:pointer;font-family:inherit;font-size:14px;min-width:32px">A↑</button>
+      <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('foreColor','#e8c56a')" title="Жёлтый" style="width:22px;height:22px;border-radius:50%;border:1px solid var(--b1);cursor:pointer;padding:0;background:#e8c56a"></button>
+      <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('foreColor','#e86060')" title="Красный" style="width:22px;height:22px;border-radius:50%;border:1px solid var(--b1);cursor:pointer;padding:0;background:#e86060"></button>
+      <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('foreColor','#5bb87a')" title="Зелёный" style="width:22px;height:22px;border-radius:50%;border:1px solid var(--b1);cursor:pointer;padding:0;background:#5bb87a"></button>
+      <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('foreColor','#5b9ee8')" title="Синий" style="width:22px;height:22px;border-radius:50%;border:1px solid var(--b1);cursor:pointer;padding:0;background:#5b9ee8"></button>
+      <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('foreColor','#a07de8')" title="Фиолетовый" style="width:22px;height:22px;border-radius:50%;border:1px solid var(--b1);cursor:pointer;padding:0;background:#a07de8"></button>
+      <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('removeFormat')" title="Убрать оформление" style="background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:6px 10px;color:var(--t2);cursor:pointer;font-family:inherit;font-size:14px;min-width:32px">⌫</button>
+    </div>
+    <div id="edit-entry-txt" contenteditable="true" dir="auto" style="width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px;font-size:15px;color:var(--t1);font-family:inherit;min-height:80px;outline:none;overflow-wrap:break-word;word-break:break-word">${sanitizeRich(entry.text)}</div>
     <div style="margin-top:8px">
       <label style="font-size:12px;color:var(--t2)">Срок выполнения</label>
       <input type="date" id="edit-entry-dl" value="${entry.deadline||''}" style="width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:8px;font-size:14px;color:var(--t1);font-family:inherit;margin-top:4px">
@@ -571,8 +582,9 @@ div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2
 async function saveEntryEdit(cardId, entryId) {
   const card = cards.find(c=>c.id===cardId); if(!card) return;
   const entry = (card.entries||[]).find(e=>e.id===entryId); if(!entry) return;
-  const txt = document.getElementById('edit-entry-txt')?.value?.trim();
-  if(!txt) return;
+  const el = document.getElementById('edit-entry-txt');
+  const txt = sanitizeRich(el?.innerHTML || '');
+  if(!stripTags(txt).trim()) return;
   entry.text = txt;
   const dl = document.getElementById('edit-entry-dl')?.value;
 entry.deadline = dl || null;
