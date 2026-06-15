@@ -263,7 +263,6 @@ function openAddEntry(cardId, sessionId = null, hideNote = false) {
     catSel.innerHTML = cats.map(c=>`<option value="${esc(c.name)}"${c.name===card.category?' selected':''}>${esc(c.name)}</option>`).join('');
     document.getElementById('ae-status').value = card.status||'new';
     document.getElementById('ae-priority').value = card.priority||'normal';
-    document.getElementById('ae-deadline').value = card.deadline||'';
     document.querySelectorAll('#ae-seg-ball .seg-btn').forEach(b=>b.classList.toggle('on', b.dataset.ball===(card.ball||'')));
   }
 
@@ -411,13 +410,13 @@ completions: completions,
     });
   });
   card.entries = [...sessionEntries, ...(card.entries||[])];
+  card.deadline = ([...(card.entries||[])].filter(e=>!e.done&&e.deadline).map(e=>e.deadline).sort()[0])||null;
 
   // Save extra settings if expanded
   if(document.getElementById('ae-extra').style.display !== 'none') {
     card.category = document.getElementById('ae-cat').value;
     card.status = document.getElementById('ae-status').value;
     card.priority = document.getElementById('ae-priority').value;
-    card.deadline = document.getElementById('ae-deadline').value || null;
     const ballBtn = document.querySelector('#ae-seg-ball .seg-btn.on');
     if(ballBtn) card.ball = ballBtn.dataset.ball;
   }
