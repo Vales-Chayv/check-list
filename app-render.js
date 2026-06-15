@@ -81,8 +81,14 @@ function renderCards() {
   el.innerHTML=html;
 }
 function renderToday() {
+	function isCardOverdue(c) {
+  const ent = c.entries || [];
+  const dls = [c.deadline, ...ent.filter(e=>!e.done).map(e=>e.deadline)].filter(Boolean).sort();
+  const info = dls.length ? deadlineInfo(dls[0]) : null;
+  return !!(info && info.days < 0);
+}
   const el = document.getElementById('scroll');
-  const todayCards = applyMemberFilter(cards.filter(c=>c.today && c.status!=='done'));
+  const todayCards = applyMemberFilter(cards.filter(c=>(c.today || isCardOverdue(c)) && c.status!=='done'));
   if(!todayCards.length) { el.innerHTML = emptyHTML('Нет задач на сегодня', 'Добавь карточки кнопкой ☆ На сегодня'); return; }
   const PO = {urgent:0, high:1, normal:2};
   const priority = todayCards.filter(c=>c.priority==='urgent'||c.priority==='high')
