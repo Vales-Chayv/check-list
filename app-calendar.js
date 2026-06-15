@@ -8,6 +8,7 @@ let calFilterMember = 'all';
 let calFilterPriority = 'all';
 let calSpaceId = 'current';
 let calAllCards = [];
+let calEnabledCats = new Set(); // включённые пары «кабинет‖рубрика» (множественный выбор)
 
 const CAL_DAYS_RU = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 const CAL_MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
@@ -23,7 +24,8 @@ async function openCalendar() {
     const ids = spaces.map(s=>s.id);
     const {data} = await sb.from('cards').select('*').in('space_id', ids).not('deadline','is',null);
     calAllCards = data||[];
-  } catch(e) { calAllCards = [...cards]; }
+} catch(e) { calAllCards = [...cards]; }
+  calEnableAll();
   renderCalFilters();
   renderCalendar();
 }
@@ -121,12 +123,19 @@ function calSetFilter(type, value, btn) {
 }
 
 // ─── CARD FILTERING ──────────────────────────
+// Ключ пары «кабинет‖рубрика» — различает одинаковые имена рубрик в разных кабинетах
+function calCatKey(spaceId, cat) { return spaceId + '||' + (cat || ''); }
+
+// По умолчанию включаем все кабинеты и все рубрики, что встречаются в карточках
+function calEnableAll() {
+  calEnabledCats = new Set(calAllCards.map(c => calCatKey(c.space_id, c.category)));
+}
+
 function getCalCards() {
-  const source = calSpaceId === 'all' ? calAllCards : calSpaceId === 'current' ? calAllCards.filter(c=>c.space_id===currentSpaceId) : calAllCards.filter(c=>c.space_id===calSpaceId);
-  return source.filter(c => {
+  return calAllCards.filter(c => {
     if(c.status === 'done') return false;
     if(!c.deadline) return false;
-    if(calFilterCat !== 'all' && c.category !== calFilterCat) return false;
+    if(!calEnabledCats.has(calCatKey(c.space_id, c.category))) return false;
     if(calFilterMember !== 'all' && c.assigned_to !== calFilterMember) return false;
     if(calFilterPriority !== 'all' && c.priority !== calFilterPriority) return false;
     return true;
