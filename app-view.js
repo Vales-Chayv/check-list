@@ -93,7 +93,7 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
         <div class="swipe-content" data-cardid="${id}" data-entryid="${e.id}" style="position:relative;display:flex;align-items:flex-start;gap:8px;padding:5px 0;background:transparent;will-change:transform;transition:transform .2s">
           ${checkboxHTML}
           <div style="flex:1">
-            <div style="font-size:13px;color:${col};${e.done?'text-decoration:line-through;opacity:.5':''};word-break:break-word;overflow-wrap:break-word" dir="auto">${esc(e.text)}</div>
+            <div style="font-size:13px;color:${col};${e.done?'text-decoration:line-through;opacity:.5':''};word-break:break-word;overflow-wrap:break-word" dir="auto">${sanitizeRich(e.text)}</div>
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
               <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                 <div style="font-size:10px;color:${dateCol};margin-top:1px">${e.date}</div>
