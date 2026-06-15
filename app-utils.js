@@ -32,8 +32,21 @@ function sanitizeRich(html) {
         let st = '';
         const c  = n.style.getPropertyValue('color');
         const fs = n.style.getPropertyValue('font-size');
+        const fw = n.style.getPropertyValue('font-weight');
+        const td = n.style.getPropertyValue('text-decoration');
         if (c  && okColor(c))  st += 'color:' + c + ';';
         if (fs && okSize(fs))  st += 'font-size:' + fs + ';';
+        if (fw && /^(bold|[6-9]00)$/i.test(fw)) st += 'font-weight:bold;';
+        if (td && /underline/i.test(td))        st += 'text-decoration:underline;';
+        out += st ? '<span style="' + st + '">' + walk(n) + '</span>' : walk(n);
+        return;
+      }
+      if (tag === 'FONT') {
+        let st = '';
+        const c  = n.getAttribute('color');
+        const sz = n.getAttribute('size');
+        if (c && okColor(c)) st += 'color:' + c + ';';
+        if (sz)              st += 'font-size:1.3em;';
         out += st ? '<span style="' + st + '">' + walk(n) + '</span>' : walk(n);
         return;
       }
@@ -42,6 +55,10 @@ function sanitizeRich(html) {
     return out;
   }
   return walk(doc.body);
+}
+// applyFmt — применить оформление к выделению в contenteditable (встроенный движок браузера)
+function applyFmt(cmd, value) {
+  document.execCommand(cmd, false, value || null);
 }
 
 function fmtDate(s) {
