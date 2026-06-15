@@ -351,7 +351,18 @@ function aeAddEntryRow() {
   div.className = 'entry-row';
 div.innerHTML = `<div class="entry-cb"></div>
     <div style="flex:1">
-      <textarea dir="auto" placeholder="Текст записи..." oninput="autoResize(this)" style="background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t1);font-size:14px;font-family:inherit;resize:none;min-height:36px;line-height:1.6;width:100%;padding:4px 0"></textarea>
+      <div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;align-items:center">
+        <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('bold')" title="Жирный" style="background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:5px 9px;color:var(--t1);cursor:pointer;font-family:inherit;font-size:13px;min-width:30px"><b>Ж</b></button>
+        <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('underline')" title="Подчеркнуть" style="background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:5px 9px;color:var(--t1);cursor:pointer;font-family:inherit;font-size:13px;min-width:30px"><u>Ч</u></button>
+        <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('fontSize','5')" title="Крупнее" style="background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:5px 9px;color:var(--t1);cursor:pointer;font-family:inherit;font-size:13px;min-width:30px">A↑</button>
+        <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('foreColor','#e8c56a')" title="Жёлтый" style="width:20px;height:20px;border-radius:50%;border:1px solid var(--b1);cursor:pointer;padding:0;background:#e8c56a"></button>
+        <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('foreColor','#e86060')" title="Красный" style="width:20px;height:20px;border-radius:50%;border:1px solid var(--b1);cursor:pointer;padding:0;background:#e86060"></button>
+        <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('foreColor','#5bb87a')" title="Зелёный" style="width:20px;height:20px;border-radius:50%;border:1px solid var(--b1);cursor:pointer;padding:0;background:#5bb87a"></button>
+        <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('foreColor','#5b9ee8')" title="Синий" style="width:20px;height:20px;border-radius:50%;border:1px solid var(--b1);cursor:pointer;padding:0;background:#5b9ee8"></button>
+        <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('foreColor','#a07de8')" title="Фиолетовый" style="width:20px;height:20px;border-radius:50%;border:1px solid var(--b1);cursor:pointer;padding:0;background:#a07de8"></button>
+        <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('removeFormat')" title="Убрать оформление" style="background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:5px 9px;color:var(--t2);cursor:pointer;font-family:inherit;font-size:13px;min-width:30px">⌫</button>
+      </div>
+      <div class="ae-entry-edit" contenteditable="true" dir="auto" style="background:transparent;border:none;border-bottom:1px solid var(--b1);color:var(--t1);font-size:14px;font-family:inherit;min-height:36px;line-height:1.6;width:100%;padding:4px 0;outline:none;overflow-wrap:break-word;word-break:break-word"></div>
       ${currentSpace?.type==='family'?`<div style="margin-top:6px">
   <div style="font-size:11px;color:rgba(var(--t2-rgb),.7);margin-bottom:4px">Назначить:</div>
   <div style="display:flex;flex-wrap:wrap;gap:4px">
@@ -363,7 +374,7 @@ div.innerHTML = `<div class="entry-cb"></div>
     </div>
     <button onclick="this.closest('.entry-row').remove()" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:16px;padding:0 4px">✕</button>`;
   wrap.prepend(div);
-  setTimeout(()=>{ const ta=div.querySelector('textarea'); if(ta){ta.focus();autoResize(ta);} },50);
+  setTimeout(()=>{ const ta=div.querySelector('.ae-entry-edit'); if(ta){ta.focus();} },50);
 }
 
 async function saveAddEntry() {
@@ -373,7 +384,7 @@ async function saveAddEntry() {
 
   const sessionNote = (document.getElementById('ae-note')?.value||'').trim();
   const entryRows = document.getElementById('ae-entries-list')?.querySelectorAll('.entry-row')||[];
-  const entryTexts = [...entryRows].map(r=>r.querySelector('textarea')?.value?.trim()).filter(Boolean);
+  const entryTexts = [...entryRows].map(r=>sanitizeRich(r.querySelector('.ae-entry-edit')?.innerHTML||'')).filter(t=>stripTags(t).trim());
   if(!sessionNote && !entryTexts.length && !aeAtts.length) { toast('Введи заметку или добавь запись', true); return; }
   const card = cards.find(c => c.id === aeCardId); if (!card) return;
 
