@@ -25,7 +25,7 @@ async function openCalendar() {
     const ids = spaces.map(s=>s.id);
     const {data} = await sb.from('cards').select('*').in('space_id', ids).not('deadline','is',null);
     calAllCards = data||[];
-  } catch(e) { calAllCards = [...cards]; }
+} catch(e) { calAllCards = [...cards]; }
   try {
     const {data:catData} = await sb.from('categories').select('name,color,space_id').in('space_id', spaces.map(s=>s.id));
     calCatColors = {};
@@ -86,13 +86,13 @@ function renderCalFilters() {
 
   cabs.forEach(cab => {
     const sp = spaces.find(s => s.id === cab.spaceId);
-    const icon = sp && sp.type === 'family' ? '\U0001F468\u200D\U0001F469\u200D\U0001F467' : '\U0001F5C2\uFE0F';
+    const icon = sp && sp.type === 'family' ? '👨‍👩‍👧' : '🗂️';
     const cabOn = cab.rubrics.some(r => calEnabledCats.has(r.key));
     html += `<div style="width:1px;background:var(--b1);flex-shrink:0;margin:2px 4px"></div>`;
     html += `<button data-sp="${esc(cab.spaceId)}" onclick="calToggleCabinet(this.dataset.sp)" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--t1);opacity:${cabOn?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0;font-weight:500">${icon} ${esc(cab.spaceName)}</button>`;
     cab.rubrics.forEach(r => {
       const on = calEnabledCats.has(r.key);
-      html += `<button data-key="${esc(r.key)}" onclick="calToggleRubric(this.dataset.key)" style="background:${on?hex2rgba(r.color,.18):'var(--s2)'};border:1px solid ${on?hex2rgba(r.color,.5):'var(--b1)'};border-radius:14px;padding:4px 10px;font-size:12px;color:${on?r.color:'var(--t3)'};opacity:${on?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${r.color};margin-right:4px"></span>${esc(r.name||'\u2014')}</button>`;
+      html += `<button data-key="${esc(r.key)}" onclick="calToggleRubric(this.dataset.key)" style="background:${on?hex2rgba(r.color,.18):'var(--s2)'};border:1px solid ${on?hex2rgba(r.color,.5):'var(--b1)'};border-radius:14px;padding:4px 10px;font-size:12px;color:${on?r.color:'var(--t3)'};opacity:${on?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${r.color};margin-right:4px"></span>${esc(r.name||'—')}</button>`;
     });
   });
 
@@ -101,17 +101,18 @@ function renderCalFilters() {
     html += `<button onclick="calSetFilter('member','all')" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 10px;font-size:12px;color:${calFilterMember==='all'?'var(--t1)':'var(--t3)'};opacity:${calFilterMember==='all'?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0">${t('Все участники')}</button>`;
     members.forEach(m => {
       const on = calFilterMember === m;
-      html += `<button onclick="calSetFilter('member','${esc(m)}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 10px;font-size:12px;color:${on?'var(--t1)':'var(--t3)'};opacity:${on?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0">\U0001F464 ${esc(m)}</button>`;
+      html += `<button onclick="calSetFilter('member','${esc(m)}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 10px;font-size:12px;color:${on?'var(--t1)':'var(--t3)'};opacity:${on?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0">👤 ${esc(m)}</button>`;
     });
   }
 
   html += `<div style="width:1px;background:var(--b1);flex-shrink:0;margin:2px 4px"></div>`;
   html += `<button onclick="calSetFilter('priority','all')" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 10px;font-size:12px;color:${calFilterPriority==='all'?'var(--t1)':'var(--t3)'};opacity:${calFilterPriority==='all'?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0">${t('Все приоритеты')}</button>`;
-  html += `<button onclick="calSetFilter('priority','urgent')" style="background:rgba(232,96,96,.15);border:1px solid rgba(232,96,96,.4);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--red);opacity:${calFilterPriority==='urgent'?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0">\U0001F525 ${t('Срочные')}</button>`;
-  html += `<button onclick="calSetFilter('priority','high')" style="background:rgba(232,197,106,.15);border:1px solid rgba(232,197,106,.4);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--accent);opacity:${calFilterPriority==='high'?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0">\u26A1 ${t('Важные')}</button>`;
+  html += `<button onclick="calSetFilter('priority','urgent')" style="background:rgba(232,96,96,.15);border:1px solid rgba(232,96,96,.4);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--red);opacity:${calFilterPriority==='urgent'?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0">🔥 ${t('Срочные')}</button>`;
+  html += `<button onclick="calSetFilter('priority','high')" style="background:rgba(232,197,106,.15);border:1px solid rgba(232,197,106,.4);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--accent);opacity:${calFilterPriority==='high'?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0">⚡ ${t('Важные')}</button>`;
 
   el.innerHTML = html;
 }
+
 
 function calSetFilter(type, value) {
   if(type === 'member') calFilterMember = value;
@@ -151,7 +152,6 @@ function calCatKey(spaceId, cat) { return spaceId + '||' + (cat || ''); }
 function calEnableAll() {
   calEnabledCats = new Set(calAllCards.map(c => calCatKey(c.space_id, c.category)));
 }
-
 // Структура для фильтра: список кабинетов, у каждого — его рубрики (из реальных карточек)
 function calCabinetRubrics() {
   const map = {};
