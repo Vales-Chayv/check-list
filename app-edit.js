@@ -21,7 +21,6 @@ function openEdit(id) {
   document.getElementById('e-title').value=card?.title||'';
 document.getElementById('e-body').closest('.fld').style.display = 'flex';
   document.getElementById('e-body').value=card?.body||'';
-  document.getElementById('e-deadline').value=card?.deadline||'';
   document.getElementById('e-priority').value=card?.priority||'normal';
   populateCatSel(card?.category);
 
@@ -64,7 +63,7 @@ function getState() {
   return JSON.stringify({
     title:document.getElementById('e-title')?.value||'',
     body:document.getElementById('e-body')?.value||'',
-    entries:tempEntries, deadline:document.getElementById('e-deadline')?.value||''
+    entries:tempEntries
   });
 }
 
@@ -301,8 +300,7 @@ function renderEntriesEdit() {
   }
 }
 function addEntry() {
-  const cardDeadline = document.getElementById('e-deadline')?.value || null;
-  tempEntries.unshift({id:uid(),text:'',date:nowStr(),done:false,_saved:false,deadline:cardDeadline});
+  tempEntries.unshift({id:uid(),text:'',date:nowStr(),done:false,_saved:false,deadline:null});
   renderEntriesEdit();
   setTimeout(()=>{const ta=document.querySelector('#e-new-entry-area .entry-textarea');if(ta)ta.focus();},50);
 }
@@ -400,7 +398,7 @@ async function saveCard() {
   const data={
     title, body: isFamily&&!editId ? '' : bodyVal, category:catVal,
     status:finalStatus, priority:document.getElementById('e-priority').value||'normal',
-    deadline:document.getElementById('e-deadline').value||null,
+    deadline:([...tempEntries].filter(e=>!e.done&&e.deadline).map(e=>e.deadline).sort()[0])||null,
     ball:isFamily?'':ballVal,
     assigned_to:assignedTo,
     attachments: isFamily&&!editId ? [] : tempAtt,
