@@ -9,6 +9,7 @@ let calFilterPriority = 'all';
 let calSpaceId = 'current';
 let calAllCards = [];
 let calEnabledCats = new Set(); // включённые пары «кабинет‖рубрика» (множественный выбор)
+let calCatColors = {}; // цвета рубрик всех кабинетов: ключ «кабинет‖рубрика» → цвет
 
 const CAL_DAYS_RU = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 const CAL_MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
@@ -25,6 +26,11 @@ async function openCalendar() {
     const {data} = await sb.from('cards').select('*').in('space_id', ids).not('deadline','is',null);
     calAllCards = data||[];
 } catch(e) { calAllCards = [...cards]; }
+  try {
+    const {data:catData} = await sb.from('categories').select('name,color,space_id').in('space_id', spaces.map(s=>s.id));
+    calCatColors = {};
+    (catData||[]).forEach(c => { calCatColors[calCatKey(c.space_id, c.name)] = c.color; });
+  } catch(e) { calCatColors = {}; }
   calEnableAll();
   renderCalFilters();
   renderCalendar();
@@ -129,6 +135,23 @@ function calCatKey(spaceId, cat) { return spaceId + '||' + (cat || ''); }
 // По умолчанию включаем все кабинеты и все рубрики, что встречаются в карточках
 function calEnableAll() {
   calEnabledCats = new Set(calAllCards.map(c => calCatKey(c.space_id, c.category)));
+}
+// Структура для фильтра: список кабинетов, у каждого — его рубрики (из реальных карточек)
+function calCabinetRubrics() {
+  const map = {};
+  calAllCards.forEach(c => {
+    if(!map[c.space_id]) map[c.space_id] = new Set();
+    map[c.space_id].add(c.category || '');
+  });
+  return Object.keys(map).map(spaceId => {
+    const sp = spaces.find(s => s.id === spaceId);
+    const rubrics = [...map[spaceId]].sort().map(name => ({
+      name,
+      key: calCatKey(spaceId, name),
+      color: calCatColors[calCatKey(spaceId, name)] || '#888'
+    }));
+    return { spaceId, spaceName: sp ? sp.name : 'Кабинет', rubrics };
+  });
 }
 
 function getCalCards() {
