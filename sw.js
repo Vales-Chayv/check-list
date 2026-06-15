@@ -1,9 +1,10 @@
-const CACHE = 'mc-v10';
+const CACHE = 'mc-v11';
 const APP_FILES = [
   '/check-list/',
   '/check-list/index.html',
   '/check-list/style.css',
   '/check-list/app-config.js',
+  '/check-list/app-i18n.js',
   '/check-list/app-auth.js',
   '/check-list/app-spaces.js',
   '/check-list/app-db.js',
