@@ -94,7 +94,7 @@ const allKeys = cabs.flatMap(c => c.rubrics.map(r => r.key));
     const sp = spaces.find(s => s.id === cab.spaceId);
     const icon = sp && sp.type === 'family' ? '👨‍👩‍👧' : '🗂️';
     html += `<div style="width:1px;background:var(--b1);flex-shrink:0;margin:2px 4px"></div>`;
-    html += `<button data-sp="${esc(cab.spaceId)}" onclick="calToggleCabShown(this.dataset.sp)" title="${t('Убрать из фильтра')}" style="background:none;border:none;font-size:12px;color:var(--t2);font-weight:500;white-space:nowrap;flex-shrink:0;cursor:pointer;padding:4px 2px">${icon} ${esc(cab.spaceName)} ✕</button>`;
+    html += `<button data-sp="${esc(cab.spaceId)}" onclick="calToggleCabShown(this.dataset.sp)" title="${t('Убрать из фильтра')}" style="background:var(--s2);border:1px solid var(--accent);border-radius:14px;padding:4px 12px;font-size:12px;color:var(--accent);font-weight:600;white-space:nowrap;flex-shrink:0;cursor:pointer">${icon} ${esc(cab.spaceName)}</button>`;
     cab.rubrics.forEach(r => {
       const on = calEnabledCats.has(r.key);
       html += `<button data-key="${esc(r.key)}" onclick="calToggleRubric(this.dataset.key)" style="background:${on?hex2rgba(r.color,.18):'var(--s2)'};border:1px solid ${on?hex2rgba(r.color,.5):'var(--b1)'};border-radius:14px;padding:4px 10px;font-size:12px;color:${on?r.color:'var(--t3)'};opacity:${on?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${r.color};margin-right:4px"></span>${esc(r.name||'—')}</button>`;
@@ -229,9 +229,11 @@ function calCabinetRubrics() {
 }
 
 function getCalCards() {
+  const hasCabFilter = calShownCabs.size > 0;
   return calAllCards.filter(c => {
     if(c.status === 'done') return false;
     if(!c.deadline) return false;
+    if(hasCabFilter && !calShownCabs.has(c.space_id)) return false;
     if(!calEnabledCats.has(calCatKey(c.space_id, c.category))) return false;
     if(calFilterMember !== 'all' && c.assigned_to !== calFilterMember) return false;
     if(calFilterPriority !== 'all' && c.priority !== calFilterPriority) return false;
