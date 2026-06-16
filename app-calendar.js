@@ -85,11 +85,10 @@ function renderCalFilters() {
   const cabs = calCabinetRubrics();
 
   let html = '';
-  html += `<button onclick="calSetAllCats(true)" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--t1);cursor:pointer;white-space:nowrap;flex-shrink:0">${t('Все')}</button>`;
-  html += `<button onclick="calSetAllCats(false)" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--t2);cursor:pointer;white-space:nowrap;flex-shrink:0">${t('Никакие')}</button>`;
-
-const allKeys = cabs.flatMap(c => c.rubrics.map(r => r.key));
+ const allKeys = cabs.flatMap(c => c.rubrics.map(r => r.key));
   const onCount = allKeys.filter(k => calEnabledCats.has(k)).length;
+  const allOn = allKeys.length > 0 && onCount === allKeys.length;
+  html += `<button onclick="calSetAllCats(${!allOn})" style="background:${allOn?'rgba(232,197,106,.18)':'var(--s2)'};border:1px solid ${allOn?'var(--accent)':'var(--b1)'};border-radius:14px;padding:4px 10px;font-size:12px;color:${allOn?'var(--accent)':'var(--t3)'};opacity:${allOn?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0">${t('Все')}</button>`;
   html += `<button id="cal-cab-btn" onclick="openCabinetPanel()" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 12px;font-size:12px;color:var(--t1);cursor:pointer;white-space:nowrap;flex-shrink:0;font-weight:500">🗂️ ${t('Кабинеты')}${onCount<allKeys.length?` (${onCount}/${allKeys.length})`:''}</button>`;
   cabs.forEach(cab => {
     if(!calShownCabs.has(cab.spaceId)) return;
