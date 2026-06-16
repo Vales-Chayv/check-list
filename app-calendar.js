@@ -94,7 +94,7 @@ const allKeys = cabs.flatMap(c => c.rubrics.map(r => r.key));
     const sp = spaces.find(s => s.id === cab.spaceId);
     const icon = sp && sp.type === 'family' ? '👨‍👩‍👧' : '🗂️';
     html += `<div style="width:1px;background:var(--b1);flex-shrink:0;margin:2px 4px"></div>`;
-    html += `<span style="font-size:12px;color:var(--t2);font-weight:500;white-space:nowrap;flex-shrink:0;align-self:center">${icon} ${esc(cab.spaceName)}</span>`;
+    html += `<button data-sp="${esc(cab.spaceId)}" onclick="calToggleCabShown(this.dataset.sp)" title="${t('Убрать из фильтра')}" style="background:none;border:none;font-size:12px;color:var(--t2);font-weight:500;white-space:nowrap;flex-shrink:0;cursor:pointer;padding:4px 2px">${icon} ${esc(cab.spaceName)} ✕</button>`;
     cab.rubrics.forEach(r => {
       const on = calEnabledCats.has(r.key);
       html += `<button data-key="${esc(r.key)}" onclick="calToggleRubric(this.dataset.key)" style="background:${on?hex2rgba(r.color,.18):'var(--s2)'};border:1px solid ${on?hex2rgba(r.color,.5):'var(--b1)'};border-radius:14px;padding:4px 10px;font-size:12px;color:${on?r.color:'var(--t3)'};opacity:${on?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${r.color};margin-right:4px"></span>${esc(r.name||'—')}</button>`;
