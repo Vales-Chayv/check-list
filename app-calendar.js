@@ -12,6 +12,7 @@ let calEnabledCats = new Set(); // включённые пары «кабине�
 let calCatColors = {}; // цвета рубрик всех кабинетов: ключ «кабинет‖рубрика» → цвет
 let calOpenCab = null; // какой кабинет развёрнут в панели (аккордеон)
 let calShownCabs = new Set(); // кабинеты, вынесенные чипсами в верхнюю строку
+let calPrioOpen = false; // развёрнуты ли кнопки приоритетов (🔥/⚡)
 let calFromLobby = false; // календарь открыт с экрана кабинетов → вернуться туда при закрытии
 
 const CAL_DAYS_RU = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
@@ -112,9 +113,12 @@ function renderCalFilters() {
   }
 
   html += `<div style="width:1px;background:var(--b1);flex-shrink:0;margin:2px 4px"></div>`;
-  html += `<button onclick="calSetFilter('priority','all')" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 10px;font-size:12px;color:${calFilterPriority==='all'?'var(--t1)':'var(--t3)'};opacity:${calFilterPriority==='all'?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0">${t('Все приоритеты')}</button>`;
-  html += `<button onclick="calSetFilter('priority','urgent')" style="background:rgba(232,96,96,.15);border:1px solid rgba(232,96,96,.4);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--red);opacity:${calFilterPriority==='urgent'?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0">🔥 ${t('Срочные')}</button>`;
-  html += `<button onclick="calSetFilter('priority','high')" style="background:rgba(232,197,106,.15);border:1px solid rgba(232,197,106,.4);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--accent);opacity:${calFilterPriority==='high'?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0">⚡ ${t('Важные')}</button>`;
+ const prioHL = calPrioOpen || calFilterPriority !== 'all';
+  html += `<button onclick="calTogglePrio()" style="background:${prioHL?'rgba(232,197,106,.18)':'var(--s2)'};border:1px solid ${prioHL?'var(--accent)':'var(--b1)'};border-radius:14px;padding:4px 10px;font-size:12px;color:${prioHL?'var(--accent)':'var(--t3)'};opacity:${prioHL?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0">🔥/⚡</button>`;
+  if(calPrioOpen) {
+    html += `<button onclick="calSetFilter('priority','${calFilterPriority==='urgent'?'all':'urgent'}')" style="background:rgba(232,96,96,.15);border:1px solid rgba(232,96,96,.4);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--red);opacity:${calFilterPriority==='urgent'?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0">🔥 ${t('Срочные')}</button>`;
+    html += `<button onclick="calSetFilter('priority','${calFilterPriority==='high'?'all':'high'}')" style="background:rgba(232,197,106,.15);border:1px solid rgba(232,197,106,.4);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--accent);opacity:${calFilterPriority==='high'?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0">⚡ ${t('Важные')}</button>`;
+  }
 
   el.innerHTML = html;
 }
@@ -151,6 +155,10 @@ function calSetAllCats(on) {
   if(on) calEnableAll();
   else calEnabledCats = new Set();
   calRefreshFilters();
+}
+function calTogglePrio() {
+  calPrioOpen = !calPrioOpen;
+  renderCalFilters();
 }
 
 // ─── ПАНЕЛЬ «КАБИНЕТЫ» (оверлей на телефоне, выпадающий список на ПК) ───
