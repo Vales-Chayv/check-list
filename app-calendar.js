@@ -9,6 +9,10 @@ let calFilterPriority = 'all';
 let calSpaceId = 'current';
 let calAllCards = [];
 let calAllEvents = [];
+let calShowHols = localStorage.getItem('mc_show_hols') !== '0';   // показывать праздники
+let calShowEvents = localStorage.getItem('mc_show_events') !== '0'; // показывать события
+function calToggleHols() { calShowHols = !calShowHols; localStorage.setItem('mc_show_hols', calShowHols?'1':'0'); renderCalFilters(); renderCalendar(); }
+function calToggleEvents() { calShowEvents = !calShowEvents; localStorage.setItem('mc_show_events', calShowEvents?'1':'0'); renderCalFilters(); renderCalendar(); }
 let calEnabledCats = new Set(); // включённые пары «кабинет‖рубрика» (множественный выбор)
 let calCatColors = {}; // цвета рубрик всех кабинетов: ключ «кабинет‖рубрика» → цвет
 let calOpenCab = null; // какой кабинет развёрнут в панели (аккордеон)
@@ -77,6 +81,7 @@ function calHolidays(dateStr) { // праздники на дату (масси�
   return (src && src[dateStr]) || [];
 }
 function calHolHtml(dateStr, size) { // size: 'sm' месяц | 'md' неделя | 'lg' день
+  if(!calShowHols) return '';
   const hols = calHolidays(dateStr);
   if(!hols.length) return '';
   return hols.map(h => {
@@ -104,6 +109,7 @@ function calEventOccursOn(ev, dateStr) { // выпадает ли событие
 }
 function calEventsOnDate(dateStr) { return calAllEvents.filter(ev => calEventOccursOn(ev, dateStr)); }
 function calEvtHtml(dateStr, size) { // size: 'sm' месяц | 'md' неделя | 'lg' день
+  if(!calShowEvents) return '';
   const evs = calEventsOnDate(dateStr);
   if(!evs.length) return '';
   const col = '#b48ef0'; // события — фиолетовый
@@ -278,6 +284,8 @@ function renderCalFilters() {
   const onCount = allKeys.filter(k => calEnabledCats.has(k)).length;
   const allOn = allKeys.length > 0 && onCount === allKeys.length;
   html += `<button onclick="calSetAllCats(${!allOn})" style="background:${allOn?'rgba(232,197,106,.18)':'var(--s2)'};border:1px solid ${allOn?'var(--accent)':'var(--b1)'};border-radius:14px;padding:4px 10px;font-size:12px;color:${allOn?'var(--accent)':'var(--t3)'};opacity:${allOn?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0">${t('Все')}</button>`;
+  html += `<button onclick="calToggleHols()" style="background:${calShowHols?'rgba(122,162,247,.18)':'var(--s2)'};border:1px solid ${calShowHols?'#7aa2f7':'var(--b1)'};border-radius:14px;padding:4px 10px;font-size:12px;color:${calShowHols?'#7aa2f7':'var(--t3)'};opacity:${calShowHols?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0">✡️ ${t('Праздники')}</button>`;
+  html += `<button onclick="calToggleEvents()" style="background:${calShowEvents?'rgba(180,142,240,.18)':'var(--s2)'};border:1px solid ${calShowEvents?'#b48ef0':'var(--b1)'};border-radius:14px;padding:4px 10px;font-size:12px;color:${calShowEvents?'#b48ef0':'var(--t3)'};opacity:${calShowEvents?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0">🗓️ ${t('События')}</button>`;
   html += `<button id="cal-cab-btn" onclick="openCabinetPanel()" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 12px;font-size:12px;color:var(--t1);cursor:pointer;white-space:nowrap;flex-shrink:0;font-weight:500">🗂️ ${t('Кабинеты')}${onCount<allKeys.length?` (${onCount}/${allKeys.length})`:''}</button>`;
   cabs.forEach(cab => {
     if(!calShownCabs.has(cab.spaceId)) return;
@@ -554,7 +562,7 @@ function renderCalWeek() {
       html += `<div onclick="showCalPopup('${c.id}',event)" style="font-size:11px;background:${hex2rgba(col,.2)};border-left:2px solid ${c.priority==='urgent'?'var(--red)':c.priority==='high'?'var(--accent)':col};border-radius:3px;padding:3px 5px;margin-bottom:3px;cursor:pointer;color:var(--t1)">${c.priority==='urgent'?'🔥':c.priority==='high'?'⚡':''}${esc(c.title.length>18?c.title.slice(0,16)+'…':c.title)}</div>`;
     });
 
-    if(!dayCards.length && !calHolidays(dateStr).length && !calEventsOnDate(dateStr).length) {
+    if(!dayCards.length && !calHolHtml(dateStr,'md') && !calEvtHtml(dateStr,'md')) {
       html += `<div style="font-size:10px;color:var(--t3);text-align:center;margin-top:16px">—</div>`;
     }
 
