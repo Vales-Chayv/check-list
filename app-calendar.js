@@ -8,6 +8,7 @@ let calFilterMember = 'all';
 let calFilterPriority = 'all';
 let calSpaceId = 'current';
 let calAllCards = [];
+let calAllEvents = [];
 let calEnabledCats = new Set(); // включённые пары «кабинет‖рубрика» (множественный выбор)
 let calCatColors = {}; // цвета рубрик всех кабинетов: ключ «кабинет‖рубрика» → цвет
 let calOpenCab = null; // какой кабинет развёрнут в панели (аккордеон)
@@ -94,6 +95,7 @@ async function openCalendar() {
   calDate = new Date();
   calSpaceId = 'current';
   calAllCards = [];
+  calAllEvents = [];
   document.getElementById('cal-ov').classList.add('on');
   document.getElementById('cal-body').innerHTML = '<div style="text-align:center;padding:40px;color:var(--t3)">⏳ Загрузка...</div>';
   try {
@@ -101,6 +103,11 @@ async function openCalendar() {
     const {data} = await sb.from('cards').select('*').in('space_id', ids).not('deadline','is',null);
     calAllCards = data||[];
 } catch(e) { calAllCards = [...cards]; }
+  try {
+    const ids2 = spaces.map(s=>s.id);
+    const {data:evData} = await sb.from('events').select('*').in('space_id', ids2);
+    calAllEvents = evData||[];
+  } catch(e) { calAllEvents = []; }
   try {
     const {data:catData} = await sb.from('categories').select('name,color,space_id').in('space_id', spaces.map(s=>s.id));
     calCatColors = {};
