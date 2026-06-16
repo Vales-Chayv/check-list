@@ -576,6 +576,39 @@
 
 <!-- Calendar card mini popup -->
 <div id="cal-popup" style="display:none;position:fixed;z-index:300;background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);padding:14px;max-width:280px;box-shadow:0 4px 20px rgba(0,0,0,.5)"></div>
+<!-- Event modal -->
+<div class="overlay" id="event-ov" onclick="if(event.target===this)closeEventModal()">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <span class="sheet-title" id="ev-modal-title">Новое событие</span>
+      <button class="close-btn" onclick="closeEventModal()">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:13px;padding:16px 20px">
+      <div class="fld"><label>Кабинет</label><select id="ev-space"></select></div>
+      <div class="fld"><label>Название</label><input id="ev-title" placeholder="Название события" dir="auto"></div>
+      <div style="display:flex;gap:10px">
+        <div class="fld" style="flex:1"><label>Дата</label><input id="ev-date" type="date"></div>
+        <div class="fld" style="flex:1"><label>Время</label><input id="ev-time" type="time"></div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <div class="fld" style="flex:1"><label>Повтор</label><select id="ev-repeat" onchange="evRepeatChanged()">
+          <option value="none">Нет</option>
+          <option value="daily">Каждый день</option>
+          <option value="weekly">Каждую неделю</option>
+          <option value="monthly">Каждый месяц</option>
+          <option value="yearly">Каждый год</option>
+        </select></div>
+        <div class="fld" style="flex:1" id="ev-until-wrap"><label>Повтор до</label><input id="ev-until" type="date"></div>
+      </div>
+      <div class="fld"><label>Заметка</label><textarea id="ev-note" dir="auto" placeholder="Необязательно"></textarea></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-p" onclick="saveEvent()">Сохранить</button>
+        <button class="btn-d" id="ev-delete-btn" onclick="deleteEvent()" style="display:none">Удалить</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- App modules — load in order -->
 <script src="app-config.js"></script>
