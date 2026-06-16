@@ -111,10 +111,10 @@ function calEvtHtml(dateStr, size) { // size: 'sm' месяц | 'md' недел�
     const rep = (ev.repeat && ev.repeat !== 'none') ? '🔁 ' : '';
     const tm = ev.event_time ? esc(ev.event_time) + ' ' : '';
     if(size === 'lg') {
-      return `<div style="background:${hex2rgba(col,.15)};border-left:4px solid ${col};border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:8px"><div style="font-size:15px;font-weight:700;color:var(--t1);margin-bottom:2px">🗓️ ${rep}${tm}${esc(ev.title)}</div>${ev.note?`<div style="font-size:12px;color:var(--t3)">${esc(ev.note)}</div>`:''}</div>`;
+      return `<div onclick="openEventModal('${dateStr}','${esc(ev.id)}')" style="background:${hex2rgba(col,.15)};border-left:4px solid ${col};border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:8px;cursor:pointer"><div style="font-size:15px;font-weight:700;color:var(--t1);margin-bottom:2px">🗓️ ${rep}${tm}${esc(ev.title)}</div>${ev.note?`<div style="font-size:12px;color:var(--t3)">${esc(ev.note)}</div>`:''}</div>`;
     }
     const fs = size === 'md' ? '11px' : '10px';
-    return `<div title="${esc(ev.title)}" style="font-size:${fs};background:${hex2rgba(col,.2)};border-left:2px solid ${col};border-radius:3px;padding:2px 4px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--t1)">🗓️ ${rep}${tm}${esc(ev.title)}</div>`;
+    return `<div onclick="event.stopPropagation();openEventModal('${dateStr}','${esc(ev.id)}')" title="${esc(ev.title)}" style="font-size:${fs};background:${hex2rgba(col,.2)};border-left:2px solid ${col};border-radius:3px;padding:2px 4px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--t1);cursor:pointer">🗓️ ${rep}${tm}${esc(ev.title)}</div>`;
   }).join('');
 }
 
@@ -150,6 +150,88 @@ function closeCalendar() {
   document.getElementById('cal-ov').classList.remove('on');
   document.getElementById('cal-popup').style.display = 'none';
   if(calFromLobby) { calFromLobby = false; showSpaceSelector(); }
+}
+let evEditId = null;
+function evRepeatChanged() {
+  const rep = document.getElementById('ev-repeat').value;
+  document.getElementById('ev-until-wrap').style.display = (rep === 'none') ? 'none' : 'flex';
+}
+function openEventModal(dateStr, eventId) {
+  evEditId = eventId || null;
+  const sel = document.getElementById('ev-space');
+  sel.innerHTML = spaces.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+  const ev = evEditId ? calAllEvents.find(e => e.id === evEditId) : null;
+  if(ev) {
+    document.getElementById('ev-modal-title').textContent = 'Редактировать событие';
+    sel.value = ev.space_id || (spaces[0] && spaces[0].id) || '';
+    document.getElementById('ev-title').value = ev.title || '';
+    document.getElementById('ev-date').value = ev.event_date || '';
+    document.getElementById('ev-time').value = ev.event_time || '';
+    document.getElementById('ev-repeat').value = ev.repeat || 'none';
+    document.getElementById('ev-until').value = ev.repeat_until || '';
+    document.getElementById('ev-note').value = ev.note || '';
+    document.getElementById('ev-delete-btn').style.display = 'block';
+  } else {
+    if(!dateStr) {
+      if(calView === 'day') { const d = calDate; dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+      else dateStr = calTodayStr();
+    }
+    document.getElementById('ev-modal-title').textContent = 'Новое событие';
+    sel.value = currentSpaceId || (spaces[0] && spaces[0].id) || '';
+    document.getElementById('ev-title').value = '';
+    document.getElementById('ev-date').value = dateStr;
+    document.getElementById('ev-time').value = '';
+    document.getElementById('ev-repeat').value = 'none';
+    document.getElementById('ev-until').value = '';
+    document.getElementById('ev-note').value = '';
+    document.getElementById('ev-delete-btn').style.display = 'none';
+  }
+  evRepeatChanged();
+  document.getElementById('event-ov').classList.add('on');
+}
+function closeEventModal() {
+  document.getElementById('event-ov').classList.remove('on');
+}
+async function calReloadEvents() {
+  try {
+    const {data} = await sb.from('events').select('*').in('space_id', spaces.map(s=>s.id));
+    calAllEvents = data || [];
+  } catch(e) {}
+}
+async function saveEvent() {
+  const space_id = document.getElementById('ev-space').value;
+  const title = document.getElementById('ev-title').value.trim();
+  const event_date = document.getElementById('ev-date').value;
+  const repeat = document.getElementById('ev-repeat').value;
+  if(!title) { toast('Введите название', true); return; }
+  if(!event_date) { toast('Укажите дату', true); return; }
+  if(!space_id) { toast('Выберите кабинет', true); return; }
+  const obj = {
+    space_id, title, event_date,
+    event_time: document.getElementById('ev-time').value || null,
+    repeat,
+    repeat_until: (repeat !== 'none' ? (document.getElementById('ev-until').value || null) : null),
+    note: document.getElementById('ev-note').value.trim() || null
+  };
+  try {
+    if(evEditId) await sb.from('events').update(obj).eq('id', evEditId);
+    else await sb.from('events').insert(obj);
+    await calReloadEvents();
+    renderCalendar();
+    closeEventModal();
+    toast('✓ Сохранено');
+  } catch(e) { toast('Ошибка сохранения', true); }
+}
+async function deleteEvent() {
+  if(!evEditId) return;
+  if(!confirm('Удалить событие?')) return;
+  try {
+    await sb.from('events').delete().eq('id', evEditId);
+    await calReloadEvents();
+    renderCalendar();
+    closeEventModal();
+    toast('✓ Удалено');
+  } catch(e) { toast('Ошибка удаления', true); }
 }
 
 // ─── VIEW SWITCHER ───────────────────────────
