@@ -181,8 +181,7 @@ function closeCabinetPanel() {
 function calToggleCabShown(spaceId) {
   if(calShownCabs.has(spaceId)) calShownCabs.delete(spaceId);
   else calShownCabs.add(spaceId);
-  renderCalFilters();
-  if(document.getElementById('cal-cab-panel')) renderCabinetPanel();
+  calRefreshFilters();
 }
 
 function renderCabinetPanel() {
