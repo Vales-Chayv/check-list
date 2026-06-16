@@ -75,6 +75,19 @@ function calHolidays(dateStr) { // праздники на дату (масси�
   const src = CAL_HOLIDAYS[calRegion];
   return (src && src[dateStr]) || [];
 }
+function calHolHtml(dateStr, size) { // size: 'sm' месяц | 'md' неделя | 'lg' день
+  const hols = calHolidays(dateStr);
+  if(!hols.length) return '';
+  return hols.map(h => {
+    const col = h.type === 'modern' ? '#5fb98e' : '#7aa2f7'; // современные — зелёный, крупные — синий
+    const icon = h.type === 'modern' ? '🇮🇱' : '✡️';
+    if(size === 'lg') {
+      return `<div style="display:flex;align-items:center;gap:8px;background:${hex2rgba(col,.15)};border-left:4px solid ${col};border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:8px"><span style="font-size:16px">${icon}</span><span style="font-size:14px;font-weight:700;color:${col}">${esc(h.ru)}</span></div>`;
+    }
+    const fs = size === 'md' ? '11px' : '9px';
+    return `<div title="${esc(h.ru)}" style="font-size:${fs};line-height:1.25;color:${col};background:${hex2rgba(col,.14)};border-radius:3px;padding:1px 4px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${icon} ${esc(h.ru)}</div>`;
+  }).join('');
+}
 
 // ─── OPEN / CLOSE ────────────────────────────
 async function openCalendar() {
@@ -360,6 +373,7 @@ function renderCalMonth() {
 
     html += `<div style="min-height:72px;background:${bg};border-radius:6px;border:${border};padding:4px;cursor:pointer" onclick="calDayClick('${dateStr}',event)">
       <div style="font-size:12px;font-weight:${isToday?'700':'400'};color:${isToday?'var(--accent)':hasUrgent?'var(--red)':'var(--t2)'};margin-bottom:3px">${d}</div>`;
+    html += calHolHtml(dateStr, 'sm');
 
     dayCards.slice(0,3).forEach(c => {
       const col = catColor(c.category);
@@ -414,13 +428,14 @@ function renderCalWeek() {
     html += `<div style="background:${isToday?'rgba(232,197,106,.1)':'var(--s2)'};border-radius:8px;border:${isToday?'1px solid var(--accent)':hasUrgent?'1px solid var(--red)':'1px solid var(--b1)'};padding:6px;min-height:120px">
       <div style="font-size:11px;color:var(--t3);margin-bottom:2px">${CAL_DAYS_RU[d.getDay()===0?6:d.getDay()-1]}</div>
       <div style="font-size:16px;font-weight:700;color:${isToday?'var(--accent)':hasUrgent?'var(--red)':'var(--t1)'};margin-bottom:6px">${d.getDate()}</div>`;
+    html += calHolHtml(dateStr, 'md');
 
     dayCards.forEach(c => {
       const col = catColor(c.category);
       html += `<div onclick="showCalPopup('${c.id}',event)" style="font-size:11px;background:${hex2rgba(col,.2)};border-left:2px solid ${c.priority==='urgent'?'var(--red)':c.priority==='high'?'var(--accent)':col};border-radius:3px;padding:3px 5px;margin-bottom:3px;cursor:pointer;color:var(--t1)">${c.priority==='urgent'?'🔥':c.priority==='high'?'⚡':''}${esc(c.title.length>18?c.title.slice(0,16)+'…':c.title)}</div>`;
     });
 
-    if(!dayCards.length) {
+    if(!dayCards.length && !calHolidays(dateStr).length) {
       html += `<div style="font-size:10px;color:var(--t3);text-align:center;margin-top:16px">—</div>`;
     }
 
@@ -443,6 +458,7 @@ function renderCalDay() {
   const filtered = getCalCards().filter(c => c.deadline === dateStr);
 
   let html = '';
+  html += calHolHtml(dateStr, 'lg');
   if(!filtered.length) {
     html = `<div style="text-align:center;padding:40px;color:var(--t3)">
       <div style="font-size:40px;margin-bottom:12px">📅</div>
