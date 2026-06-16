@@ -10,6 +10,7 @@ let calSpaceId = 'current';
 let calAllCards = [];
 let calEnabledCats = new Set(); // включённые пары «кабинет‖рубрика» (множественный выбор)
 let calCatColors = {}; // цвета рубрик всех кабинетов: ключ «кабинет‖рубрика» → цвет
+let calOpenCab = null; // какой кабинет развёрнут в панели (аккордеон)
 
 const CAL_DAYS_RU = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 const CAL_MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
@@ -84,17 +85,9 @@ function renderCalFilters() {
   html += `<button onclick="calSetAllCats(true)" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--t1);cursor:pointer;white-space:nowrap;flex-shrink:0">${t('Все')}</button>`;
   html += `<button onclick="calSetAllCats(false)" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--t2);cursor:pointer;white-space:nowrap;flex-shrink:0">${t('Никакие')}</button>`;
 
-  cabs.forEach(cab => {
-    const sp = spaces.find(s => s.id === cab.spaceId);
-    const icon = sp && sp.type === 'family' ? '👨‍👩‍👧' : '🗂️';
-    const cabOn = cab.rubrics.some(r => calEnabledCats.has(r.key));
-    html += `<div style="width:1px;background:var(--b1);flex-shrink:0;margin:2px 4px"></div>`;
-    html += `<button data-sp="${esc(cab.spaceId)}" onclick="calToggleCabinet(this.dataset.sp)" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--t1);opacity:${cabOn?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0;font-weight:500">${icon} ${esc(cab.spaceName)}</button>`;
-    cab.rubrics.forEach(r => {
-      const on = calEnabledCats.has(r.key);
-      html += `<button data-key="${esc(r.key)}" onclick="calToggleRubric(this.dataset.key)" style="background:${on?hex2rgba(r.color,.18):'var(--s2)'};border:1px solid ${on?hex2rgba(r.color,.5):'var(--b1)'};border-radius:14px;padding:4px 10px;font-size:12px;color:${on?r.color:'var(--t3)'};opacity:${on?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${r.color};margin-right:4px"></span>${esc(r.name||'—')}</button>`;
-    });
-  });
+ const allKeys = cabs.flatMap(c => c.rubrics.map(r => r.key));
+  const onCount = allKeys.filter(k => calEnabledCats.has(k)).length;
+  html += `<button id="cal-cab-btn" onclick="openCabinetPanel()" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 12px;font-size:12px;color:var(--t1);cursor:pointer;white-space:nowrap;flex-shrink:0;font-weight:500">🗂️ ${t('Кабинеты')}${onCount<allKeys.length?` (${onCount}/${allKeys.length})`:''}</button>`;
 
   if(members.length) {
     html += `<div style="width:1px;background:var(--b1);flex-shrink:0;margin:2px 4px"></div>`;
@@ -121,11 +114,16 @@ function calSetFilter(type, value) {
   renderCalendar();
 }
 
+function calRefreshFilters() {
+  renderCalFilters();
+  renderCalendar();
+  if(document.getElementById('cal-cab-panel')) renderCabinetPanel();
+}
+
 function calToggleRubric(key) {
   if(calEnabledCats.has(key)) calEnabledCats.delete(key);
   else calEnabledCats.add(key);
-  renderCalFilters();
-  renderCalendar();
+  calRefreshFilters();
 }
 
 function calToggleCabinet(spaceId) {
@@ -133,15 +131,73 @@ function calToggleCabinet(spaceId) {
   if(!cab) return;
   const allOn = cab.rubrics.every(r => calEnabledCats.has(r.key));
   cab.rubrics.forEach(r => { if(allOn) calEnabledCats.delete(r.key); else calEnabledCats.add(r.key); });
-  renderCalFilters();
-  renderCalendar();
+  calRefreshFilters();
 }
 
 function calSetAllCats(on) {
   if(on) calEnableAll();
   else calEnabledCats = new Set();
-  renderCalFilters();
-  renderCalendar();
+  calRefreshFilters();
+}
+
+// ─── ПАНЕЛЬ «КАБИНЕТЫ» (оверлей на телефоне, выпадающий список на ПК) ───
+function openCabinetPanel() {
+  closeCabinetPanel();
+  const mobile = window.innerWidth < 700;
+  const btn = document.getElementById('cal-cab-btn');
+  const r = btn ? btn.getBoundingClientRect() : { left: 14, bottom: 150 };
+  const back = document.createElement('div');
+  back.id = 'cal-cab-backdrop';
+  back.onclick = closeCabinetPanel;
+  back.style.cssText = 'position:fixed;inset:0;z-index:200;background:' + (mobile ? 'rgba(0,0,0,.5)' : 'transparent');
+  const panel = document.createElement('div');
+  panel.id = 'cal-cab-panel';
+  panel.onclick = e => e.stopPropagation();
+  panel.style.cssText = mobile
+    ? 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:90%;max-width:360px;max-height:80vh;overflow-y:auto;background:var(--s1);border:1px solid var(--b1);border-radius:12px;padding:8px;z-index:201;box-shadow:0 10px 40px rgba(0,0,0,.5)'
+    : `position:fixed;left:${Math.min(r.left, window.innerWidth - 340)}px;top:${r.bottom + 6}px;width:320px;max-height:70vh;overflow-y:auto;background:var(--s1);border:1px solid var(--b1);border-radius:12px;padding:8px;z-index:201;box-shadow:0 8px 30px rgba(0,0,0,.4)`;
+  back.appendChild(panel);
+  document.body.appendChild(back);
+  renderCabinetPanel();
+}
+
+function closeCabinetPanel() {
+  const b = document.getElementById('cal-cab-backdrop');
+  if(b) b.remove();
+}
+
+function calToggleCabExpand(spaceId) {
+  calOpenCab = (calOpenCab === spaceId) ? null : spaceId;
+  renderCabinetPanel();
+}
+
+function renderCabinetPanel() {
+  const panel = document.getElementById('cal-cab-panel');
+  if(!panel) return;
+  const cabs = calCabinetRubrics();
+  let html = `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px 10px"><span style="font-size:15px;font-weight:600">🗂️ ${t('Кабинеты')}</span><button onclick="closeCabinetPanel()" style="background:none;border:none;color:var(--t2);font-size:20px;cursor:pointer;line-height:1">✕</button></div>`;
+  cabs.forEach(cab => {
+    const sp = spaces.find(s => s.id === cab.spaceId);
+    const icon = sp && sp.type === 'family' ? '👨‍👩‍👧' : '🗂️';
+    const cabOn = cab.rubrics.some(r => calEnabledCats.has(r.key));
+    const expanded = calOpenCab === cab.spaceId;
+    html += `<div style="border-top:1px solid var(--b1)">`;
+    html += `<div style="display:flex;align-items:center;gap:8px;padding:10px 8px">`;
+    html += `<button data-sp="${esc(cab.spaceId)}" onclick="calToggleCabExpand(this.dataset.sp)" style="background:none;border:none;color:var(--t2);font-size:13px;cursor:pointer;width:16px;flex-shrink:0">${expanded?'▾':'▸'}</button>`;
+    html += `<span style="flex:1;font-size:14px;font-weight:500;opacity:${cabOn?'1':'.55'}">${icon} ${esc(cab.spaceName)}</span>`;
+    html += `<button data-sp="${esc(cab.spaceId)}" onclick="calToggleCabinet(this.dataset.sp)" style="background:var(--s2);border:1px solid var(--b1);border-radius:8px;padding:3px 9px;font-size:12px;color:var(--t2);cursor:pointer;flex-shrink:0">${cabOn?t('Скрыть'):t('Показать')}</button>`;
+    html += `</div>`;
+    if(expanded) {
+      html += `<div style="padding:0 10px 10px 30px;display:flex;flex-direction:column;gap:10px">`;
+      cab.rubrics.forEach(r => {
+        const on = calEnabledCats.has(r.key);
+        html += `<div data-key="${esc(r.key)}" onclick="calToggleRubric(this.dataset.key)" style="display:flex;align-items:center;gap:9px;cursor:pointer;opacity:${on?'1':'.5'}"><span style="width:11px;height:11px;border-radius:50%;background:${r.color};flex-shrink:0"></span><span style="flex:1;font-size:13px;color:var(--t1)">${esc(r.name||'—')}</span><span style="font-size:16px;color:${on?r.color:'var(--t3)'}">${on?'☑':'☐'}</span></div>`;
+      });
+      html += `</div>`;
+    }
+    html += `</div>`;
+  });
+  panel.innerHTML = html;
 }
 
 // ─── CARD FILTERING ──────────────────────────
