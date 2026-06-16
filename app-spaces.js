@@ -67,7 +67,7 @@ spaces = Array.isArray(saved) ? saved : [];
 function showSpaceSelector() {
   renderSpacesList();
   const cb = document.getElementById('lobby-cal-btn');
-  if(cb) cb.style.display = currentUser ? 'block' : 'none';
+  if(cb) { cb.style.display = currentUser ? 'block' : 'none'; cb.textContent = '📅 ' + t('Календарь'); }
   document.getElementById('space-selector').style.display = 'flex';
 }
 function hideSpaceSelector() {
