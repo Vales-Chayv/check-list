@@ -66,10 +66,17 @@ spaces = Array.isArray(saved) ? saved : [];
 // ─── SELECTOR ───────────────────────────────
 function showSpaceSelector() {
   renderSpacesList();
+  const cb = document.getElementById('lobby-cal-btn');
+  if(cb) cb.style.display = currentUser ? 'block' : 'none';
   document.getElementById('space-selector').style.display = 'flex';
 }
 function hideSpaceSelector() {
   document.getElementById('space-selector').style.display = 'none';
+}
+function openCalendarFromLobby() {
+  calFromLobby = true;
+  hideSpaceSelector();
+  openCalendar();
 }
 function renderSpacesList() {
   const list = document.getElementById('spaces-list');
