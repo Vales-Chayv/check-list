@@ -182,16 +182,15 @@ function renderCabinetPanel() {
     const cabOn = cab.rubrics.some(r => calEnabledCats.has(r.key));
     const expanded = calOpenCab === cab.spaceId;
     html += `<div style="border-top:1px solid var(--b1)">`;
-    html += `<div style="display:flex;align-items:center;gap:8px;padding:10px 8px">`;
-    html += `<button data-sp="${esc(cab.spaceId)}" onclick="calToggleCabExpand(this.dataset.sp)" style="background:none;border:none;color:var(--t2);font-size:13px;cursor:pointer;width:16px;flex-shrink:0">${expanded?'▾':'▸'}</button>`;
+   html += `<div data-sp="${esc(cab.spaceId)}" onclick="calToggleCabExpand(this.dataset.sp)" style="display:flex;align-items:center;gap:8px;padding:11px 8px;cursor:pointer">`;
+    html += `<span style="color:var(--t2);font-size:13px;width:16px;flex-shrink:0">${expanded?'▾':'▸'}</span>`;
     html += `<span style="flex:1;font-size:14px;font-weight:500;opacity:${cabOn?'1':'.55'}">${icon} ${esc(cab.spaceName)}</span>`;
-    html += `<button data-sp="${esc(cab.spaceId)}" onclick="calToggleCabinet(this.dataset.sp)" style="background:var(--s2);border:1px solid var(--b1);border-radius:8px;padding:3px 9px;font-size:12px;color:var(--t2);cursor:pointer;flex-shrink:0">${cabOn?t('Скрыть'):t('Показать')}</button>`;
     html += `</div>`;
     if(expanded) {
-      html += `<div style="padding:0 10px 10px 30px;display:flex;flex-direction:column;gap:10px">`;
+      html += `<div style="padding:0 8px 10px 24px;display:flex;flex-wrap:wrap;gap:6px">`;
       cab.rubrics.forEach(r => {
         const on = calEnabledCats.has(r.key);
-        html += `<div data-key="${esc(r.key)}" onclick="calToggleRubric(this.dataset.key)" style="display:flex;align-items:center;gap:9px;cursor:pointer;opacity:${on?'1':'.5'}"><span style="width:11px;height:11px;border-radius:50%;background:${r.color};flex-shrink:0"></span><span style="flex:1;font-size:13px;color:var(--t1)">${esc(r.name||'—')}</span><span style="font-size:16px;color:${on?r.color:'var(--t3)'}">${on?'☑':'☐'}</span></div>`;
+        html += `<button data-key="${esc(r.key)}" onclick="calToggleRubric(this.dataset.key)" style="background:${on?hex2rgba(r.color,.18):'var(--s2)'};border:1px solid ${on?hex2rgba(r.color,.5):'var(--b1)'};border-radius:14px;padding:4px 10px;font-size:12px;color:${on?r.color:'var(--t3)'};opacity:${on?'1':'.55'};cursor:pointer;white-space:nowrap"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${r.color};margin-right:4px"></span>${esc(r.name||'—')}</button>`;
       });
       html += `</div>`;
     }
