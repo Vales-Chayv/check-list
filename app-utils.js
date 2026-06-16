@@ -5,8 +5,14 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 const today = () => new Date().toISOString().slice(0,10);
 const nowStr = () => new Date().toLocaleString(langLocale(),{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
 const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-const hex2rgba = (h,a) => { const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16); return `rgba(${r},${g},${b},${a})`; };
-const catColor = name => (cats.find(c=>c.name===name)||{}).color || '#666';
+const hex2rgba = (h,a) => {
+  let s = String(h||'').trim().replace(/^#/,'');
+  if(s.length === 3) s = s[0]+s[0]+s[1]+s[1]+s[2]+s[2]; // #abc → #aabbcc
+  if(!/^[0-9a-f]{6}$/i.test(s)) s = '666666';           // мусор → серый
+  const r=parseInt(s.slice(0,2),16), g=parseInt(s.slice(2,4),16), b=parseInt(s.slice(4,6),16);
+  return `rgba(${r},${g},${b},${a})`;
+};
+const catColor = name => (cats.find(c=>c.name===name)||{}).color || '#666666';
 
 // ─── Оформление текста записей: разрешаем только жирный/подчёркивание/цвет/размер ───
 // stripTags — убрать все теги, вернуть чистый текст (для превью карточки)
