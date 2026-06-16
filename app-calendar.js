@@ -11,6 +11,7 @@ let calAllCards = [];
 let calEnabledCats = new Set(); // включённые пары «кабинет‖рубрика» (множественный выбор)
 let calCatColors = {}; // цвета рубрик всех кабинетов: ключ «кабинет‖рубрика» → цвет
 let calOpenCab = null; // какой кабинет развёрнут в панели (аккордеон)
+let calShownCabs = new Set(); // кабинеты, вынесенные чипсами в верхнюю строку
 
 const CAL_DAYS_RU = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 const CAL_MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
@@ -85,9 +86,20 @@ function renderCalFilters() {
   html += `<button onclick="calSetAllCats(true)" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--t1);cursor:pointer;white-space:nowrap;flex-shrink:0">${t('Все')}</button>`;
   html += `<button onclick="calSetAllCats(false)" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 10px;font-size:12px;color:var(--t2);cursor:pointer;white-space:nowrap;flex-shrink:0">${t('Никакие')}</button>`;
 
- const allKeys = cabs.flatMap(c => c.rubrics.map(r => r.key));
+const allKeys = cabs.flatMap(c => c.rubrics.map(r => r.key));
   const onCount = allKeys.filter(k => calEnabledCats.has(k)).length;
   html += `<button id="cal-cab-btn" onclick="openCabinetPanel()" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 12px;font-size:12px;color:var(--t1);cursor:pointer;white-space:nowrap;flex-shrink:0;font-weight:500">🗂️ ${t('Кабинеты')}${onCount<allKeys.length?` (${onCount}/${allKeys.length})`:''}</button>`;
+  cabs.forEach(cab => {
+    if(!calShownCabs.has(cab.spaceId)) return;
+    const sp = spaces.find(s => s.id === cab.spaceId);
+    const icon = sp && sp.type === 'family' ? '👨‍👩‍👧' : '🗂️';
+    html += `<div style="width:1px;background:var(--b1);flex-shrink:0;margin:2px 4px"></div>`;
+    html += `<span style="font-size:12px;color:var(--t2);font-weight:500;white-space:nowrap;flex-shrink:0;align-self:center">${icon} ${esc(cab.spaceName)}</span>`;
+    cab.rubrics.forEach(r => {
+      const on = calEnabledCats.has(r.key);
+      html += `<button data-key="${esc(r.key)}" onclick="calToggleRubric(this.dataset.key)" style="background:${on?hex2rgba(r.color,.18):'var(--s2)'};border:1px solid ${on?hex2rgba(r.color,.5):'var(--b1)'};border-radius:14px;padding:4px 10px;font-size:12px;color:${on?r.color:'var(--t3)'};opacity:${on?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${r.color};margin-right:4px"></span>${esc(r.name||'—')}</button>`;
+    });
+  });
 
   if(members.length) {
     html += `<div style="width:1px;background:var(--b1);flex-shrink:0;margin:2px 4px"></div>`;
@@ -166,9 +178,11 @@ function closeCabinetPanel() {
   if(b) b.remove();
 }
 
-function calToggleCabExpand(spaceId) {
-  calOpenCab = (calOpenCab === spaceId) ? null : spaceId;
-  renderCabinetPanel();
+function calToggleCabShown(spaceId) {
+  if(calShownCabs.has(spaceId)) calShownCabs.delete(spaceId);
+  else calShownCabs.add(spaceId);
+  renderCalFilters();
+  if(document.getElementById('cal-cab-panel')) renderCabinetPanel();
 }
 
 function renderCabinetPanel() {
@@ -179,21 +193,10 @@ function renderCabinetPanel() {
   cabs.forEach(cab => {
     const sp = spaces.find(s => s.id === cab.spaceId);
     const icon = sp && sp.type === 'family' ? '👨‍👩‍👧' : '🗂️';
-    const cabOn = cab.rubrics.some(r => calEnabledCats.has(r.key));
-    const expanded = calOpenCab === cab.spaceId;
-    html += `<div style="border-top:1px solid var(--b1)">`;
-   html += `<div data-sp="${esc(cab.spaceId)}" onclick="calToggleCabExpand(this.dataset.sp)" style="display:flex;align-items:center;gap:8px;padding:11px 8px;cursor:pointer">`;
-    html += `<span style="color:var(--t2);font-size:13px;width:16px;flex-shrink:0">${expanded?'▾':'▸'}</span>`;
-    html += `<span style="flex:1;font-size:14px;font-weight:500;opacity:${cabOn?'1':'.55'}">${icon} ${esc(cab.spaceName)}</span>`;
-    html += `</div>`;
-    if(expanded) {
-      html += `<div style="padding:0 8px 10px 24px;display:flex;flex-wrap:wrap;gap:6px">`;
-      cab.rubrics.forEach(r => {
-        const on = calEnabledCats.has(r.key);
-        html += `<button data-key="${esc(r.key)}" onclick="calToggleRubric(this.dataset.key)" style="background:${on?hex2rgba(r.color,.18):'var(--s2)'};border:1px solid ${on?hex2rgba(r.color,.5):'var(--b1)'};border-radius:14px;padding:4px 10px;font-size:12px;color:${on?r.color:'var(--t3)'};opacity:${on?'1':'.55'};cursor:pointer;white-space:nowrap"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${r.color};margin-right:4px"></span>${esc(r.name||'—')}</button>`;
-      });
-      html += `</div>`;
-    }
+    const shown = calShownCabs.has(cab.spaceId);
+    html += `<div data-sp="${esc(cab.spaceId)}" onclick="calToggleCabShown(this.dataset.sp)" style="display:flex;align-items:center;gap:8px;padding:12px 8px;cursor:pointer;border-top:1px solid var(--b1)">`;
+    html += `<span style="flex:1;font-size:14px;font-weight:500;opacity:${shown?'1':'.7'}">${icon} ${esc(cab.spaceName)}</span>`;
+    html += `<span style="font-size:12px;color:${shown?'var(--accent)':'var(--t3)'}">${shown?'✓ '+t('в фильтре'):t('добавить')}</span>`;
     html += `</div>`;
   });
   panel.innerHTML = html;
