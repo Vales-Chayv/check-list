@@ -409,6 +409,7 @@ function renderCabinetPanel() {
 // ─── CARD FILTERING ──────────────────────────
 // Ключ пары «кабинет‖рубрика» — различает одинаковые имена рубрик в разных кабинетах
 function calCatKey(spaceId, cat) { return spaceId + '||' + (cat || ''); }
+function calColor(card) { return (card && calCatColors[calCatKey(card.space_id, card.category)]) || '#666666'; }
 
 // По умолчанию включаем все кабинеты и все рубрики, что встречаются в карточках
 function calEnableAll() {
@@ -502,7 +503,7 @@ function renderCalMonth() {
     html += calEvtHtml(dateStr, 'sm');
 
     dayCards.slice(0,3).forEach(c => {
-      const col = catColor(c.category);
+      const col = calColor(c);
       const isUrgent = c.priority==='urgent';
       const isHigh = c.priority==='high';
       html += `<div onclick="event.stopPropagation();showCalPopup('${c.id}',event)" style="font-size:10px;background:${hex2rgba(col,.2)};border-left:2px solid ${isUrgent?'var(--red)':isHigh?'var(--accent)':col};border-radius:3px;padding:2px 4px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--t1);cursor:pointer">${isUrgent?'🔥':isHigh?'⚡':''}${esc(c.title)}</div>`;
@@ -558,7 +559,7 @@ function renderCalWeek() {
     html += calEvtHtml(dateStr, 'md');
 
     dayCards.forEach(c => {
-      const col = catColor(c.category);
+      const col = calColor(c);
       html += `<div onclick="showCalPopup('${c.id}',event)" style="font-size:11px;background:${hex2rgba(col,.2)};border-left:2px solid ${c.priority==='urgent'?'var(--red)':c.priority==='high'?'var(--accent)':col};border-radius:3px;padding:3px 5px;margin-bottom:3px;cursor:pointer;color:var(--t1)">${c.priority==='urgent'?'🔥':c.priority==='high'?'⚡':''}${esc(c.title.length>18?c.title.slice(0,16)+'…':c.title)}</div>`;
     });
 
@@ -599,7 +600,7 @@ function renderCalDay() {
       return (po[a.priority||'normal']||2) - (po[b.priority||'normal']||2);
     });
     sorted.forEach(c => {
-      const col = catColor(c.category);
+      const col = calColor(c);
       const isUrgent = c.priority==='urgent';
       const isHigh = c.priority==='high';
       html += `<div onclick="showCalPopup('${c.id}',event)" style="background:${hex2rgba(col,.15)};border-left:4px solid ${isUrgent?'var(--red)':isHigh?'var(--accent)':col};border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:8px;cursor:pointer">
@@ -628,7 +629,7 @@ function showCalPopup(cardId, event) {
   event.stopPropagation();
   const card = calAllCards.find(c=>c.id===cardId) || cards.find(c=>c.id===cardId); if(!card) return;
   const popup = document.getElementById('cal-popup');
-  const col = catColor(card.category);
+  const col = calColor(card);
   const dl = card.deadline ? deadlineInfo(card.deadline) : null;
 
   popup.innerHTML = `
