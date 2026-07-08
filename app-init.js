@@ -66,6 +66,34 @@ initAuth();
 // ═══════════════════════════════════════════
 let _intervalRemTimer = null;
 
+function showReminderPopup(card) {
+  const wrap = document.getElementById('rem-popups'); if(!wrap) return;
+  const pid = 'rem-pop-' + card.id;
+  if(document.getElementById(pid)) return; // уже висит — не дублируем
+  const el = document.createElement('div');
+  el.id = pid; el.className = 'rem-pop';
+  el.style.cssText = 'background:var(--s2);border:1px solid var(--accent);border-radius:var(--r);padding:14px;box-shadow:0 6px 24px rgba(0,0,0,.5)';
+  el.innerHTML = `
+    <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:10px">
+      <span style="font-size:18px">🔔</span>
+      <div style="flex:1;font-size:14px;font-weight:700;color:var(--t1);line-height:1.3">${esc(card.title)}</div>
+      <button onclick="this.closest('.rem-pop').remove()" style="background:none;border:none;color:var(--t3);font-size:18px;cursor:pointer;line-height:1;padding:0">✕</button>
+    </div>
+    <div style="display:flex;gap:6px">
+      <button onclick="remPopupOpen('${esc(card.id)}')" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:8px;font-size:13px;font-weight:700;cursor:pointer">Открыть</button>
+      <button onclick="remPopupSnooze('${esc(card.id)}',${card.reminder?.intervalMin||30})" style="background:var(--s1);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:8px 10px;font-size:13px;cursor:pointer;white-space:nowrap">Отложить 10 мин</button>
+    </div>`;
+  wrap.appendChild(el);
+}
+function remPopupOpen(id) {
+  const el = document.getElementById('rem-pop-' + id); if(el) el.remove();
+  if(typeof openView === 'function') openView(id);
+}
+function remPopupSnooze(id, mins) {
+  localStorage.setItem('rem_last_' + id, Date.now() + 10*60000 - (mins||30)*60000); // следующий показ ~через 10 мин
+  const el = document.getElementById('rem-pop-' + id); if(el) el.remove();
+  toast('Отложено на 10 минут');
+}
 function startIntervalReminders() {
   if(_intervalRemTimer) clearInterval(_intervalRemTimer);
   _intervalRemTimer = setInterval(() => {
@@ -79,24 +107,38 @@ function startIntervalReminders() {
       const last = parseInt(localStorage.getItem(key)||'0');
       if(now - last >= mins * 60 * 1000) {
         localStorage.setItem(key, now);
-        if(Notification.permission === 'granted') {
-          new Notification('🔔 Мои карточки', {
+        showReminderPopup(card);
+       if(typeof Notification !== 'undefined' && Notification.permission === 'granted' && navigator.serviceWorker) {
+          navigator.serviceWorker.ready.then(reg => reg.showNotification('🔔 Мои карточки', {
             body: card.title,
-            icon: 'https://vales-chayv.github.io/check-list/icon-192.png'
-          });
+            icon: 'https://vales-chayv.github.io/check-list/icon-192.png',
+            tag: 'card-' + card.id,
+            renotify: true
+          })).catch(()=>{});
         }
       }
     });
   }, 60 * 1000); // проверка каждую минуту
 }
 function askPushPermission() {
+  if(typeof Notification === 'undefined') return;
+  if(Notification.permission === 'granted') { startIntervalReminders(); return; }
   const div = document.createElement('div');
   div.style.cssText = 'position:fixed;bottom:80px;left:16px;right:16px;background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:16px;z-index:1000;box-shadow:0 4px 20px rgba(0,0,0,.4)';
   div.innerHTML = `<div style="font-size:15px;font-weight:700;margin-bottom:6px">🔔 Включить уведомления?</div>
     <div style="font-size:13px;color:var(--t2);margin-bottom:12px">Получай напоминания о важных карточках</div>
     <div style="display:flex;gap:8px">
-      <button onclick="subscribePush();this.closest('div[style*=fixed]').remove()" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:10px;font-size:14px;font-weight:700;cursor:pointer">Включить</button>
+      <button onclick="enableReminders();this.closest('div[style*=fixed]').remove()" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:10px;font-size:14px;font-weight:700;cursor:pointer">Включить</button>
       <button onclick="toast('Можно включить в настройках ⚙️');this.closest('div[style*=fixed]').remove()" style="background:var(--s1);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:10px 14px;font-size:14px;cursor:pointer">Не сейчас</button>
     </div>`;
-  document.body.appendChild(div);
+document.body.appendChild(div);
 }
+function enableReminders() {
+  if(typeof Notification === 'undefined') { toast('Уведомления не поддерживаются', true); return; }
+  Notification.requestPermission().then(p => {
+    if(p === 'granted') { startIntervalReminders(); toast('🔔 Напоминания включены'); }
+    else toast('Уведомления заблокированы', true);
+  });
+}
+// запустить таймер при старте, если разрешение уже выдано
+if(typeof Notification !== 'undefined' && Notification.permission === 'granted') startIntervalReminders();
