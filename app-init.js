@@ -66,41 +66,80 @@ initAuth();
 // ═══════════════════════════════════════════
 let _intervalRemTimer = null;
 
+let remQueue = [];
+let remCurrentId = null;
+let remCards = [];
+
+async function loadReminderCards() {
+  try {
+    if(!spaces || !spaces.length) return;
+    const { data } = await sb.from('cards').select('*').in('space_id', spaces.map(s=>s.id));
+    remCards = (data||[]).filter(c => c.reminder && c.reminder.enabled);
+  } catch(e) {}
+}
+
 function showReminderPopup(card) {
   const wrap = document.getElementById('rem-popups'); if(!wrap) return;
-  const pid = 'rem-pop-' + card.id;
-  if(document.getElementById(pid)) return; // уже висит — не дублируем
+  if(remCurrentId) { // уже висит попап — ставим в очередь
+    if(remCurrentId !== card.id && !remQueue.some(c => c.id === card.id)) remQueue.push(card);
+    return;
+  }
+  remCurrentId = card.id;
+  wrap.innerHTML = '';
   const el = document.createElement('div');
-  el.id = pid; el.className = 'rem-pop';
+  el.className = 'rem-pop';
   el.style.cssText = 'background:var(--s2);border:1px solid var(--accent);border-radius:var(--r);padding:14px;box-shadow:0 6px 24px rgba(0,0,0,.5)';
+  const more = remQueue.length;
   el.innerHTML = `
     <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:10px">
       <span style="font-size:18px">🔔</span>
       <div style="flex:1;font-size:14px;font-weight:700;color:var(--t1);line-height:1.3">${esc(card.title)}</div>
-      <button onclick="this.closest('.rem-pop').remove()" style="background:none;border:none;color:var(--t3);font-size:18px;cursor:pointer;line-height:1;padding:0">✕</button>
+      <button onclick="remDismiss()" style="background:none;border:none;color:var(--t3);font-size:18px;cursor:pointer;line-height:1;padding:0">✕</button>
     </div>
+    ${more ? `<div style="font-size:11px;color:var(--t3);margin-bottom:8px">Ещё напоминаний: ${more}</div>` : ''}
     <div style="display:flex;gap:6px">
       <button onclick="remPopupOpen('${esc(card.id)}')" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:8px;font-size:13px;font-weight:700;cursor:pointer">Открыть</button>
-      <button onclick="remPopupSnooze('${esc(card.id)}',${card.reminder?.intervalMin||30})" style="background:var(--s1);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:8px 10px;font-size:13px;cursor:pointer;white-space:nowrap">Отложить 10 мин</button>
+      <button onclick="remPopupSnooze('${esc(card.id)}',${(card.reminder&&card.reminder.intervalMin)||30})" style="background:var(--s1);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:8px 10px;font-size:13px;cursor:pointer;white-space:nowrap">Отложить 10 мин</button>
     </div>`;
   wrap.appendChild(el);
 }
-function remPopupOpen(id) {
-  const el = document.getElementById('rem-pop-' + id); if(el) el.remove();
-  if(typeof openView === 'function') openView(id);
+
+function showNextReminder() {
+  remCurrentId = null;
+  const wrap = document.getElementById('rem-popups'); if(wrap) wrap.innerHTML = '';
+  const next = remQueue.shift();
+  if(next) showReminderPopup(next);
 }
+
+function remDismiss() { showNextReminder(); }
+
+async function remPopupOpen(id) {
+  const card = remCards.find(c => c.id === id) || (cards||[]).find(c => c.id === id);
+  showNextReminder();
+  if(card && card.space_id && typeof currentSpaceId !== 'undefined' && card.space_id !== currentSpaceId && typeof setCurrentSpace === 'function') {
+    await setCurrentSpace(card.space_id, true);
+    setTimeout(() => { if(typeof openView === 'function') openView(id); }, 600);
+  } else if(typeof openView === 'function') {
+    openView(id);
+  }
+}
+
 function remPopupSnooze(id, mins) {
-  localStorage.setItem('rem_last_' + id, Date.now() + 10*60000 - (mins||30)*60000); // следующий показ ~через 10 мин
-  const el = document.getElementById('rem-pop-' + id); if(el) el.remove();
+  localStorage.setItem('rem_last_' + id, Date.now() + 10*60000 - (mins||30)*60000);
   toast('Отложено на 10 минут');
+  showNextReminder();
 }
+
 function startIntervalReminders() {
   if(_intervalRemTimer) clearInterval(_intervalRemTimer);
+  loadReminderCards();
+  let remTick = 0;
   _intervalRemTimer = setInterval(() => {
-    if(!cards) return;
+    if(remTick % 5 === 0 || !remCards.length) loadReminderCards();
+    remTick++;
     const now = Date.now();
-    cards.forEach(card => {
-      if(!card.reminder?.enabled || card.reminder?.freq !== 'interval') return;
+    remCards.forEach(card => {
+      if(!card.reminder || !card.reminder.enabled || card.reminder.freq !== 'interval') return;
       if(card.status === 'done') return;
       const mins = card.reminder.intervalMin || 30;
       const key = 'rem_last_' + card.id;
@@ -108,7 +147,7 @@ function startIntervalReminders() {
       if(now - last >= mins * 60 * 1000) {
         localStorage.setItem(key, now);
         showReminderPopup(card);
-       if(typeof Notification !== 'undefined' && Notification.permission === 'granted' && navigator.serviceWorker) {
+        if(typeof Notification !== 'undefined' && Notification.permission === 'granted' && navigator.serviceWorker) {
           navigator.serviceWorker.ready.then(reg => reg.showNotification('🔔 Мои карточки', {
             body: card.title,
             icon: 'https://vales-chayv.github.io/check-list/icon-192.png',
@@ -118,8 +157,9 @@ function startIntervalReminders() {
         }
       }
     });
-  }, 60 * 1000); // проверка каждую минуту
+  }, 60 * 1000);
 }
+
 function askPushPermission() {
   if(typeof Notification === 'undefined') return;
   if(Notification.permission === 'granted') { startIntervalReminders(); return; }
