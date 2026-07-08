@@ -206,6 +206,8 @@ body{display:flex;flex-direction:column;overflow:hidden}
     border-left: 1px solid var(--b1);
     transition: none;
   }
-  #cal-close-btn { display: none; }                 /* ✕ на ПК не нужен */
+ #cal-close-btn { display: none; }                 /* ✕ на ПК не нужен */
+  #view-ov, #edit-ov, #ae-ov {
+    inset: 0 auto 0 0; width: var(--split-left);    /* карточка — в левой колонке, календарь справа виден */
+  }
 }
-
