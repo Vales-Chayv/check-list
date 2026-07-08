@@ -15,7 +15,8 @@ function render() {
     s.textContent = '@keyframes dl-pulse{0%,100%{opacity:1}50%{opacity:.35}} .dl-pulse{animation:dl-pulse 1.8s ease-in-out infinite}';
     document.head.appendChild(s);
   }
-  renderCats(); renderMain();
+   renderCats(); renderMain();
+  desktopCalSync();
 }
 
 function renderCats() {

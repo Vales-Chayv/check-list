@@ -182,3 +182,19 @@ function enableReminders() {
 }
 // запустить таймер при старте, если разрешение уже выдано
 if(typeof Notification !== 'undefined' && Notification.permission === 'granted') startIntervalReminders();
+
+// ── ПК: календарь как правая колонка (авто-открытие ≥900px) ──
+let _deskCalOpened = false;
+function desktopCalSync() {
+  if(window.innerWidth >= 900) {
+    if(_deskCalOpened) return;
+    if(typeof spaces === 'undefined' || !spaces || !spaces.length) return;
+    const ss = document.getElementById('space-selector');
+    if(ss && ss.style.display !== 'none') return; // ещё в лобби — ждём входа в кабинет
+    _deskCalOpened = true;
+    if(typeof openCalendar === 'function') openCalendar();
+  } else {
+    if(_deskCalOpened) { _deskCalOpened = false; if(typeof closeCalendar === 'function') closeCalendar(); }
+  }
+}
+window.addEventListener('resize', desktopCalSync);

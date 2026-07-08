@@ -211,3 +211,4 @@ body{display:flex;flex-direction:column;overflow:hidden}
     inset: 0 auto 0 0; width: var(--split-left);    /* карточка — в левой колонке, календарь справа виден */
   }
 }
+
