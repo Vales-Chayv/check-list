@@ -201,5 +201,45 @@ window.addEventListener('resize', desktopCalSync);
 let _deskCalRefreshT = null;
 function desktopCalRefresh() {
   if(_deskCalRefreshT) clearTimeout(_deskCalRefreshT);
-  _deskCalRefreshT = setTimeout(() => { if(typeof calRefreshData === 'function') calRefreshData(); }, 1000);
+ _deskCalRefreshT = setTimeout(() => { if(typeof calRefreshData === 'function') calRefreshData(); }, 1000);
 }
+
+// ── Ручка-разделитель пропорций (ПК) ──
+(function initSplitHandle() {
+  const saved = localStorage.getItem('mc_split');
+  if(saved) document.documentElement.style.setProperty('--split-left', saved);
+  const h = document.getElementById('split-handle');
+  if(!h) return;
+  let dragging = false;
+  const onMove = e => {
+    if(!dragging) return;
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    let pct = x / window.innerWidth * 100;
+    pct = Math.max(25, Math.min(70, pct)); // границы 25%–70%
+    document.documentElement.style.setProperty('--split-left', pct.toFixed(1) + '%');
+    if(e.cancelable) e.preventDefault();
+  };
+  const onUp = () => {
+    if(!dragging) return;
+    dragging = false;
+    document.body.style.userSelect = '';
+    localStorage.setItem('mc_split', getComputedStyle(document.documentElement).getPropertyValue('--split-left').trim());
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onUp);
+    window.removeEventListener('touchmove', onMove);
+    window.removeEventListener('touchend', onUp);
+    if(typeof renderCalendar === 'function') renderCalendar();
+  };
+  const onDown = e => {
+    if(window.innerWidth < 900) return;
+    dragging = true;
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+    e.preventDefault();
+  };
+  h.addEventListener('mousedown', onDown);
+  h.addEventListener('touchstart', onDown, { passive: false });
+})();

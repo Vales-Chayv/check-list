@@ -193,6 +193,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 @media (hover: hover) {
   input[type="date"] { color-scheme: dark; }
 }
+#split-handle { display: none; } /* ручка-разделитель, видна только на ПК */
 /* ── ПК (≥900px): карточки слева 40% / календарь справа 60% ── */
 @media (min-width:900px) {
   :root { --split-left: 40%; }
@@ -207,8 +208,18 @@ body{display:flex;flex-direction:column;overflow:hidden}
     transition: none;
   }
  #cal-close-btn { display: none; }                 /* ✕ на ПК не нужен */
-  #view-ov, #edit-ov, #ae-ov {
+ #view-ov, #edit-ov, #ae-ov {
     inset: 0 auto 0 0; width: var(--split-left);    /* карточка — в левой колонке, календарь справа виден */
   }
+  #split-handle {
+    display: block; position: fixed; top: 0; bottom: 0;
+    left: var(--split-left); width: 10px; transform: translateX(-50%);
+    z-index: 20; cursor: col-resize; background: transparent;
+  }
+  #split-handle::before {
+    content: ''; position: absolute; top: 0; bottom: 0; left: 50%;
+    width: 2px; transform: translateX(-50%); background: var(--b1);
+  }
+  #split-handle:hover::before { background: var(--accent); width: 3px; }
 }
 
