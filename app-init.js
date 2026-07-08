@@ -186,8 +186,8 @@ if(typeof Notification !== 'undefined' && Notification.permission === 'granted')
 // ── ПК: календарь как правая колонка (авто-открытие ≥900px) ──
 let _deskCalOpened = false;
 function desktopCalSync() {
-  if(window.innerWidth >= 900) {
-    if(_deskCalOpened) return;
+if(window.innerWidth >= 900) {
+    if(_deskCalOpened) { desktopCalRefresh(); return; }
     if(typeof spaces === 'undefined' || !spaces || !spaces.length) return;
     const ss = document.getElementById('space-selector');
     if(ss && ss.style.display !== 'none') return; // ещё в лобби — ждём входа в кабинет
@@ -198,3 +198,8 @@ function desktopCalSync() {
   }
 }
 window.addEventListener('resize', desktopCalSync);
+let _deskCalRefreshT = null;
+function desktopCalRefresh() {
+  if(_deskCalRefreshT) clearTimeout(_deskCalRefreshT);
+  _deskCalRefreshT = setTimeout(() => { if(typeof calRefreshData === 'function') calRefreshData(); }, 1000);
+}

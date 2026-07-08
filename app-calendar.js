@@ -204,6 +204,24 @@ async function calReloadEvents() {
     calAllEvents = data || [];
   } catch(e) {}
 }
+async function calRefreshData() { // лёгкое обновление колонки: данные + перерисовка, без сброса вида/фильтров
+  if(!spaces || !spaces.length) return;
+  const ids = spaces.map(s=>s.id);
+  try {
+    const {data} = await sb.from('cards').select('*').in('space_id', ids).not('deadline','is',null);
+    calAllCards = data || [];
+  } catch(e) {}
+  try {
+    const {data:evData} = await sb.from('events').select('*').in('space_id', ids);
+    calAllEvents = evData || [];
+  } catch(e) {}
+  try {
+    const {data:catData} = await sb.from('categories').select('name,color,space_id').in('space_id', ids);
+    calCatColors = {};
+    (catData||[]).forEach(c => { calCatColors[calCatKey(c.space_id, c.name)] = c.color; });
+  } catch(e) {}
+  renderCalendar();
+}
 async function saveEvent() {
   const space_id = document.getElementById('ev-space').value;
   const title = document.getElementById('ev-title').value.trim();
