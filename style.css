@@ -193,4 +193,19 @@ body{display:flex;flex-direction:column;overflow:hidden}
 @media (hover: hover) {
   input[type="date"] { color-scheme: dark; }
 }
+/* ── ПК (≥900px): карточки слева 40% / календарь справа 60% ── */
+@media (min-width:900px) {
+  :root { --split-left: 40%; }
+  body { width: var(--split-left); min-width: 320px; }
+  #cal-btn { display: none !important; }            /* плавающая кнопка не нужна */
+  #cal-ov {
+    inset: auto; top: 0; bottom: 0; left: var(--split-left); right: 0; width: auto;
+    z-index: 10;                                     /* фоновая колонка: модалки открываются поверх */
+    background: var(--s1);
+    opacity: 1 !important; pointer-events: all !important;
+    border-left: 1px solid var(--b1);
+    transition: none;
+  }
+  #cal-close-btn { display: none; }                 /* ✕ на ПК не нужен */
+}
 
