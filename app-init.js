@@ -3,12 +3,46 @@
 // ═══════════════════════════════════════════
 const mf={name:'Мои карточки',short_name:'Карточки',start_url:'./',display:'standalone',background_color:'#0f0f0f',theme_color:'#0f0f0f',orientation:'portrait',icons:[{src:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f0f0f'/><text y='.9em' font-size='80' x='10'>🗂</text></svg>",sizes:'192x192',type:'image/svg+xml',purpose:'any maskable'}]};
 document.getElementById('manifest-link').href=URL.createObjectURL(new Blob([JSON.stringify(mf)],{type:'application/json'}));
+let _swReg = null;
+function showUpdateBar() {
+  if(document.getElementById('update-bar')) return;
+  const bar = document.createElement('div');
+  bar.id = 'update-bar';
+  bar.style.cssText = 'position:fixed;left:50%;bottom:calc(20px + var(--safe,0px));transform:translateX(-50%);z-index:2000;background:var(--s2);border:1px solid var(--accent);border-radius:var(--r);padding:10px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 6px 24px rgba(0,0,0,.5);max-width:92vw';
+  bar.innerHTML = '<span style="font-size:14px;color:var(--t1)">🔄 Доступна новая версия</span><button onclick="applyUpdate()" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Обновить</button>';
+  document.body.appendChild(bar);
+}
+function applyUpdate() {
+  if(_swReg && _swReg.waiting) {
+    navigator.serviceWorker.addEventListener('controllerchange', () => location.reload(), { once: true });
+    _swReg.waiting.postMessage({ type: 'SKIP_WAITING' });
+  } else {
+    location.reload();
+  }
+}
+async function checkForUpdate(manual) {
+  try {
+    if(!_swReg) _swReg = await navigator.serviceWorker.getRegistration();
+    if(_swReg) await _swReg.update();
+    if(_swReg && _swReg.waiting) showUpdateBar();
+    else if(manual) toast('Обновлений нет');
+  } catch(e) {}
+}
 if('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/check-list/sw.js').catch(()=>{});
-  // Listen for message from service worker to open checklist
+  navigator.serviceWorker.register('/check-list/sw.js').then(reg => {
+    _swReg = reg;
+    if(reg.waiting && navigator.serviceWorker.controller) showUpdateBar();
+    reg.addEventListener('updatefound', () => {
+      const nw = reg.installing; if(!nw) return;
+      nw.addEventListener('statechange', () => {
+        if(nw.state === 'installed' && navigator.serviceWorker.controller) showUpdateBar();
+      });
+    });
+  }).catch(()=>{});
   navigator.serviceWorker.addEventListener('message', e => {
     if (e.data?.type === 'OPEN_CHECKLIST') switchToChecklist();
   });
+  document.addEventListener('visibilitychange', () => { if(!document.hidden) checkForUpdate(false); });
 }
 
 // Check URL param on load

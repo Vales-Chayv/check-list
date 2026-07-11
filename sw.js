@@ -1,4 +1,4 @@
-const CACHE = 'mc-v36';
+const CACHE = 'mc-v32';
 const APP_FILES = [
   '/check-list/',
   '/check-list/index.html',
@@ -18,10 +18,12 @@ const APP_FILES = [
 ];
 
 self.addEventListener('install', e => {
-  self.skipWaiting();
   e.waitUntil(
     caches.open(CACHE).then(cache => cache.addAll(APP_FILES).catch(()=>{}))
   );
+});
+self.addEventListener('message', e => {
+  if(e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
