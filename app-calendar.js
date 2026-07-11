@@ -731,3 +731,22 @@ async function calOpenCard(cardId) {
   if(monEl) monEl.textContent = months[now.getMonth()] + ' ' + now.getFullYear();
   setTimeout(updateCalBtn, 60000);
 })();
+
+// ── Свайп по календарю: влево = следующий период, вправо = предыдущий ──
+(function initCalSwipe() {
+  const el = document.getElementById('cal-body');
+  if(!el) return;
+  let sx = 0, sy = 0, st = 0;
+  el.addEventListener('touchstart', e => {
+    const t = e.changedTouches[0];
+    sx = t.clientX; sy = t.clientY; st = Date.now();
+  }, { passive: true });
+  el.addEventListener('touchend', e => {
+    const t = e.changedTouches[0];
+    const dx = t.clientX - sx, dy = t.clientY - sy, dt = Date.now() - st;
+    if(dt > 800) return;                       // слишком долго — не свайп
+    if(Math.abs(dx) < 55) return;              // слишком короткий
+    if(Math.abs(dx) < Math.abs(dy) * 1.6) return; // это вертикальная прокрутка
+    if(dx < 0) calNext(); else calPrev();
+  }, { passive: true });
+})();
