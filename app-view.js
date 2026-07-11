@@ -211,7 +211,10 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
   setTimeout(()=>setupEntrySwipe(), 100);
 }
 
-function closeView() { document.getElementById('view-ov').classList.remove('on'); }
+function closeView() {
+  document.getElementById('view-ov').classList.remove('on');
+  if(window._foreignCardId){ const fid=window._foreignCardId; window._foreignCardId=null; cards=cards.filter(c=>c.id!==fid); render(); }
+}
 
 async function toggleBall(cardId, val) {
   const card = cards.find(c=>c.id===cardId); if(!card) return;

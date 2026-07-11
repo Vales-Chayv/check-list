@@ -23,8 +23,7 @@ function closePinStrip(){ document.getElementById('pin-strip-ov').classList.remo
 function closePinPopup(){ document.getElementById('pin-popup-ov').classList.remove('on'); }
 async function openPinPopup(){
   document.getElementById('pin-popup-ov').classList.add('on');
-  const listEl = document.getElementById('pin-popup-list');
-  listEl.innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Загрузка…</div>';
+  document.getElementById('pin-popup-list').innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Загрузка…</div>';
   let pinned = [];
   try {
     const ids = spaces.map(s=>s.id);
@@ -32,29 +31,56 @@ async function openPinPopup(){
     pinned = data||[];
   } catch(e) { pinned = (cards||[]).filter(c=>c.pinned); }
   window._pinnedCache = pinned;
+  renderPinList();
+}
+function renderPinList(){
+  const listEl = document.getElementById('pin-popup-list'); if(!listEl) return;
+  const pinned = window._pinnedCache||[];
   if(!pinned.length){ listEl.innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Нет закреплённых карточек</div>'; return; }
   const spaceName = id => (spaces.find(s=>s.id===id)?.name)||'';
   listEl.innerHTML = pinned.map(c=>{
     const ents = c.entries||[];
     const doneN = ents.filter(e=>e.done).length;
-    return `<div onclick="openPinnedCard('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:var(--rsm);border:1px solid var(--b1);background:var(--s2);margin-bottom:8px;cursor:pointer">
-      <span style="font-size:16px;flex-shrink:0">📌</span>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:14px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.title)}</div>
+    return `<div style="display:flex;align-items:center;gap:8px;padding:11px 12px;border-radius:var(--rsm);border:1px solid var(--b1);background:var(--s2);margin-bottom:8px">
+      <div onclick="openPinnedCard('${c.id}')" style="flex:1;min-width:0;cursor:pointer">
+        <div style="font-size:14px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📌 ${esc(c.title)}</div>
         <div style="font-size:12px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🗂️ ${esc(spaceName(c.space_id))}${ents.length?` · записи ${doneN}/${ents.length}`:''}</div>
       </div>
+      <button onclick="unpinFromPopup('${c.id}',event)" style="flex-shrink:0;background:var(--s1);border:1px solid var(--b1);color:var(--t2);border-radius:12px;padding:4px 10px;font-size:12px;cursor:pointer">Открепить</button>
     </div>`;
   }).join('');
 }
+async function unpinFromPopup(id, ev){
+  if(ev) ev.stopPropagation();
+  const inCurrent = (cards||[]).find(c=>c.id===id);
+  const card = inCurrent || (window._pinnedCache||[]).find(c=>c.id===id);
+  if(!card) return;
+  card.pinned = false;
+  if((card.entries||[]).length>0 && (card.entries||[]).every(e=>e.done)) card.status='done';
+  try { await dbUpdate(card); } catch(e) {}
+  if(inCurrent) render();
+  window._pinnedCache = (window._pinnedCache||[]).filter(c=>c.id!==id);
+  renderPinList();
+}
 async function openPinnedCard(id){
-  const card = (window._pinnedCache||[]).find(c=>c.id===id) || (cards||[]).find(c=>c.id===id);
+  const cached = (window._pinnedCache||[]).find(c=>c.id===id);
+  const card = cached || (cards||[]).find(c=>c.id===id);
   closePinPopup(); closePinStrip();
   if(!card) return;
-  if(card.space_id && card.space_id !== currentSpaceId && typeof setCurrentSpace==='function'){
-    await setCurrentSpace(card.space_id, true);
-    setTimeout(()=>{ if(typeof openView==='function') openView(id); }, 800);
-  } else if(typeof openView==='function'){
+  const inCurrent = card.space_id === currentSpaceId;
+  const sp = spaces.find(s=>s.id===card.space_id);
+  const famLike = sp && (sp.type==='family' || sp.type==='group');
+  if(inCurrent){
     openView(id);
+  } else if(!famLike){
+    // личный чужой кабинет: открыть без переключения (временно подложим карточку)
+    if(!cards.some(c=>c.id===id)){ window._foreignCardId = id; cards.push(card); }
+    openView(id);
+  } else {
+    // семейный чужой кабинет: пока со старым переключением
+    await setCurrentSpace(card.space_id, true);
+    let tries=0;
+    (function waitOpen(){ if((cards||[]).some(c=>c.id===id)){ openView(id); return; } if(++tries>25) return; setTimeout(waitOpen,120); })();
   }
 }
 

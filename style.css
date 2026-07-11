@@ -211,8 +211,8 @@ body{display:flex;flex-direction:column;overflow:hidden}
     transition: none;
   }
  #cal-close-btn { display: none; }                 /* ✕ на ПК не нужен */
- #view-ov, #edit-ov, #ae-ov {
-    inset: 0 auto 0 0; width: var(--split-left);    /* карточка — в левой колонке, календарь справа виден */
+#view-ov, #edit-ov, #ae-ov, #pin-strip-ov, #pin-popup-ov {
+    inset: 0 auto 0 0; width: var(--split-left);    /* карточка/попап — в левой колонке, календарь справа виден */
   }
   #split-handle {
     display: block; position: fixed; top: 0; bottom: 0;
