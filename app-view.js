@@ -268,7 +268,8 @@ function openAddEntry(cardId, sessionId = null, hideNote = false) {
 
   document.getElementById('ae-extra').style.display = 'none';
   document.getElementById('ae-extra-arrow').textContent = '▼';
-  document.getElementById('ae-ov').classList.add('on');
+ document.getElementById('ae-ov').classList.add('on');
+  aeAddEntryRow();                                   // авто-первая пустая строка записи
   setTimeout(() => { if(noteEl) noteEl.focus(); }, 300);
 }
 
