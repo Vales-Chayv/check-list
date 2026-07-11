@@ -21,10 +21,41 @@ function render() {
 function openPinStrip(){ document.getElementById('pin-strip-ov').classList.add('on'); }
 function closePinStrip(){ document.getElementById('pin-strip-ov').classList.remove('on'); }
 function closePinPopup(){ document.getElementById('pin-popup-ov').classList.remove('on'); }
-function openPinPopup(){
+async function openPinPopup(){
   document.getElementById('pin-popup-ov').classList.add('on');
-  document.getElementById('pin-popup-list').innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Загрузка…</div>';
-  // список наполним на шаге 1.3b
+  const listEl = document.getElementById('pin-popup-list');
+  listEl.innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Загрузка…</div>';
+  let pinned = [];
+  try {
+    const ids = spaces.map(s=>s.id);
+    const { data } = await sb.from('cards').select('*').in('space_id', ids).eq('pinned', true);
+    pinned = data||[];
+  } catch(e) { pinned = (cards||[]).filter(c=>c.pinned); }
+  window._pinnedCache = pinned;
+  if(!pinned.length){ listEl.innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Нет закреплённых карточек</div>'; return; }
+  const spaceName = id => (spaces.find(s=>s.id===id)?.name)||'';
+  listEl.innerHTML = pinned.map(c=>{
+    const ents = c.entries||[];
+    const doneN = ents.filter(e=>e.done).length;
+    return `<div onclick="openPinnedCard('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:var(--rsm);border:1px solid var(--b1);background:var(--s2);margin-bottom:8px;cursor:pointer">
+      <span style="font-size:16px;flex-shrink:0">📌</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.title)}</div>
+        <div style="font-size:12px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🗂️ ${esc(spaceName(c.space_id))}${ents.length?` · записи ${doneN}/${ents.length}`:''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function openPinnedCard(id){
+  const card = (window._pinnedCache||[]).find(c=>c.id===id) || (cards||[]).find(c=>c.id===id);
+  closePinPopup(); closePinStrip();
+  if(!card) return;
+  if(card.space_id && card.space_id !== currentSpaceId && typeof setCurrentSpace==='function'){
+    await setCurrentSpace(card.space_id, true);
+    setTimeout(()=>{ if(typeof openView==='function') openView(id); }, 800);
+  } else if(typeof openView==='function'){
+    openView(id);
+  }
 }
 
 let filterNoDeadline = localStorage.getItem('mc_no_dl')==='1';
