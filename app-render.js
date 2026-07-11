@@ -26,6 +26,7 @@ function renderCats() {
   const bar = document.getElementById('cats');
   const all = filterCat==='all';
   let html = `<button class="cat-btn${all?' on':''}" style="${all?'border-color:rgba(255,255,255,.25)':''}" onclick="handleAllCatClick()">Все ▾</button>`;
+  if(view==='cards') html += `<button class="cat-btn${filterNoDeadline?' on':''}" style="${filterNoDeadline?'background:rgba(232,197,106,.15);border-color:var(--accent);color:var(--accent)':''}" onclick="toggleNoDeadline()">📅✕ Без срока</button>`;
   cats.forEach((c,i) => {
     const col = c.color||'#888';
     const active = filterCat===c.name;
@@ -40,11 +41,8 @@ function renderCats() {
       ontouchstart="App.startCatHold(${i},this);App.touchStartCat(${i},event)"
       ontouchend="App.cancelCatHold();App.touchEndCat(event)"
       ontouchmove="App.cancelCatHold();App.touchMoveCat(event)">
-     <span class="cat-dot" style="background:${col}"></span>${esc(c.name)}</button>`;
+    <span class="cat-dot" style="background:${col}"></span>${esc(c.name)}</button>`;
   });
-  if(view==='cards') {
-    html += `<button class="cat-btn${filterNoDeadline?' on':''}" style="${filterNoDeadline?'background:rgba(232,197,106,.15);border-color:var(--accent);color:var(--accent)':''}" onclick="toggleNoDeadline()">📅✕ Без срока</button>`;
-  }
   bar.innerHTML = html;
 }
 
