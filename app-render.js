@@ -15,8 +15,16 @@ function render() {
     s.textContent = '@keyframes dl-pulse{0%,100%{opacity:1}50%{opacity:.35}} .dl-pulse{animation:dl-pulse 1.8s ease-in-out infinite}';
     document.head.appendChild(s);
   }
-   renderCats(); renderMain();
+  renderCats(); renderMain();
   desktopCalSync();
+}
+function openPinStrip(){ document.getElementById('pin-strip-ov').classList.add('on'); }
+function closePinStrip(){ document.getElementById('pin-strip-ov').classList.remove('on'); }
+function closePinPopup(){ document.getElementById('pin-popup-ov').classList.remove('on'); }
+function openPinPopup(){
+  document.getElementById('pin-popup-ov').classList.add('on');
+  document.getElementById('pin-popup-list').innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Загрузка…</div>';
+  // список наполним на шаге 1.3b
 }
 
 let filterNoDeadline = localStorage.getItem('mc_no_dl')==='1';
