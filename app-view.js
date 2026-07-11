@@ -193,7 +193,16 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
     if(chips) html+=`<div class="view-sec"><div class="view-lbl">Связанные</div><div style="display:flex;flex-wrap:wrap;gap:5px">${chips}</div></div>`;
   }
 
-  document.getElementById('view-content').innerHTML=html;
+ document.getElementById('view-content').innerHTML=html;
+  // Сэндвич-градиент: слой над текстом, под шапкой (шапку не трогаем)
+  const _vc = document.getElementById('view-content');
+  const _head = _vc.firstElementChild;
+  if(_head) {
+    const _fade = document.createElement('div');
+    _fade.id = 'view-fade';
+    _head.insertAdjacentElement('afterend', _fade);
+    requestAnimationFrame(() => { _fade.style.top = _head.getBoundingClientRect().height + 'px'; });
+  }
   document.getElementById('view-ov').classList.add('on');
   setTimeout(()=>setupEntrySwipe(), 100);
 }
