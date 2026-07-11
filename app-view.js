@@ -620,6 +620,60 @@ entry.deadline = dl || null;
   try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
 }
 
+let _mcTargetSpace = null;
+function moveCardToSpace(cardId) {
+  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  _mcTargetSpace = null;
+  const curFam = currentSpace?.type==='family' || currentSpace?.type==='group';
+  const famLike = t => t==='family' || t==='group';
+  const targets = spaces.filter(s => s.id!==currentSpaceId && famLike(s.type)===curFam);
+  const div = document.createElement('div');
+  div.id = 'move-card-dialog';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
+  const spaceBtns = targets.length ? targets.map(s =>
+    `<button onclick="mcSelectSpace('${cardId}','${s.id}',this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">${famLike(s.type)?'👨‍👩‍👧':'🗂️'} ${esc(s.name)}</button>`
+  ).join('') : `<div style="font-size:13px;color:var(--t3)">Нет других кабинетов того же типа</div>`;
+  div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto">
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">📦 Переместить карточку</div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:10px">«${esc(card.title)}» → выбери кабинет</div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">${spaceBtns}</div>
+    <div id="mc-cat-section" style="display:none">
+      <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Рубрика в новом кабинете</div>
+      <div style="display:flex;flex-direction:column;gap:6px" id="mc-cat-list"></div>
+    </div>
+    <button onclick="document.getElementById('move-card-dialog')?.remove()" style="width:100%;margin-top:12px;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;cursor:pointer">Отмена</button>
+  </div>`;
+  document.body.appendChild(div);
+}
+async function mcSelectSpace(cardId, spaceId, btn) {
+  _mcTargetSpace = spaceId;
+  document.querySelectorAll('#move-card-dialog button[onclick^="mcSelectSpace"]').forEach(b=>{ b.style.borderColor='var(--b1)'; b.style.color='var(--t1)'; });
+  if(btn){ btn.style.borderColor='var(--accent)'; btn.style.color='var(--accent)'; }
+  const sec = document.getElementById('mc-cat-section');
+  const list = document.getElementById('mc-cat-list');
+  if(!sec || !list) return;
+  sec.style.display='block';
+  list.innerHTML = '<div style="font-size:13px;color:var(--t3)">Загрузка рубрик…</div>';
+  let targetCats = [];
+  try { const { data } = await sb.from('categories').select('name,color').eq('space_id', spaceId); targetCats = data||[]; } catch(e) {}
+  const catBtns = targetCats.map(c =>
+    `<button onclick="mcConfirm('${cardId}','${esc(c.name)}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c.color||'#888'};margin-right:8px;vertical-align:middle"></span>${esc(c.name)}</button>`
+  ).join('');
+  list.innerHTML = catBtns + `<button onclick="mcConfirm('${cardId}','')" style="background:transparent;border:1px dashed var(--b2);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t2);cursor:pointer;text-align:left;font-family:inherit">— Без рубрики</button>`;
+}
+async function mcConfirm(cardId, catName) {
+  const card = cards.find(c=>c.id===cardId);
+  const target = _mcTargetSpace;
+  if(!card || !target) return;
+  document.getElementById('move-card-dialog')?.remove();
+  const updated = { ...card, space_id: target, category: catName || '' };
+  try { await dbUpdate(updated); } catch(e) { toast('Ошибка переноса', true); return; }
+  cards = cards.filter(c => c.id !== cardId);
+  try { await local.delete('cards', cardId); } catch(e) {}
+  if(typeof closeView === 'function') closeView();
+  render();
+  toast('✓ Карточка перемещена');
+}
 function moveEntry(cardId, entryId) {
   const card = cards.find(c=>c.id===cardId); if(!card) return;
   const entry = (card.entries||[]).find(e=>e.id===entryId); if(!entry) return;

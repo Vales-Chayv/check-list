@@ -241,10 +241,14 @@ function handleRealtimeCard(payload) {
   const { eventType, new: n, old: o } = payload;
   if(eventType === 'INSERT') {
     if(!cards.find(c => c.id === n.id)) { cards.unshift(n); local.put('cards', n); }
-  } else if(eventType === 'UPDATE') {
-    const idx = cards.findIndex(c => c.id === n.id);
-    if(idx !== -1) { cards[idx] = n; local.put('cards', n); }
-    else { cards.unshift(n); local.put('cards', n); }
+} else if(eventType === 'UPDATE') {
+    if(n.space_id && currentSpaceId && n.space_id !== currentSpaceId) {
+      cards = cards.filter(c => c.id !== n.id); local.delete('cards', n.id); // карточку перенесли в другой кабинет
+    } else {
+      const idx = cards.findIndex(c => c.id === n.id);
+      if(idx !== -1) { cards[idx] = n; local.put('cards', n); }
+      else { cards.unshift(n); local.put('cards', n); }
+    }
   } else if(eventType === 'DELETE') {
     cards = cards.filter(c => c.id !== o.id);
     local.delete('cards', o.id);
