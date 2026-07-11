@@ -55,8 +55,16 @@ document.getElementById('e-body').closest('.fld').style.display = isFamily ? 'fl
   document.querySelector('.mtab').classList.add('on');
   document.getElementById('p-main').classList.add('on');
 
-  document.getElementById('edit-ov').classList.add('on');
-  setTimeout(()=>{document.getElementById('e-title').focus(); originalState=getState();},300);
+ document.getElementById('edit-ov').classList.add('on');
+  setTimeout(()=>{
+    if(editId){
+      const hasBlank = tempEntries.some(e => !e._saved && !stripTags(e.text||'').trim());
+      if(!hasBlank) addEntry();                        // авто-«＋ запись» — только в существующей карточке
+    } else {
+      document.getElementById('e-title').focus();      // новая карточка — фокус на название, без пустой записи
+    }
+    originalState = getState();
+  },300);
 }
 
 function getState() {
