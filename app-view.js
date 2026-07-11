@@ -33,6 +33,7 @@ function openView(id) {
       <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
         <button onclick="closeView()" style="background:var(--s2);border:none;color:var(--t2);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px">✕</button>
         <button onclick="closeView();setTimeout(()=>openAddEntry('${id}'),200)" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:8px;padding:9px 16px;font-size:15px;font-weight:700;cursor:pointer">＋ Запись</button>
+        ${card.pinned?`<button onclick="resetCardChecks('${id}')" style="background:var(--s2);color:var(--t1);border:1px solid var(--b1);border-radius:8px;padding:9px 16px;font-size:15px;cursor:pointer">↺ Сбросить</button>`:''}
 		${card.status!=='done'&&view!=='today'?`<button onclick="toggleToday('${id}')" style="background:${card.today?'rgba(232,197,106,.3)':'rgba(232,197,106,.1)'};color:var(--accent);border:1px solid rgba(232,197,106,.3);border-radius:8px;padding:9px 16px;font-size:15px;cursor:pointer">${card.today?'✕ Убрать из списка':'☆ На сегодня'}</button>`:''}
 		${card.status==='done'?`<button onclick="restoreCard('${id}')" style="background:rgba(91,184,122,.15);color:var(--green);border:1px solid rgba(91,184,122,.25);border-radius:8px;padding:9px 16px;font-size:15px;cursor:pointer">↩ Вернуть</button>`:''}
       ${(currentSpace?.type!=='family'||(card.created_by&&card.created_by.toLowerCase()===localStorage.getItem('mc_current_member')?.toLowerCase()))?
@@ -227,6 +228,22 @@ function openImgDirect(src) {
   document.getElementById('img-viewer').style.display = 'flex';
 }
 
+async function resetCardChecks(cardId) {
+  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  (card.entries||[]).forEach(e=>{ e.done=false; if(e.completions) e.completions.forEach(c=>c.done=false); });
+  if(card.status==='done') card.status='in_progress';
+  const dls=(card.entries||[]).filter(x=>x.deadline).map(x=>x.deadline).sort();
+  card.deadline = dls[0]||null;
+  render();
+  if(document.getElementById('view-ov')?.classList.contains('on')) openView(cardId);
+  try{await dbUpdate(card);}catch(e){toast('Ошибка',true);}
+  toast('↺ Галочки сброшены');
+}
+function maybeOfferReset(cardId, justChecked) {
+  const card = cards.find(c=>c.id===cardId); if(!card || !card.pinned || !justChecked) return;
+  const allDone = (card.entries||[]).length>0 && (card.entries||[]).every(x=>x.done);
+  if(allDone) setTimeout(()=>{ if(confirm('Все записи отмечены. Сбросить галочки?')) resetCardChecks(cardId); }, 120);
+}
 async function viewToggleEntry(cardId, entryId) {
   const card=cards.find(c=>c.id===cardId); if(!card)return;
   const e=(card.entries||[]).find(x=>x.id===entryId); if(!e)return;
@@ -239,12 +256,13 @@ async function viewToggleEntry(cardId, entryId) {
   e.done=!e.done;
   const activeDls = (card.entries||[]).filter(x=>!x.done&&x.deadline).map(x=>x.deadline).sort();
   if(activeDls.length) card.deadline = activeDls[0];
-  if((card.entries||[]).length>0&&(card.entries||[]).every(x=>x.done)){
+  if(!card.pinned && (card.entries||[]).length>0&&(card.entries||[]).every(x=>x.done)){
     card.status='done';
     card.history=[...(card.history||[]),{date:nowStr(),text:'Все записи выполнены → Готово',type:'status'}];
   }
   render(); openView(cardId);
   try{await dbUpdate(card);}catch(err){toast('Ошибка синхронизации',true);}
+  maybeOfferReset(cardId, e.done);
 }
 
 
@@ -446,7 +464,7 @@ completions: completions,
   }
 
   if(card.status === 'new') card.status = 'in_progress';
-  if((card.entries||[]).filter(e=>e.text).length && (card.entries||[]).filter(e=>e.text).every(e=>e.done)) card.status='done';
+  if(!card.pinned && (card.entries||[]).filter(e=>e.text).length && (card.entries||[]).filter(e=>e.text).every(e=>e.done)) card.status='done';
 
   closeAddEntry();
   render();

@@ -376,7 +376,7 @@ async function saveCard() {
   else hist.push({date:nowStr(),text:'Обновлено',type:'note'});
   const cleanEntries=tempEntries.map(({_saved,...e})=>({...e,text:sanitizeRich(e.text)})).filter(e=>stripTags(e.text).trim());
   let finalStatus=isFamily ? 'new' : newStatus;
-  if(cleanEntries.length>0&&cleanEntries.every(e=>e.done)) finalStatus='done';
+  if(cleanEntries.length>0&&cleanEntries.every(e=>e.done)&&!oldCard?.pinned) finalStatus='done';
 
   // Family space: wrap body+entries into session
   let sessionEntries = cleanEntries;
@@ -462,12 +462,13 @@ async function toggleDone(id) {
 async function toggleEntry(cardId,entryId) {
   const card=cards.find(c=>c.id===cardId); if(!card)return;
   const e=(card.entries||[]).find(x=>x.id===entryId); if(!e)return;
-  e.done=!e.done;
-  if((card.entries||[]).length>0&&(card.entries||[]).every(x=>x.done)){
+ e.done=!e.done;
+  if(!card.pinned && (card.entries||[]).length>0&&(card.entries||[]).every(x=>x.done)){
     card.status='done';
     card.history=[...(card.history||[]),{date:nowStr(),text:'Все записи выполнены → Готово',type:'status'}];
   }
   render(); try{await dbUpdate(card);}catch(e){toast('Ошибка',true);}
+  if(typeof maybeOfferReset==='function') maybeOfferReset(cardId, e.done);
 }
 
 // Tabs

@@ -191,7 +191,8 @@ function cardHTML(card, isDone=false) {
   const lastChg=hist.length?`<span style="font-size:10px;opacity:.45;margin-left:auto">${hist[hist.length-1].date}</span>`:'';
 
   return`<div class="card ${pcls}" style="background:${bg};border-color:${border}${isDone?';opacity:.75':''}" onclick="App.openView('${card.id}')">
-    <div style="display:flex;justify-content:space-between;gap:7px;align-items:flex-start">
+<div style="display:flex;justify-content:space-between;gap:7px;align-items:flex-start">
+      <button onclick="event.stopPropagation();App.togglePin('${card.id}')" title="${card.pinned?'Открепить':'Закрепить'}" style="background:none;border:none;cursor:pointer;font-size:16px;padding:0;line-height:1;flex-shrink:0;margin-top:1px;${card.pinned?'':'opacity:.28;filter:grayscale(1)'}">📌</button>
       <div style="flex:1;min-width:0">
         <div class="card-title" style="color:${col};${isDone?'text-decoration:line-through;opacity:.7':''}">${card.reminder?.enabled?'🔔 ':''}${pBadge}${esc(card.title)}</div>
         ${bodyHTML}${entriesHTML}${imgsHTML}${filesHTML}
@@ -291,6 +292,13 @@ const App = {
   },
   openView(id) { openView(id); },
   toggleDone(id) { toggleDone(id); },
+ togglePin(id) {
+    const card = cards.find(c=>c.id===id); if(!card) return;
+    card.pinned = !card.pinned;
+    if(!card.pinned && (card.entries||[]).length>0 && (card.entries||[]).every(e=>e.done)) card.status='done';
+    render(); dbUpdate(card);
+    toast(card.pinned?'📌 Закреплено':'Откреплено');
+  },
   toggleEntry(cardId,entryId) {
     if(currentSpace?.type==='family') {
       const card = cards.find(c=>c.id===cardId);
