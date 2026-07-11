@@ -79,7 +79,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .sheet-title{font-size:17px;font-weight:700}
 /* Сэндвич-градиент: шапка (z:10) перекрывает верх, "хвост" градиента торчит под шапкой */
 #view-fade{position:sticky;top:0;height:0;z-index:9;pointer-events:none}
-#view-fade::after{content:'';position:absolute;left:0;right:0;top:0;height:calc(var(--head-h,120px) + 45px);pointer-events:none;background:linear-gradient(to bottom,var(--bg),transparent)}
+#view-fade::after{content:'';position:absolute;left:0;right:0;top:0;height:calc(var(--head-h,120px) + 45px);pointer-events:none;background:linear-gradient(to bottom,var(--bg) 40%,transparent)}
 .close-btn{background:var(--s2);border:none;color:var(--t2);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center}
 .mtabs{display:flex;border-bottom:1px solid var(--b1)}
 .mtab{flex:1;padding:10px 6px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--t2);font-family:inherit;border-bottom:2px solid transparent}
