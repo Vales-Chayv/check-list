@@ -49,7 +49,7 @@ const expanded = deck.classList.contains('expanded');
     const col = catColor(c.category);
     const bg = hex2rgba(col, .13), border = hex2rgba(col, .35);
     const pos = expanded ? 'position:relative;margin-bottom:10px' : `position:absolute;left:0;right:0;top:${i*OFFSET}px;z-index:${900-i}`;
-    return `<div class="pin-tile" style="${pos};background:${bg};border-color:${border}" onclick="openPinnedCard('${c.id}')">
+   return `<div class="pin-tile" style="${pos};background:linear-gradient(${bg},${bg}),var(--bg);border-color:${border}" onclick="openPinnedCard('${c.id}')">
       <button onclick="unpinFromPopup('${c.id}',event)" title="Открепить" style="position:absolute;top:8px;right:10px;background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:0;line-height:1">✕</button>
       <div style="font-size:14px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:22px">📌 ${esc(c.title)}</div>
       <div style="font-size:12px;color:var(--t3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🗂️ ${esc(spaceName(c.space_id))}${ents.length?` · записи ${doneN}/${ents.length}`:''}</div>
