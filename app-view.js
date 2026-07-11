@@ -194,17 +194,17 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
   }
 
  document.getElementById('view-content').innerHTML=html;
- // Сэндвич-градиент: слой над текстом, под шапкой (шапку не трогаем)
+// Сэндвич-градиент: шапка сверху перекрывает верх градиента, "хвост" торчит под шапкой
   const _vc = document.getElementById('view-content');
   const _head = _vc.firstElementChild;
   if(_head) {
     const _fade = document.createElement('div');
     _fade.id = 'view-fade';
-    _head.insertAdjacentElement('afterend', _fade);
-    const _setFadeTop = () => { _fade.style.top = _head.offsetHeight + 'px'; };
-    setTimeout(_setFadeTop, 450);                 // после анимации выезда листа
+    _vc.insertBefore(_fade, _head);              // перед шапкой в потоке, но шапка (z:10) ляжет сверху
+    const _setFadeH = () => { _fade.style.setProperty('--head-h', _head.offsetHeight + 'px'); };
+    setTimeout(_setFadeH, 450);                   // после анимации выезда листа
     const _sheet = _fade.closest('.sheet');
-    if(_sheet) _sheet.addEventListener('scroll', _setFadeTop, { passive: true });
+    if(_sheet) _sheet.addEventListener('scroll', _setFadeH, { passive: true });
   }
   document.getElementById('view-ov').classList.add('on');
   setTimeout(()=>setupEntrySwipe(), 100);
