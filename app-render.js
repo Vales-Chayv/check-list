@@ -88,6 +88,24 @@ async function openPinnedCard(id){
   }
 }
 
+// ── Жест колоды: свайп вниз / колёсико вниз — разложить; свайп вверх / колёсико вверх — собрать ──
+(function initPinDeckGestures(){
+  const deck = document.getElementById('pin-deck');
+  if(!deck) return;
+  let startY = 0;
+  deck.addEventListener('touchstart', e=>{ startY = e.touches[0].clientY; }, {passive:true});
+  deck.addEventListener('touchend', e=>{
+    const dy = e.changedTouches[0].clientY - startY;
+    const expanded = deck.classList.contains('expanded');
+    if(!expanded && dy > 40){ deck.classList.add('expanded'); renderPinDeck(); e.preventDefault(); }
+    else if(expanded && dy < -40 && deck.scrollTop <= 2){ deck.classList.remove('expanded'); renderPinDeck(); e.preventDefault(); }
+  }, {passive:false});
+  deck.addEventListener('wheel', e=>{
+    const expanded = deck.classList.contains('expanded');
+    if(!expanded && e.deltaY > 0){ deck.classList.add('expanded'); renderPinDeck(); e.preventDefault(); }
+    else if(expanded && e.deltaY < 0 && deck.scrollTop <= 2){ deck.classList.remove('expanded'); renderPinDeck(); e.preventDefault(); }
+  }, {passive:false});
+})();
 let filterNoDeadline = localStorage.getItem('mc_no_dl')==='1';
 function cardHasNoDeadline(c){ return !c.deadline && (c.entries||[]).every(e=>!e.deadline); }
 function toggleNoDeadline(){ filterNoDeadline=!filterNoDeadline; localStorage.setItem('mc_no_dl', filterNoDeadline?'1':'0'); render(); }
