@@ -22,8 +22,11 @@ function openPinStrip(){ document.getElementById('pin-strip-ov').classList.add('
 function closePinStrip(){ document.getElementById('pin-strip-ov').classList.remove('on'); }
 function closePinPopup(){ document.getElementById('pin-popup-ov').classList.remove('on'); }
 async function openPinPopup(){
+  closePinStrip();
   document.getElementById('pin-popup-ov').classList.add('on');
-  document.getElementById('pin-popup-list').innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Загрузка…</div>';
+  const deck = document.getElementById('pin-deck');
+  deck.classList.remove('expanded');
+  deck.innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Загрузка…</div>';
   let pinned = [];
   try {
     const ids = spaces.map(s=>s.id);
@@ -31,22 +34,23 @@ async function openPinPopup(){
     pinned = data||[];
   } catch(e) { pinned = (cards||[]).filter(c=>c.pinned); }
   window._pinnedCache = pinned;
-  renderPinList();
+  renderPinDeck();
 }
-function renderPinList(){
-  const listEl = document.getElementById('pin-popup-list'); if(!listEl) return;
+function renderPinDeck(){
+  const deck = document.getElementById('pin-deck'); if(!deck) return;
   const pinned = window._pinnedCache||[];
-  if(!pinned.length){ listEl.innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Нет закреплённых карточек</div>'; return; }
+  if(!pinned.length){ deck.innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Нет закреплённых карточек</div>'; return; }
   const spaceName = id => (spaces.find(s=>s.id===id)?.name)||'';
-  listEl.innerHTML = pinned.map(c=>{
+  const expanded = deck.classList.contains('expanded');
+  const OFFSET = 46;
+  deck.innerHTML = pinned.map((c,i)=>{
     const ents = c.entries||[];
     const doneN = ents.filter(e=>e.done).length;
-    return `<div style="display:flex;align-items:center;gap:8px;padding:11px 12px;border-radius:var(--rsm);border:1px solid var(--b1);background:var(--s2);margin-bottom:8px">
-      <div onclick="openPinnedCard('${c.id}')" style="flex:1;min-width:0;cursor:pointer">
-        <div style="font-size:14px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📌 ${esc(c.title)}</div>
-        <div style="font-size:12px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🗂️ ${esc(spaceName(c.space_id))}${ents.length?` · записи ${doneN}/${ents.length}`:''}</div>
-      </div>
-      <button onclick="unpinFromPopup('${c.id}',event)" style="flex-shrink:0;background:var(--s1);border:1px solid var(--b1);color:var(--t2);border-radius:12px;padding:4px 10px;font-size:12px;cursor:pointer">Открепить</button>
+    const pos = expanded ? 'position:relative;margin-bottom:10px' : `position:absolute;left:0;right:0;top:${i*OFFSET}px;z-index:${900-i}`;
+    return `<div class="pin-tile" style="${pos}" onclick="openPinnedCard('${c.id}')">
+      <button onclick="unpinFromPopup('${c.id}',event)" title="Открепить" style="position:absolute;top:8px;right:10px;background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:0;line-height:1">✕</button>
+      <div style="font-size:14px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:22px">📌 ${esc(c.title)}</div>
+      <div style="font-size:12px;color:var(--t3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🗂️ ${esc(spaceName(c.space_id))}${ents.length?` · записи ${doneN}/${ents.length}`:''}</div>
     </div>`;
   }).join('');
 }
@@ -60,7 +64,7 @@ async function unpinFromPopup(id, ev){
   try { await dbUpdate(card); } catch(e) {}
   if(inCurrent) render();
   window._pinnedCache = (window._pinnedCache||[]).filter(c=>c.id!==id);
-  renderPinList();
+  renderPinDeck();
 }
 async function openPinnedCard(id){
   const cached = (window._pinnedCache||[]).find(c=>c.id===id);
