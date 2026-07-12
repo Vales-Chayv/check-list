@@ -132,11 +132,19 @@ async function openCalendar() {
   calAllEvents = [];
   document.getElementById('cal-ov').classList.add('on');
   document.getElementById('cal-body').innerHTML = '<div style="text-align:center;padding:40px;color:var(--t3)">⏳ Загрузка...</div>';
-  try {
+ try {
     const ids = spaces.map(s=>s.id);
-    const {data} = await sb.from('cards').select('*').in('space_id', ids).not('deadline','is',null);
+    let data = null;
+    if(navigator.onLine){
+      const r = await sb.from('cards').select('*').in('space_id', ids).not('deadline','is',null);
+      data = r.data;
+    }
+    if(!data){ const all = await local.getAll('cards'); data = all.filter(c => c.deadline); } // офлайн — из кэша
     calAllCards = data||[];
-} catch(e) { calAllCards = [...cards]; }
+  } catch(e) {
+    try { const all = await local.getAll('cards'); calAllCards = all.filter(c => c.deadline); }
+    catch(_) { calAllCards = [...cards]; }
+  }
   try {
     const ids2 = spaces.map(s=>s.id);
     const {data:evData} = await sb.from('events').select('*').in('space_id', ids2);

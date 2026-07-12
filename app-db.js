@@ -139,14 +139,16 @@ async function loadData() {
 async function prefetchAllSpaces() {
   if (!navigator.onLine) return;
   if (typeof spaces === 'undefined' || !spaces || !spaces.length) return;
+  setSyncDot('sync'); // держим индикатор «синим», пока не закэшируем все кабинеты
   try {
     const ids = spaces.map(s => s.id);
     const { data, error } = await sb.from('cards').select('*').in('space_id', ids);
-    if (error || !data) return;
-    // сохраняем в кэш карточки ДРУГИХ кабинетов (текущий уже обновлён свежими данными)
-    const others = data.filter(c => c.space_id !== currentSpaceId);
-    if (others.length) await local.putAll('cards', others);
-  } catch (e) { /* тихо: это фоновая оптимизация */ }
+    if (!error && data) {
+      const others = data.filter(c => c.space_id !== currentSpaceId);
+      if (others.length) await local.putAll('cards', others);
+    }
+  } catch (e) { /* тихо */ }
+  setSyncDot('ok'); // теперь все кабинеты в кэше — можно уходить в офлайн
 }
 
 async function syncFromServer() {
