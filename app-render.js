@@ -18,7 +18,7 @@ function render() {
   renderCats(); renderMain();
   desktopCalSync();
 }
-ffunction openPinStrip(){ document.getElementById('pin-strip').classList.add('open'); }
+function openPinStrip(){ document.getElementById('pin-strip').classList.add('open'); }
 function closePinStrip(){ document.getElementById('pin-strip').classList.remove('open'); closePinPopup(); }
 function togglePinStrip(){ const s=document.getElementById('pin-strip'); if(s.classList.contains('open')) closePinStrip(); else s.classList.add('open'); }
 function closePinPopup(){ document.getElementById('pin-popup-ov').classList.remove('on'); }
