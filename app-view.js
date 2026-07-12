@@ -213,7 +213,10 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
 
 function closeView() {
   document.getElementById('view-ov').classList.remove('on');
-  if(window._foreignCardId){ const fid=window._foreignCardId; window._foreignCardId=null; cards=cards.filter(c=>c.id!==fid); render(); }
+  if(window._foreignCat){ cats = cats.filter(k=>k.name!==window._foreignCat); window._foreignCat=null; }
+  if(window._foreignCardId){ const fid=window._foreignCardId; window._foreignCardId=null; cards=cards.filter(c=>c.id!==fid); }
+  if(window._pinFromLobby){ window._pinFromLobby=false; if(typeof showSpaceSelector==='function'){ showSpaceSelector(); return; } }
+  render();
 }
 
 async function toggleBall(cardId, val) {

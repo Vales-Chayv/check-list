@@ -19,10 +19,10 @@ function render() {
   desktopCalSync();
 }
 function openPinStrip(){ document.getElementById('pin-strip-ov').classList.add('on'); }
-function closePinStrip(){ document.getElementById('pin-strip-ov').classList.remove('on'); }
+function closePinStrip(){ document.getElementById('pin-strip-ov').classList.remove('on'); closePinPopup(); }
+function togglePinStrip(){ const s=document.getElementById('pin-strip-ov'); if(s.classList.contains('on')) closePinStrip(); else s.classList.add('on'); }
 function closePinPopup(){ document.getElementById('pin-popup-ov').classList.remove('on'); }
 async function openPinPopup(){
-  closePinStrip();
   document.getElementById('pin-popup-ov').classList.add('on');
   const deck = document.getElementById('pin-deck');
   deck.classList.remove('expanded');
@@ -79,17 +79,20 @@ async function openPinnedCard(id){
   const card = cached || (cards||[]).find(c=>c.id===id);
   closePinPopup(); closePinStrip();
   if(!card) return;
+  const sel = document.getElementById('space-selector');
+  const fromLobby = sel && sel.style.display !== 'none';
   const inCurrent = card.space_id === currentSpaceId;
   const sp = spaces.find(s=>s.id===card.space_id);
   const famLike = sp && (sp.type==='family' || sp.type==='group');
-  if(inCurrent){
-    openView(id);
-  } else if(!famLike){
-    // личный чужой кабинет: открыть без переключения (временно подложим карточку)
-    if(!cards.some(c=>c.id===id)){ window._foreignCardId = id; cards.push(card); }
+  if(inCurrent || !famLike){
+    if(fromLobby){ window._pinFromLobby = true; sel.style.display = 'none'; } // из лобби — спрятать, вернём при закрытии
+    if(!inCurrent){
+      if(!cards.some(c=>c.id===id)){ window._foreignCardId = id; cards.push(card); }
+      const col = window._pinCatColors && window._pinCatColors[card.space_id + '||' + (card.category||'')];
+      if(card.category && col && !cats.some(k=>k.name===card.category)){ window._foreignCat = card.category; cats.push({name:card.category, color:col}); }
+    }
     openView(id);
   } else {
-    // семейный чужой кабинет: пока со старым переключением
     await setCurrentSpace(card.space_id, true);
     let tries=0;
     (function waitOpen(){ if((cards||[]).some(c=>c.id===id)){ openView(id); return; } if(++tries>25) return; setTimeout(waitOpen,120); })();
