@@ -579,9 +579,9 @@
 <div id="cal-popup" style="display:none;position:fixed;z-index:300;background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);padding:14px;max-width:280px;box-shadow:0 4px 20px rgba(0,0,0,.5)"></div>
 <div id="rem-popups" style="position:fixed;bottom:20px;right:20px;z-index:1500;display:flex;flex-direction:column;gap:10px;max-width:320px"></div>
 <!-- Закреплённые: язычок → полоска → попап -->
-<div id="pin-tab" onclick="togglePinStrip()" title="Закреплённые">›</div>
-<div id="pin-strip-ov" onclick="if(event.target===this)closePinStrip()">
-  <div id="pin-strip">
+<div id="pin-strip">
+  <button id="pin-arrow" onclick="togglePinStrip()" title="Закреплённые">›</button>
+  <div id="pin-strip-buttons">
     <button id="pin-strip-btn" onclick="openPinPopup()" title="Закреплённые">📌</button>
   </div>
 </div>
