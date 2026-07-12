@@ -130,8 +130,23 @@ async function loadData() {
   } catch(e) {
     document.getElementById('scroll').innerHTML='<div class="loading"><div class="spinner"></div><span>Загрузка...</span></div>';
   }
-  // 2. Sync from server
+ // 2. Sync from server
   await syncFromServer();
+  // 3. Фоновая предзагрузка карточек всех кабинетов в кэш (для мгновенного переключения)
+  prefetchAllSpaces();
+}
+
+async function prefetchAllSpaces() {
+  if (!navigator.onLine) return;
+  if (typeof spaces === 'undefined' || !spaces || !spaces.length) return;
+  try {
+    const ids = spaces.map(s => s.id);
+    const { data, error } = await sb.from('cards').select('*').in('space_id', ids);
+    if (error || !data) return;
+    // сохраняем в кэш карточки ДРУГИХ кабинетов (текущий уже обновлён свежими данными)
+    const others = data.filter(c => c.space_id !== currentSpaceId);
+    if (others.length) await local.putAll('cards', others);
+  } catch (e) { /* тихо: это фоновая оптимизация */ }
 }
 
 async function syncFromServer() {
