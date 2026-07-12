@@ -580,10 +580,10 @@
 <div id="rem-popups" style="position:fixed;bottom:20px;right:20px;z-index:1500;display:flex;flex-direction:column;gap:10px;max-width:320px"></div>
 <!-- Закреплённые: язычок → полоска → попап -->
 <div id="pin-strip">
-  <button id="pin-arrow" onclick="togglePinStrip()" title="Закреплённые">›</button>
   <div id="pin-strip-buttons">
     <button id="pin-strip-btn" onclick="openPinPopup()" title="Закреплённые">📌</button>
   </div>
+  <button id="pin-arrow" onclick="togglePinStrip()" title="Закреплённые">›</button>
 </div>
 <div id="pin-popup-ov" onclick="if(event.target===this)closePinPopup()">
   <div id="pin-deck-wrap">
