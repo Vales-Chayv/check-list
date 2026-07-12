@@ -203,34 +203,85 @@ function renderToday() {
   el.innerHTML = html;
 }
 
+let clSelectedCabs = null; // null = только текущий кабинет; Set(ids) = агрегировать несколько
+window._clCache = []; window._clCatColors = {};
+async function loadChecklistCards(){
+  if(!clSelectedCabs){ render(); return; }
+  const ids = [...clSelectedCabs];
+  try { const { data } = await sb.from('cards').select('*').in('space_id', ids); window._clCache = data||[]; } catch(e){ window._clCache = []; }
+  try { const { data:cat } = await sb.from('categories').select('name,color,space_id').in('space_id', ids); window._clCatColors = {}; (cat||[]).forEach(c=>{ window._clCatColors[c.space_id+'||'+(c.name||'')]=c.color; }); } catch(e){ window._clCatColors = {}; }
+  render();
+}
+function clSelectAll(){ clSelectedCabs = new Set(spaces.map(s=>s.id)); loadChecklistCards(); }
+function clToggleCab(id){
+  if(!clSelectedCabs) clSelectedCabs = new Set([currentSpaceId]);
+  if(clSelectedCabs.has(id)) clSelectedCabs.delete(id); else clSelectedCabs.add(id);
+  if(clSelectedCabs.size===0 || (clSelectedCabs.size===1 && clSelectedCabs.has(currentSpaceId))) clSelectedCabs = null;
+  loadChecklistCards();
+}
+async function clOpenCard(id){
+  const card = (window._clCache||[]).find(c=>c.id===id) || (cards||[]).find(c=>c.id===id);
+  if(!card) return;
+  const sel = document.getElementById('space-selector');
+  const fromLobby = sel && sel.style.display !== 'none';
+  const inCurrent = card.space_id === currentSpaceId;
+  const sp = spaces.find(s=>s.id===card.space_id);
+  const famLike = sp && (sp.type==='family'||sp.type==='group');
+  if(inCurrent || !famLike){
+    if(fromLobby){ window._pinFromLobby = true; sel.style.display='none'; }
+    if(!inCurrent){
+      if(!cards.some(c=>c.id===id)){ window._foreignCardId=id; cards.push(card); }
+      const col = window._clCatColors && window._clCatColors[card.space_id+'||'+(card.category||'')];
+      if(card.category && col && !cats.some(k=>k.name===card.category)){ window._foreignCat=card.category; cats.push({name:card.category,color:col}); }
+    }
+    openView(id);
+  } else {
+    await setCurrentSpace(card.space_id, true);
+    let tries=0;(function w(){ if((cards||[]).some(c=>c.id===id)){openView(id);return;} if(++tries>25)return; setTimeout(w,120); })();
+  }
+}
 function renderChecklist() {
-  const el = document.getElementById('scroll');
+ const el = document.getElementById('scroll');
   const PO = {urgent:0, high:1, normal:2};
-  const rem = applyMemberFilter(cards.filter(c=>c.reminder?.enabled && c.status!=='done' && (filterCat==='all'||c.category===filterCat)));
-  if(!rem.length){el.innerHTML=emptyHTML('Чек-лист пуст','Включи напоминание в карточке');return;}
+  const agg = !!clSelectedCabs;
+  const src = agg ? (window._clCache||[]) : cards;
+  let rem = src.filter(c=>c.reminder?.enabled && c.status!=='done' && (agg || filterCat==='all' || c.category===filterCat));
+  if(!agg) rem = applyMemberFilter(rem);
 
-  // Sort: urgent/high first, then by deadline
+  const chip = (label, on, onclick) => `<button onclick="${onclick}" style="background:${on?'rgba(232,197,106,.15)':'var(--s2)'};border:1px solid ${on?'var(--accent)':'var(--b1)'};border-radius:14px;padding:4px 12px;font-size:12px;color:${on?'var(--accent)':'var(--t2)'};cursor:pointer;white-space:nowrap;flex-shrink:0">${label}</button>`;
+  const allIds = spaces.map(s=>s.id);
+  const allOn = agg && allIds.length>0 && allIds.every(id=>clSelectedCabs.has(id));
+  let chips = `<div style="display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px">`;
+  chips += chip('🗂️ Все кабинеты', allOn, 'clSelectAll()');
+  spaces.forEach(s=>{ const on = agg ? clSelectedCabs.has(s.id) : (s.id===currentSpaceId); chips += chip(esc(s.name), on, `clToggleCab('${s.id}')`); });
+  chips += `</div>`;
+
+  if(!rem.length){ el.innerHTML = chips + emptyHTML('Чек-лист пуст', agg?'Нет задач с напоминанием в выбранных кабинетах':'Включи напоминание в карточке'); return; }
+
   rem.sort((a,b) => {
     const pa = PO[a.priority||'normal'], pb = PO[b.priority||'normal'];
     if(pa !== pb) return pa - pb;
     const da = a.deadline||'9999', db = b.deadline||'9999';
     return da.localeCompare(db);
   });
-
   const priority = rem.filter(c=>c.priority==='urgent'||c.priority==='high');
   const normal = rem.filter(c=>!c.priority||c.priority==='normal');
+  const colOf = card => agg ? ((window._clCatColors && window._clCatColors[card.space_id+'||'+(card.category||'')])||'#666666') : catColor(card.category);
+  const cabName = id => (spaces.find(s=>s.id===id)||{}).name||'';
 
   function clItemHTML(card) {
-    const col = catColor(card.category);
+    const col = colOf(card);
     const bg = hex2rgba(col,.12), border = hex2rgba(col,.3);
     const done = card.status==='done';
     const dl = deadlineInfo(card.deadline);
     const pBorder = card.priority==='urgent'?';border-left:4px solid var(--red)':card.priority==='high'?';border-left:4px solid var(--accent)':'';
-    return `<div class="cl-item" style="background:${bg};border-color:${border}${pBorder}" onclick="App.openView('${card.id}')">
+    const open = agg ? `clOpenCard('${card.id}')` : `App.openView('${card.id}')`;
+    return `<div class="cl-item" style="background:${bg};border-color:${border}${pBorder}" onclick="${open}">
       <div class="cl-cb${done?' on':''}" onclick="event.stopPropagation();App.toggleDone('${card.id}')">${done?checkSVG():''}</div>
       <div style="flex:1">
         <div class="cl-title${done?' done':''}" style="color:${col}">${card.priority==='urgent'?'🔥 ':card.priority==='high'?'⚡ ':''}${esc(card.title)}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:3px">
+          ${agg?`<span style="font-size:11px;opacity:.75;color:${col}">🗂️ ${esc(cabName(card.space_id))}</span>`:''}
           ${card.category?`<span style="font-size:11px;opacity:.6">${esc(card.category)}</span>`:''}
           ${dl?`<span class="dl-badge ${dl.cls}${dl.days<=3?' dl-pulse':''}" style="font-size:11px">${dl.text}</span>`:''}
         </div>
@@ -239,7 +290,7 @@ function renderChecklist() {
     </div>`;
   }
 
-  let html = '';
+  let html = chips;
   if(priority.length) {
     html += `<div class="date-lbl" style="color:var(--red)">🔥 Срочные и важные</div>`;
     html += priority.map(clItemHTML).join('');
