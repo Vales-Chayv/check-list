@@ -142,7 +142,7 @@ document.getElementById('current-space-name').textContent = currentSpace.name;
       btn.style.display = 'none';
     }
   }
-  if(loadNew) { cards=[]; cats=[]; render(); loadData(); }
+  if(loadNew) { loadData(); }
   if(currentSpace?.type === 'family') {
     subscribeRealtimeCards(id);
     subscribePresence(id);

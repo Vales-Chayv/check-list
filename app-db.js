@@ -118,7 +118,8 @@ async function loadData() {
   setSyncDot('sync');
   // 1. Show local data immediately
   try {
-    const [localCards, localCats] = await Promise.all([local.getAll('cards'), local.getAll('categories')]);
+   const [_allLocalCards, localCats] = await Promise.all([local.getAll('cards'), local.getAll('categories')]);
+    const localCards = _allLocalCards.filter(c => !currentSpaceId || c.space_id === currentSpaceId);
     if (localCards.length || localCats.length) {
       cards = localCards.sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''));
       cats = localCats || [];
@@ -144,9 +145,13 @@ async function syncFromServer() {
     const [cr,kr] = await Promise.all([cardsQuery, catsQuery]);
     if(cr.error) throw cr.error;
     if(kr.error) throw kr.error;
+    // обновляем в кэше только текущий кабинет; карточки других кабинетов оставляем
+    const _allLocal = await local.getAll('cards');
+    const _keep = _allLocal.filter(c => c.space_id !== currentSpaceId);
     await local.clear('cards');
-    await local.clear('categories');
+    if(_keep.length) await local.putAll('cards', _keep);
     if(cr.data?.length) await local.putAll('cards', cr.data);
+    await local.clear('categories');
     if(kr.data?.length) await local.putAll('categories', kr.data);
     cards = cr.data||[];
     cats = kr.data || [];
