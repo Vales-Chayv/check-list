@@ -514,6 +514,7 @@ function toggleCatsDropdown() {
   const catsBar = document.getElementById('cats');
   if(!dropdown) return;
   if(dropdown.style.display !== 'none') { dropdown.style.display = 'none'; return; }
+  dropdown.dir = currentLang === 'he' ? 'rtl' : 'ltr'; // кружок сам встанет с нужной стороны
   // Fill with categories
   const all = filterCat==='all';
   let html = `<button class="cat-btn${all?' on':''}" style="display:block;width:100%;text-align:left;${all?'border-color:rgba(255,255,255,.25)':''}" onclick="App.setCat(-1);document.getElementById('cats-dropdown').style.display='none'">Все</button>`;
