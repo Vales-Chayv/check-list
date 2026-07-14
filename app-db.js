@@ -95,9 +95,19 @@ async function processSyncQueue() {
       } else if (op.type === 'delete') {
         const {error} = await sb.from('cards').delete().eq('id', op.data.id);
         if (error) throw error;
-      } else if (op.type === 'insert_cat') {
+} else if (op.type === 'insert_cat') {
         const {error} = await sb.from('categories').insert(op.data);
         if (error && error.code !== '23505') throw error;
+      } else if (op.type === 'insert_event') {
+        const {error} = await sb.from('events').insert(op.data);
+        if (error && error.code !== '23505') throw error;
+      } else if (op.type === 'update_event') {
+        const {id, ...data} = op.data;
+        const {error} = await sb.from('events').update(data).eq('id', id);
+        if (error) throw error;
+      } else if (op.type === 'delete_event') {
+        const {error} = await sb.from('events').delete().eq('id', op.data.id);
+        if (error) throw error;
       }
       await clearQueueItem(op.id);
     } catch(e) {

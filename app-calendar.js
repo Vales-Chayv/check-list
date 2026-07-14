@@ -270,32 +270,50 @@ async function saveEvent() {
   if(!title) { toast('Введите название', true); return; }
   if(!event_date) { toast('Укажите дату', true); return; }
   if(!space_id) { toast('Выберите кабинет', true); return; }
+  const isNew = !evEditId;
   const obj = {
+    id: isNew ? uid() : evEditId,
     space_id, title, event_date,
     event_time: document.getElementById('ev-time').value || null,
     repeat,
     repeat_until: (repeat !== 'none' ? (document.getElementById('ev-until').value || null) : null),
     note: document.getElementById('ev-note').value.trim() || null
   };
-  try {
-    if(evEditId) await sb.from('events').update(obj).eq('id', evEditId);
-    else await sb.from('events').insert(obj);
-    await calReloadEvents();
-    renderCalendar();
-    closeEventModal();
-    toast('✓ Сохранено');
-  } catch(e) { toast('Ошибка сохранения', true); }
+  await local.put('events', obj);
+  if(navigator.onLine) {
+    try {
+      if(isNew) { const {error} = await sb.from('events').insert(obj); if(error && error.code!=='23505') throw error; }
+      else { const {id, ...data} = obj; const {error} = await sb.from('events').update(data).eq('id', id); if(error) throw error; }
+    } catch(e) {
+      await queueOp({type: isNew ? 'insert_event' : 'update_event', data: obj});
+    }
+  } else {
+    await queueOp({type: isNew ? 'insert_event' : 'update_event', data: obj});
+  }
+  await calReloadEvents();
+  renderCalendar();
+  closeEventModal();
+  toast('✓ Сохранено');
 }
 async function deleteEvent() {
   if(!evEditId) return;
   if(!confirm('Удалить событие?')) return;
-  try {
-    await sb.from('events').delete().eq('id', evEditId);
-    await calReloadEvents();
-    renderCalendar();
-    closeEventModal();
-    toast('✓ Удалено');
-  } catch(e) { toast('Ошибка удаления', true); }
+  const id = evEditId;
+  await local.delete('events', id);
+  if(navigator.onLine) {
+    try {
+      const {error} = await sb.from('events').delete().eq('id', id);
+      if(error) throw error;
+    } catch(e) {
+      await queueOp({type:'delete_event', data:{id}});
+    }
+  } else {
+    await queueOp({type:'delete_event', data:{id}});
+  }
+  await calReloadEvents();
+  renderCalendar();
+  closeEventModal();
+  toast('✓ Удалено');
 }
 
 // ─── VIEW SWITCHER ───────────────────────────
