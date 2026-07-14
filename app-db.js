@@ -4,6 +4,8 @@
 const DB_NAME = 'mycards-db', DB_VER = 4;
 let db = null;
 
+function catKey(spaceId, name) { return (spaceId || 'null') + '||' + name; }
+
 function openDB() {
   return new Promise((resolve, reject) => {
     if (db) { resolve(db); return; }
@@ -120,8 +122,9 @@ async function loadData() {
   setSyncDot('sync');
   // 1. Show local data immediately
   try {
-   const [_allLocalCards, localCats] = await Promise.all([local.getAll('cards'), local.getAll('categories')]);
+ const [_allLocalCards, _allLocalCats] = await Promise.all([local.getAll('cards'), local.getAll('categories')]);
     const localCards = _allLocalCards.filter(c => !currentSpaceId || c.space_id === currentSpaceId);
+    const localCats = _allLocalCats.filter(c => (c.space_id||null) === (currentSpaceId||null));
     if (localCards.length || localCats.length) {
       cards = localCards.sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''));
       cats = localCats || [];
@@ -143,11 +146,19 @@ async function prefetchAllSpaces() {
   if (typeof spaces === 'undefined' || !spaces || !spaces.length) return;
   setSyncDot('sync'); // держим индикатор «синим», пока не закэшируем все кабинеты
   try {
-    const ids = spaces.map(s => s.id);
+   const ids = spaces.map(s => s.id);
     const { data, error } = await sb.from('cards').select('*').in('space_id', ids);
     if (!error && data) {
       const others = data.filter(c => c.space_id !== currentSpaceId);
       if (others.length) await local.putAll('cards', others);
+    }
+    const { data: catsData, error: catsErr } = await sb.from('categories').select('*').in('space_id', ids);
+    if (!catsErr && catsData?.length) {
+      await local.putAll('categories', catsData.map(c => ({...c, catKey: catKey(c.space_id, c.name)})));
+    }
+    const { data: evData, error: evErr } = await sb.from('events').select('*').in('space_id', ids);
+    if (!evErr && evData?.length) {
+      await local.putAll('events', evData);
     }
   } catch (e) { /* тихо */ }
   setSyncDot('ok'); // теперь все кабинеты в кэше — можно уходить в офлайн
@@ -170,8 +181,11 @@ async function syncFromServer() {
     await local.clear('cards');
     if(_keep.length) await local.putAll('cards', _keep);
     if(cr.data?.length) await local.putAll('cards', cr.data);
+  const _allLocalCats = await local.getAll('categories');
+    const _keepCats = _allLocalCats.filter(c => c.space_id !== currentSpaceId);
     await local.clear('categories');
-    if(kr.data?.length) await local.putAll('categories', kr.data);
+    if(_keepCats.length) await local.putAll('categories', _keepCats);
+    if(kr.data?.length) await local.putAll('categories', kr.data.map(c => ({...c, catKey: catKey(c.space_id, c.name)})));
     cards = cr.data||[];
     cats = kr.data || [];
     const todayStr = new Date().toISOString().slice(0,10);
@@ -235,6 +249,7 @@ async function dbDelete(id) {
 
 async function dbAddCat(cat) {
   const catWithSpace = {...cat, space_id: currentSpaceId||null};
+  catWithSpace.catKey = catKey(catWithSpace.space_id, catWithSpace.name);
   await local.put('categories', catWithSpace);
   if (navigator.onLine) {
     const {error}=await sb.from('categories').insert(catWithSpace);
