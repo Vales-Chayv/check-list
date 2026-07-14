@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════
 //  INDEXEDDB — LOCAL STORAGE
 // ═══════════════════════════════════════════
-const DB_NAME = 'mycards-db', DB_VER = 3;
+const DB_NAME = 'mycards-db', DB_VER = 4;
 let db = null;
 
 function openDB() {
@@ -10,11 +10,13 @@ function openDB() {
     const req = indexedDB.open(DB_NAME, DB_VER);
     req.onupgradeneeded = e => {
       const d = e.target.result;
-      if (!d.objectStoreNames.contains('cards')) d.createObjectStore('cards', {keyPath:'id'});
-      if (!d.objectStoreNames.contains('categories')) d.createObjectStore('categories', {keyPath:'name'});
+     if (!d.objectStoreNames.contains('cards')) d.createObjectStore('cards', {keyPath:'id'});
+      if (d.objectStoreNames.contains('categories')) d.deleteObjectStore('categories');
+      d.createObjectStore('categories', {keyPath:'catKey'});
      if (!d.objectStoreNames.contains('queue')) d.createObjectStore('queue', {keyPath:'id', autoIncrement:true});
 if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta', {keyPath:'key'});
 if (!d.objectStoreNames.contains('offline_files')) d.createObjectStore('offline_files', {keyPath:'tempId'});
+if (!d.objectStoreNames.contains('events')) d.createObjectStore('events', {keyPath:'id'});
     };
     req.onsuccess = e => { db = e.target.result; resolve(db); };
     req.onerror = () => reject(req.error);
