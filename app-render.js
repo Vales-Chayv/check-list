@@ -521,7 +521,7 @@ function toggleCatsDropdown() {
   cats.forEach((c,i) => {
     const col = c.color||'#888';
     const active = filterCat===c.name;
-    html += `<button class="cat-btn${active?' on':''}" style="display:block;width:100%;text-align:left;background:${active?hex2rgba(col,.15):'transparent'};border-color:${active?hex2rgba(col,.5):'rgba(255,255,255,.08)'}" onclick="App.setCat(${i});document.getElementById('cats-dropdown').style.display='none'"><span class="cat-dot" style="background:${col}"></span>${esc(c.name)}</button>`;
+   html += `<button class="cat-btn${active?' on':''}" style="display:block;width:100%;text-align:left;background:${active?hex2rgba(col,.15):'transparent'};border-color:${active?hex2rgba(col,.5):'rgba(255,255,255,.08)'}" onclick="App.setCat(${i});document.getElementById('cats-dropdown').style.display='none'"><span class="cat-dot" style="display:inline-block;vertical-align:middle;margin-inline-end:6px;background:${col}"></span>${esc(c.name)}</button>`;
   });
   dropdown.innerHTML = html;
   // Position below cats bar
