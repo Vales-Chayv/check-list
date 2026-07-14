@@ -147,11 +147,25 @@ async function openCalendar() {
   }
   try {
     const ids2 = spaces.map(s=>s.id);
-    const {data:evData} = await sb.from('events').select('*').in('space_id', ids2);
+    let evData = null;
+    if(navigator.onLine){
+      const r = await sb.from('events').select('*').in('space_id', ids2);
+      evData = r.data;
+    }
+    if(!evData) evData = (await local.getAll('events')).filter(ev => ids2.includes(ev.space_id)); // офлайн — из кэша
     calAllEvents = evData||[];
-  } catch(e) { calAllEvents = []; }
+  } catch(e) {
+    try { calAllEvents = (await local.getAll('events')).filter(ev => spaces.map(s=>s.id).includes(ev.space_id)); }
+    catch(_) { calAllEvents = []; }
+  }
   try {
-    const {data:catData} = await sb.from('categories').select('name,color,space_id').in('space_id', spaces.map(s=>s.id));
+    const ids3 = spaces.map(s=>s.id);
+    let catData = null;
+    if(navigator.onLine){
+      const r = await sb.from('categories').select('name,color,space_id').in('space_id', ids3);
+      catData = r.data;
+    }
+    if(!catData) catData = (await local.getAll('categories')).filter(c => ids3.includes(c.space_id)); // офлайн — из кэша
     calCatColors = {};
     (catData||[]).forEach(c => { calCatColors[calCatKey(c.space_id, c.name)] = c.color; });
   } catch(e) { calCatColors = {}; }
@@ -207,26 +221,44 @@ function closeEventModal() {
   document.getElementById('event-ov').classList.remove('on');
 }
 async function calReloadEvents() {
+  const ids = spaces.map(s=>s.id);
   try {
-    const {data} = await sb.from('events').select('*').in('space_id', spaces.map(s=>s.id));
-    calAllEvents = data || [];
+    if(navigator.onLine){
+      const {data} = await sb.from('events').select('*').in('space_id', ids);
+      calAllEvents = data || [];
+    } else {
+      calAllEvents = (await local.getAll('events')).filter(ev => ids.includes(ev.space_id));
+    }
   } catch(e) {}
 }
 async function calRefreshData() { // лёгкое обновление колонки: данные + перерисовка, без сброса вида/фильтров
   if(!spaces || !spaces.length) return;
   const ids = spaces.map(s=>s.id);
   try {
-    const {data} = await sb.from('cards').select('*').in('space_id', ids).not('deadline','is',null);
-    calAllCards = data || [];
+    if(navigator.onLine){
+      const {data} = await sb.from('cards').select('*').in('space_id', ids).not('deadline','is',null);
+      calAllCards = data || [];
+    } else {
+      calAllCards = (await local.getAll('cards')).filter(c => c.deadline && ids.includes(c.space_id));
+    }
   } catch(e) {}
   try {
-    const {data:evData} = await sb.from('events').select('*').in('space_id', ids);
-    calAllEvents = evData || [];
+    if(navigator.onLine){
+      const {data:evData} = await sb.from('events').select('*').in('space_id', ids);
+      calAllEvents = evData || [];
+    } else {
+      calAllEvents = (await local.getAll('events')).filter(ev => ids.includes(ev.space_id));
+    }
   } catch(e) {}
   try {
-    const {data:catData} = await sb.from('categories').select('name,color,space_id').in('space_id', ids);
-    calCatColors = {};
-    (catData||[]).forEach(c => { calCatColors[calCatKey(c.space_id, c.name)] = c.color; });
+    if(navigator.onLine){
+      const {data:catData} = await sb.from('categories').select('name,color,space_id').in('space_id', ids);
+      calCatColors = {};
+      (catData||[]).forEach(c => { calCatColors[calCatKey(c.space_id, c.name)] = c.color; });
+    } else {
+      calCatColors = {};
+      (await local.getAll('categories')).filter(c => ids.includes(c.space_id)).forEach(c => { calCatColors[calCatKey(c.space_id, c.name)] = c.color; });
+    }
   } catch(e) {}
   renderCalendar();
 }
