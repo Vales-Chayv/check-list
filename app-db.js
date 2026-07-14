@@ -4,7 +4,7 @@
 const DB_NAME = 'mycards-db', DB_VER = 4;
 let db = null;
 
-function catKey(spaceId, name) { return (spaceId || 'null') + '||' + name; }
+function catKey(spaceId, name) { return (spaceId || 'personal') + '||' + name; }
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -123,8 +123,8 @@ async function loadData() {
   // 1. Show local data immediately
   try {
  const [_allLocalCards, _allLocalCats] = await Promise.all([local.getAll('cards'), local.getAll('categories')]);
-    const localCards = _allLocalCards.filter(c => !currentSpaceId || c.space_id === currentSpaceId);
-    const localCats = _allLocalCats.filter(c => (c.space_id||null) === (currentSpaceId||null));
+    const localCards = _allLocalCards.filter(c => c.space_id === (currentSpaceId||'personal'));
+    const localCats = _allLocalCats.filter(c => (c.space_id||'personal') === (currentSpaceId||'personal'));
     if (localCards.length || localCats.length) {
       cards = localCards.sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''));
       cats = localCats || [];
@@ -149,7 +149,7 @@ async function prefetchAllSpaces() {
    const ids = spaces.map(s => s.id);
     const { data, error } = await sb.from('cards').select('*').in('space_id', ids);
     if (!error && data) {
-      const others = data.filter(c => c.space_id !== currentSpaceId);
+      const others = data.filter(c => c.space_id !== (currentSpaceId||'personal'));
       if (others.length) await local.putAll('cards', others);
     }
     const { data: catsData, error: catsErr } = await sb.from('categories').select('*').in('space_id', ids);
@@ -167,17 +167,15 @@ async function prefetchAllSpaces() {
 async function syncFromServer() {
   if (!navigator.onLine) { setSyncDot('err'); render(); return; }
   try {
-    let cardsQuery = sb.from('cards').select('*').order('created_at',{ascending:false});
-    if(currentSpaceId) cardsQuery = cardsQuery.eq('space_id', currentSpaceId);
-    let catsQuery = sb.from('categories').select('*');
-    if(currentSpaceId) catsQuery = catsQuery.eq('space_id', currentSpaceId);
-    else catsQuery = catsQuery.is('space_id', null);
+  const spaceIdForQuery = currentSpaceId || 'personal';
+    let cardsQuery = sb.from('cards').select('*').order('created_at',{ascending:false}).eq('space_id', spaceIdForQuery);
+    let catsQuery = sb.from('categories').select('*').eq('space_id', spaceIdForQuery);
     const [cr,kr] = await Promise.all([cardsQuery, catsQuery]);
     if(cr.error) throw cr.error;
     if(kr.error) throw kr.error;
     // обновляем в кэше только текущий кабинет; карточки других кабинетов оставляем
     const _allLocal = await local.getAll('cards');
-    const _keep = _allLocal.filter(c => c.space_id !== currentSpaceId);
+    const _keep = _allLocal.filter(c => c.space_id !== spaceIdForQuery);
     await local.clear('cards');
     if(_keep.length) await local.putAll('cards', _keep);
     if(cr.data?.length) await local.putAll('cards', cr.data);
@@ -248,7 +246,7 @@ async function dbDelete(id) {
 }
 
 async function dbAddCat(cat) {
-  const catWithSpace = {...cat, space_id: currentSpaceId||null};
+  const catWithSpace = {...cat, space_id: currentSpaceId||'personal'};
   catWithSpace.catKey = catKey(catWithSpace.space_id, catWithSpace.name);
   await local.put('categories', catWithSpace);
   if (navigator.onLine) {
