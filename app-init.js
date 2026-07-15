@@ -172,9 +172,11 @@ function startIntervalReminders() {
     if(remTick % 5 === 0 || !remCards.length) loadReminderCards();
     remTick++;
     const now = Date.now();
-    remCards.forEach(card => {
+   remCards.forEach(card => {
       if(!card.reminder || !card.reminder.enabled || card.reminder.freq !== 'interval') return;
-      if(card.status === 'done') return;
+      const live = (typeof calAllCards!=='undefined' && calAllCards.find(c=>c.id===card.id))
+                || (typeof cards!=='undefined' && cards.find(c=>c.id===card.id));
+      if((live ? live.status : card.status) === 'done') return;
       const mins = card.reminder.intervalMin || 30;
       const key = 'rem_last_' + card.id;
       const last = parseInt(localStorage.getItem(key)||'0');

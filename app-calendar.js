@@ -26,7 +26,7 @@ function calTodayStr() { // «сегодня» как 'YYYY-MM-DD' в часов
 let calPrioOpen = false; // развёрнуты ли кнопки приоритетов (🔥/⚡)
 let calFromLobby = false; // календарь открыт с экрана кабинетов → вернуться туда при закрытии
 
-const CAL_DAYS_RU = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+const CAL_DAYS_RU = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
 const CAL_MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 const CAL_HOLIDAYS_IL = {
   '2026-03-03': [{ ru:"Пурим", he:"פורים", en:"Purim", type:"major" }],
@@ -349,6 +349,18 @@ function calToday() {
   renderCalendar();
 }
 
+function calPrevYear() {
+  calDate.setFullYear(calDate.getFullYear() - 1);
+  calDate = new Date(calDate);
+  renderCalendar();
+}
+
+function calNextYear() {
+  calDate.setFullYear(calDate.getFullYear() + 1);
+  calDate = new Date(calDate);
+  renderCalendar();
+}
+
 // ─── FILTERS ─────────────────────────────────
 function renderCalFilters() {
   const el = document.getElementById('cal-filters');
@@ -533,10 +545,9 @@ function renderCalMonth() {
   const y = calDate.getFullYear(), m = calDate.getMonth();
   document.getElementById('cal-title').textContent = CAL_MONTHS_RU[m] + ' ' + y;
 
-  const firstDay = new Date(y, m, 1);
+const firstDay = new Date(y, m, 1);
   const lastDay = new Date(y, m + 1, 0);
-  let startDow = firstDay.getDay(); // 0=Sun
-  startDow = startDow === 0 ? 6 : startDow - 1; // Mon=0
+  const startDow = firstDay.getDay(); // 0=Вс ... 6=Сб — неделя уже начинается с воскресенья
 
   const todayStr = calTodayStr();
   const filtered = getCalCards();
@@ -562,14 +573,15 @@ function renderCalMonth() {
     html += `<div style="min-height:72px;background:var(--s2);border-radius:4px;opacity:.3"></div>`;
   }
 
-  for(let d = 1; d <= lastDay.getDate(); d++) {
+ for(let d = 1; d <= lastDay.getDate(); d++) {
     const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const isToday = dateStr === todayStr;
+    const isSat = (startDow + d - 1) % 7 === 6;
     const dayCards = cardMap[dateStr] || [];
     const hasUrgent = dayCards.some(c=>c.priority==='urgent');
     const hasHigh = dayCards.some(c=>c.priority==='high');
 
-    let bg = isToday ? 'rgba(232,197,106,.1)' : 'var(--s2)';
+    let bg = isToday ? 'rgba(232,197,106,.1)' : (isSat ? 'rgba(255,255,255,.05)' : 'var(--s2)');
     let border = isToday ? '1px solid var(--accent)' : '1px solid transparent';
     if(hasUrgent) border = '1px solid var(--red)';
 
@@ -598,14 +610,14 @@ function renderCalMonth() {
 
 function renderCalWeek() {
   const dow = calDate.getDay();
-  const mondayOffset = dow === 0 ? -6 : 1 - dow;
-  const monday = new Date(calDate);
-  monday.setDate(calDate.getDate() + mondayOffset);
+  const sundayOffset = -dow;
+  const sunday = new Date(calDate);
+  sunday.setDate(calDate.getDate() + sundayOffset);
 
   const days = [];
   for(let i = 0; i < 7; i++) {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
+    const d = new Date(sunday);
+    d.setDate(sunday.getDate() + i);
     days.push(d);
   }
 
@@ -623,13 +635,14 @@ function renderCalWeek() {
 
   let html = `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">`;
   days.forEach(d => {
-    const dateStr = d.toISOString().slice(0,10);
+   const dateStr = d.toISOString().slice(0,10);
     const isToday = dateStr === todayStr;
+    const isSat = d.getDay() === 6;
     const dayCards = cardMap[dateStr] || [];
     const hasUrgent = dayCards.some(c=>c.priority==='urgent');
 
-    html += `<div style="background:${isToday?'rgba(232,197,106,.1)':'var(--s2)'};border-radius:8px;border:${isToday?'1px solid var(--accent)':hasUrgent?'1px solid var(--red)':'1px solid var(--b1)'};padding:6px;min-height:120px">
-      <div style="font-size:11px;color:var(--t3);margin-bottom:2px">${CAL_DAYS_RU[d.getDay()===0?6:d.getDay()-1]}</div>
+    html += `<div style="background:${isToday?'rgba(232,197,106,.1)':isSat?'rgba(255,255,255,.05)':'var(--s2)'};border-radius:8px;border:${isToday?'1px solid var(--accent)':hasUrgent?'1px solid var(--red)':'1px solid var(--b1)'};padding:6px;min-height:120px">
+      <div style="font-size:11px;color:var(--t3);margin-bottom:2px">${CAL_DAYS_RU[d.getDay()]}</div>
       <div style="font-size:16px;font-weight:700;color:${isToday?'var(--accent)':hasUrgent?'var(--red)':'var(--t1)'};margin-bottom:6px">${d.getDate()}</div>`;
     html += calHolHtml(dateStr, 'md');
     html += calEvtHtml(dateStr, 'md');
@@ -739,19 +752,29 @@ function showCalPopup(cardId, event) {
   }), 100);
 }
 
+function calFindCard(cardId) {
+  return calAllCards.find(c=>c.id===cardId) || cards.find(c=>c.id===cardId);
+}
+function calSyncCardEverywhere(card) {
+  const i1 = calAllCards.findIndex(c=>c.id===card.id); if(i1!==-1) calAllCards[i1] = card;
+  const i2 = cards.findIndex(c=>c.id===card.id); if(i2!==-1) cards[i2] = card;
+}
+
 async function calChangeDeadline(cardId) {
-  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  const card = calFindCard(cardId); if(!card) return;
   const newDate = prompt('Новый дедлайн (ГГГГ-ММ-ДД):', card.deadline||'');
   if(!newDate) return;
   card.deadline = newDate;
+  calSyncCardEverywhere(card);
   document.getElementById('cal-popup').style.display='none';
   renderCalendar();
   try { await dbUpdate(card); toast('✓ Дедлайн изменён'); } catch(e) { toast('Ошибка', true); }
 }
 
 async function calToggleDone(cardId) {
-  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  const card = calFindCard(cardId); if(!card) return;
   card.status = card.status === 'done' ? 'in_progress' : 'done';
+  calSyncCardEverywhere(card);
   document.getElementById('cal-popup').style.display='none';
   renderCalendar();
   try { await dbUpdate(card); toast(card.status==='done'?'✓ Выполнено':'↩ Возвращено'); } catch(e) { toast('Ошибка', true); }
