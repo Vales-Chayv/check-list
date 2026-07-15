@@ -809,7 +809,16 @@ async function calOpenCard(cardId) {
   const dayEl = document.getElementById('cal-day-num');
   const monEl = document.getElementById('cal-month-txt');
   if(dayEl) dayEl.textContent = now.getDate();
-  if(monEl) monEl.textContent = months[now.getMonth()] + ' ' + now.getFullYear();
+  if(monEl) {
+    monEl.textContent = '';
+    const tMonth = document.createElementNS('http://www.w3.org/2000/svg','tspan');
+    tMonth.textContent = months[now.getMonth()] + ' ';
+    monEl.appendChild(tMonth);
+    const tYear = document.createElementNS('http://www.w3.org/2000/svg','tspan');
+    tYear.setAttribute('font-size', '10');
+    tYear.textContent = now.getFullYear();
+    monEl.appendChild(tYear);
+  }
   setTimeout(updateCalBtn, 60000);
 })();
 
