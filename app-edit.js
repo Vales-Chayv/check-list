@@ -1,6 +1,9 @@
 // ═══════════════════════════════════════════
 //  EDIT MODAL
 // ═══════════════════════════════════════════
+let tempEntryGroups = [];
+let groupedMode = false;
+
 function openEdit(id) {
   editId=id||null;
   const card=id?cards.find(c=>c.id===id):null;
@@ -15,7 +18,15 @@ function openEdit(id) {
   customDays=[...(card?.reminder?.days||[])];
   intervalMin = card?.reminder?.intervalMin || 30;
 
-  const isFamily = currentSpace?.type === 'family';
+ const isFamily = currentSpace?.type === 'family';
+  const isPersonal = !currentSpaceId;
+  tempEntryGroups = JSON.parse(JSON.stringify(card?.entryGroups||[]));
+  groupedMode = !!(card?.entryGroups && card.entryGroups.length);
+  const deckBtn = document.getElementById('deck-btn');
+  if(deckBtn) {
+    deckBtn.style.display = (isPersonal && !card) ? 'flex' : 'none';
+    deckBtn.classList.toggle('on', groupedMode);
+  }
 
   document.getElementById('edit-title').textContent=card?'Редактировать':'Новая карточка';
   document.getElementById('e-title').value=card?.title||'';
@@ -295,24 +306,85 @@ function renderEntriesEdit() {
     <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('removeFormat')" title="Убрать оформление" style="background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:5px 9px;color:var(--t2);cursor:pointer;font-family:inherit;font-size:13px;min-width:30px">⌫</button>
   </div>`;
 
+  function groupsBlockHTML(list) {
+    const groupsInOrder = tempEntryGroups.filter(g => list.some(e=>e.groupId===g.id) || g._naming);
+    const ungrouped = list.filter(e => !e.groupId);
+    let out = '';
+    groupsInOrder.forEach(g => {
+      const gEntries = list.filter(e => e.groupId === g.id);
+      const expanded = g._expanded !== false;
+      out += `<div class="group-block" data-groupid="${g.id}" style="border:1px solid var(--b1);border-radius:var(--rsm);margin-bottom:8px;overflow:hidden">
+        ${g._naming ? `
+          <input class="group-name-inp" data-groupid="${g.id}" value="${esc(g.name)}" placeholder="Название раздела" onblur="finishGroupName('${g.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()" style="width:100%;background:var(--bg);border:none;padding:10px 12px;color:var(--accent);font-size:13px;font-weight:700;font-family:inherit">
+        ` : `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:var(--bg)">
+            <span onclick="toggleGroupExpand('${g.id}')" style="flex:1;cursor:pointer;font-size:13px;font-weight:700;color:var(--accent)">${esc(g.name)||'Без названия'} <span style="color:var(--t3);font-weight:400">(${gEntries.length}) ${expanded?'▲':'▼'}</span></span>
+            <button type="button" onclick="startRenameGroup('${g.id}')" style="background:none;border:none;color:var(--t3);font-size:12px;cursor:pointer;padding:2px 6px">✎</button>
+          </div>
+        `}
+        ${expanded ? `<div style="padding:2px 12px">${gEntries.map(entryRowHTML).join('')}
+          <button type="button" onclick="addEntryToGroup('${g.id}')" style="width:100%;background:none;border:none;color:var(--blue);font-size:12px;cursor:pointer;text-align:left;padding:8px 0;font-family:inherit">+ запись в раздел</button>
+        </div>` : ''}
+      </div>`;
+    });
+    if(ungrouped.length) out += ungrouped.map(entryRowHTML).join('');
+    return out;
+  }
+
   if(existing.length) {
     wrap.style.display='block';
-    el.innerHTML=existing.map(entryRowHTML).join('');
+    el.innerHTML = groupedMode ? groupsBlockHTML(existing) : existing.map(entryRowHTML).join('');
   } else {
     wrap.style.display='none';
     el.innerHTML='';
   }
 
-  if(newEntries.length) {
+  if(groupedMode) {
+    newArea.innerHTML = (newEntries.length || tempEntryGroups.length)
+      ? `<div style="background:var(--s2);border-radius:var(--rsm);padding:8px 12px;margin-bottom:4px">${fmtBar}${groupsBlockHTML(newEntries)}</div>`
+      : '';
+  } else if(newEntries.length) {
     newArea.innerHTML=`<div style="background:var(--s2);border-radius:var(--rsm);padding:8px 12px;margin-bottom:4px">${fmtBar}${newEntries.map(entryRowHTML).join('')}</div>`;
   } else {
     newArea.innerHTML='';
   }
 }
+function toggleDeckMode() {
+  groupedMode = true;
+  document.getElementById('deck-btn')?.classList.add('on');
+  addEntryGroup();
+}
 function addEntry() {
+  if(groupedMode) { addEntryGroup(); return; }
   tempEntries.unshift({id:uid(),text:'',date:nowStr(),done:false,_saved:false,deadline:null});
   renderEntriesEdit();
   setTimeout(()=>{const ta=document.querySelector('#e-new-entry-area .entry-textarea');if(ta)ta.focus();},50);
+}
+function addEntryGroup() {
+  tempEntryGroups.unshift({id:uid(), name:'', _naming:true});
+  renderEntriesEdit();
+  setTimeout(()=>{const inp=document.querySelector('#e-new-entry-area .group-name-inp');if(inp)inp.focus();},50);
+}
+function addEntryToGroup(groupId) {
+  tempEntries.unshift({id:uid(),text:'',date:nowStr(),done:false,_saved:false,deadline:null,groupId});
+  renderEntriesEdit();
+  setTimeout(()=>{const ta=document.querySelector(`.group-block[data-groupid="${groupId}"] .entry-textarea`);if(ta)ta.focus();},50);
+}
+function finishGroupName(groupId, val) {
+  const g = tempEntryGroups.find(x=>x.id===groupId);
+  if(g) { g.name = val.trim(); g._naming = false; }
+  renderEntriesEdit();
+}
+function startRenameGroup(groupId) {
+  const g = tempEntryGroups.find(x=>x.id===groupId);
+  if(!g) return;
+  g._naming = true;
+  renderEntriesEdit();
+  setTimeout(()=>{const inp=document.querySelector(`.group-name-inp[data-groupid="${groupId}"]`);if(inp){inp.focus();inp.select();}},50);
+}
+function toggleGroupExpand(groupId) {
+  const g = tempEntryGroups.find(x=>x.id===groupId);
+  if(g) { g._expanded = g._expanded===false ? true : false; renderEntriesEdit(); }
 }
 function updateEntryAssignee(entryId, val) {
   const e = tempEntries.find(x=>x.id===entryId);
@@ -412,7 +484,8 @@ async function saveCard() {
     ball:isFamily?'':ballVal,
     assigned_to:assignedTo,
     attachments: isFamily&&!editId ? [] : tempAtt,
-    entries:sessionEntries,
+   entries:sessionEntries,
+    entryGroups: groupedMode ? tempEntryGroups.filter(g=>g.name||!g._naming).map(({_naming,_expanded,...g})=>g) : [],
     reminder:{enabled:remOn,freq:freqVal,days:customDays,intervalMin:freqVal==='interval'?intervalMin:null},
     history:hist, related_ids:tempRelIds
   };
