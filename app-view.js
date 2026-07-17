@@ -1,7 +1,17 @@
 // ═══════════════════════════════════════════
 //  VIEW MODAL
 // ═══════════════════════════════════════════
+let viewGroupState = new Map(); // groupId -> развёрнут(true)/свёрнут(false), по умолчанию развёрнут
+
+function viewToggleGroup(cardId, groupId) {
+  const cur = viewGroupState.get(groupId);
+  viewGroupState.set(groupId, cur === false ? true : false);
+  openView(cardId);
+}
+
 function openView(id) {
+  const card = cards.find(c=>c.id===id); if(!card) return;
+  (card.entryGroups||[]).forEach(g => { if(!viewGroupState.has(g.id)) viewGroupState.set(g.id, true); });
   const card = cards.find(c=>c.id===id); if(!card) return;
   const col = catColor(card.category);
   const entries = card.entries||[];
@@ -176,7 +186,23 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
       return sep + noteHTML + entriesHTML + sAttHTML;
     }
 
-    const sessionsHTML = sessions.map((s,si) => isFamily ? stickerHTML(s,si) : plainSessionHTML(s,si)).join('');
+   const entryGroups = card.entryGroups||[];
+    let sessionsHTML;
+    if(!isFamily && entryGroups.length) {
+      sessionsHTML = entryGroups.map(g => {
+        const gEntries = entries.filter(e => e.groupId === g.id && e.text);
+        const expanded = viewGroupState.get(g.id) !== false;
+        return `<div style="border:1px solid var(--b1);border-radius:var(--rsm);margin-bottom:8px;overflow:hidden">
+          <div onclick="viewToggleGroup('${id}','${g.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--s2);cursor:pointer">
+            <span style="font-size:13px;font-weight:700;color:var(--accent)">${esc(g.name)||'Без названия'}</span>
+            <span style="font-size:11px;color:var(--t3)">${gEntries.length} ${expanded?'▲':'▼'}</span>
+          </div>
+          ${expanded ? `<div style="padding:0 12px">${gEntries.map(e=>entryRowHTML(e,null)).join('')}</div>` : ''}
+        </div>`;
+      }).join('');
+    } else {
+      sessionsHTML = sessions.map((s,si) => isFamily ? stickerHTML(s,si) : plainSessionHTML(s,si)).join('');
+    }
     html+=`<div class="view-sec">${!isFamily?`<div class="view-lbl">Записи (${dc}/${entries.filter(e=>e.text).length})</div>`:''}${sessionsHTML}</div>`;
   }
 
