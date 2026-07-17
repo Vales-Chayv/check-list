@@ -19,7 +19,7 @@ function openEdit(id) {
   intervalMin = card?.reminder?.intervalMin || 30;
 
  const isFamily = currentSpace?.type === 'family';
-  const isPersonal = !currentSpaceId;
+ const isPersonal = !currentSpaceId || currentSpaceId === 'personal';
   tempEntryGroups = JSON.parse(JSON.stringify(card?.entryGroups||[]));
   groupedMode = !!(card?.entryGroups && card.entryGroups.length);
   const deckBtn = document.getElementById('deck-btn');
