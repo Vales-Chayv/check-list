@@ -12,7 +12,6 @@ function viewToggleGroup(cardId, groupId) {
 function openView(id) {
   const card = cards.find(c=>c.id===id); if(!card) return;
   (card.entryGroups||[]).forEach(g => { if(!viewGroupState.has(g.id)) viewGroupState.set(g.id, true); });
-  const card = cards.find(c=>c.id===id); if(!card) return;
   const col = catColor(card.category);
   const entries = card.entries||[];
   const atts = card.attachments||[];
