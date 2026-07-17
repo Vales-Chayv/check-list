@@ -19,14 +19,17 @@ function openEdit(id) {
   intervalMin = card?.reminder?.intervalMin || 30;
 
  const isFamily = currentSpace?.type === 'family';
- const isPersonal = !currentSpaceId || currentSpaceId === 'personal';
+  const isPersonal = currentSpace?.type === 'personal';
   tempEntryGroups = JSON.parse(JSON.stringify(card?.entryGroups||[]));
   groupedMode = !!(card?.entryGroups && card.entryGroups.length);
-  const deckBtn = document.getElementById('deck-btn');
+const deckBtn = document.getElementById('deck-btn');
   if(deckBtn) {
     deckBtn.style.display = (isPersonal && !card) ? 'flex' : 'none';
-    deckBtn.classList.toggle('on', groupedMode);
+    deckBtn.style.color = groupedMode ? 'var(--accent)' : 'var(--t2)';
+    deckBtn.style.borderColor = groupedMode ? 'var(--accent)' : 'var(--b1)';
   }
+  const addBtn = document.querySelector('button[onclick="addEntry()"]');
+  if(addBtn) addBtn.textContent = groupedMode ? '＋ Раздел' : '＋ Добавить запись';
 
   document.getElementById('edit-title').textContent=card?'Редактировать':'Новая карточка';
   document.getElementById('e-title').value=card?.title||'';
@@ -306,11 +309,10 @@ function renderEntriesEdit() {
     <button type="button" onmousedown="event.preventDefault()" onclick="applyFmt('removeFormat')" title="Убрать оформление" style="background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:5px 9px;color:var(--t2);cursor:pointer;font-family:inherit;font-size:13px;min-width:30px">⌫</button>
   </div>`;
 
-  function groupsBlockHTML(list) {
-    const groupsInOrder = tempEntryGroups.filter(g => list.some(e=>e.groupId===g.id) || g._naming);
+ function groupsBlockHTML(list) {
     const ungrouped = list.filter(e => !e.groupId);
     let out = '';
-    groupsInOrder.forEach(g => {
+    tempEntryGroups.forEach(g => {
       const gEntries = list.filter(e => e.groupId === g.id);
       const expanded = g._expanded !== false;
       out += `<div class="group-block" data-groupid="${g.id}" style="border:1px solid var(--b1);border-radius:var(--rsm);margin-bottom:8px;overflow:hidden">
@@ -331,19 +333,24 @@ function renderEntriesEdit() {
     return out;
   }
 
+ if(groupedMode) {
+    wrap.style.display='none';
+    el.innerHTML='';
+    newArea.innerHTML = tempEntryGroups.length
+      ? `<div style="background:var(--s2);border-radius:var(--rsm);padding:8px 12px;margin-bottom:4px">${fmtBar}${groupsBlockHTML(tempEntries)}</div>`
+      : '';
+    return;
+  }
+
   if(existing.length) {
     wrap.style.display='block';
-    el.innerHTML = groupedMode ? groupsBlockHTML(existing) : existing.map(entryRowHTML).join('');
+    el.innerHTML = existing.map(entryRowHTML).join('');
   } else {
     wrap.style.display='none';
     el.innerHTML='';
   }
 
-  if(groupedMode) {
-    newArea.innerHTML = (newEntries.length || tempEntryGroups.length)
-      ? `<div style="background:var(--s2);border-radius:var(--rsm);padding:8px 12px;margin-bottom:4px">${fmtBar}${groupsBlockHTML(newEntries)}</div>`
-      : '';
-  } else if(newEntries.length) {
+  if(newEntries.length) {
     newArea.innerHTML=`<div style="background:var(--s2);border-radius:var(--rsm);padding:8px 12px;margin-bottom:4px">${fmtBar}${newEntries.map(entryRowHTML).join('')}</div>`;
   } else {
     newArea.innerHTML='';
@@ -351,7 +358,10 @@ function renderEntriesEdit() {
 }
 function toggleDeckMode() {
   groupedMode = true;
-  document.getElementById('deck-btn')?.classList.add('on');
+  const btn = document.getElementById('deck-btn');
+  if(btn) { btn.style.color = 'var(--accent)'; btn.style.borderColor = 'var(--accent)'; }
+  const addBtn = document.querySelector('button[onclick="addEntry()"]');
+  if(addBtn) addBtn.textContent = '＋ Раздел';
   addEntryGroup();
 }
 function addEntry() {
