@@ -2,8 +2,12 @@
 // ═══════════════════════════════════════════
 //  CONFIG
 // ═══════════════════════════════════════════
-const SB_URL = 'https://rmlcbznnoroumjsqoluz.supabase.co';
-const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJtbGNiem5ub3JvdW1qc3FvbHV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNDUyMjYsImV4cCI6MjA5MzcyMTIyNn0.9DlXlx8_X1S5kVAdzpTPNyq6rChlMNDkJbDXQIud62I';
+// ── ВРЕМЕННО: dev-проект (пока у основного заблокирован egress) ──
+// Старые ключи закомментированы ниже — вернуть после 7 августа, просто раскомментировать и убрать dev-строки.
+// const SB_URL = 'https://rmlcbznnoroumjsqoluz.supabase.co';
+// const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJtbGNiem5ub3JvdW1qc3FvbHV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNDUyMjYsImV4cCI6MjA5MzcyMTIyNn0.9DlXlx8_X1S5kVAdzpTPNyq6rChlMNDkJbDXQIud62I';
+const SB_URL = 'https://rlntiwzmpkptdwfegram.supabase.co';
+const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJsbnRpd3ptcGtwdGR3ZmVncmFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0NjczNTIsImV4cCI6MjEwMDA0MzM1Mn0.Iqy-ZHKuecV4dxrxU19aKihsPUSIOEGsPRxJmw-n_7Y';
 const FUNC_URL = 'https://rmlcbznnoroumjsqoluz.supabase.co/functions/v1/send-reminders';
 const VAPID_PUB = 'BFb2H0DTunN23F8-C7Db5WNB1wE7Uc5aT_5qGDTIq57d91YdeIPlJZfxNbPoRnElGKOF_254YNTTqSLpX4ZPkZ0';
 const COLORS = [
