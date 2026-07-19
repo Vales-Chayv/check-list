@@ -151,7 +151,10 @@ async function loadData() {
   prefetchAllSpaces();
 }
 
+const PREFETCH_ALL_SPACES_ENABLED = false; // временно выключено — экономим egress-трафик Supabase, вернуть true когда лимит снимется
+
 async function prefetchAllSpaces() {
+  if (!PREFETCH_ALL_SPACES_ENABLED) return;
   if (!navigator.onLine) return;
   if (typeof spaces === 'undefined' || !spaces || !spaces.length) return;
   setSyncDot('sync'); // держим индикатор «синим», пока не закэшируем все кабинеты
