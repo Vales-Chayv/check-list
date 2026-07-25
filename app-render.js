@@ -77,7 +77,6 @@ async function unpinFromPopup(id, ev){
 async function openPinnedCard(id){
   const cached = (window._pinnedCache||[]).find(c=>c.id===id);
   const card = cached || (cards||[]).find(c=>c.id===id);
-  closePinPopup(); 
   if(!card) return;
   const sel = document.getElementById('space-selector');
   const fromLobby = sel && sel.style.display !== 'none';
