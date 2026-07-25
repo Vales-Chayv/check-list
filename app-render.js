@@ -18,9 +18,9 @@ function render() {
   renderCats(); renderMain();
   desktopCalSync();
 }
-function openPinStrip(){ document.getElementById('pin-strip-ov').classList.add('on'); }
-function closePinStrip(){ document.getElementById('pin-strip-ov').classList.remove('on'); closePinPopup(); }
-function togglePinStrip(){ const s=document.getElementById('pin-strip-ov'); if(s.classList.contains('on')) closePinStrip(); else s.classList.add('on'); }
+function openPinStrip(){ document.getElementById('pin-strip-ov').classList.add('on'); document.getElementById('pin-tab')?.classList.add('shifted'); }
+function closePinStrip(){ document.getElementById('pin-strip-ov').classList.remove('on'); document.getElementById('pin-tab')?.classList.remove('shifted'); closePinPopup(); }
+function togglePinStrip(){ const s=document.getElementById('pin-strip-ov'); if(s.classList.contains('on')) closePinStrip(); else { s.classList.add('on'); document.getElementById('pin-tab')?.classList.add('shifted'); } }
 function closePinPopup(){ document.getElementById('pin-popup-ov').classList.remove('on'); }
 async function openPinPopup(){
   document.getElementById('pin-popup-ov').classList.add('on');
