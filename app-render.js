@@ -98,18 +98,50 @@ async function openPinnedCard(id){
   }
 }
 
-// ── Жест колоды: свайп вниз / колёсико вниз — разложить; свайп вверх / колёсико вверх — собрать ──
+// ── Жест колоды: веер под палец — карточки живо раздвигаются во время движения, свайп/колёсико вверх — собрать ──
 (function initPinDeckGestures(){
   const deck = document.getElementById('pin-deck');
   if(!deck) return;
-  let startY = 0;
-  deck.addEventListener('touchstart', e=>{ startY = e.touches[0].clientY; }, {passive:true});
+  const FAN_DIST = 130;        // px движения пальца = полный разворот веера
+  const OFFSET_COLLAPSED = 13; // как в renderPinDeck
+  const OFFSET_EXPANDED = 62;  // примерный шаг между карточками в развёрнутом виде
+  let startY = 0, dragging = false, tiles = [];
+
+  deck.addEventListener('touchstart', e=>{
+    startY = e.touches[0].clientY;
+    dragging = !deck.classList.contains('expanded');
+    tiles = dragging ? Array.from(deck.querySelectorAll('.pin-tile')) : [];
+  }, {passive:true});
+
+  deck.addEventListener('touchmove', e=>{
+    if(!dragging || !tiles.length) return;
+    const dy = e.touches[0].clientY - startY;
+    if(dy <= 0) return;
+    e.preventDefault();
+    const progress = Math.min(dy / FAN_DIST, 1);
+    tiles.forEach((t,i)=>{
+      t.style.top = (i*OFFSET_COLLAPSED + progress*i*(OFFSET_EXPANDED-OFFSET_COLLAPSED)) + 'px';
+      t.style.transform = `rotate(${progress*Math.min(i*1.5,6)}deg)`;
+      t.style.pointerEvents = progress > 0.15 ? 'auto' : 'none';
+    });
+  }, {passive:false});
+
   deck.addEventListener('touchend', e=>{
+    if(dragging){
+      const dy = e.changedTouches[0].clientY - startY;
+      const progress = Math.min(Math.max(dy,0) / FAN_DIST, 1);
+      if(progress > 0.4) deck.classList.add('expanded');
+      renderPinDeck();
+      dragging = false;
+      return;
+    }
     const dy = e.changedTouches[0].clientY - startY;
     const expanded = deck.classList.contains('expanded');
-    if(!expanded && dy > 40){ deck.classList.add('expanded'); renderPinDeck(); e.preventDefault(); }
-    else if(expanded && dy < -40 && deck.scrollTop <= 2){ deck.classList.remove('expanded'); renderPinDeck(); e.preventDefault(); }
+    if(expanded && dy < -40 && deck.scrollTop <= 2){ deck.classList.remove('expanded'); renderPinDeck(); e.preventDefault(); }
   }, {passive:false});
+
+  deck.addEventListener('touchcancel', ()=>{ dragging = false; renderPinDeck(); });
+
   deck.addEventListener('wheel', e=>{
     const expanded = deck.classList.contains('expanded');
     if(!expanded && e.deltaY > 0){ deck.classList.add('expanded'); renderPinDeck(); e.preventDefault(); }
