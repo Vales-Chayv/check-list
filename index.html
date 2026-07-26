@@ -442,7 +442,6 @@
     </div>
  <div id="spaces-list" style="max-height:60vh;overflow-y:auto"></div>
  <button id="lobby-cal-btn" onclick="openCalendarFromLobby()" style="width:100%;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);padding:14px;font-size:15px;font-weight:600;color:var(--accent);cursor:pointer;font-family:inherit;margin-top:4px;margin-bottom:10px">📅 Календарь</button>
- <button onclick="openMyTasksPopup()" style="width:100%;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);padding:14px;font-size:15px;font-weight:600;color:var(--accent);cursor:pointer;font-family:inherit;margin-top:4px;margin-bottom:10px">📋 Мои задачи</button>
     <button onclick="openCreateSpace()" style="width:100%;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);padding:14px;font-size:15px;font-weight:600;color:var(--accent);cursor:pointer;font-family:inherit;margin-top:4px">＋ Создать кабинет</button>
     <button onclick="logoutUser()" style="width:100%;background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;font-family:inherit;margin-top:14px;padding:6px">Выйти из аккаунта</button>
   </div>
@@ -605,6 +604,7 @@
 <div id="pin-strip-ov" onclick="if(event.target===this)closePinStrip()">
   <div id="pin-strip">
     <button id="pin-strip-btn" onclick="openPinPopup()" title="Закреплённые">📌</button>
+    <button id="pin-strip-btn" onclick="openMyTasksPopup()" title="Мои задачи">📋</button>
   </div>
 </div>
 <div id="pin-popup-ov" onclick="if(event.target===this)closePinPopup()">
