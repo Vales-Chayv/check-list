@@ -18,6 +18,70 @@ function render() {
   renderCats(); renderMain();
   desktopCalSync();
 }
+async function openMyTasksPopup(){
+  document.getElementById('my-tasks-ov').classList.add('on');
+  const box = document.getElementById('my-tasks-list');
+  box.innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Загрузка…</div>';
+  const myName = localStorage.getItem('mc_current_member') || currentUser?.display_name || '';
+  const famSpaces = (spaces||[]).filter(s => s.type==='family' || s.type==='group');
+  let allCards = [];
+  try {
+    const ids = famSpaces.map(s=>s.id);
+    if(ids.length){
+      const { data } = await sb.from('cards').select('*').in('space_id', ids);
+      allCards = data||[];
+    }
+  } catch(e) {}
+  const tasks = [];
+  allCards.forEach(c => {
+    (c.entries||[]).forEach(e => {
+      if(!e.text) return;
+      if(e.assigned_to === myName && !e.done) {
+        tasks.push({cardId:c.id, cardTitle:c.title, entryId:e.id, entryText:e.text, spaceId:c.space_id});
+      } else if(e.assigned_to === 'all') {
+        const comp = (e.completions||[]).find(x=>x.name===myName);
+        if(comp && !comp.done) tasks.push({cardId:c.id, cardTitle:c.title, entryId:e.id, entryText:e.text, spaceId:c.space_id});
+      }
+    });
+  });
+  window._myTasksCache = tasks;
+  renderMyTasks();
+}
+function renderMyTasks(){
+  const box = document.getElementById('my-tasks-list'); if(!box) return;
+  const tasks = window._myTasksCache||[];
+  if(!tasks.length){ box.innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Нет невыполненных задач 🎉</div>'; return; }
+  box.innerHTML = tasks.map(t => {
+    const spaceName = (spaces.find(s=>s.id===t.spaceId)?.name)||'';
+    return `<div onclick="goToMyTask('${t.cardId}','${t.entryId}','${t.spaceId}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:12px 14px;margin-bottom:8px;cursor:pointer">
+      <div style="font-size:14px;color:var(--t1)">${esc(t.entryText)}</div>
+      <div style="font-size:12px;color:var(--t3);margin-top:4px">📌 ${esc(t.cardTitle)} · 🗂️ ${esc(spaceName)}</div>
+    </div>`;
+  }).join('');
+}
+function closeMyTasksPopup(){ document.getElementById('my-tasks-ov').classList.remove('on'); }
+async function goToMyTask(cardId, entryId, spaceId){
+  closeMyTasksPopup();
+  if(spaceId !== currentSpaceId){
+    await setCurrentSpace(spaceId, true);
+    let tries=0;
+    (function wait(){ if((cards||[]).some(c=>c.id===cardId)){ highlightTask(cardId, entryId); return; } if(++tries>25) return; setTimeout(wait,120); })();
+  } else {
+    highlightTask(cardId, entryId);
+  }
+}
+function highlightTask(cardId, entryId){
+  openView(cardId);
+  setTimeout(()=>{
+    const el = document.querySelector(`[data-entryid="${entryId}"]`);
+    if(el){
+      el.scrollIntoView({behavior:'smooth', block:'center'});
+      el.style.transition='background .3s';
+      el.style.background='rgba(232,197,106,.25)';
+      setTimeout(()=>{ el.style.background=''; }, 1600);
+    }
+  }, 350);
+}
 function openPinStrip(){ document.getElementById('pin-strip-ov').classList.add('on'); document.getElementById('pin-tab')?.classList.add('shifted'); }
 function closePinStrip(){ document.getElementById('pin-strip-ov').classList.remove('on'); document.getElementById('pin-tab')?.classList.remove('shifted'); closePinPopup(); }
 function togglePinStrip(){ const s=document.getElementById('pin-strip-ov'); if(s.classList.contains('on')) closePinStrip(); else { s.classList.add('on'); document.getElementById('pin-tab')?.classList.add('shifted'); } }
