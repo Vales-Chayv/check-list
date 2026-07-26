@@ -151,7 +151,6 @@ document.getElementById('current-space-name').textContent = currentSpace.name;
 }
 function switchSpace() {
   localStorage.removeItem('mc_current_space');
-  localStorage.removeItem('mc_current_member');
   unsubscribeRealtimeCards();
   unsubscribePresence();
   currentSpaceId = null; currentSpace = null;
