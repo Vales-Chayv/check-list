@@ -79,6 +79,7 @@ function openCalendarFromLobby() {
   openCalendar();
 }
 function renderSpacesList() {
+  document.getElementById('space-selector')?.classList.toggle('has-space', !!(spaces && spaces.length));
   const list = document.getElementById('spaces-list');
   list.innerHTML = spaces.map(s => {
     const icon = s.type==='family' ? '👨‍👩‍👧' : '🗂️';

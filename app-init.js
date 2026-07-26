@@ -224,9 +224,7 @@ let _deskCalOpened = false;
 function desktopCalSync() {
 if(window.innerWidth >= 900) {
     if(_deskCalOpened) { desktopCalRefresh(); return; }
-    if(typeof spaces === 'undefined' || !spaces || !spaces.length) return;
-    const ss = document.getElementById('space-selector');
-    if(ss && ss.style.display !== 'none') return; // ещё в лобби — ждём входа в кабинет
+    if(typeof spaces === 'undefined' || !spaces || !spaces.length) return; // ни одного кабинета — лобби остаётся во всю ширину
     _deskCalOpened = true;
     if(typeof openCalendar === 'function') openCalendar();
   } else {
