@@ -82,6 +82,54 @@ function highlightTask(cardId, entryId){
     }
   }, 350);
 }
+function renderLobbyPanelB() {
+  const ownedGroups = (spaces||[]).filter(s => (s.type==='family'||s.type==='group') && s.owner_id === currentUser?.id);
+  const sel = document.getElementById('lobby-group-select');
+  if(!sel || !ownedGroups.length) return;
+  const prevVal = sel.value;
+  sel.innerHTML = ownedGroups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('');
+  sel.value = ownedGroups.some(g=>g.id===prevVal) ? prevVal : ownedGroups[0].id;
+  loadLobbyGroupTasks(sel.value);
+}
+let lobbyGroupTasksCache = [];
+async function loadLobbyGroupTasks(spaceId) {
+  const box = document.getElementById('lobby-tasks-list');
+  if(!box) return;
+  box.innerHTML = '<div style="text-align:center;color:var(--t3);padding:20px">Загрузка…</div>';
+  const { data } = await sb.from('cards').select('*').eq('space_id', spaceId);
+  const tasks = [];
+  (data||[]).forEach(c => {
+    (c.entries||[]).forEach(e => {
+      if(!e.text) return;
+      if(e.assigned_to === 'all') {
+        (e.completions||[]).forEach(comp => {
+          if(!comp.done) tasks.push({cardId:c.id, cardTitle:c.title, entryId:e.id, entryText:e.text, member:comp.name, deadline:e.deadline, spaceId});
+        });
+      } else if(e.assigned_to && !e.done) {
+        tasks.push({cardId:c.id, cardTitle:c.title, entryId:e.id, entryText:e.text, member:e.assigned_to, deadline:e.deadline, spaceId});
+      }
+    });
+  });
+  lobbyGroupTasksCache = tasks;
+  const space = spaces.find(s=>s.id===spaceId);
+  const memberSel = document.getElementById('lobby-member-filter');
+  const members = (space?.members||[]).map(m=>m.name);
+  if(memberSel) memberSel.innerHTML = '<option value="">Все участники</option>' + members.map(m=>`<option value="${esc(m)}">${esc(m)}</option>`).join('');
+  renderLobbyTasksList();
+}
+function renderLobbyTasksList(){
+  const box = document.getElementById('lobby-tasks-list');
+  if(!box) return;
+  const filterMember = document.getElementById('lobby-member-filter')?.value || '';
+  const list = filterMember ? lobbyGroupTasksCache.filter(t=>t.member===filterMember) : lobbyGroupTasksCache;
+  if(!list.length){ box.innerHTML = '<div style="text-align:center;color:var(--t3);padding:20px">Нет невыполненных задач 🎉</div>'; return; }
+  box.innerHTML = list.map(t => `
+    <div onclick="goToMyTask('${t.cardId}','${t.entryId}','${t.spaceId}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 12px;margin-bottom:8px;cursor:pointer">
+      <div style="font-size:13px;color:var(--t1)">${esc(t.entryText)}</div>
+      <div style="font-size:11px;color:var(--t3);margin-top:4px">👤 ${esc(t.member)} · 📌 ${esc(t.cardTitle)}${t.deadline?` · ⏰ ${esc(t.deadline)}`:''}</div>
+    </div>
+  `).join('');
+}
 function openPinStrip(){ document.getElementById('pin-strip-ov').classList.add('on'); document.getElementById('pin-tab')?.classList.add('shifted'); }
 function closePinStrip(){ document.getElementById('pin-strip-ov').classList.remove('on'); document.getElementById('pin-tab')?.classList.remove('shifted'); closePinPopup(); }
 function togglePinStrip(){ const s=document.getElementById('pin-strip-ov'); if(s.classList.contains('on')) closePinStrip(); else { s.classList.add('on'); document.getElementById('pin-tab')?.classList.add('shifted'); } }

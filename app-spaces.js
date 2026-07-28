@@ -69,17 +69,29 @@ function showSpaceSelector() {
   const cb = document.getElementById('lobby-cal-btn');
   if(cb) { cb.style.display = currentUser ? 'block' : 'none'; cb.textContent = '📅 ' + t('Календарь'); }
   document.getElementById('space-selector').style.display = 'flex';
+  document.body.classList.add('in-lobby');
+}
+function hideSpaceSelector() {
+  document.getElementById('space-selector').style.display = 'none';
+  document.body.classList.remove('in-lobby');
 }
 function hideSpaceSelector() {
   document.getElementById('space-selector').style.display = 'none';
 }
 function openCalendarFromLobby() {
+  if(window.innerWidth >= 900) {
+    document.body.classList.toggle('lobby-cal-on');
+    return;
+  }
   calFromLobby = true;
   hideSpaceSelector();
   openCalendar();
 }
 function renderSpacesList() {
   document.getElementById('space-selector')?.classList.toggle('has-space', !!(spaces && spaces.length));
+  const ownsGroup = (spaces||[]).some(s => (s.type==='family'||s.type==='group') && s.owner_id === currentUser?.id);
+  document.body.classList.toggle('owns-group', ownsGroup);
+  if(ownsGroup && typeof renderLobbyPanelB === 'function') renderLobbyPanelB();
   const list = document.getElementById('spaces-list');
   list.innerHTML = spaces.map(s => {
     const icon = s.type==='family' ? '👨‍👩‍👧' : '🗂️';

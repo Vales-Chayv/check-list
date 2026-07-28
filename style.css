@@ -203,14 +203,23 @@ body{display:flex;flex-direction:column;overflow:hidden}
   body { width: var(--split-left); min-width: 320px; }
   #cal-btn { display: none !important; }            /* плавающая кнопка не нужна */
   #space-selector.has-space { inset: 0 auto 0 0 !important; width: var(--split-left) !important; } /* лобби — в левой колонке, календарь справа виден, как в кабинете */
-  #cal-ov {
+#cal-ov {
     inset: auto; top: 0; bottom: 0; left: var(--split-left); right: 0; width: auto;
-    z-index: 10;                                     /* фоновая колонка: модалки открываются поверх */
+    z-index: 30;                                     /* выше панелей лобби, ниже модалок */
     background: var(--s1);
-    opacity: 1 !important; pointer-events: all !important;
     border-left: 1px solid var(--b1);
-    transition: none;
   }
+  body:not(.in-lobby) #cal-ov { opacity: 1 !important; pointer-events: all !important; transition: none; } /* внутри кабинета — всегда открыт, как было */
+  body.in-lobby.lobby-cal-on #cal-ov { opacity: 1 !important; pointer-events: all !important; } /* в лобби — только по кнопке */
+  #lobby-panels {
+    position: fixed; top: 0; bottom: 0; left: var(--split-left); right: 0;
+    z-index: 5; display: none; flex-direction: column;
+    background: var(--s1); border-left: 1px solid var(--b1);
+  }
+  body.in-lobby.owns-group #lobby-panels { display: flex; }
+  #lobby-panel-a, #lobby-panel-b { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px; }
+  #lobby-panel-a { border-bottom: 1px solid var(--b1); display: flex; align-items: center; justify-content: center; color: var(--t3); font-size: 13px; }
+  #lobby-h-handle { height: 6px; margin-top: -6px; cursor: row-resize; position: relative; z-index: 6; flex-shrink: 0; }
  #cal-close-btn { display: none; }                 /* ✕ на ПК не нужен */
 #view-ov, #edit-ov, #ae-ov, #pin-strip-ov, #pin-popup-ov {
     inset: 0 auto 0 0; width: var(--split-left);    /* карточка/попап — в левой колонке, календарь справа виден */
