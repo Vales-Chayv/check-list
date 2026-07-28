@@ -219,6 +219,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
     z-index: 30;
     background: var(--s1);
     border-left: 1px solid var(--b1);
+    overflow-y: auto;
     opacity: 0; pointer-events: none; transition: opacity .15s;
   }
   body.cal-on #cal-ov { opacity: 1 !important; pointer-events: all !important; }
