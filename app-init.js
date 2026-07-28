@@ -224,11 +224,12 @@ let _deskCalOpened = false;
 function desktopCalSync() {
 if(window.innerWidth >= 900) {
     if(_deskCalOpened) { desktopCalRefresh(); return; }
-    if(typeof spaces === 'undefined' || !spaces || !spaces.length) return; // ни одного кабинета — лобби остаётся во всю ширину
+    if(typeof spaces === 'undefined' || !spaces || !spaces.length) return;
     _deskCalOpened = true;
+    document.body.classList.add('cal-on');
     if(typeof openCalendar === 'function') openCalendar();
   } else {
-    if(_deskCalOpened) { _deskCalOpened = false; if(typeof closeCalendar === 'function') closeCalendar(); }
+    if(_deskCalOpened) { _deskCalOpened = false; document.body.classList.remove('cal-on'); if(typeof closeCalendar === 'function') closeCalendar(); }
   }
 }
 window.addEventListener('resize', desktopCalSync);

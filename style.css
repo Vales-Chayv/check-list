@@ -197,22 +197,30 @@ body{display:flex;flex-direction:column;overflow:hidden}
   input[type="date"] { color-scheme: dark; }
 }
 #split-handle { display: none; } /* ручка-разделитель, видна только на ПК */
+#desktop-cal-toggle { display: none; } /* кнопка календаря — видна только на ПК */
 /* ── ПК (≥900px): карточки слева 40% / календарь справа 60% ── */
 @media (min-width:900px) {
   :root { --split-left: 40%; }
   body { width: var(--split-left); min-width: 320px; }
   #cal-btn { display: none !important; }            /* плавающая кнопка не нужна */
   #space-selector.has-space { inset: 0 auto 0 0 !important; width: var(--split-left) !important; } /* лобби — в левой колонке, календарь справа виден, как в кабинете */
-#cal-ov {
-    inset: auto; top: 0; bottom: 0; left: var(--split-left); right: 0; width: auto;
-    z-index: 30;                                     /* выше панелей лобби, ниже модалок */
+#desktop-cal-toggle {
+    display: block; position: fixed; top: 0; left: var(--split-left); right: 0; height: 46px;
+    z-index: 40; background: var(--s2); border: none; border-bottom: 1px solid var(--b1);
+    color: var(--accent); font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  body.cal-on #desktop-cal-toggle { background: var(--accent); color: #0f0f0f; }
+  #lobby-cal-btn { display: none !important; }              /* заменена единой кнопкой сверху */
+  #cal-ov {
+    inset: auto; top: 46px; bottom: 0; left: var(--split-left); right: 0; width: auto;
+    z-index: 30;
     background: var(--s1);
     border-left: 1px solid var(--b1);
+    opacity: 0; pointer-events: none; transition: opacity .15s;
   }
-  body:not(.in-lobby) #cal-ov { opacity: 1 !important; pointer-events: all !important; transition: none; } /* внутри кабинета — всегда открыт, как было */
-  body.in-lobby.lobby-cal-on #cal-ov { opacity: 1 !important; pointer-events: all !important; } /* в лобби — только по кнопке */
+  body.cal-on #cal-ov { opacity: 1 !important; pointer-events: all !important; } /* единственное условие видимости — везде одинаковое */
   #lobby-panels {
-    position: fixed; top: 0; bottom: 0; left: var(--split-left); right: 0;
+    position: fixed; top: 46px; bottom: 0; left: var(--split-left); right: 0;
     z-index: 5; display: none; flex-direction: column;
     background: var(--s1); border-left: 1px solid var(--b1);
   }

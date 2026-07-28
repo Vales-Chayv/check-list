@@ -82,6 +82,7 @@ function highlightTask(cardId, entryId){
     }
   }, 350);
 }
+function toggleDesktopCalendar(){ document.body.classList.toggle('cal-on'); }
 function renderLobbyPanelB() {
   const ownedGroups = (spaces||[]).filter(s => (s.type==='family'||s.type==='group') && s.owner_id === currentUser?.id);
   const sel = document.getElementById('lobby-group-select');

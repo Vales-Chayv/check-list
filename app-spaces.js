@@ -79,10 +79,6 @@ function hideSpaceSelector() {
   document.getElementById('space-selector').style.display = 'none';
 }
 function openCalendarFromLobby() {
-  if(window.innerWidth >= 900) {
-    document.body.classList.toggle('lobby-cal-on');
-    return;
-  }
   calFromLobby = true;
   hideSpaceSelector();
   openCalendar();
