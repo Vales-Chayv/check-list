@@ -239,6 +239,30 @@ function desktopCalRefresh() {
  _deskCalRefreshT = setTimeout(() => { if(typeof calRefreshData === 'function') calRefreshData(); }, 1000);
 }
 
+// ── Ручка-разделитель панелей A/Б в лобби (ПК) ──
+(function initLobbySplitHandle() {
+  const saved = localStorage.getItem('mc_lobby_split_v');
+  if(saved) document.documentElement.style.setProperty('--lobby-split-v', saved);
+  const h = document.getElementById('lobby-h-handle');
+  if(!h) return;
+  let dragging = false;
+  h.addEventListener('mousedown', () => dragging = true);
+  window.addEventListener('mousemove', e => {
+    if(!dragging) return;
+    const panels = document.getElementById('lobby-panels');
+    if(!panels) return;
+    const rect = panels.getBoundingClientRect();
+    let ratio = (e.clientY - rect.top) / rect.height;
+    ratio = Math.max(0.15, Math.min(ratio, 0.85));
+    document.documentElement.style.setProperty('--lobby-split-v', ratio);
+  });
+  window.addEventListener('mouseup', () => {
+    if(!dragging) return;
+    dragging = false;
+    localStorage.setItem('mc_lobby_split_v', getComputedStyle(document.documentElement).getPropertyValue('--lobby-split-v').trim());
+  });
+})();
+
 // ── Ручка-разделитель пропорций (ПК) ──
 (function initSplitHandle() {
   const saved = localStorage.getItem('mc_split');
