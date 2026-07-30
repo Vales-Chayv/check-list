@@ -449,6 +449,7 @@
 
 <div id="desktop-cal-toolbar">
   <button id="desktop-cal-toggle" onclick="toggleDesktopCalendar()">📅 Календарь</button>
+  <button id="desktop-calc-toggle" onclick="toggleDesktopCalc()">🧮 Калькулятор</button>
 </div>
 <div id="lobby-panels">
   <div id="lobby-panel-a">📅 мини-обзор — доработаем позже</div>
@@ -461,6 +462,76 @@
   </div>
 </div>
 <div id="lobby-h-handle"></div>
+
+<div id="calc-ov">
+  <div id="calc-history"></div>
+  <div id="calc-current">0</div>
+  <div id="calc-design-toggle" onclick="toggleCalcDesign()">🎨 Дизайн-инструменты <span id="calc-design-arrow">▾</span></div>
+  <div id="calc-design" style="display:none">
+    <div class="calc-tool">
+      <div class="calc-tool-title">Площадь (м²)</div>
+      <div class="calc-tool-row">
+        <input id="calc-area-l" placeholder="длина, м" type="number">
+        <span>×</span>
+        <input id="calc-area-w" placeholder="ширина, м" type="number">
+        <button onclick="calcArea()">=</button>
+      </div>
+    </div>
+    <div class="calc-tool">
+      <div class="calc-tool-title">Перевод см ↔ м</div>
+      <div class="calc-tool-row">
+        <input id="calc-unit-val" placeholder="значение" type="number">
+        <select id="calc-unit-dir">
+          <option value="cm2m">см → м</option>
+          <option value="m2cm">м → см</option>
+        </select>
+        <button onclick="calcUnit()">=</button>
+      </div>
+    </div>
+    <div class="calc-tool">
+      <div class="calc-tool-title">Наценка / скидка</div>
+      <div class="calc-tool-row">
+        <input id="calc-markup-sum" placeholder="сумма" type="number">
+        <input id="calc-markup-pct" placeholder="%" type="number">
+        <select id="calc-markup-dir">
+          <option value="up">наценка</option>
+          <option value="down">скидка</option>
+        </select>
+        <button onclick="calcMarkup()">=</button>
+      </div>
+    </div>
+    <div class="calc-tool">
+      <div class="calc-tool-title">Периметр → погонные метры</div>
+      <div class="calc-tool-row">
+        <input id="calc-perim-a" placeholder="сторона А, м" type="number">
+        <input id="calc-perim-b" placeholder="сторона Б, м" type="number">
+        <input id="calc-perim-roll" placeholder="ширина рулона, м (опц.)" type="number">
+        <button onclick="calcPerimeter()">=</button>
+      </div>
+    </div>
+  </div>
+  <div id="calc-pad">
+    <button onclick="calcInput('C')" class="calc-op">C</button>
+    <button onclick="calcInput('±')" class="calc-op">±</button>
+    <button onclick="calcInput('%')" class="calc-op">%</button>
+    <button onclick="calcInput('÷')" class="calc-op">÷</button>
+    <button onclick="calcInput('7')">7</button>
+    <button onclick="calcInput('8')">8</button>
+    <button onclick="calcInput('9')">9</button>
+    <button onclick="calcInput('×')" class="calc-op">×</button>
+    <button onclick="calcInput('4')">4</button>
+    <button onclick="calcInput('5')">5</button>
+    <button onclick="calcInput('6')">6</button>
+    <button onclick="calcInput('-')" class="calc-op">−</button>
+    <button onclick="calcInput('1')">1</button>
+    <button onclick="calcInput('2')">2</button>
+    <button onclick="calcInput('3')">3</button>
+    <button onclick="calcInput('+')" class="calc-op">+</button>
+    <button onclick="calcInput('0')" style="grid-column:span 2">0</button>
+    <button onclick="calcInput('.')">.</button>
+    <button onclick="calcInput('=')" class="calc-eq">=</button>
+  </div>
+</div>
 
 <!-- My Tasks (across all family/group spaces) -->
 <div class="overlay" id="my-tasks-ov">
@@ -678,6 +749,7 @@
 <script src="app-spaces.js"></script>
 <script src="app-db.js"></script>
 <script src="app-render.js"></script>
+<script src="app-calc.js"></script>
 <script src="app-view.js"></script>
 <script src="app-edit.js"></script>
 <script src="app-archive.js"></script>

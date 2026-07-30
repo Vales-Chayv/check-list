@@ -200,6 +200,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 #desktop-cal-toolbar { display: none; } /* панель с кнопкой календаря — видна только на ПК */
 #lobby-panels { display: none; } /* панели A/Б с задачами — видны только на ПК, на мобильном для этого есть кнопка в боковой ленте */
 #lobby-h-handle { display: none; } /* ручка A/Б — видна только на ПК */
+#calc-ov { display: none; } /* калькулятор — только на ПК */
 /* ── ПК (≥900px): карточки слева 40% / календарь справа 60% ── */
 @media (min-width:900px) {
   :root { --split-left: 40%; --lobby-split-v: 0.45; }
@@ -224,8 +225,37 @@ body{display:flex;flex-direction:column;overflow:hidden}
     overflow-y: auto;
     opacity: 0; pointer-events: none; transition: opacity .15s;
   }
-  body.cal-on #cal-ov { opacity: 1 !important; pointer-events: all !important; }
+ body.cal-on #cal-ov { opacity: 1 !important; pointer-events: all !important; }
   body.in-lobby.cal-on #cal-ov { bottom: auto; height: calc((100vh - 40px) * var(--lobby-split-v)); } /* в лобби — только поверх панели А, панель Б видна снизу */
+
+  #desktop-calc-toggle {
+    background: var(--s2); border: 1px solid var(--b1); border-radius: 18px; padding: 6px 12px;
+    color: var(--t2); font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  body.calc-on #desktop-calc-toggle { background: var(--accent); color: #0f0f0f; border-color: var(--accent); }
+  #calc-ov {
+    position: fixed; inset: auto; top: 40px; bottom: 0; left: var(--split-left); right: 0; width: auto;
+    z-index: 30; background: var(--s1); border-left: 1px solid var(--b1);
+    overflow-y: auto; padding: 14px;
+    opacity: 0; pointer-events: none; transition: opacity .15s;
+  }
+  body.calc-on #calc-ov { opacity: 1 !important; pointer-events: all !important; }
+  body.in-lobby.calc-on #calc-ov { bottom: auto; height: calc((100vh - 40px) * var(--lobby-split-v)); }
+  #calc-history { max-height: 90px; overflow-y: auto; color: var(--t3); font-size: 12px; text-align: right; margin-bottom: 6px; }
+  #calc-history div { padding: 2px 0; cursor: pointer; }
+  #calc-history div:hover { color: var(--t2); }
+  #calc-current { text-align: right; font-size: 30px; font-weight: 700; color: var(--t1); margin-bottom: 10px; word-break: break-all; }
+  #calc-design-toggle { font-size: 13px; color: var(--accent); cursor: pointer; margin-bottom: 8px; user-select: none; }
+  #calc-design { margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .calc-tool { background: var(--s2); border: 1px solid var(--b1); border-radius: 10px; padding: 10px; }
+  .calc-tool-title { font-size: 12px; color: var(--t3); margin-bottom: 6px; }
+  .calc-tool-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .calc-tool-row input, .calc-tool-row select { background: var(--s1); border: 1px solid var(--b1); border-radius: 6px; padding: 6px 8px; color: var(--t1); font-size: 12px; width: 90px; font-family: inherit; }
+  .calc-tool-row button { background: var(--accent); border: none; border-radius: 6px; padding: 6px 10px; color: #0f0f0f; font-weight: 700; cursor: pointer; }
+  #calc-pad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  #calc-pad button { background: var(--s2); border: 1px solid var(--b1); border-radius: 10px; padding: 14px 0; color: var(--t1); font-size: 16px; cursor: pointer; font-family: inherit; }
+  #calc-pad button.calc-op { background: var(--s1); color: var(--accent); }
+  #calc-pad button.calc-eq { background: var(--accent); color: #0f0f0f; font-weight: 700; grid-column: span 4; }
   #lobby-panels {
     position: fixed; top: 40px; bottom: 0; left: var(--split-left); right: 0;
     z-index: 5; display: none; flex-direction: column;
