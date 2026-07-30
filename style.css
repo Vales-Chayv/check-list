@@ -199,6 +199,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 #split-handle { display: none; } /* ручка-разделитель, видна только на ПК */
 #desktop-cal-toolbar { display: none; } /* панель с кнопкой календаря — видна только на ПК */
 #lobby-panels { display: none; } /* панели A/Б с задачами — видны только на ПК, на мобильном для этого есть кнопка в боковой ленте */
+#lobby-h-handle { display: none; } /* ручка A/Б — видна только на ПК */
 /* ── ПК (≥900px): карточки слева 40% / календарь справа 60% ── */
 @media (min-width:900px) {
   :root { --split-left: 40%; --lobby-split-v: 0.45; }
@@ -231,18 +232,27 @@ body{display:flex;flex-direction:column;overflow:hidden}
     background: var(--s1); border-left: 1px solid var(--b1);
   }
   body.in-lobby.owns-group #lobby-panels { display: flex; }
-  #lobby-panel-a { flex: 0 0 calc(var(--lobby-split-v) * 100%); min-height: 0; overflow-y: auto; padding: 14px 16px; border-bottom: 1px solid var(--b1); display: flex; align-items: center; justify-content: center; color: var(--t3); font-size: 13px; }
+ #lobby-panel-a { flex: 0 0 calc(var(--lobby-split-v) * 100%); min-height: 0; overflow-y: auto; padding: 14px 16px; display: flex; align-items: center; justify-content: center; color: var(--t3); font-size: 13px; }
   #lobby-panel-b { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px; }
- #lobby-h-handle { height: 6px; margin-top: -6px; cursor: row-resize; position: relative; z-index: 35; flex-shrink: 0; }
-  #lobby-h-handle:hover { background: rgba(232,197,106,.3); }
+  body.in-lobby.owns-group #lobby-h-handle {
+    display: block; position: fixed; left: var(--split-left); right: 0;
+    top: calc(40px + (100vh - 40px) * var(--lobby-split-v));
+    height: 10px; margin-top: -5px; cursor: row-resize;
+    z-index: 36;
+  }
+  #lobby-h-handle::before {
+    content: ''; position: absolute; left: 0; right: 0; top: 50%;
+    height: 2px; transform: translateY(-50%); background: var(--b1);
+  }
+  #lobby-h-handle:hover::before { background: var(--accent); height: 3px; }
  #cal-close-btn { display: none; }                 /* ✕ на ПК не нужен */
 #view-ov, #edit-ov, #ae-ov, #pin-strip-ov, #pin-popup-ov {
     inset: 0 auto 0 0; width: var(--split-left);    /* карточка/попап — в левой колонке, календарь справа виден */
   }
-  #split-handle {
+#split-handle {
     display: block; position: fixed; top: 0; bottom: 0;
     left: var(--split-left); width: 10px; transform: translateX(-50%);
-    z-index: 20; cursor: col-resize; background: transparent;
+    z-index: 999; cursor: col-resize; background: transparent;
   }
   #split-handle::before {
     content: ''; position: absolute; top: 0; bottom: 0; left: 50%;
