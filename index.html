@@ -467,7 +467,12 @@
  <div class="sheet">
   <div class="sheet-handle"></div>
   <div class="sheet-head"><span class="sheet-title">🧮 Калькулятор</span><button class="close-btn" onclick="closeCalcMobile()">✕</button></div>
-  <div id="calc-history"></div>
+  <div id="calc-body">
+  <div id="calc-right">
+   <h4 id="calc-history-label">Лента решений</h4>
+   <div id="calc-history"></div>
+  </div>
+  <div id="calc-left">
   <div id="calc-current">0</div>
   <div id="calc-design-toggle" onclick="toggleCalcDesign()">🎨 Дизайн-инструменты <span id="calc-design-arrow">▾</span></div>
   <div id="calc-design" style="display:none">
@@ -533,6 +538,8 @@
     <button onclick="calcInput('0')" style="grid-column:span 2">0</button>
     <button onclick="calcInput('.')">.</button>
   <button onclick="calcInput('=')" class="calc-eq">=</button>
+  </div>
+  </div>
   </div>
  </div>
 </div>
