@@ -200,7 +200,6 @@ body{display:flex;flex-direction:column;overflow:hidden}
 #desktop-cal-toolbar { display: none; } /* панель с кнопкой календаря — видна только на ПК */
 #lobby-panels { display: none; } /* панели A/Б с задачами — видны только на ПК, на мобильном для этого есть кнопка в боковой ленте */
 #lobby-h-handle { display: none; } /* ручка A/Б — видна только на ПК */
-#calc-ov { display: none; } /* калькулятор — только на ПК */
 /* ── ПК (≥900px): карточки слева 40% / календарь справа 60% ── */
 @media (min-width:900px) {
   :root { --split-left: 40%; --lobby-split-v: 0.45; }
@@ -233,13 +232,14 @@ body{display:flex;flex-direction:column;overflow:hidden}
     color: var(--t2); font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
   }
   body.calc-on #desktop-calc-toggle { background: var(--accent); color: #0f0f0f; border-color: var(--accent); }
-  #calc-ov {
+ #calc-ov {
     display: block;
     position: fixed; inset: auto; top: 40px; bottom: 0; left: var(--split-left); right: 0; width: auto;
     z-index: 30; background: var(--s1); border-left: 1px solid var(--b1);
     overflow-y: auto; padding: 14px;
     opacity: 0; pointer-events: none; transition: opacity .15s;
   }
+  #calc-ov .sheet { transform: none; max-height: none; height: 100%; border-radius: 0; background: none; padding: 0; overflow: visible; }
   body.calc-on #calc-ov { opacity: 1 !important; pointer-events: all !important; }
   body.in-lobby.calc-on #calc-ov { bottom: auto; height: calc((100vh - 40px) * var(--lobby-split-v)); }
   #calc-history { max-height: 90px; overflow-y: auto; color: var(--t3); font-size: 12px; text-align: right; margin-bottom: 6px; }

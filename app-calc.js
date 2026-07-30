@@ -2,6 +2,8 @@
 //  КАЛЬКУЛЯТОР (панель A на ПК)
 // ═══════════════════════════════════════════
 
+function openCalcMobile(){ document.getElementById('calc-ov').classList.add('on'); }
+function closeCalcMobile(){ document.getElementById('calc-ov').classList.remove('on'); }
 function toggleDesktopCalc(){
   document.body.classList.remove('cal-on');
   document.body.classList.toggle('calc-on');

@@ -463,7 +463,10 @@
 </div>
 <div id="lobby-h-handle"></div>
 
-<div id="calc-ov">
+<div class="overlay" id="calc-ov" onclick="if(event.target===this)closeCalcMobile()">
+ <div class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head"><span class="sheet-title">🧮 Калькулятор</span><button class="close-btn" onclick="closeCalcMobile()">✕</button></div>
   <div id="calc-history"></div>
   <div id="calc-current">0</div>
   <div id="calc-design-toggle" onclick="toggleCalcDesign()">🎨 Дизайн-инструменты <span id="calc-design-arrow">▾</span></div>
@@ -529,8 +532,9 @@
     <button onclick="calcInput('+')" class="calc-op">+</button>
     <button onclick="calcInput('0')" style="grid-column:span 2">0</button>
     <button onclick="calcInput('.')">.</button>
-    <button onclick="calcInput('=')" class="calc-eq">=</button>
+  <button onclick="calcInput('=')" class="calc-eq">=</button>
   </div>
+ </div>
 </div>
 
 <!-- My Tasks (across all family/group spaces) -->
@@ -698,6 +702,7 @@
   <div id="pin-strip">
     <button id="pin-strip-btn" onclick="openPinPopup()" title="Закреплённые">📌</button>
     <button id="pin-strip-btn" onclick="openMyTasksPopup()" title="Мои задачи">📋</button>
+    <button id="pin-strip-btn" onclick="openCalcMobile()" title="Калькулятор">🧮</button>
   </div>
 </div>
 <div id="pin-popup-ov" onclick="if(event.target===this)closePinPopup()">
