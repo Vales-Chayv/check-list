@@ -196,9 +196,9 @@ body{display:flex;flex-direction:column;overflow:hidden}
 @media (hover: hover) {
   input[type="date"] { color-scheme: dark; }
 }
-#calc-history { max-height: 90px; overflow-y: auto; color: var(--t3); font-size: 12px; text-align: right; margin-bottom: 6px; padding: 0 4px }
-#calc-history div { padding: 3px 0; cursor: pointer; }
-#calc-history div:hover { color: var(--t2); }
+#calc-history { max-height: 100px; overflow-y: auto; color: var(--t2); font-size: 15px; text-align: right; margin-bottom: 6px; padding: 0 4px }
+#calc-history div { padding: 4px 0; cursor: pointer; }
+#calc-history div:hover { color: var(--t1); }
 #calc-current { text-align: right; font-size: 32px; font-weight: 700; color: var(--t1); margin-bottom: 12px; word-break: break-all; padding: 0 4px }
 #calc-design-toggle { font-size: 14px; color: var(--accent); cursor: pointer; margin-bottom: 10px; user-select: none; padding: 0 4px }
 #calc-design { margin-bottom: 14px; display: flex; flex-direction: column; gap: 10px; padding: 0 4px }

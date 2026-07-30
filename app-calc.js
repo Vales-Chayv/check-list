@@ -3,10 +3,26 @@
 // ═══════════════════════════════════════════
 
 function openCalcMobile(){ document.getElementById('calc-ov').classList.add('on'); }
-function closeCalcMobile(){ document.getElementById('calc-ov').classList.remove('on'); }
+
+function calcHasHistory(){ return (document.getElementById('calc-history')?.children.length || 0) > 0; }
+function calcClearAll(){
+  document.getElementById('calc-history').innerHTML = '';
+  document.getElementById('calc-current').textContent = '0';
+  calcAcc = null; calcOp = null; calcFresh = true;
+}
+
+function closeCalcMobile(){
+  if(calcHasHistory() && confirm('Стереть все подсчёты? (Отмена — оставить до следующего раза)')) calcClearAll();
+  document.getElementById('calc-ov').classList.remove('on');
+}
 function toggleDesktopCalc(){
+  if(document.body.classList.contains('calc-on')){
+    if(calcHasHistory() && confirm('Стереть все подсчёты? (Отмена — оставить до следующего раза)')) calcClearAll();
+    document.body.classList.remove('calc-on');
+    return;
+  }
   document.body.classList.remove('cal-on');
-  document.body.classList.toggle('calc-on');
+  document.body.classList.add('calc-on');
 }
 function toggleCalcDesign(){
   const box = document.getElementById('calc-design');
