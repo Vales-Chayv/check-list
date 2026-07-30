@@ -472,6 +472,7 @@
         <button onclick="setMyTasksMode('mine')" id="mt-tab-mine" style="flex:1;padding:8px;border:none;background:var(--accent);color:#0f0f0f;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit">Свои</button>
         <button onclick="setMyTasksMode('all')" id="mt-tab-all" style="flex:1;padding:8px;border:none;background:none;color:var(--t2);font-weight:600;font-size:13px;cursor:pointer;font-family:inherit">Все</button>
       </div>
+      <select id="mt-member-filter" onchange="renderMyTasks()" style="display:none;width:100%;margin-top:8px;background:var(--s2);border:1px solid var(--b1);border-radius:8px;padding:8px;color:var(--t1);font-size:13px;font-family:inherit"></select>
     </div>
     <div id="my-tasks-list" style="padding:16px;max-height:70vh;overflow-y:auto"></div>
   </div>

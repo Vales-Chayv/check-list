@@ -25,6 +25,8 @@ function setMyTasksMode(mode){
   const mine = document.getElementById('mt-tab-mine'), all = document.getElementById('mt-tab-all');
   if(mine){ mine.style.background = mode==='mine' ? 'var(--accent)' : 'none'; mine.style.color = mode==='mine' ? '#0f0f0f' : 'var(--t2)'; }
   if(all){ all.style.background = mode==='all' ? 'var(--accent)' : 'none'; all.style.color = mode==='all' ? '#0f0f0f' : 'var(--t2)'; }
+  const memberSel = document.getElementById('mt-member-filter');
+  if(memberSel) memberSel.style.display = mode==='all' ? 'block' : 'none';
   loadMyTasksData();
 }
 
@@ -74,12 +76,25 @@ async function loadMyTasksData(){
       }
     });
   });
-  window._myTasksCache = tasks;
+window._myTasksCache = tasks;
+  if(myTasksMode === 'all') {
+    const memberSel = document.getElementById('mt-member-filter');
+    if(memberSel) {
+      const names = [...new Set(tasks.map(t=>t.member).filter(Boolean))];
+      const prevVal = memberSel.value;
+      memberSel.innerHTML = '<option value="">Все участники</option>' + names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+      memberSel.value = names.includes(prevVal) ? prevVal : '';
+    }
+  }
   renderMyTasks();
 }
 function renderMyTasks(){
   const box = document.getElementById('my-tasks-list'); if(!box) return;
-  const tasks = window._myTasksCache||[];
+  let tasks = window._myTasksCache||[];
+  if(myTasksMode === 'all') {
+    const filterMember = document.getElementById('mt-member-filter')?.value || '';
+    if(filterMember) tasks = tasks.filter(t=>t.member===filterMember);
+  }
   if(!tasks.length){ box.innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Нет невыполненных задач 🎉</div>'; return; }
   box.innerHTML = tasks.map(t => {
     const spaceName = (spaces.find(s=>s.id===t.spaceId)?.name)||'';
