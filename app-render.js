@@ -18,12 +18,32 @@ function render() {
   renderCats(); renderMain();
   desktopCalSync();
 }
+let myTasksMode = 'mine';
+
+function setMyTasksMode(mode){
+  myTasksMode = mode;
+  const mine = document.getElementById('mt-tab-mine'), all = document.getElementById('mt-tab-all');
+  if(mine){ mine.style.background = mode==='mine' ? 'var(--accent)' : 'none'; mine.style.color = mode==='mine' ? '#0f0f0f' : 'var(--t2)'; }
+  if(all){ all.style.background = mode==='all' ? 'var(--accent)' : 'none'; all.style.color = mode==='all' ? '#0f0f0f' : 'var(--t2)'; }
+  loadMyTasksData();
+}
+
 async function openMyTasksPopup(){
   document.getElementById('my-tasks-ov').classList.add('on');
+  const ownsGroup = (spaces||[]).some(s => (s.type==='family'||s.type==='group') && s.owner_id === currentUser?.id);
+  const toggle = document.getElementById('my-tasks-toggle');
+  if(toggle) toggle.style.display = ownsGroup ? 'block' : 'none';
+  myTasksMode = 'mine';
+  setMyTasksMode('mine');
+}
+
+async function loadMyTasksData(){
   const box = document.getElementById('my-tasks-list');
   box.innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Загрузка…</div>';
   const myName = localStorage.getItem('mc_current_member') || currentUser?.display_name || '';
-  const famSpaces = (spaces||[]).filter(s => s.type==='family' || s.type==='group');
+  const famSpaces = myTasksMode === 'all'
+    ? (spaces||[]).filter(s => (s.type==='family'||s.type==='group') && s.owner_id === currentUser?.id)
+    : (spaces||[]).filter(s => s.type==='family' || s.type==='group');
   let allCards = [];
   try {
     const ids = famSpaces.map(s=>s.id);
@@ -36,11 +56,21 @@ async function openMyTasksPopup(){
   allCards.forEach(c => {
     (c.entries||[]).forEach(e => {
       if(!e.text) return;
-      if(e.assigned_to === myName && !e.done) {
-        tasks.push({cardId:c.id, cardTitle:c.title, entryId:e.id, entryText:e.text, spaceId:c.space_id});
-      } else if(e.assigned_to === 'all') {
-        const comp = (e.completions||[]).find(x=>x.name===myName);
-        if(comp && !comp.done) tasks.push({cardId:c.id, cardTitle:c.title, entryId:e.id, entryText:e.text, spaceId:c.space_id});
+      if(myTasksMode === 'all') {
+        if(e.assigned_to === 'all') {
+          (e.completions||[]).forEach(comp => {
+            if(!comp.done) tasks.push({cardId:c.id, cardTitle:c.title, entryId:e.id, entryText:e.text, member:comp.name, spaceId:c.space_id});
+          });
+        } else if(e.assigned_to && !e.done) {
+          tasks.push({cardId:c.id, cardTitle:c.title, entryId:e.id, entryText:e.text, member:e.assigned_to, spaceId:c.space_id});
+        }
+      } else {
+        if(e.assigned_to === myName && !e.done) {
+          tasks.push({cardId:c.id, cardTitle:c.title, entryId:e.id, entryText:e.text, spaceId:c.space_id});
+        } else if(e.assigned_to === 'all') {
+          const comp = (e.completions||[]).find(x=>x.name===myName);
+          if(comp && !comp.done) tasks.push({cardId:c.id, cardTitle:c.title, entryId:e.id, entryText:e.text, spaceId:c.space_id});
+        }
       }
     });
   });
@@ -53,9 +83,10 @@ function renderMyTasks(){
   if(!tasks.length){ box.innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Нет невыполненных задач 🎉</div>'; return; }
   box.innerHTML = tasks.map(t => {
     const spaceName = (spaces.find(s=>s.id===t.spaceId)?.name)||'';
+    const memberLine = t.member ? `👤 ${esc(t.member)} · ` : '';
     return `<div onclick="goToMyTask('${t.cardId}','${t.entryId}','${t.spaceId}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:12px 14px;margin-bottom:8px;cursor:pointer">
       <div style="font-size:14px;color:var(--t1)">${esc(t.entryText)}</div>
-      <div style="font-size:12px;color:var(--t3);margin-top:4px">📌 ${esc(t.cardTitle)} · 🗂️ ${esc(spaceName)}</div>
+      <div style="font-size:12px;color:var(--t3);margin-top:4px">${memberLine}📌 ${esc(t.cardTitle)} · 🗂️ ${esc(spaceName)}</div>
     </div>`;
   }).join('');
 }

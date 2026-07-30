@@ -466,7 +466,13 @@
 <div class="overlay" id="my-tasks-ov">
   <div class="sheet">
     <div class="sheet-handle"></div>
-    <div class="sheet-head"><span class="sheet-title">📋 Мои задачи</span><button class="close-btn" onclick="closeMyTasksPopup()">✕</button></div>
+   <div class="sheet-head"><span class="sheet-title">📋 Мои задачи</span><button class="close-btn" onclick="closeMyTasksPopup()">✕</button></div>
+    <div id="my-tasks-toggle" style="display:none;padding:0 16px 10px">
+      <div style="display:flex;background:var(--s2);border:1px solid var(--b1);border-radius:8px;overflow:hidden">
+        <button onclick="setMyTasksMode('mine')" id="mt-tab-mine" style="flex:1;padding:8px;border:none;background:var(--accent);color:#0f0f0f;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit">Свои</button>
+        <button onclick="setMyTasksMode('all')" id="mt-tab-all" style="flex:1;padding:8px;border:none;background:none;color:var(--t2);font-weight:600;font-size:13px;cursor:pointer;font-family:inherit">Все</button>
+      </div>
+    </div>
     <div id="my-tasks-list" style="padding:16px;max-height:70vh;overflow-y:auto"></div>
   </div>
 </div>
