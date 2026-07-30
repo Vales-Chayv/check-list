@@ -198,6 +198,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 }
 #split-handle { display: none; } /* ручка-разделитель, видна только на ПК */
 #desktop-cal-toolbar { display: none; } /* панель с кнопкой календаря — видна только на ПК */
+#lobby-panels { display: none; } /* панели A/Б с задачами — видны только на ПК, на мобильном для этого есть кнопка в боковой ленте */
 /* ── ПК (≥900px): карточки слева 40% / календарь справа 60% ── */
 @media (min-width:900px) {
   :root { --split-left: 40%; --lobby-split-v: 0.45; }
