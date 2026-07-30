@@ -233,7 +233,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
   body.in-lobby.owns-group #lobby-panels { display: flex; }
   #lobby-panel-a { flex: 0 0 calc(var(--lobby-split-v) * 100%); min-height: 0; overflow-y: auto; padding: 14px 16px; border-bottom: 1px solid var(--b1); display: flex; align-items: center; justify-content: center; color: var(--t3); font-size: 13px; }
   #lobby-panel-b { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px; }
-  #lobby-h-handle { height: 6px; margin-top: -6px; cursor: row-resize; position: relative; z-index: 6; flex-shrink: 0; }
+ #lobby-h-handle { height: 6px; margin-top: -6px; cursor: row-resize; position: relative; z-index: 35; flex-shrink: 0; }
   #lobby-h-handle:hover { background: rgba(232,197,106,.3); }
  #cal-close-btn { display: none; }                 /* ✕ на ПК не нужен */
 #view-ov, #edit-ov, #ae-ov, #pin-strip-ov, #pin-popup-ov {
