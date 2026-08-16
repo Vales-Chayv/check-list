@@ -758,9 +758,12 @@ async function mcConfirm(cardId, catName) {
   render();
   toast('✓ Карточка перемещена');
 }
+let moveAssignedTo = null, moveAssignedCompletions = null;
+
 function moveEntry(cardId, entryId) {
   const card = cards.find(c=>c.id===cardId); if(!card) return;
   const entry = (card.entries||[]).find(e=>e.id===entryId); if(!entry) return;
+  moveAssignedTo = null; moveAssignedCompletions = null;
   const div = document.createElement('div');
   div.id = 'move-entry-dialog';
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
@@ -774,12 +777,58 @@ function moveEntry(cardId, entryId) {
       <button onclick="selectMoveSpace('${cardId}','${entryId}','${currentSpaceId}',this)" style="background:var(--s2);border:1px solid var(--accent);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--accent);cursor:pointer;text-align:left;font-family:inherit">📂 Текущий кабинет</button>
       ${spaceList}
     </div>
+    <div id="move-assign-block"></div>
     <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Рубрика</div>
     <div style="display:flex;flex-direction:column;gap:6px" id="move-cat-list"></div>
     <div id="move-card-list" style="margin-top:12px;display:flex;flex-direction:column;gap:6px"></div>
     <button onclick="document.getElementById('move-entry-dialog')?.remove()" style="width:100%;margin-top:12px;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;cursor:pointer">Отмена</button>
   </div>`;
   document.body.appendChild(div);
+}
+
+function renderMoveAssignBlock(spaceId) {
+  const block = document.getElementById('move-assign-block'); if(!block) return;
+  moveAssignedTo = null; moveAssignedCompletions = null;
+  const targetSpace = spaces.find(s=>s.id===spaceId);
+  if(!targetSpace || !(targetSpace.type==='family' || targetSpace.type==='group')) { block.innerHTML = ''; return; }
+  block.innerHTML = `<div style="margin-bottom:12px">
+    <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Назначить</div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px">
+      <button type="button" class="move-assign-btn on" data-val="" onclick="moveToggleAssign(this,'',event)" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:var(--accent);color:#0f0f0f;cursor:pointer">👤 Никому</button>
+      <button type="button" class="move-assign-btn" data-val="all" onclick="moveToggleAssign(this,'all',event)" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:transparent;color:var(--t2);cursor:pointer">👥 Все</button>
+      ${(targetSpace.members||[]).map(m=>`<button type="button" class="move-assign-btn" data-val="${esc(m.name)}" onclick="moveToggleAssign(this,'${esc(m.name)}',event)" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:transparent;color:var(--t2);cursor:pointer">${esc(m.name)}</button>`).join('')}
+    </div>
+  </div>`;
+}
+
+function moveToggleAssign(btn, val, event) {
+  event.stopPropagation();
+  const wrap = document.getElementById('move-assign-block');
+  const allBtns = wrap.querySelectorAll('.move-assign-btn');
+  if(val === '' || val === 'all') {
+    allBtns.forEach(b => { b.style.background='transparent'; b.style.color='var(--t2)'; b.classList.remove('on'); });
+    btn.style.background = 'var(--accent)'; btn.style.color = '#0f0f0f'; btn.classList.add('on');
+  } else {
+    const noneBtns = wrap.querySelectorAll('[data-val=""], [data-val="all"]');
+    noneBtns.forEach(b => { b.style.background='transparent'; b.style.color='var(--t2)'; b.classList.remove('on'); });
+    btn.classList.toggle('on');
+    btn.style.background = btn.classList.contains('on') ? 'var(--accent)' : 'transparent';
+    btn.style.color = btn.classList.contains('on') ? '#0f0f0f' : 'var(--t2)';
+  }
+  const onVals = [...wrap.querySelectorAll('.move-assign-btn.on')].map(b=>b.dataset.val).filter(v=>v);
+  const targetSpace = spaces.find(s=>s.id===document.querySelector('[onclick*="selectMoveSpace"][style*="accent"]')?.getAttribute('onclick')?.match(/'([^']+)'\)$/)?.[1]);
+  if(onVals.includes('all')) {
+    moveAssignedTo = 'all';
+    moveAssignedCompletions = (targetSpace?.members||[]).map(m=>({name:m.name, done:false}));
+  } else if(onVals.length > 1) {
+    moveAssignedTo = 'all';
+    moveAssignedCompletions = onVals.map(name=>({name, done:false}));
+  } else if(onVals.length === 1) {
+    moveAssignedTo = onVals[0];
+    moveAssignedCompletions = null;
+  } else {
+    moveAssignedTo = null; moveAssignedCompletions = null;
+  }
 }
 
 function selectMoveCat(cardId, entryId, catName, btn) {
@@ -799,6 +848,7 @@ async function confirmMoveEntry(fromCardId, entryId, toCardId) {
   const toCard = cards.find(c=>c.id===toCardId);
   if(!fromCard||!toCard) return;
   const entry = (fromCard.entries||[]).find(e=>e.id===entryId); if(!entry) return;
+  if(moveAssignedTo !== null) { entry.assigned_to = moveAssignedTo; entry.completions = moveAssignedCompletions; entry.done = false; }
   fromCard.entries = (fromCard.entries||[]).filter(e=>e.id!==entryId);
   if((fromCard.entries||[]).length === 0) {
   if(confirm('Карточка «' + fromCard.title + '» пуста. Удалить её?')) {
@@ -856,6 +906,7 @@ function toggleEntryMenu(btn, cardId, entryId) {
 async function selectMoveSpace(cardId, entryId, spaceId, btn) {
   document.querySelectorAll('[onclick*="selectMoveSpace"]').forEach(b=>b.style.borderColor='var(--b1)');
   btn.style.borderColor = 'var(--accent)';
+  renderMoveAssignBlock(spaceId);
   const catListEl = document.getElementById('move-cat-list');
   const cardListEl = document.getElementById('move-card-list');
   cardListEl.innerHTML = '';
@@ -892,6 +943,7 @@ async function selectMoveSpaceCat(cardId, entryId, spaceId, catName, btn) {
 async function confirmMoveEntryToSpace(fromCardId, entryId, toSpaceId, toCardId) {
   const fromCard = cards.find(c=>c.id===fromCardId); if(!fromCard) return;
   const entry = (fromCard.entries||[]).find(e=>e.id===entryId); if(!entry) return;
+  if(moveAssignedTo !== null) { entry.assigned_to = moveAssignedTo; entry.completions = moveAssignedCompletions; entry.done = false; }
   fromCard.entries = (fromCard.entries||[]).filter(e=>e.id!==entryId);
   if((fromCard.entries||[]).length === 0) {
   if(confirm('Карточка «' + fromCard.title + '» пуста. Удалить её?')) {
@@ -912,6 +964,7 @@ async function confirmMoveEntryToSpace(fromCardId, entryId, toSpaceId, toCardId)
 async function createCardAndMove(fromCardId, entryId, toSpaceId, catName) {
   const fromCard = cards.find(c=>c.id===fromCardId); if(!fromCard) return;
   const entry = (fromCard.entries||[]).find(e=>e.id===entryId); if(!entry) return;
+  if(moveAssignedTo !== null) { entry.assigned_to = moveAssignedTo; entry.completions = moveAssignedCompletions; entry.done = false; }
   const title = prompt('Название новой карточки:');
   if(!title) return;
   const newCard = {id:uid(), title, category:catName, status:'in_progress', space_id:toSpaceId, created_at:today(), entries:[entry], attachments:[], history:[], created_by:localStorage.getItem('mc_current_member')||currentUser?.display_name||''};
