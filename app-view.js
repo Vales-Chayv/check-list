@@ -327,11 +327,32 @@ function openAddEntry(cardId, sessionId = null, hideNote = false) {
     document.querySelectorAll('#ae-seg-ball .seg-btn').forEach(b=>b.classList.toggle('on', b.dataset.ball===(card.ball||'')));
   }
 
+ const groupSel = document.getElementById('ae-group-select');
+  if(groupSel) {
+    if(card?.entryGroups?.length) {
+      groupSel.style.display = 'block';
+      groupSel.innerHTML = card.entryGroups.map(g=>`<option value="${g.id}">${esc(g.name)||'Без названия'}</option>`).join('') + `<option value="__new__">+ Новый раздел</option>`;
+      groupSel.value = card.entryGroups[0].id;
+    } else {
+      groupSel.style.display = 'none';
+    }
+  }
+  const newGroupInp = document.getElementById('ae-new-group-name');
+  if(newGroupInp) { newGroupInp.style.display = 'none'; newGroupInp.value = ''; }
+
   document.getElementById('ae-extra').style.display = 'none';
   document.getElementById('ae-extra-arrow').textContent = '▼';
  document.getElementById('ae-ov').classList.add('on');
   aeAddEntryRow();                                   // авто-первая пустая строка записи
   setTimeout(() => { if(noteEl) noteEl.focus(); }, 300);
+}
+
+function aeToggleNewGroupInput() {
+  const sel = document.getElementById('ae-group-select');
+  const inp = document.getElementById('ae-new-group-name');
+  if(!sel || !inp) return;
+  inp.style.display = sel.value === '__new__' ? 'block' : 'none';
+  if(sel.value === '__new__') setTimeout(()=>inp.focus(), 50);
 }
 
 function toggleAEExtra(btn) {
@@ -444,11 +465,24 @@ async function saveAddEntry() {
     await new Promise(resolve => { aeStopResolve = resolve; stopAEVoice(); });
   }
 
-  const sessionNote = (document.getElementById('ae-note')?.value||'').trim();
+ const sessionNote = (document.getElementById('ae-note')?.value||'').trim();
   const entryRows = document.getElementById('ae-entries-list')?.querySelectorAll('.entry-row')||[];
   const entryTexts = [...entryRows].map(r=>sanitizeRich(r.querySelector('.ae-entry-edit')?.innerHTML||'')).filter(t=>stripTags(t).trim());
   if(!sessionNote && !entryTexts.length && !aeAtts.length) { toast('Введи заметку или добавь запись', true); return; }
   const card = cards.find(c => c.id === aeCardId); if (!card) return;
+
+  // Раздел (если у карточки уже есть группировка записей)
+  let targetGroupId = null;
+  const groupSel = document.getElementById('ae-group-select');
+  if(groupSel && groupSel.style.display !== 'none') {
+    if(groupSel.value === '__new__') {
+      const newName = (document.getElementById('ae-new-group-name')?.value||'').trim();
+      targetGroupId = uid();
+      card.entryGroups = [...(card.entryGroups||[]), {id: targetGroupId, name: newName}];
+    } else {
+      targetGroupId = groupSel.value;
+    }
+  }
 
   // Build session
   const sessionId = aeStickerSessionId || uid();
@@ -471,7 +505,7 @@ if(onVals.includes('all')) {
   assignedTo = onVals[0];
   completions = null;
 }
-    sessionEntries.push({
+   sessionEntries.push({
       id: uid(), text: text, date: nowStr(), done: false, attachments: [],
       sessionId,
       sessionNote: (i === 0 && isNewSession) ? (sessionNote||null) : null,
@@ -479,7 +513,8 @@ if(onVals.includes('all')) {
       sessionCreator: isNewSession ? (localStorage.getItem('mc_current_member')||currentUser?.display_name||'') : (localStorage.getItem('mc_current_member')||currentUser?.display_name||''),
       assigned_to: assignedTo,
 completions: completions,
-      deadline
+      deadline,
+      groupId: targetGroupId
     });
   });
   card.entries = [...sessionEntries, ...(card.entries||[])];
