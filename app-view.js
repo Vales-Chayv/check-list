@@ -1060,44 +1060,7 @@ function toggleEntryMenu(btn, cardId, entryId) {
     if(!popup.contains(e.target)&&e.target!==btn){popup.remove();document.removeEventListener('click',h);}
   }), 100);
 }
-async function selectMoveSpace(cardId, entryId, spaceId, btn) {
-  document.querySelectorAll('[onclick*="selectMoveSpace"]').forEach(b=>b.style.borderColor='var(--b1)');
-  btn.style.borderColor = 'var(--accent)';
-  renderMoveAssignBlock(spaceId);
-  const catListEl = document.getElementById('move-cat-list');
-  const cardListEl = document.getElementById('move-card-list');
-  cardListEl.innerHTML = '';
-  if(spaceId === currentSpaceId) {
-    catListEl.innerHTML = cats.map(c=>`<button onclick="selectMoveCat('${cardId}','${entryId}','${esc(c.name)}',this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.color||'#888'};margin-right:8px"></span>${esc(c.name)}</button>`).join('');
-  } else {
-    catListEl.innerHTML = '<div style="font-size:13px;color:var(--t3)">Загрузка...</div>';
-    try {
-      const {data} = await sb.from('categories').select('*').eq('space_id', spaceId);
-      const spaceCats = data||[];
-      catListEl.innerHTML = spaceCats.length
-        ? spaceCats.map(c=>`<button onclick="selectMoveSpaceCat('${cardId}','${entryId}','${spaceId}','${esc(c.name)}',this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.color||'#888'};margin-right:8px"></span>${esc(c.name)}</button>`).join('')
-        : '<div style="font-size:13px;color:var(--t3)">Нет рубрик</div>';
-    } catch(e) { catListEl.innerHTML = '<div style="font-size:13px;color:var(--red)">Ошибка загрузки</div>'; }
-  }
-}
 
-async function createCardAndMove(fromCardId, entryId, toSpaceId, catName) {
-  const fromCard = cards.find(c=>c.id===fromCardId); if(!fromCard) return;
-  const entry = (fromCard.entries||[]).find(e=>e.id===entryId); if(!entry) return;
-  if(moveAssignedTo !== null) { entry.assigned_to = moveAssignedTo; entry.completions = moveAssignedCompletions; entry.done = false; }
-  const title = prompt('Название новой карточки:');
-  if(!title) return;
-  const newCard = {id:uid(), title, category:catName, status:'in_progress', space_id:toSpaceId, created_at:today(), entries:[entry], attachments:[], history:[], created_by:localStorage.getItem('mc_current_member')||currentUser?.display_name||''};
-  fromCard.entries = (fromCard.entries||[]).filter(e=>e.id!==entryId);
-  try {
-    await sb.from('cards').insert(newCard);
-    await dbUpdate(fromCard);
-    if(toSpaceId===currentSpaceId) { cards.unshift(newCard); }
-    document.getElementById('move-entry-dialog')?.remove();
-    render(); openView(fromCardId);
-    toast('✓ Карточка создана и запись перенесена');
-  } catch(e) { toast('Ошибка: '+e.message, true); }
-}
 function toggleCompletions(entryId) {
   const el = document.getElementById('comp_'+entryId);
   if(!el) return;
