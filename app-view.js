@@ -45,7 +45,10 @@ function openView(id) {
         <div style="display:flex;gap:6px">
           <button onclick="closeView();setTimeout(()=>openChatCompose('${id}'),200)" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:8px;padding:9px 14px;font-size:15px;font-weight:700;cursor:pointer">💬 Написать в чат</button>
           <button onclick="closeView();setTimeout(()=>openChatVoice('${id}'),200)" style="background:var(--s2);color:var(--accent);border:1px solid var(--b1);border-radius:8px;padding:9px 12px;font-size:15px;cursor:pointer">🎙️</button>
-        </div>`:`<button onclick="closeView();setTimeout(()=>openAddEntry('${id}'),200)" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:8px;padding:9px 16px;font-size:15px;font-weight:700;cursor:pointer">＋ Запись</button>`}
+        </div>`:`<div style="display:flex;gap:6px">
+          <button onclick="closeView();setTimeout(()=>openAddEntry('${id}'),200)" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:8px;padding:9px 14px;font-size:15px;font-weight:700;cursor:pointer">＋ Запись</button>
+          <button onclick="closeView();setTimeout(()=>openBulkTransferPicker('${id}'),200)" style="background:var(--s2);color:var(--accent);border:1px solid var(--b1);border-radius:8px;padding:9px 12px;font-size:15px;cursor:pointer" title="Перенести несколько">📤</button>
+        </div>`}
         ${card.pinned?`<button onclick="resetCardChecks('${id}')" style="background:var(--s2);color:var(--t1);border:1px solid var(--b1);border-radius:8px;padding:9px 16px;font-size:15px;cursor:pointer">↺ Сбросить</button>`:''}
 		${(card.status!=='done'&&view!=='today'&&currentSpace?.type!=='family'&&currentSpace?.type!=='group')?`<button onclick="toggleToday('${id}')" style="background:${card.today?'rgba(232,197,106,.3)':'rgba(232,197,106,.1)'};color:var(--accent);border:1px solid rgba(232,197,106,.3);border-radius:8px;padding:9px 16px;font-size:15px;cursor:pointer">${card.today?'✕ Убрать из списка':'☆ На сегодня'}</button>`:''}
 		${card.status==='done'?`<button onclick="restoreCard('${id}')" style="background:rgba(91,184,122,.15);color:var(--green);border:1px solid rgba(91,184,122,.25);border-radius:8px;padding:9px 16px;font-size:15px;cursor:pointer">↩ Вернуть</button>`:''}
@@ -762,47 +765,93 @@ async function mcConfirm(cardId, catName) {
   render();
   toast('✓ Карточка перемещена');
 }
-let moveAssignedTo = null, moveAssignedCompletions = null;
+let moveAssignedTo = null, moveAssignedCompletions = null, moveDeleteSource = false, moveSelection = null, moveTargetCard = null;
 
-function moveEntry(cardId, entryId) {
+function openBulkTransferPicker(cardId) {
   const card = cards.find(c=>c.id===cardId); if(!card) return;
-  const entry = (card.entries||[]).find(e=>e.id===entryId); if(!entry) return;
-  moveAssignedTo = null; moveAssignedCompletions = null;
+  const groups = card.entryGroups||[];
+  const entries = (card.entries||[]).filter(e=>e.text);
+  const div = document.createElement('div');
+  div.id = 'bulk-transfer-ov';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
+  const groupBlocks = groups.map(g => {
+    const gEntries = entries.filter(e=>e.groupId===g.id);
+    return `<label style="display:flex;align-items:center;gap:8px;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 12px;cursor:pointer;margin-bottom:6px">
+      <input type="checkbox" class="bt-group-cb" data-groupid="${g.id}">
+      <div><div style="font-weight:700;color:var(--accent);font-size:13px">${esc(g.name)||'Без названия'}</div><div style="font-size:11px;color:var(--t3)">${gEntries.length} записей — весь раздел</div></div>
+    </label>`;
+  }).join('');
+  const ungrouped = entries.filter(e=>!e.groupId);
+  const entryBlocks = ungrouped.map(e => `<label style="display:flex;align-items:flex-start;gap:8px;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 12px;cursor:pointer;margin-bottom:6px">
+      <input type="checkbox" class="bt-entry-cb" data-entryid="${e.id}" style="margin-top:2px">
+      <div style="font-size:13px">${esc(stripTags(e.text))}</div>
+    </label>`).join('');
+  div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto">
+    <div style="font-size:16px;font-weight:700;margin-bottom:12px">Что перенести?</div>
+    ${groupBlocks}
+    ${entryBlocks}
+    ${!groups.length && !ungrouped.length ? '<div style="color:var(--t3);font-size:13px">Нет записей</div>' : ''}
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button onclick="document.getElementById('bulk-transfer-ov')?.remove()" style="flex:1;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;cursor:pointer">Отмена</button>
+      <button onclick="confirmBulkSelection('${cardId}')" style="flex:1;background:var(--accent);border:none;color:#0f0f0f;font-weight:700;border-radius:var(--rsm);padding:11px;cursor:pointer">Далее →</button>
+    </div>
+  </div>`;
+  document.body.appendChild(div);
+}
+function confirmBulkSelection(cardId) {
+  const entryIds = [...document.querySelectorAll('.bt-entry-cb:checked')].map(cb=>cb.dataset.entryid);
+  const groupIds = [...document.querySelectorAll('.bt-group-cb:checked')].map(cb=>cb.dataset.groupid);
+  if(!entryIds.length && !groupIds.length) { toast('Выбери хотя бы одну запись или раздел', true); return; }
+  document.getElementById('bulk-transfer-ov')?.remove();
+  moveEntry(cardId, {entryIds, groupIds});
+}
+
+function moveEntry(cardId, selection) {
+  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  moveSelection = typeof selection === 'string' ? {entryIds:[selection], groupIds:[]} : selection;
+  moveAssignedTo = null; moveAssignedCompletions = null; moveDeleteSource = false; moveTargetCard = null;
   const div = document.createElement('div');
   div.id = 'move-entry-dialog';
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
   const spaceList = spaces.filter(s=>s.id!==currentSpaceId).map(s=>
-    `<button onclick="selectMoveSpace('${cardId}','${entryId}','${s.id}',this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">${s.type==='family'?'👨‍👩‍👧':'🗂️'} ${esc(s.name)}</button>`
+    `<button onclick="selectMoveSpace('${cardId}','${s.id}',this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">${s.type==='family'?'👨‍👩‍👧':'🗂️'} ${esc(s.name)}</button>`
   ).join('');
+  const n = moveSelection.entryIds.length + moveSelection.groupIds.length;
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto">
-    <div style="font-size:16px;font-weight:700;margin-bottom:4px">Перенести запись</div>
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">Перенести${n>1?` (${n})`:' запись'}</div>
+    <label style="display:flex;align-items:center;gap:8px;margin:8px 0 14px;font-size:13px;color:var(--t2);cursor:pointer">
+      <input type="checkbox" id="move-delete-source" onchange="moveDeleteSource=this.checked">
+      Стереть в источнике после переноса
+    </label>
     <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Кабинет</div>
     <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
-      <button onclick="selectMoveSpace('${cardId}','${entryId}','${currentSpaceId}',this)" style="background:var(--s2);border:1px solid var(--accent);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--accent);cursor:pointer;text-align:left;font-family:inherit">📂 Текущий кабинет</button>
+      <button onclick="selectMoveSpace('${cardId}','${currentSpaceId}',this)" style="background:var(--s2);border:1px solid var(--accent);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--accent);cursor:pointer;text-align:left;font-family:inherit">📂 Текущий кабинет</button>
       ${spaceList}
     </div>
-    <div id="move-assign-block"></div>
     <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Рубрика</div>
     <div style="display:flex;flex-direction:column;gap:6px" id="move-cat-list"></div>
     <div id="move-card-list" style="margin-top:12px;display:flex;flex-direction:column;gap:6px"></div>
+    <div id="move-assign-block"></div>
+    <div id="move-confirm-block"></div>
     <button onclick="document.getElementById('move-entry-dialog')?.remove()" style="width:100%;margin-top:12px;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;cursor:pointer">Отмена</button>
   </div>`;
   document.body.appendChild(div);
 }
 
-function renderMoveAssignBlock(spaceId) {
+function renderMoveAssignBlock(targetSpace, chatParticipants) {
   const block = document.getElementById('move-assign-block'); if(!block) return;
   moveAssignedTo = null; moveAssignedCompletions = null;
-  const targetSpace = spaces.find(s=>s.id===spaceId);
   if(!targetSpace || !(targetSpace.type==='family' || targetSpace.type==='group')) { block.innerHTML = ''; return; }
-  block.innerHTML = `<div style="margin-bottom:12px">
-    <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Назначить</div>
+  const pool = (chatParticipants && chatParticipants.length) ? chatParticipants : (targetSpace.members||[]).map(m=>m.name);
+  block.innerHTML = `<div style="margin:12px 0">
+    <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Назначить (участники этого чата)</div>
     <div style="display:flex;flex-wrap:wrap;gap:4px">
       <button type="button" class="move-assign-btn on" data-val="" onclick="moveToggleAssign(this,'',event)" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:var(--accent);color:#0f0f0f;cursor:pointer">👤 Никому</button>
       <button type="button" class="move-assign-btn" data-val="all" onclick="moveToggleAssign(this,'all',event)" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:transparent;color:var(--t2);cursor:pointer">👥 Все</button>
-      ${(targetSpace.members||[]).map(m=>`<button type="button" class="move-assign-btn" data-val="${esc(m.name)}" onclick="moveToggleAssign(this,'${esc(m.name)}',event)" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:transparent;color:var(--t2);cursor:pointer">${esc(m.name)}</button>`).join('')}
+      ${pool.map(name=>`<button type="button" class="move-assign-btn" data-val="${esc(name)}" onclick="moveToggleAssign(this,'${esc(name)}',event)" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:transparent;color:var(--t2);cursor:pointer">${esc(name)}</button>`).join('')}
     </div>
   </div>`;
+  block.dataset.pool = JSON.stringify(pool);
 }
 
 function moveToggleAssign(btn, val, event) {
@@ -820,10 +869,10 @@ function moveToggleAssign(btn, val, event) {
     btn.style.color = btn.classList.contains('on') ? '#0f0f0f' : 'var(--t2)';
   }
   const onVals = [...wrap.querySelectorAll('.move-assign-btn.on')].map(b=>b.dataset.val).filter(v=>v);
-  const targetSpace = spaces.find(s=>s.id===document.querySelector('[onclick*="selectMoveSpace"][style*="accent"]')?.getAttribute('onclick')?.match(/'([^']+)'\)$/)?.[1]);
+  const pool = JSON.parse(wrap.dataset.pool || '[]');
   if(onVals.includes('all')) {
     moveAssignedTo = 'all';
-    moveAssignedCompletions = (targetSpace?.members||[]).map(m=>({name:m.name, done:false}));
+    moveAssignedCompletions = pool.map(name=>({name, done:false}));
   } else if(onVals.length > 1) {
     moveAssignedTo = 'all';
     moveAssignedCompletions = onVals.map(name=>({name, done:false}));
@@ -835,38 +884,142 @@ function moveToggleAssign(btn, val, event) {
   }
 }
 
-function selectMoveCat(cardId, entryId, catName, btn) {
-  const cardList = document.getElementById('move-card-list'); if(!cardList) return;
-  const catCards = cards.filter(c=>c.category===catName && c.id!==cardId && c.status!=='done');
-  document.querySelectorAll('#move-cat-list button').forEach(b=>b.style.background='var(--s2)');
-if(btn) btn.style.background='var(--s3,rgba(255,255,255,.1))';
-  cardList.innerHTML = catCards.length
-    ? `<div style="font-size:12px;color:var(--t3);margin-bottom:4px">Выбери карточку:</div>` +
-      catCards.map(c=>`<button onclick="confirmMoveEntry('${cardId}','${entryId}','${c.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">${esc(c.title)}</button>`).join('')
-    : `<div style="font-size:13px;color:var(--t3);margin-bottom:8px">Нет карточек в этой рубрике</div>
-   <button onclick="createCardAndMove('${cardId}','${entryId}','${currentSpaceId}','${catName}')" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:10px 14px;font-size:14px;font-weight:700;cursor:pointer;width:100%">＋ Создать карточку и перенести</button>`;
-}
-
-async function confirmMoveEntry(fromCardId, entryId, toCardId) {
-  const fromCard = cards.find(c=>c.id===fromCardId);
-  const toCard = cards.find(c=>c.id===toCardId);
-  if(!fromCard||!toCard) return;
-  const entry = (fromCard.entries||[]).find(e=>e.id===entryId); if(!entry) return;
-  if(moveAssignedTo !== null) { entry.assigned_to = moveAssignedTo; entry.completions = moveAssignedCompletions; entry.done = false; }
-  fromCard.entries = (fromCard.entries||[]).filter(e=>e.id!==entryId);
-  if((fromCard.entries||[]).length === 0) {
-  if(confirm('Карточка «' + fromCard.title + '» пуста. Удалить её?')) {
-    deleteCardById(fromCard.id);
+async function selectMoveSpace(cardId, spaceId, btn) {
+  document.querySelectorAll('[onclick*="selectMoveSpace"]').forEach(b=>b.style.borderColor='var(--b1)');
+  btn.style.borderColor = 'var(--accent)';
+  document.getElementById('move-assign-block').innerHTML = '';
+  document.getElementById('move-confirm-block').innerHTML = '';
+  moveTargetCard = null;
+  const catListEl = document.getElementById('move-cat-list');
+  const cardListEl = document.getElementById('move-card-list');
+  cardListEl.innerHTML = '';
+  if(spaceId === currentSpaceId) {
+    catListEl.innerHTML = cats.map(c=>`<button onclick="selectMoveCat('${cardId}','${spaceId}','${esc(c.name)}',this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.color||'#888'};margin-right:8px"></span>${esc(c.name)}</button>`).join('');
+  } else {
+    catListEl.innerHTML = '<div style="font-size:13px;color:var(--t3)">Загрузка...</div>';
+    try {
+      const {data} = await sb.from('categories').select('*').eq('space_id', spaceId);
+      const spaceCats = data||[];
+      catListEl.innerHTML = spaceCats.length
+        ? spaceCats.map(c=>`<button onclick="selectMoveCat('${cardId}','${spaceId}','${esc(c.name)}',this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.color||'#888'};margin-right:8px"></span>${esc(c.name)}</button>`).join('')
+        : '<div style="font-size:13px;color:var(--t3)">Нет рубрик</div>';
+    } catch(e) { catListEl.innerHTML = '<div style="font-size:13px;color:var(--red)">Ошибка загрузки</div>'; }
   }
 }
-  toCard.entries = [entry, ...(toCard.entries||[])];
-document.getElementById('move-entry-dialog')?.remove();
-  render(); openView(fromCardId);
+
+async function selectMoveCat(cardId, spaceId, catName, btn) {
+  document.querySelectorAll('#move-cat-list button').forEach(b=>b.style.background='var(--s2)');
+  if(btn) btn.style.background='var(--s3,rgba(255,255,255,.1))';
+  const cardListEl = document.getElementById('move-card-list'); if(!cardListEl) return;
+  document.getElementById('move-assign-block').innerHTML = '';
+  document.getElementById('move-confirm-block').innerHTML = '';
+  moveTargetCard = null;
+  let targetCards = [];
+  if(spaceId === currentSpaceId) {
+    targetCards = cards.filter(c=>c.category===catName && c.id!==cardId && c.status!=='done').map(c=>({id:c.id, title:c.title, chatParticipants:c.chatParticipants}));
+  } else {
+    cardListEl.innerHTML = '<div style="font-size:13px;color:var(--t3)">Загрузка...</div>';
+    try {
+      const {data} = await sb.from('cards').select('id,title,chatParticipants').eq('space_id', spaceId).eq('category', catName).neq('status','done');
+      targetCards = data||[];
+    } catch(e) { cardListEl.innerHTML = '<div style="font-size:13px;color:var(--red)">Ошибка загрузки</div>'; return; }
+  }
+  window._moveTargetCards = targetCards;
+  cardListEl.innerHTML = targetCards.length
+    ? `<div style="font-size:12px;color:var(--t3);margin-bottom:4px">Выбери карточку:</div>` +
+      targetCards.map((c,i)=>`<button onclick="selectMoveTarget('${cardId}','${spaceId}',${i},this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">${esc(c.title)}</button>`).join('')
+    : `<div style="font-size:13px;color:var(--t3);margin-bottom:8px">Нет карточек в этой рубрике</div>
+   <button onclick="createCardAndMove('${cardId}','${spaceId}','${esc(catName)}')" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:10px 14px;font-size:14px;font-weight:700;cursor:pointer;width:100%">＋ Создать карточку и перенести</button>`;
+}
+
+function selectMoveTarget(cardId, spaceId, idx, btn) {
+  document.querySelectorAll('#move-card-list button').forEach(b=>b.style.borderColor='var(--b1)');
+  if(btn) btn.style.borderColor='var(--accent)';
+  const targetCard = (window._moveTargetCards||[])[idx];
+  if(!targetCard) return;
+  moveTargetCard = {id: targetCard.id, spaceId};
+  const targetSpace = spaces.find(s=>s.id===spaceId);
+  renderMoveAssignBlock(targetSpace, targetCard.chatParticipants);
+  document.getElementById('move-confirm-block').innerHTML = `<button onclick="confirmMove('${cardId}')" style="width:100%;margin-top:10px;background:var(--accent);border:none;color:#0f0f0f;font-weight:700;border-radius:var(--rsm);padding:11px;cursor:pointer">Перенести</button>`;
+}
+
+function collectMoveEntries(fromCard) {
+  const picked = [];
+  (fromCard.entries||[]).forEach(e => {
+    if(moveSelection.entryIds.includes(e.id) || (e.groupId && moveSelection.groupIds.includes(e.groupId))) {
+      const copy = {...e, id: uid()};
+      if(moveAssignedTo !== null) { copy.assigned_to = moveAssignedTo; copy.completions = moveAssignedCompletions; copy.done = false; }
+      picked.push(copy);
+    }
+  });
+  return picked;
+}
+
+function stripMovedFromSource(fromCard) {
+  if(!moveDeleteSource) return;
+  fromCard.entries = (fromCard.entries||[]).filter(e =>
+    !moveSelection.entryIds.includes(e.id) && !(e.groupId && moveSelection.groupIds.includes(e.groupId))
+  );
+  if(moveSelection.groupIds.length) {
+    fromCard.entryGroups = (fromCard.entryGroups||[]).filter(g => !moveSelection.groupIds.includes(g.id));
+  }
+}
+
+async function confirmMove(fromCardId) {
+  const fromCard = cards.find(c=>c.id===fromCardId); if(!fromCard || !moveTargetCard) return;
+  const movedEntries = collectMoveEntries(fromCard);
+  if(!movedEntries.length) { toast('Нечего переносить', true); return; }
+  stripMovedFromSource(fromCard);
+  document.getElementById('move-entry-dialog')?.remove();
   try {
-    await dbUpdate(fromCard);
-    await dbUpdate(toCard);
-    toast('✓ Запись перенесена');
-  } catch(e) { toast('Ошибка синхронизации', true); }
+    if(moveTargetCard.spaceId === currentSpaceId) {
+      const toCard = cards.find(c=>c.id===moveTargetCard.id);
+      if(!toCard) { toast('Карточка не найдена', true); return; }
+      toCard.entries = [...movedEntries, ...(toCard.entries||[])];
+      await dbUpdate(toCard);
+    } else {
+      const {data:toCardData} = await sb.from('cards').select('*').eq('id', moveTargetCard.id).single();
+      if(!toCardData) { toast('Карточка не найдена', true); return; }
+      const updatedEntries = [...movedEntries, ...(toCardData.entries||[])];
+      await sb.from('cards').update({entries: updatedEntries}).eq('id', moveTargetCard.id);
+    }
+    if(moveDeleteSource && (fromCard.entries||[]).length === 0 && confirm('Карточка «' + fromCard.title + '» пуста. Удалить её?')) {
+      deleteCardById(fromCard.id);
+    } else {
+      await dbUpdate(fromCard);
+    }
+    render(); openView(fromCardId);
+    toast('✓ Перенесено');
+  } catch(e) { toast('Ошибка: '+e.message, true); }
+}
+
+async function createCardAndMove(fromCardId, spaceId, catName) {
+  const fromCard = cards.find(c=>c.id===fromCardId); if(!fromCard) return;
+  const movedEntries = collectMoveEntries(fromCard);
+  if(!movedEntries.length) { toast('Нечего переносить', true); return; }
+  const title = prompt('Название новой карточки:');
+  if(!title) return;
+  const targetSpace = spaces.find(s=>s.id===spaceId);
+  const isChat = targetSpace?.type==='family' || targetSpace?.type==='group';
+  const newCard = {
+    id:uid(), title, category:catName, status:'in_progress', space_id:spaceId, created_at:today(),
+    entries:movedEntries, entryGroups:[], attachments:[], history:[],
+    created_by:localStorage.getItem('mc_current_member')||currentUser?.display_name||'',
+    chatParticipants: isChat ? (targetSpace.members||[]).map(m=>m.name) : undefined
+  };
+  stripMovedFromSource(fromCard);
+  try {
+    await sb.from('cards').insert(newCard);
+    if(moveDeleteSource && (fromCard.entries||[]).length === 0 && confirm('Карточка «' + fromCard.title + '» пуста. Удалить её?')) {
+      deleteCardById(fromCard.id);
+    } else {
+      await dbUpdate(fromCard);
+    }
+    if(spaceId===currentSpaceId) { cards.unshift(newCard); }
+    document.getElementById('move-entry-dialog')?.remove();
+    render(); openView(fromCardId);
+    toast('✓ Карточка создана и запись перенесена');
+  } catch(e) { toast('Ошибка: '+e.message, true); }
 }
 				
 function openVideoViewer(src) {
@@ -928,43 +1081,6 @@ async function selectMoveSpace(cardId, entryId, spaceId, btn) {
   }
 }
 
-async function selectMoveSpaceCat(cardId, entryId, spaceId, catName, btn) {
-  document.querySelectorAll('#move-cat-list button').forEach(b=>b.style.background='var(--s2)');
-  btn.style.background='var(--s3,rgba(255,255,255,.1))';
-  const cardListEl = document.getElementById('move-card-list'); if(!cardListEl) return;
-  cardListEl.innerHTML = '<div style="font-size:13px;color:var(--t3)">Загрузка...</div>';
-  try {
-    const {data} = await sb.from('cards').select('id,title').eq('space_id', spaceId).eq('category', catName).neq('status','done');
-    const spaceCards = data||[];
-    cardListEl.innerHTML = spaceCards.length
-      ? `<div style="font-size:12px;color:var(--t3);margin-bottom:4px">Выбери карточку:</div>` +
-        spaceCards.map(c=>`<button onclick="confirmMoveEntryToSpace('${cardId}','${entryId}','${spaceId}','${c.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">${esc(c.title)}</button>`).join('')
-      : `<div style="font-size:13px;color:var(--t3);margin-bottom:8px">Нет карточек в этой рубрике</div>
-   <button onclick="createCardAndMove('${cardId}','${entryId}','${spaceId}','${catName}')" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:10px 14px;font-size:14px;font-weight:700;cursor:pointer;width:100%">＋ Создать карточку и перенести</button>`;
-  } catch(e) { cardListEl.innerHTML = '<div style="font-size:13px;color:var(--red)">Ошибка загрузки</div>'; }
-}
-
-async function confirmMoveEntryToSpace(fromCardId, entryId, toSpaceId, toCardId) {
-  const fromCard = cards.find(c=>c.id===fromCardId); if(!fromCard) return;
-  const entry = (fromCard.entries||[]).find(e=>e.id===entryId); if(!entry) return;
-  if(moveAssignedTo !== null) { entry.assigned_to = moveAssignedTo; entry.completions = moveAssignedCompletions; entry.done = false; }
-  fromCard.entries = (fromCard.entries||[]).filter(e=>e.id!==entryId);
-  if((fromCard.entries||[]).length === 0) {
-  if(confirm('Карточка «' + fromCard.title + '» пуста. Удалить её?')) {
-    deleteCardById(fromCard.id);
-  }
-}
-  try {
-    const {data:toCardData} = await sb.from('cards').select('*').eq('id', toCardId).single();
-    if(!toCardData) { toast('Карточка не найдена', true); return; }
-    const updatedEntries = [entry, ...(toCardData.entries||[])];
-    await sb.from('cards').update({entries: updatedEntries}).eq('id', toCardId);
-    await dbUpdate(fromCard);
-    document.getElementById('move-entry-dialog')?.remove();
-    render(); openView(fromCardId);
-    toast('✓ Запись перенесена');
-  } catch(e) { toast('Ошибка: '+e.message, true); }
-}
 async function createCardAndMove(fromCardId, entryId, toSpaceId, catName) {
   const fromCard = cards.find(c=>c.id===fromCardId); if(!fromCard) return;
   const entry = (fromCard.entries||[]).find(e=>e.id===entryId); if(!entry) return;

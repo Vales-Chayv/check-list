@@ -18,7 +18,8 @@ async function quickCreateChat(){
     assigned_to: null, attachments: [], entries: [], entryGroups: [],
     reminder: {enabled:false, freq:'daily', days:[], intervalMin:null},
     history: [{date: nowStr(), text: 'Чат создан', type:'created'}],
-    related_ids: [], today: false, pinned: false
+    related_ids: [], today: false, pinned: false,
+    chatParticipants: (currentSpace?.members||[]).map(m=>m.name) // пока = все участники группы, точечный выбор — отдельная фаза
   };
   cards.unshift(card);
   render();
@@ -79,10 +80,10 @@ async function chatFinishVoice(){
   toast('Загрузка голосового…');
   try {
     const att = await uploadToStorage(file, card.id, null);
-    const entry = {
+  const entry = {
       id: uid(), text: '🎙️ Голосовое сообщение', date: nowStr(), done: false,
-      attachments: [att], sessionId: uid(),
-      sessionNote: null, sessionAtts: [], sessionCreator: localStorage.getItem('mc_current_member')||currentUser?.display_name||'',
+      attachments: [], sessionId: uid(),
+      sessionNote: null, sessionAtts: [att], sessionCreator: localStorage.getItem('mc_current_member')||currentUser?.display_name||'',
       assigned_to: null, completions: null, deadline: null
     };
     card.entries = [...(card.entries||[]), entry];
