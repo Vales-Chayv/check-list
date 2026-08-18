@@ -351,7 +351,8 @@ function renderCards() {
   const el=document.getElementById('scroll');
   const PO={urgent:0,high:1,normal:2};
  const filtered=applyMemberFilter(cards.filter(c=>c.status!=='done'&&(filterCat==='all'||c.category===filterCat)&&(!filterNoDeadline||cardHasNoDeadline(c))&&(filterClosed ? c.chatStatus==='closed' : c.chatStatus!=='closed')));
-  if(!filtered.length){el.innerHTML=emptyHTML(filterClosed?'Нет закрытых чатов':filterNoDeadline?'Нет карточек без срока':'Нет карточек', filterClosed?'Закрытые чаты появятся здесь':filterNoDeadline?'Все карточки имеют дату':'Создай первую карточку');return;}}
+  const isChatSpace = currentSpace?.type==='family' || currentSpace?.type==='group';
+  if(!filtered.length){el.innerHTML=emptyHTML(filterClosed?'Нет закрытых чатов':filterNoDeadline?'Нет карточек без срока':isChatSpace?'Нет чатов':'Нет карточек', filterClosed?'Закрытые чаты появятся здесь':filterNoDeadline?'Все карточки имеют дату':isChatSpace?'Создать первый чат':'Создай первую карточку');return;}}
 
   // Separate urgent/high from normal
   const priority=filtered.filter(c=>c.priority==='urgent'||c.priority==='high')
@@ -507,7 +508,8 @@ function renderDone() {
 }
 
 function emptyHTML(h,p) {
-  return`<div class="empty"><div class="empty-icon">🗂️</div><h3>${h}</h3><p>${p}</p><button onclick="openEdit()" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:11px;padding:11px 26px;font-size:15px;font-weight:700;cursor:pointer">＋ Создать</button></div>`;
+  const isChat = currentSpace?.type==='family' || currentSpace?.type==='group';
+  return`<div class="empty"><div class="empty-icon">🗂️</div><h3>${h}</h3><p>${p}</p><button onclick="handleNewCardClick()" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:11px;padding:11px 26px;font-size:15px;font-weight:700;cursor:pointer">${isChat?'＋ Создать чат':'＋ Создать'}</button></div>`;
 }
 
 function checkSVG() { return'<svg width="11" height="9" viewBox="0 0 11 9"><path d="M1 4l3 3 6-6" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'; }
