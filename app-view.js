@@ -41,11 +41,21 @@ function openView(id) {
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
         <button onclick="closeView()" style="background:var(--s2);border:none;color:var(--t2);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px">✕</button>
-      ${(currentSpace?.type==='family'||currentSpace?.type==='group')?`
-        <div style="display:flex;gap:6px">
+    ${(currentSpace?.type==='family'||currentSpace?.type==='group')?(card.chatStatus==='closed'?`
+        <div style="font-size:12px;color:var(--t3);padding:6px 0">🔒 Чат закрыт — только просмотр</div>
+        `:`
+        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
           <button onclick="closeView();setTimeout(()=>openChatCompose('${id}'),200)" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:8px;padding:9px 14px;font-size:15px;font-weight:700;cursor:pointer">💬 Написать в чат</button>
           <button onclick="closeView();setTimeout(()=>openChatVoice('${id}'),200)" style="background:var(--s2);color:var(--accent);border:1px solid var(--b1);border-radius:8px;padding:9px 12px;font-size:15px;cursor:pointer">🎙️</button>
-        </div>`:`<div style="display:flex;gap:6px">
+          ${card.chatStatus==='pending_close' && (typeof isGroupOwner==='function' && isGroupOwner())?`
+            <button onclick="actuallyCloseChat('${id}')" style="background:rgba(91,184,122,.15);color:var(--green);border:1px solid rgba(91,184,122,.25);border-radius:8px;padding:9px 12px;font-size:13px;cursor:pointer">✅ Подтвердить закрытие</button>
+            <button onclick="rejectCloseChat('${id}')" style="background:var(--s2);color:var(--t2);border:1px solid var(--b1);border-radius:8px;padding:9px 12px;font-size:13px;cursor:pointer">❌ Отклонить</button>
+          `:(typeof isChatCreator==='function' && isChatCreator(card))?`
+            <button onclick="requestCloseChat('${id}')" style="background:var(--s2);color:var(--t2);border:1px solid var(--b1);border-radius:8px;padding:9px 12px;font-size:13px;cursor:pointer">🔒 Закрыть чат</button>
+          `:(typeof isGroupOwner==='function' && isGroupOwner())?`
+            <button onclick="actuallyCloseChat('${id}')" style="background:var(--s2);color:var(--t2);border:1px solid var(--b1);border-radius:8px;padding:9px 12px;font-size:13px;cursor:pointer">🔒 Закрыть чат</button>
+          `:''}
+        </div>`):`<div style="display:flex;gap:6px">
           <button onclick="closeView();setTimeout(()=>openAddEntry('${id}'),200)" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:8px;padding:9px 14px;font-size:15px;font-weight:700;cursor:pointer">＋ Запись</button>
           <button onclick="closeView();setTimeout(()=>openBulkTransferPicker('${id}'),200)" style="background:var(--s2);color:var(--accent);border:1px solid var(--b1);border-radius:8px;padding:9px 12px;font-size:15px;cursor:pointer" title="Перенести несколько">📤</button>
         </div>`}

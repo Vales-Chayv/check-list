@@ -72,6 +72,60 @@ function chatCancelVoice(){
   chatRecordedChunks=[];
   document.getElementById('chat-voice-ov')?.remove();
 }
+// ── Закрытие чата ──
+async function notifyUsers(userIds, title, body) {
+  if(!userIds.length) return;
+  try {
+    await fetch(FUNC_URL, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ notifyUserIds: userIds, title, body })
+    });
+  } catch(e) { console.log('Push notify error:', e.message); }
+}
+
+function isChatCreator(card) {
+  const myName = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
+  return card.created_by && card.created_by.toLowerCase() === myName.toLowerCase();
+}
+function isGroupOwner() {
+  return currentSpace?.owner_id && currentUser?.id === currentSpace.owner_id;
+}
+
+async function requestCloseChat(cardId) {
+  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  if(!confirm('Закрыть чат «' + card.title + '»?')) return;
+  if(isGroupOwner()) {
+    await actuallyCloseChat(cardId);
+    return;
+  }
+  card.chatStatus = 'pending_close';
+  await dbUpdate(card);
+  render(); openView(cardId);
+  const ownerId = currentSpace?.owner_id;
+  if(ownerId) await notifyUsers([ownerId], '🔒 Запрос на закрытие чата', `«${card.title}» — просит закрыть ${localStorage.getItem('mc_current_member')||''}`);
+  toast('✓ Запрос отправлен создателю группы');
+}
+
+async function actuallyCloseChat(cardId) {
+  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  card.chatStatus = 'closed';
+  await dbUpdate(card);
+  render(); openView(cardId);
+  const memberNames = (currentSpace?.members||[]).map(m=>m.name);
+  // Уведомляем через push только тех, у кого есть привязанный аккаунт (members_auth), т.к. push идёт по user_id
+  const authIds = (currentSpace?.members_auth||[]).map(m=>m.user_id).filter(Boolean);
+  if(authIds.length) await notifyUsers(authIds, '🔒 Чат закрыт', `«${card.title}» закрыт и перемещён в архив`);
+  toast('✓ Чат закрыт');
+}
+
+async function rejectCloseChat(cardId) {
+  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  card.chatStatus = 'active';
+  await dbUpdate(card);
+  render(); openView(cardId);
+  toast('Запрос отклонён, чат снова активен');
+}
+
 async function chatFinishVoice(){
   if(!chatRecordedChunks.length) return;
   const blob = new Blob(chatRecordedChunks, {type:'audio/webm'});

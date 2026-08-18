@@ -212,12 +212,43 @@ document.body.appendChild(div);
 function enableReminders() {
   if(typeof Notification === 'undefined') { toast('Уведомления не поддерживаются', true); return; }
   Notification.requestPermission().then(p => {
-    if(p === 'granted') { startIntervalReminders(); toast('🔔 Напоминания включены'); }
+    if(p === 'granted') { startIntervalReminders(); subscribeToPush(); toast('🔔 Напоминания включены'); }
     else toast('Уведомления заблокированы', true);
   });
 }
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+
+async function subscribeToPush() {
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUB)
+      });
+    }
+    await fetch(FUNC_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        subscription: sub.toJSON(),
+        deviceName: navigator.userAgent.slice(0,60),
+        userId: currentUser?.id || null
+      })
+    });
+  } catch(e) { console.log('Push subscribe error:', e.message); }
+}
+
 // запустить таймер при старте, если разрешение уже выдано
-if(typeof Notification !== 'undefined' && Notification.permission === 'granted') startIntervalReminders();
+if(typeof Notification !== 'undefined' && Notification.permission === 'granted') { startIntervalReminders(); subscribeToPush(); }
 
 // ── ПК: календарь как правая колонка (авто-открытие ≥900px) ──
 let _deskCalOpened = false;
