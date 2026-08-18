@@ -945,9 +945,19 @@ function selectMoveTarget(cardId, spaceId, idx, btn) {
 
 function collectMoveEntries(fromCard) {
   const picked = [];
+  const sharedSessionId = uid();
+  const sessionCreator = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
+  let isFirst = true;
   (fromCard.entries||[]).forEach(e => {
     if(moveSelection.entryIds.includes(e.id) || (e.groupId && moveSelection.groupIds.includes(e.groupId))) {
-      const copy = {...e, id: uid()};
+      const copy = {
+        ...e, id: uid(),
+        sessionId: sharedSessionId,
+        sessionCreator,
+        sessionNote: isFirst ? (e.sessionNote||null) : null,
+        sessionAtts: isFirst ? (e.sessionAtts||e.attachments||[]) : []
+      };
+      isFirst = false;
       if(moveAssignedTo !== null) { copy.assigned_to = moveAssignedTo; copy.completions = moveAssignedCompletions; copy.done = false; }
       picked.push(copy);
     }
