@@ -352,7 +352,7 @@ function renderCards() {
   const PO={urgent:0,high:1,normal:2};
  const filtered=applyMemberFilter(cards.filter(c=>c.status!=='done'&&(filterCat==='all'||c.category===filterCat)&&(!filterNoDeadline||cardHasNoDeadline(c))&&(filterClosed ? c.chatStatus==='closed' : c.chatStatus!=='closed')));
   const isChatSpace = currentSpace?.type==='family' || currentSpace?.type==='group';
-  if(!filtered.length){el.innerHTML=emptyHTML(filterClosed?'Нет закрытых чатов':filterNoDeadline?'Нет карточек без срока':isChatSpace?'Нет чатов':'Нет карточек', filterClosed?'Закрытые чаты появятся здесь':filterNoDeadline?'Все карточки имеют дату':isChatSpace?'Создать первый чат':'Создай первую карточку');return;}}
+  if(!filtered.length){el.innerHTML=emptyHTML(filterClosed?'Нет закрытых чатов':filterNoDeadline?'Нет карточек без срока':isChatSpace?'Нет чатов':'Нет карточек', filterClosed?'Закрытые чаты появятся здесь':filterNoDeadline?'Все карточки имеют дату':isChatSpace?'Создать первый чат':'Создай первую карточку');return;}
 
   // Separate urgent/high from normal
   const priority=filtered.filter(c=>c.priority==='urgent'||c.priority==='high')
