@@ -30,7 +30,8 @@
     <button onclick="openMyTasksPopup()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:18px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit">📋</button>
     <button onclick="openArchive()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:18px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit">📦</button>
     <button onclick="openSettings()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:18px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit">⚙️</button>
-    <button class="btn-new" onclick="openEdit()" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:18px;padding:7px 15px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">＋ Карточка</button>
+    <button class="btn-new" id="btn-new-card" onclick="handleNewCardClick()" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:18px;padding:7px 15px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">＋ Карточка</button>
+    <script>function updateNewCardBtnLabel(){const b=document.getElementById('btn-new-card');if(b)b.textContent=(currentSpace?.type==='family'||currentSpace?.type==='group')?'＋ Создать чат':'＋ Карточка';}</script>
   </div>
 </div>
 
@@ -52,7 +53,7 @@
   <button class="nav-btn" data-view="done"><span class="nav-ico">🏁</span><span class="nav-lbl">Готово</span></button>
 </div>
 
-<button class="fab" onclick="openEdit()">＋</button>
+<button class="fab" onclick="handleNewCardClick()">＋</button>
 <button id="cal-btn" onclick="openCalendar()" style="position:fixed;bottom:145px;right:20px;background:none;border:none;cursor:pointer;z-index:50;padding:0"><svg id="cal-icon" width="54" height="54" viewBox="0 0 90 90" fill="none" xmlns="http://www.w3.org/2000/svg" filter="drop-shadow(0 3px 6px rgba(0,0,0,.35))">
 <defs>
   <clipPath id="calClipcal"><rect x="2" y="2" width="86" height="86" rx="6"/></clipPath>
@@ -764,6 +765,7 @@
 <script src="app-db.js"></script>
 <script src="app-render.js"></script>
 <script src="app-calc.js"></script>
+<script src="app-chat.js"></script>
 <script src="app-view.js"></script>
 <script src="app-edit.js"></script>
 <script src="app-archive.js"></script>
