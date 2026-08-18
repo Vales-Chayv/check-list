@@ -311,6 +311,8 @@ async function openPinnedCard(id){
   }, {passive:false});
 })();
 let filterNoDeadline = localStorage.getItem('mc_no_dl')==='1';
+let filterClosed = false;
+function toggleClosedFilter(){ filterClosed=!filterClosed; render(); }
 function cardHasNoDeadline(c){ return !c.deadline && (c.entries||[]).every(e=>!e.deadline); }
 function toggleNoDeadline(){ filterNoDeadline=!filterNoDeadline; localStorage.setItem('mc_no_dl', filterNoDeadline?'1':'0'); render(); }
 function renderCats() {
@@ -318,6 +320,7 @@ function renderCats() {
   const all = filterCat==='all';
   let html = `<button class="cat-btn${all?' on':''}" style="${all?'border-color:rgba(255,255,255,.25)':''}" onclick="handleAllCatClick()">Все ▾</button>`;
   if(view==='cards') html += `<button class="cat-btn${filterNoDeadline?' on':''}" style="${filterNoDeadline?'background:rgba(232,197,106,.15);border-color:var(--accent);color:var(--accent)':''}" onclick="toggleNoDeadline()">📅✕ Без срока</button>`;
+  if(view==='cards' && (currentSpace?.type==='family'||currentSpace?.type==='group')) html += `<button class="cat-btn${filterClosed?' on':''}" style="${filterClosed?'background:rgba(232,96,96,.15);border-color:var(--red);color:var(--red)':''}" onclick="toggleClosedFilter()">🔒 Закрытые</button>`;
   cats.forEach((c,i) => {
     const col = c.color||'#888';
     const active = filterCat===c.name;
@@ -347,8 +350,8 @@ function renderMain() {
 function renderCards() {
   const el=document.getElementById('scroll');
   const PO={urgent:0,high:1,normal:2};
- const filtered=applyMemberFilter(cards.filter(c=>c.status!=='done'&&(filterCat==='all'||c.category===filterCat)&&(!filterNoDeadline||cardHasNoDeadline(c))));
-  if(!filtered.length){el.innerHTML=emptyHTML(filterNoDeadline?'Нет карточек без срока':'Нет карточек', filterNoDeadline?'Все карточки имеют дату':'Создай первую карточку');return;}
+ const filtered=applyMemberFilter(cards.filter(c=>c.status!=='done'&&(filterCat==='all'||c.category===filterCat)&&(!filterNoDeadline||cardHasNoDeadline(c))&&(filterClosed ? c.chatStatus==='closed' : c.chatStatus!=='closed')));
+  if(!filtered.length){el.innerHTML=emptyHTML(filterClosed?'Нет закрытых чатов':filterNoDeadline?'Нет карточек без срока':'Нет карточек', filterClosed?'Закрытые чаты появятся здесь':filterNoDeadline?'Все карточки имеют дату':'Создай первую карточку');return;}}
 
   // Separate urgent/high from normal
   const priority=filtered.filter(c=>c.priority==='urgent'||c.priority==='high')
