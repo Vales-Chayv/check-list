@@ -299,6 +299,16 @@ function handleRealtimeCard(payload) {
       if(idx !== -1) { cards[idx] = n; local.put('cards', n); }
       else { cards.unshift(n); local.put('cards', n); }
     }
+    if(o && n.chatStatus !== o.chatStatus && typeof showChatNotice === 'function') {
+      const myName = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
+      if(n.chatStatus === 'pending_close' && isGroupOwner()) {
+        showChatNotice('🔒 Запрос на закрытие чата', `«${n.title}» — просит закрыть ${n.created_by||''}`, n.id);
+      } else if(n.chatStatus === 'closed') {
+        showChatNotice('🔒 Чат закрыт', `«${n.title}» закрыт и перемещён в архив`, n.id);
+      } else if(n.chatStatus === 'active' && o.chatStatus === 'pending_close' && isChatCreator(n)) {
+        showChatNotice('❌ Запрос отклонён', `Закрытие «${n.title}» отклонено`, n.id);
+      }
+    }
   } else if(eventType === 'DELETE') {
     cards = cards.filter(c => c.id !== o.id);
     local.delete('cards', o.id);
