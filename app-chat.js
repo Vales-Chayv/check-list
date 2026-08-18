@@ -83,6 +83,23 @@ async function notifyUsers(userIds, title, body) {
   } catch(e) { console.log('Push notify error:', e.message); }
 }
 
+function showChatNotice(title, body, cardId) {
+  const wrap = document.getElementById('notice-popups'); if(!wrap) return;
+  const el = document.createElement('div');
+  el.className = 'rem-pop';
+  el.style.cssText = 'background:var(--s2);border:1px solid var(--accent);border-radius:var(--r);padding:14px;box-shadow:0 6px 24px rgba(0,0,0,.5)';
+  el.innerHTML = `
+    <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:${body?'6px':'10px'}">
+      <span style="font-size:18px">${title.slice(0,2)}</span>
+      <div style="flex:1;font-size:14px;font-weight:700;color:var(--t1);line-height:1.3">${esc(title.slice(2).trim())}</div>
+      <button onclick="this.closest('.rem-pop').remove()" style="background:none;border:none;color:var(--t3);font-size:18px;cursor:pointer;line-height:1;padding:0">✕</button>
+    </div>
+    ${body?`<div style="font-size:12px;color:var(--t2);margin-bottom:10px">${esc(body)}</div>`:''}
+    ${cardId?`<button onclick="this.closest('.rem-pop').remove();openView('${cardId}')" style="width:100%;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:8px;font-size:13px;font-weight:700;cursor:pointer">Открыть</button>`:''}`;
+  wrap.appendChild(el);
+  if(!cardId) setTimeout(()=>el.remove(), 6000);
+}
+
 function isChatCreator(card) {
   const myName = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
   return card.created_by && card.created_by.toLowerCase() === myName.toLowerCase();
@@ -98,11 +115,14 @@ async function requestCloseChat(cardId) {
     await actuallyCloseChat(cardId);
     return;
   }
-  card.chatStatus = 'pending_close';
+ card.chatStatus = 'pending_close';
   await dbUpdate(card);
   render(); openView(cardId);
   const ownerId = currentSpace?.owner_id;
-  if(ownerId) await notifyUsers([ownerId], '🔒 Запрос на закрытие чата', `«${card.title}» — просит закрыть ${localStorage.getItem('mc_current_member')||''}`);
+  const closeReqTitle = '🔒 Запрос на закрытие чата';
+  const closeReqBody = `«${card.title}» — просит закрыть ${localStorage.getItem('mc_current_member')||''}`;
+  showChatNotice(closeReqTitle, closeReqBody, cardId);
+  if(ownerId) await notifyUsers([ownerId], closeReqTitle, closeReqBody);
   toast('✓ Запрос отправлен создателю группы');
 }
 
@@ -111,10 +131,12 @@ async function actuallyCloseChat(cardId) {
   card.chatStatus = 'closed';
   await dbUpdate(card);
   render(); openView(cardId);
-  const memberNames = (currentSpace?.members||[]).map(m=>m.name);
+ const closedTitle = '🔒 Чат закрыт';
+  const closedBody = `«${card.title}» закрыт и перемещён в архив`;
+  showChatNotice(closedTitle, closedBody, cardId);
   // Уведомляем через push только тех, у кого есть привязанный аккаунт (members_auth), т.к. push идёт по user_id
   const authIds = (currentSpace?.members_auth||[]).map(m=>m.user_id).filter(Boolean);
-  if(authIds.length) await notifyUsers(authIds, '🔒 Чат закрыт', `«${card.title}» закрыт и перемещён в архив`);
+  if(authIds.length) await notifyUsers(authIds, closedTitle, closedBody);
   toast('✓ Чат закрыт');
 }
 
