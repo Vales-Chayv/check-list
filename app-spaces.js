@@ -34,6 +34,7 @@ spaces = Array.isArray(saved) ? saved : [];
     return;
   }
   localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+  if(typeof subscribeRealtimeSpaces === 'function') subscribeRealtimeSpaces();
   // Handle invite link
   if(urlToken) {
     try {

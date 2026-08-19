@@ -287,6 +287,34 @@ function unsubscribeRealtimeCards() {
   if(realtimeCardChannel) { sb.removeChannel(realtimeCardChannel); realtimeCardChannel = null; }
 }
 
+let realtimeSpacesChannel = null;
+function subscribeRealtimeSpaces() {
+  if(realtimeSpacesChannel) return; // уже подписаны, повторно не нужно
+  realtimeSpacesChannel = sb.channel('spaces:all')
+    .on('postgres_changes', {
+      event: 'UPDATE', schema: 'public', table: 'spaces'
+    }, payload => handleRealtimeSpace(payload))
+    .subscribe();
+}
+function unsubscribeRealtimeSpaces() {
+  if(realtimeSpacesChannel) { sb.removeChannel(realtimeSpacesChannel); realtimeSpacesChannel = null; }
+}
+
+function handleRealtimeSpace(payload) {
+  const { new: n, old: o } = payload;
+  if(!n || !spaces) return;
+  const idx = spaces.findIndex(s => s.id === n.id);
+  if(idx === -1) return; // кабинет не в моём списке — не моё дело
+  const wasClosed = spaces[idx].status === 'closed';
+  spaces[idx] = { ...spaces[idx], ...n };
+  localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+  if(n.status === 'closed' && !wasClosed) {
+    if(currentSpaceId === n.id) { currentSpace = spaces[idx]; render(); }
+    if(typeof renderSpacesList === 'function' && document.getElementById('space-selector')?.style.display !== 'none') renderSpacesList();
+    if(typeof showChatNotice === 'function') showChatNotice('🔒 Группа закрыта', `«${n.name}» закрыта и перемещена в архив`, null);
+  }
+}
+
 function handleRealtimeCard(payload) {
   const { eventType, new: n, old: o } = payload;
   if(eventType === 'INSERT') {
