@@ -456,14 +456,14 @@
 </div>
 <div id="lobby-panels">
   <div id="lobby-panel-a">📅 мини-обзор — доработаем позже</div>
-  <div id="lobby-panel-b">
+   <div id="lobby-panel-b">
+    <div style="margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--b1)">
+      <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🟢 Онлайн сейчас</div>
+      <div id="lobby-presence-list"></div>
+    </div>
     <div style="display:flex;gap:8px;margin-bottom:10px">
       <select id="lobby-group-select" onchange="loadLobbyGroupTasks(this.value)" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:8px;padding:8px;color:var(--t1);font-size:13px;font-family:inherit"></select>
       <select id="lobby-member-filter" onchange="renderLobbyTasksList()" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:8px;padding:8px;color:var(--t1);font-size:13px;font-family:inherit"></select>
-    </div>
-       <div style="margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--b1)">
-      <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🟢 Онлайн сейчас</div>
-      <div id="lobby-presence-list"></div>
     </div>
     <div id="lobby-tasks-list"></div>
   </div>
