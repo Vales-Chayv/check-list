@@ -111,13 +111,18 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
           ${e.completions.map(c=>`<div style="width:18px;height:18px;border-radius:50%;background:${c.done?'rgba(0,0,0,.45)':'rgba(0,0,0,.08)'};border:${c.done?'none':'1px dashed rgba(0,0,0,.25)'};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:${c.done?'white':'rgba(0,0,0,.4)'}" title="${esc(c.name)}">${esc(c.name.slice(0,1).toUpperCase())}</div>`).join('')}
         </div>` : '';
 
-      const isLocked = card.chatStatus === 'closed' || currentSpace?.status === 'closed';
-      return `<div class="swipe-entry-wrap" style="position:relative;overflow:hidden;border-bottom:1px solid ${borderCol}22">
-        ${isLocked ? '' : `<div class="swipe-actions" style="position:absolute;left:0;top:0;bottom:0;display:flex;align-items:center;gap:4px;padding:0 8px;opacity:0;transition:opacity .2s">
-          <button onclick="deleteEntry('${id}','${e.id}')" style="background:rgba(232,96,96,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">🗑️</button>
+     const isLocked = card.chatStatus === 'closed' || currentSpace?.status === 'closed';
+      const isGroupSpace = currentSpace?.type==='family' || currentSpace?.type==='group';
+      const hasAtts = (e.sessionAtts&&e.sessionAtts.length) || (e.attachments&&e.attachments.length);
+      const swipeButtonsHTML = isGroupSpace
+        ? `<button onclick="copyEntryToPersonal('${id}','${e.id}')" style="background:rgba(91,158,232,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer" title="Копировать в личный">📋</button>${hasAtts?`<button onclick="downloadEntryAttachments('${id}','${e.id}')" style="background:rgba(91,184,122,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer" title="Скачать">⬇️</button>`:''}`
+        : `<button onclick="deleteEntry('${id}','${e.id}')" style="background:rgba(232,96,96,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">🗑️</button>
           <button onclick="editEntry('${id}','${e.id}')" style="background:rgba(91,158,232,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">📝</button>
-          <button onclick="moveEntry('${id}','${e.id}')" style="background:rgba(91,184,122,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">📤</button>
-        </div>`}
+          <button onclick="moveEntry('${id}','${e.id}')" style="background:rgba(91,184,122,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">📤</button>`;
+      return `<div class="swipe-entry-wrap" style="position:relative;overflow:hidden;border-bottom:1px solid ${borderCol}22">
+        <div class="swipe-actions" style="position:absolute;left:0;top:0;bottom:0;display:flex;align-items:center;gap:4px;padding:0 8px;opacity:0;transition:opacity .2s">
+          ${swipeButtonsHTML}
+        </div>
         <div class="swipe-content" data-cardid="${id}" data-entryid="${e.id}" style="position:relative;display:flex;align-items:flex-start;gap:8px;padding:5px 0;background:transparent;will-change:transform;transition:transform .2s">
           ${checkboxHTML}
           <div style="flex:1">
@@ -1064,6 +1069,41 @@ async function toggleToday(id) {
   try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
 }
 
+async function copyEntryToPersonal(cardId, entryId) {
+  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  const entry = (card.entries||[]).find(e=>e.id===entryId); if(!entry) return;
+  const catName = prompt('В какую рубрику личного кабинета скопировать?', 'Личное') || 'Личное';
+  const copy = {
+    ...entry, id: uid(), assigned_to: null, completions: null, done: false,
+    sessionId: uid(), sessionCreator: localStorage.getItem('mc_current_member')||currentUser?.display_name||'',
+    sessionNote: null, sessionAtts: entry.sessionAtts||entry.attachments||[]
+  };
+  try {
+    const { data } = await sb.from('cards').select('*').eq('space_id','personal').eq('category', catName).limit(1);
+    if(data && data.length) {
+      const target = data[0];
+      await sb.from('cards').update({entries:[copy, ...(target.entries||[])]}).eq('id', target.id);
+    } else {
+      const newCard = {id:uid(), title:catName, category:catName, status:'in_progress', space_id:'personal', created_at:today(), entries:[copy], entryGroups:[], attachments:[], history:[], created_by:localStorage.getItem('mc_current_member')||currentUser?.display_name||''};
+      await sb.from('cards').insert(newCard);
+    }
+    toast('✓ Скопировано в личный кабинет');
+  } catch(e) { toast('Ошибка: '+e.message, true); }
+}
+
+function downloadEntryAttachments(cardId, entryId) {
+  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  const entry = (card.entries||[]).find(e=>e.id===entryId); if(!entry) return;
+  const atts = [...(entry.sessionAtts||[]), ...(entry.attachments||[])];
+  if(!atts.length) { toast('Нет вложений', true); return; }
+  atts.forEach(a => {
+    const link = document.createElement('a');
+    link.href = a.data; link.download = a.name || 'file';
+    link.target = '_blank';
+    document.body.appendChild(link); link.click(); link.remove();
+  });
+}
+
 function toggleEntryMenu(btn, cardId, entryId) {
   // Close any open menus
   document.querySelectorAll('.entry-menu-popup').forEach(p=>p.remove());
@@ -1071,9 +1111,14 @@ function toggleEntryMenu(btn, cardId, entryId) {
   const popup = document.createElement('div');
   popup.className = 'entry-menu-popup';
   popup.innerHTML = `
+  ${(currentSpace?.type==='family'||currentSpace?.type==='group') ? `
+    <button onclick="copyEntryToPersonal('${cardId}','${entryId}');this.closest('.entry-menu-popup').remove()" style="background:rgba(91,158,232,.85);border:none;border-radius:8px;width:40px;height:40px;font-size:20px;cursor:pointer" title="Копировать в личный">📋</button>
+    <button onclick="downloadEntryAttachments('${cardId}','${entryId}');this.closest('.entry-menu-popup').remove()" style="background:rgba(91,184,122,.85);border:none;border-radius:8px;width:40px;height:40px;font-size:20px;cursor:pointer" title="Скачать">⬇️</button>
+    ` : `
     <button onclick="deleteEntry('${cardId}','${entryId}');this.closest('.entry-menu-popup').remove()" style="background:rgba(232,96,96,.85);border:none;border-radius:8px;width:40px;height:40px;font-size:20px;cursor:pointer">🗑️</button>
     <button onclick="editEntry('${cardId}','${entryId}');this.closest('.entry-menu-popup').remove()" style="background:rgba(91,158,232,.85);border:none;border-radius:8px;width:40px;height:40px;font-size:20px;cursor:pointer">📝</button>
     <button onclick="moveEntry('${cardId}','${entryId}');this.closest('.entry-menu-popup').remove()" style="background:rgba(91,184,122,.85);border:none;border-radius:8px;width:40px;height:40px;font-size:20px;cursor:pointer">📤</button>
+    `}
   `;
   wrap.style.position = 'relative';
   wrap.appendChild(popup);
