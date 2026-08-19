@@ -145,6 +145,7 @@ let lobbyGroupTasksCache = [];
 async function loadLobbyGroupTasks(spaceId) {
   const box = document.getElementById('lobby-tasks-list');
   if(!box) return;
+  if(typeof subscribeOwnerPresence === 'function') subscribeOwnerPresence(spaceId);
   box.innerHTML = '<div style="text-align:center;color:var(--t3);padding:20px">Загрузка…</div>';
   const { data } = await sb.from('cards').select('*').eq('space_id', spaceId);
   const tasks = [];

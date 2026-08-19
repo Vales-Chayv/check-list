@@ -11,6 +11,7 @@ function viewToggleGroup(cardId, groupId) {
 
 function openView(id) {
   const card = cards.find(c=>c.id===id); if(!card) return;
+  if((currentSpace?.type==='family'||currentSpace?.type==='group') && typeof updateMyPresenceCard==='function') updateMyPresenceCard(id, card.title);
   (card.entryGroups||[]).forEach(g => { if(!viewGroupState.has(g.id)) viewGroupState.set(g.id, true); });
   const col = catColor(card.category);
   const entries = card.entries||[];
@@ -261,6 +262,7 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
 
 function closeView() {
   document.getElementById('view-ov').classList.remove('on');
+  if((currentSpace?.type==='family'||currentSpace?.type==='group') && typeof updateMyPresenceCard==='function') updateMyPresenceCard(null, null);
   if(window._foreignCat){ cats = cats.filter(k=>k.name!==window._foreignCat); window._foreignCat=null; }
   if(window._foreignCardId){ const fid=window._foreignCardId; window._foreignCardId=null; cards=cards.filter(c=>c.id!==fid); }
   if(window._pinFromLobby){ window._pinFromLobby=false; if(typeof showSpaceSelector==='function'){ showSpaceSelector(); return; } }

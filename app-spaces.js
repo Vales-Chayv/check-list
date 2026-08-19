@@ -397,6 +397,31 @@ function subscribePresence(spaceId) {
       if(status === 'SUBSCRIBED') await presenceChannel.track({ name: myName });
     });
 }
+function updateMyPresenceCard(cardId, cardTitle) {
+  if(!presenceChannel) return;
+  const myName = localStorage.getItem('mc_current_member') || '';
+  presenceChannel.track(cardId ? { name: myName, cardId, cardTitle } : { name: myName });
+}
+
+// ── Presence «подглядыванием» для дашборда владельца (не заходя в кабинет) ──
+let ownerPresenceChannel = null, ownerPresenceSpaceId = null;
+function subscribeOwnerPresence(spaceId) {
+  if(ownerPresenceSpaceId === spaceId && ownerPresenceChannel) return;
+  if(ownerPresenceChannel) { sb.removeChannel(ownerPresenceChannel); ownerPresenceChannel = null; }
+  ownerPresenceSpaceId = spaceId;
+  ownerPresenceChannel = sb.channel('presence:' + spaceId)
+    .on('presence', { event: 'sync' }, () => renderOwnerPresence())
+    .subscribe();
+}
+function renderOwnerPresence() {
+  const box = document.getElementById('lobby-presence-list');
+  if(!box || !ownerPresenceChannel) return;
+  const state = ownerPresenceChannel.presenceState();
+  const people = Object.values(state).flatMap(arr=>arr);
+  box.innerHTML = people.length
+    ? people.map(p => `<div style="font-size:13px;padding:4px 0">🟢 ${esc(p.name)}${p.cardTitle?` · <span style="color:var(--t3)">${esc(p.cardTitle)}</span>`:''}</div>`).join('')
+    : '<div style="color:var(--t3);font-size:12px">Никого нет онлайн</div>';
+}
 function unsubscribePresence() {
   if(presenceChannel) { sb.removeChannel(presenceChannel); presenceChannel = null; }
 }
