@@ -30,8 +30,8 @@
     <button onclick="openMyTasksPopup()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:18px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit">📋</button>
     <button onclick="openArchive()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:18px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit">📦</button>
     <button onclick="openSettings()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:18px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit">⚙️</button>
-    <button class="btn-new" id="btn-new-card" onclick="handleNewCardClick()" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:18px;padding:7px 15px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">＋ Карточка</button>
-    <script>function updateNewCardBtnLabel(){const b=document.getElementById('btn-new-card');if(b)b.textContent=(currentSpace?.type==='family'||currentSpace?.type==='group')?'＋ Создать чат':'＋ Карточка';}</script>
+  <button class="btn-new" id="btn-new-card" onclick="handleNewCardClick()" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:18px;padding:7px 15px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">＋ Карточка</button>
+    <script>function updateNewCardBtnLabel(){const b=document.getElementById('btn-new-card');if(!b)return;b.style.display=currentSpace?.status==='closed'?'none':'';b.textContent=(currentSpace?.type==='family'||currentSpace?.type==='group')?'＋ Создать чат':'＋ Карточка';}</script>
   </div>
 </div>
 

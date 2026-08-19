@@ -83,29 +83,56 @@ function openCalendarFromLobby() {
   hideSpaceSelector();
   openCalendar();
 }
+let showClosedSpaces = false;
+function toggleClosedSpaces(){ showClosedSpaces = !showClosedSpaces; renderSpacesList(); }
+
+function spaceRowHTML(s) {
+  const icon = s.type==='family' ? '👨‍👩‍👧' : '🗂️';
+  const members = (s.members||[]).length;
+  const isOwner = s.owner_id===currentUser?.id;
+  const isClosed = s.status==='closed';
+  return `<div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:18px 16px;display:flex;align-items:center;gap:14px;margin-bottom:10px;opacity:${isClosed?.7:1}">
+      <div onclick="onSpaceClick('${s.id}')" style="display:flex;align-items:center;gap:14px;flex:1;cursor:pointer">
+        <div style="font-size:32px">${isClosed?'🔒':icon}</div>
+        <div style="flex:1">
+          <div style="font-size:17px;font-weight:700">${esc(s.name)}${isClosed?' <span style="font-size:11px;color:var(--t3);font-weight:400">(закрыта)</span>':''}</div>
+          ${s.type==='family'&&members?`<div style="font-size:12px;color:var(--t3);margin-top:2px">👥 ${members} участников</div>`:''}
+        </div>
+        ${s.password?'<span style="font-size:16px;opacity:.5">🔒</span>':'<span style="font-size:12px;color:var(--t3)">Открыть</span>'}
+      </div>
+      ${(!isClosed && s.type==='family' && isOwner)?`<button onclick="getShareLink('${s.id}')" style="background:rgba(232,197,106,.15);border:1px solid rgba(232,197,106,.3);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--accent);cursor:pointer" title="Пригласить">🔗</button><button onclick="openManageMembers('${s.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--t2);cursor:pointer" title="Участники">👥</button>`:''}
+      ${(!isClosed && s.type==='family' && isOwner)?`<button onclick="closeGroupSpace('${s.id}')" style="background:rgba(232,96,96,.12);border:1px solid rgba(232,96,96,.3);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--red);cursor:pointer" title="Закрыть группу">🔒</button>`:''}
+      ${!isClosed?`<button onclick="openEditSpace('${s.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--t2);cursor:pointer" title="Редактировать">✏️</button>`:''}
+    </div>`;
+}
+
 function renderSpacesList() {
   document.getElementById('space-selector')?.classList.toggle('has-space', !!(spaces && spaces.length));
   const ownsGroup = (spaces||[]).some(s => (s.type==='family'||s.type==='group') && s.owner_id === currentUser?.id);
   document.body.classList.toggle('owns-group', ownsGroup);
   if(ownsGroup && typeof renderLobbyPanelB === 'function') renderLobbyPanelB();
   const list = document.getElementById('spaces-list');
-  list.innerHTML = spaces.map(s => {
-    const icon = s.type==='family' ? '👨‍👩‍👧' : '🗂️';
-    const members = (s.members||[]).length;
-    return `<div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:18px 16px;display:flex;align-items:center;gap:14px;margin-bottom:10px">
-      <div onclick="onSpaceClick('${s.id}')" style="display:flex;align-items:center;gap:14px;flex:1;cursor:pointer">
-        <div style="font-size:32px">${icon}</div>
-        <div style="flex:1">
-          <div style="font-size:17px;font-weight:700">${esc(s.name)}</div>
-          ${s.type==='family'&&members?`<div style="font-size:12px;color:var(--t3);margin-top:2px">👥 ${members} участников</div>`:''}
-        </div>
-        ${s.password?'<span style="font-size:16px;opacity:.5">🔒</span>':'<span style="font-size:12px;color:var(--t3)">Открыть</span>'}
-      </div>
-      ${(s.type==='family' && s.owner_id===currentUser?.id)?`<button onclick="getShareLink('${s.id}')" style="background:rgba(232,197,106,.15);border:1px solid rgba(232,197,106,.3);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--accent);cursor:pointer" title="Пригласить">🔗</button><button onclick="openManageMembers('${s.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--t2);cursor:pointer" title="Участники">👥</button>`:''}
-      <button onclick="openEditSpace('${s.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--t2);cursor:pointer" title="Редактировать">✏️</button>
-    </div>`;
-  }).join('');
+  const active = spaces.filter(s=>s.status!=='closed');
+  const closed = spaces.filter(s=>s.status==='closed');
+  list.innerHTML = active.map(spaceRowHTML).join('')
+    + (closed.length ? `<div onclick="toggleClosedSpaces()" style="text-align:center;font-size:13px;color:var(--t3);cursor:pointer;padding:10px 0">🔒 Закрытые группы (${closed.length}) ${showClosedSpaces?'▲':'▼'}</div>` : '')
+    + (showClosedSpaces ? closed.map(spaceRowHTML).join('') : '');
 }
+async function closeGroupSpace(id) {
+  const space = spaces.find(s=>s.id===id); if(!space) return;
+  if(!confirm('Закрыть группу «' + space.name + '»? Все её чаты станут доступны только для просмотра.')) return;
+  space.status = 'closed';
+  try { await sb.from('spaces').update({status:'closed'}).eq('id', id); } catch(e) {}
+  localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+  renderSpacesList();
+  const closedTitle = '🔒 Группа закрыта';
+  const closedBody = `«${space.name}» закрыта и перемещена в архив`;
+  if(typeof showChatNotice === 'function') showChatNotice(closedTitle, closedBody, null);
+  const authIds = (space.members_auth||[]).map(m=>m.user_id).filter(Boolean);
+  if(authIds.length && typeof notifyUsers === 'function') await notifyUsers(authIds, closedTitle, closedBody);
+  toast('✓ Группа закрыта');
+}
+
 function onSpaceClick(id) {
   const space = spaces.find(s=>s.id===id); if(!space) return;
   if(space.password) {

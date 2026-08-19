@@ -111,7 +111,7 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
           ${e.completions.map(c=>`<div style="width:18px;height:18px;border-radius:50%;background:${c.done?'rgba(0,0,0,.45)':'rgba(0,0,0,.08)'};border:${c.done?'none':'1px dashed rgba(0,0,0,.25)'};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:${c.done?'white':'rgba(0,0,0,.4)'}" title="${esc(c.name)}">${esc(c.name.slice(0,1).toUpperCase())}</div>`).join('')}
         </div>` : '';
 
-     const isLocked = card.chatStatus === 'closed';
+      const isLocked = card.chatStatus === 'closed' || currentSpace?.status === 'closed';
       return `<div class="swipe-entry-wrap" style="position:relative;overflow:hidden;border-bottom:1px solid ${borderCol}22">
         ${isLocked ? '' : `<div class="swipe-actions" style="position:absolute;left:0;top:0;bottom:0;display:flex;align-items:center;gap:4px;padding:0 8px;opacity:0;transition:opacity .2s">
           <button onclick="deleteEntry('${id}','${e.id}')" style="background:rgba(232,96,96,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">🗑️</button>

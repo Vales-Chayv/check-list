@@ -509,7 +509,8 @@ function renderDone() {
 
 function emptyHTML(h,p) {
   const isChat = currentSpace?.type==='family' || currentSpace?.type==='group';
-  return`<div class="empty"><div class="empty-icon">🗂️</div><h3>${h}</h3><p>${p}</p><button onclick="handleNewCardClick()" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:11px;padding:11px 26px;font-size:15px;font-weight:700;cursor:pointer">${isChat?'＋ Создать чат':'＋ Создать'}</button></div>`;
+  const isSpaceClosed = currentSpace?.status==='closed';
+  return`<div class="empty"><div class="empty-icon">🗂️</div><h3>${h}</h3><p>${p}</p>${isSpaceClosed?'':`<button onclick="handleNewCardClick()" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:11px;padding:11px 26px;font-size:15px;font-weight:700;cursor:pointer">${isChat?'＋ Создать чат':'＋ Создать'}</button>`}</div>`;
 }
 
 function checkSVG() { return'<svg width="11" height="9" viewBox="0 0 11 9"><path d="M1 4l3 3 6-6" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'; }
