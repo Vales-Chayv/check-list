@@ -10,9 +10,22 @@ async function openSettings() {
       updateNotifToggleUI();
     }
   }catch{}
+  try {
+    const {data:prof} = await sb.from('profiles').select('phone').eq('id', currentUser?.id).single();
+    const phoneInp = document.getElementById('set-phone');
+    if(phoneInp) phoneInp.value = prof?.phone || '';
+  } catch(e) {}
   checkPushStatus();
   updatePwdUI();
   document.getElementById('set-ov').classList.add('on');
+}
+async function savePhone() {
+  const phone = document.getElementById('set-phone').value.trim();
+  try {
+    const {error} = await sb.from('profiles').update({phone: phone||null}).eq('id', currentUser.id);
+    if(error) throw error;
+    toast('✓ Телефон сохранён');
+  } catch(e) { toast('Ошибка: '+e.message, true); }
 }
 function closeSettings() { document.getElementById('set-ov').classList.remove('on'); }
 function toggleNotif() { notifEnabled=!notifEnabled; updateNotifToggleUI(); }

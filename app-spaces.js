@@ -226,9 +226,23 @@ function renderNewMembersEdit() {
   const el = document.getElementById('new-members-list');
   el.innerHTML = newSpaceMembers.map((m,i)=>`<div style="display:inline-flex;align-items:center;gap:5px;background:var(--s2);border:1px solid var(--b1);border-radius:18px;padding:4px 10px;margin:3px;font-size:13px">${esc(m.name)}<button onclick="newSpaceMembers.splice(${i},1);renderNewMembersEdit()" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:11px;margin-left:2px">✕</button></div>`).join('');
 }
+async function ensureUserHasPhone() {
+  try {
+    const { data } = await sb.from('profiles').select('phone').eq('id', currentUser?.id).single();
+    if(data?.phone) return true;
+  } catch(e) {}
+  const phone = prompt('Для группового кабинета нужен номер телефона (для общения в группе):');
+  if(!phone || !phone.trim()) { toast('Номер телефона обязателен для групповых кабинетов', true); return false; }
+  try {
+    await sb.from('profiles').update({phone: phone.trim()}).eq('id', currentUser.id);
+    return true;
+  } catch(e) { toast('Ошибка сохранения телефона: '+e.message, true); return false; }
+}
+
 async function createSpace() {
   const name = document.getElementById('new-space-name').value.trim(); if(!name) return;
   const type = document.getElementById('new-space-type').value;
+  if(type === 'family') { if(!(await ensureUserHasPhone())) return; }
   const pwd  = document.getElementById('new-space-pwd').value.trim() || null;
   const id   = 'sp_' + uid();
   const share_token = uid().slice(0,12);
@@ -267,8 +281,9 @@ function showShareLink(space) {
   document.body.appendChild(div);
 }
 // ─── MEMBER SELECTOR ────────────────────────
-function afterPasswordOrDirect(id) {
+async function afterPasswordOrDirect(id) {
   const space = spaces.find(s=>s.id===id); if(!space) return;
+  if(space.type==='family') { if(!(await ensureUserHasPhone())) return; }
   const members = space.members||[];
  if(space.type==='family' && members.length > 0) {
     const userEmail = currentUser?.email?.toLowerCase()||'';
@@ -342,24 +357,57 @@ function renderManageMembersList() {
     </div>`
   ).join('');
 }
+async function searchUserByLoginOrPhone(query) {
+  const q = query.trim(); if(!q) return null;
+  try {
+    const { data } = await sb.from('profiles').select('id,display_name,login,phone,email').or(`login.eq.${q},phone.eq.${q}`).maybeSingle();
+    return data;
+  } catch(e) { return null; }
+}
+
+function offerInvite(query, space) {
+  const link = `${location.origin}${location.pathname}?space=${space.share_token}`;
+  const text = encodeURIComponent(`Присоединяйся к группе «${space.name}» в Моих карточках: ${link}`);
+  const isPhone = /^\+?\d[\d\s\-()]{6,}$/.test(query);
+  const div = document.createElement('div');
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1001;display:flex;align-items:center;justify-content:center;padding:20px';
+  div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:24px;max-width:380px;width:100%">
+    <div style="font-size:17px;font-weight:700;margin-bottom:10px">Пользователь не найден</div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:14px">«${esc(query)}» ещё не зарегистрирован(а) в приложении. Отправь приглашение:</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${isPhone ? `<a href="https://wa.me/${query.replace(/\D/g,'')}?text=${text}" target="_blank" style="text-decoration:none;background:#25D366;color:#fff;border-radius:var(--rsm);padding:12px;font-size:14px;font-weight:700;text-align:center">📱 Отправить в WhatsApp</a>` : ''}
+      <a href="mailto:?subject=Приглашение в группу&body=${text}" style="text-decoration:none;background:var(--s2);border:1px solid var(--b1);color:var(--t1);border-radius:var(--rsm);padding:12px;font-size:14px;text-align:center">✉️ Отправить по почте</a>
+      <button onclick="navigator.clipboard.writeText(decodeURIComponent('${text}')).then(()=>toast('✓ Скопировано'))" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:12px;font-size:14px;cursor:pointer">📋 Скопировать текст</button>
+    </div>
+    <button onclick="this.closest('[style*=fixed]').remove()" style="width:100%;margin-top:10px;background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;padding:8px">Закрыть</button>
+  </div>`;
+  document.body.appendChild(div);
+}
+
 async function addMemberToSpace() {
-  const inp = document.getElementById('manage-member-inp');
-  const name = inp.value.trim(); if(!name) return;
+  const inp = document.getElementById('manage-member-inp'); // логин или телефон
+  const query = inp.value.trim(); if(!query) return;
   const space = spaces.find(s=>s.id===managingSpaceId); if(!space) return;
+
+  const found = await searchUserByLoginOrPhone(query);
+  const name = found ? found.display_name : query;
   if((space.members||[]).find(m=>m.name===name)) { toast('Участник уже есть', true); inp.value=''; return; }
-const memberColors = ['#e8a83a','#5b9ee8','#a07de8','#5bb87a','#e85bb0','#5bc8e8','#e86060','#c8e85b'];
-const usedColors = (space.members||[]).map(m=>m.color);
-const freeColors = memberColors.filter(c=>!usedColors.includes(c));
-const color = freeColors.length ? freeColors[0] : memberColors[Math.floor(Math.random()*memberColors.length)];
-space.members = [...(space.members||[]), {name, email: email||null, color}];
-inp.value = '';
-document.getElementById('manage-member-email').value = '';
+
+  const memberColors = ['#e8a83a','#5b9ee8','#a07de8','#5bb87a','#e85bb0','#5bc8e8','#e86060','#c8e85b'];
+  const usedColors = (space.members||[]).map(m=>m.color);
+  const freeColors = memberColors.filter(c=>!usedColors.includes(c));
+  const color = freeColors.length ? freeColors[0] : memberColors[Math.floor(Math.random()*memberColors.length)];
+
+  space.members = [...(space.members||[]), {name, color, user_id: found?.id||null, email: found?.email||null}];
+  if(found) space.members_auth = [...(space.members_auth||[]).filter(m=>m.user_id!==found.id), {user_id: found.id, name}];
+  inp.value = '';
   renderManageMembersList();
   renderSpacesList();
   try {
-    await sb.from('spaces').update({members: space.members}).eq('id', managingSpaceId);
+    await sb.from('spaces').update({members: space.members, members_auth: space.members_auth||[]}).eq('id', managingSpaceId);
     localStorage.setItem('mc_spaces', JSON.stringify(spaces));
-    toast('✓ Участник добавлен');
+    if(found) toast('✓ ' + name + ' добавлен(а) — уже в приложении');
+    else { offerInvite(query, space); toast('Не найден — отправь приглашение'); }
   } catch(e) { toast('Ошибка: '+e.message, true); }
 }
 async function removeMemberFromSpace(name) {

@@ -376,6 +376,11 @@
           <div class="tog-track" id="notif-track" onclick="toggleNotif()" style="background:var(--accent)"><div class="tog-knob" style="left:23px"></div></div>
         </div>
       </div>
+          <div class="fld" style="border-top:1px solid var(--b1);padding-top:13px">
+        <label>Телефон</label>
+        <input id="set-phone" type="tel" placeholder="+972...">
+        <button onclick="savePhone()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t1);border-radius:var(--rsm);padding:10px;font-size:14px;cursor:pointer;font-family:inherit">Сохранить телефон</button>
+      </div>
       <div class="fld" style="border-top:1px solid var(--b1);padding-top:13px">
         <label id="pwd-label">Сменить пароль</label>
         <input id="set-pwd" type="password" placeholder="Новый пароль">
@@ -611,9 +616,8 @@
     </div>
     <div style="padding:20px;display:flex;flex-direction:column;gap:12px">
       <div id="manage-members-list" style="display:flex;flex-direction:column;gap:8px"></div>
-      <div style="display:flex;gap:7px;margin-top:4px">
-        <input id="manage-member-inp" placeholder="Имя участника..." dir="auto" onkeydown="if(event.key==='Enter'){addMemberToSpace();event.preventDefault()}">
-<input id="manage-member-email" placeholder="Email (необязательно)" type="email" style="margin-top:6px">
+           <div style="display:flex;gap:7px;margin-top:4px">
+        <input id="manage-member-inp" placeholder="Логин или телефон участника..." dir="auto" onkeydown="if(event.key==='Enter'){addMemberToSpace();event.preventDefault()}">
         <button onclick="addMemberToSpace()" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px 14px;cursor:pointer;color:var(--accent);font-size:16px">＋</button>
       </div>
 	   <button onclick="deleteSpace(managingSpaceId)" style="background:none;border:1px solid var(--red);border-radius:var(--rsm);padding:11px;font-size:14px;color:var(--red);cursor:pointer;font-family:inherit;margin-top:8px">🗑 Удалить кабинет</button>
