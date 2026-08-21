@@ -37,18 +37,16 @@ spaces = Array.isArray(saved) ? saved : [];
   }
   localStorage.setItem('mc_spaces', JSON.stringify(spaces));
   if(typeof subscribeRealtimeSpaces === 'function') subscribeRealtimeSpaces();
-  // Handle invite link
+   // Handle invite link — теперь тоже через приглашение с подтверждением, не тихое вступление
   if(urlToken) {
     try {
       const {data} = await sb.from('spaces').select('*').eq('share_token', urlToken).single();
       if(data) {
-        const joined = JSON.parse(localStorage.getItem('mc_joined_spaces')||'[]');
-        if(!joined.includes(data.id)) {
-          joined.push(data.id);
-          localStorage.setItem('mc_joined_spaces', JSON.stringify(joined));
-        }
         if(!spaces.find(s=>s.id===data.id)) spaces.push(data);
-        if(data.password) {
+        const isMember = (data.members_auth||[]).some(m=>m.user_id===currentUser?.id);
+        const hasInvite = (data.pendingInvites||[]).some(p=>p.user_id===currentUser?.id);
+
+        if(data.password && !isMember) {
           pendingSpaceId = data.id;
           document.getElementById('space-pwd-name').textContent = data.name;
           document.getElementById('space-pwd-inp').value = '';
@@ -56,9 +54,16 @@ spaces = Array.isArray(saved) ? saved : [];
           document.getElementById('space-pwd-ov').classList.add('on');
           setTimeout(()=>document.getElementById('space-pwd-inp').focus(), 300);
           return;
-        } else {
-          setCurrentSpace(data.id, true);
-          return;
+        }
+        if(isMember) { setCurrentSpace(data.id, true); return; }
+        if(!hasInvite && currentUser) {
+          let inviterName = 'Кто-то';
+          try {
+            const {data:ownerProf} = await sb.from('profiles').select('display_name').eq('id', data.owner_id).single();
+            inviterName = ownerProf?.display_name || 'Кто-то';
+          } catch(e) {}
+          data.pendingInvites = [...(data.pendingInvites||[]), {user_id: currentUser.id, name: currentUser.display_name||'', invitedBy: inviterName, invitedAt: new Date().toISOString()}];
+          try { await sb.from('spaces').update({pendingInvites: data.pendingInvites}).eq('id', data.id); } catch(e) {}
         }
       }
     } catch(e) {}
@@ -355,7 +360,22 @@ document.getElementById('edit-space-dialog')?.remove();
 }
 // ─── MANAGE MEMBERS ─────────────────────────
 let managingSpaceId = null;
+async function pickFromContacts() {
+  if(!('contacts' in navigator) || !('ContactsManager' in window)) return;
+  try {
+    const contacts = await navigator.contacts.select(['name','tel'], {multiple:false});
+    if(!contacts.length) return;
+    const c = contacts[0];
+    const phone = (c.tel && c.tel[0]) ? c.tel[0].replace(/[^\d+]/g,'') : '';
+    if(!phone) { toast('У выбранного контакта нет номера телефона', true); return; }
+    document.getElementById('manage-member-inp').value = phone;
+    addMemberToSpace();
+  } catch(e) { /* пользователь отменил выбор контакта */ }
+}
+
 function openManageMembers(id) {
+  const btn = document.getElementById('contacts-pick-btn');
+  if(btn) btn.style.display = ('contacts' in navigator && 'ContactsManager' in window) ? 'block' : 'none';
   managingSpaceId = id;
   const space = spaces.find(s=>s.id===id); if(!space) return;
   document.getElementById('manage-members-title').textContent = space.name + ' — Участники';
