@@ -152,6 +152,8 @@ function renderSpacesList() {
   const ownsGroup = (spaces||[]).some(s => (s.type==='family'||s.type==='group') && s.owner_id === currentUser?.id);
   document.body.classList.toggle('owns-group', ownsGroup);
   if(ownsGroup && typeof renderLobbyPanelB === 'function') renderLobbyPanelB();
+  if(ownsGroup && typeof subscribeOwnerPresence === 'function') subscribeOwnerPresence();
+  else if(typeof unsubscribeOwnerPresence === 'function') unsubscribeOwnerPresence();
   const list = document.getElementById('spaces-list');
   const active = spaces.filter(s=>s.status!=='closed').sort((a,b) => {
     const aInvite = (a.pendingInvites||[]).some(p=>p.user_id===currentUser?.id) ? 1 : 0;
@@ -249,6 +251,38 @@ function openCreateSpace() {
 }
 function closeCreateSpace() { document.getElementById('create-space-ov').classList.remove('on'); }
 
+let newSpaceSelectedContacts = new Set();
+function renderNewSpaceContacts() {
+  const box = document.getElementById('new-space-contacts'); if(!box) return;
+  newSpaceSelectedContacts.clear();
+  const known = getKnownContacts(null);
+  box.innerHTML = known.length
+    ? known.map(c=>`<button type="button" class="ns-contact-btn" data-uid="${c.user_id}" onclick="toggleNewSpaceContact('${c.user_id}',this)" style="background:transparent;border:1px solid var(--b1);border-radius:14px;padding:6px 12px;font-size:13px;color:var(--t2);cursor:pointer">${esc(c.name)}</button>`).join('')
+    : '<div style="font-size:12px;color:var(--t3)">Пока нет знакомых людей — пригласишь позже</div>';
+}
+function toggleNewSpaceContact(userId, btn) {
+  if(newSpaceSelectedContacts.has(userId)) {
+    newSpaceSelectedContacts.delete(userId);
+    btn.style.background = 'transparent'; btn.style.color = 'var(--t2)';
+  } else {
+    newSpaceSelectedContacts.add(userId);
+    btn.style.background = 'var(--accent)'; btn.style.color = '#0f0f0f';
+  }
+}
+function showCreatedSpacePopup(spaceName, invitedNames) {
+  const div = document.createElement('div');
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1001;display:flex;align-items:center;justify-content:center;padding:20px';
+  div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:22px;max-width:380px;width:100%">
+    <div style="font-size:18px;font-weight:700;margin-bottom:10px">✓ «${esc(spaceName)}» создан</div>
+    ${invitedNames.length
+      ? `<div style="font-size:13px;color:var(--t2);margin-bottom:8px">Приглашены:</div>
+         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">${invitedNames.map(n=>`<span style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:6px 12px;font-size:13px;color:var(--t1)">${esc(n)}</span>`).join('')}</div>`
+      : `<div style="font-size:13px;color:var(--t2);margin-bottom:16px">Пока никого не пригласили — можно сделать это в «Управлении участниками»</div>`}
+    <button onclick="this.closest('[style*=fixed]').remove()" style="width:100%;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:11px;font-size:14px;font-weight:700;cursor:pointer">Готово</button>
+  </div>`;
+  document.body.appendChild(div);
+}
+
 async function createSpace() {
   const name = document.getElementById('new-space-name').value.trim(); if(!name) return;
   const type = document.getElementById('new-space-type').value;
@@ -268,13 +302,31 @@ async function createSpace() {
       ? [{name:'Еда',color:'#5bb87a'},{name:'Уборка',color:'#5b9ee8'},{name:'Дети',color:'#a07de8'},{name:'Покупки',color:'#e8c56a'},{name:'Финансы',color:'#e88a3a'},{name:'Ремонт',color:'#e86060'}]
       : [{name:'Работа',color:'#e8c56a'},{name:'Личное',color:'#5b9ee8'},{name:'Проекты',color:'#5bb87a'}];
     await sb.from('categories').insert(defaultCats.map(c => ({...c, space_id: id})));
-    spaces.push(space);
+      spaces.push(space);
     localStorage.setItem('mc_spaces', JSON.stringify(spaces));
     if(localStorage.getItem('mc_current_member')===null || type==='family') localStorage.setItem('mc_current_member', currentUser?.display_name||'');
+
+    let invitedNames = [];
+    if(type==='family' && newSpaceSelectedContacts.size) {
+      const known = getKnownContacts(null);
+      const invitedBy = currentUser?.display_name || 'Кто-то';
+      const invites = [...newSpaceSelectedContacts].map(uid=>{
+        const c = known.find(k=>k.user_id===uid);
+        return c ? {user_id:uid, name:c.name, invitedBy, invitedAt:new Date().toISOString()} : null;
+      }).filter(Boolean);
+      if(invites.length) {
+        space.pendingInvites = invites;
+        await sb.from('spaces').update({pendingInvites: invites}).eq('id', id);
+        localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+        if(typeof notifyUsers === 'function') await notifyUsers(invites.map(i=>i.user_id), '👋 Приглашение в группу', `${invitedBy} зовёт тебя в «${name}»`);
+        invitedNames = invites.map(i=>i.name);
+      }
+    }
+
     closeCreateSpace();
     renderSpacesList();
     toast('✓ Кабинет «'+name+'» создан');
-    if(type === 'family') openManageMembers(id);
+    if(type === 'family') showCreatedSpacePopup(name, invitedNames);
   } catch(e) { toast('Ошибка: '+e.message, true); }
 }
 function showShareLink(space) {
@@ -284,9 +336,11 @@ function showShareLink(space) {
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:24px;max-width:380px;width:100%">
     <div style="font-size:18px;font-weight:700;margin-bottom:10px">🔗 Пригласить в «${esc(space.name)}»</div>
     <div style="font-size:13px;color:var(--t2);margin-bottom:12px">Отправь ссылку или дай отсканировать QR — человек получит приглашение с подтверждением</div>
-    <div id="share-qr-box" style="display:flex;justify-content:center;background:#fff;border-radius:var(--rsm);padding:14px;margin-bottom:10px"></div>
+     <div id="share-qr-box" style="display:flex;justify-content:center;background:#fff;border-radius:var(--rsm);padding:14px;margin-bottom:10px"></div>
     <div style="background:var(--s2);border-radius:var(--rsm);padding:11px;font-size:12px;word-break:break-all;color:var(--accent);margin-bottom:10px">${link}</div>
     ${space.password?`<div style="font-size:13px;color:var(--t2);margin-bottom:12px">🔒 Пароль: <strong style="color:var(--t1)">${esc(space.password)}</strong></div>`:''}
+    <button onclick="const b=document.getElementById('share-known-contacts-box');const show=b.style.display==='none';b.style.display=show?'block':'none';if(show)renderKnownContacts('${space.id}','share-known-contacts-list')" style="width:100%;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:10px;font-size:13px;cursor:pointer;margin-bottom:10px">👥 Добавить из списка знакомых</button>
+    <div id="share-known-contacts-box" style="display:none;margin-bottom:4px"><div id="share-known-contacts-list"></div></div>
     <div style="display:flex;gap:8px">
       <button onclick="navigator.clipboard.writeText('${link}').then(()=>toast('✓ Скопировано'))" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:11px;font-size:14px;font-weight:700;cursor:pointer">Скопировать</button>
       <button onclick="this.closest('[style*=fixed]').remove()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px 16px;font-size:14px;cursor:pointer">Закрыть</button>
@@ -361,8 +415,9 @@ async function pickFromContacts() {
     const c = contacts[0];
     const phone = (c.tel && c.tel[0]) ? c.tel[0].replace(/[^\d+]/g,'') : '';
     if(!phone) { toast('У выбранного контакта нет номера телефона', true); return; }
+    const contactName = (c.name && c.name[0]) ? c.name[0] : '';
     document.getElementById('manage-member-inp').value = phone;
-    addMemberToSpace();
+    addMemberToSpace(contactName);
   } catch(e) { /* пользователь отменил выбор контакта */ }
 }
 
@@ -378,8 +433,9 @@ function getKnownContacts(excludeSpaceId) {
   return [...seen.entries()].map(([user_id,name])=>({user_id,name}));
 }
 
-function renderKnownContacts(spaceId) {
-  const box = document.getElementById('known-contacts-list');
+function renderKnownContacts(spaceId, containerId) {
+  const cid = containerId || 'known-contacts-list';
+  const box = document.getElementById(cid);
   if(!box) return;
   const space = spaces.find(s=>s.id===spaceId);
   const alreadyIn = new Set((space?.members_auth||[]).map(m=>m.user_id));
@@ -387,11 +443,11 @@ function renderKnownContacts(spaceId) {
   const known = getKnownContacts(spaceId).filter(c=>!alreadyIn.has(c.user_id) && !alreadyInvited.has(c.user_id));
   box.innerHTML = known.length ? `<div style="font-size:12px;color:var(--t3);margin:10px 0 6px">Уже знакомые</div>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">
-      ${known.map(c=>`<button onclick="inviteKnownContact('${spaceId}','${c.user_id}','${esc(c.name)}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:6px 12px;font-size:13px;color:var(--t1);cursor:pointer">${esc(c.name)}</button>`).join('')}
-    </div>` : '';
+      ${known.map(c=>`<button onclick="inviteKnownContact('${spaceId}','${c.user_id}','${esc(c.name)}','${cid}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:6px 12px;font-size:13px;color:var(--t1);cursor:pointer">${esc(c.name)}</button>`).join('')}
+    </div>` : '<div style="font-size:12px;color:var(--t3);margin:10px 0 6px">Нет новых знакомых для добавления</div>';
 }
 
-async function inviteKnownContact(spaceId, userId, name) {
+async function inviteKnownContact(spaceId, userId, name, containerId) {
   const space = spaces.find(s=>s.id===spaceId); if(!space) return;
   const invitedBy = localStorage.getItem('mc_current_member') || currentUser?.display_name || 'Кто-то';
   space.pendingInvites = [...(space.pendingInvites||[]), {user_id:userId, name, invitedBy, invitedAt:new Date().toISOString()}];
@@ -399,7 +455,7 @@ async function inviteKnownContact(spaceId, userId, name) {
     await sb.from('spaces').update({pendingInvites: space.pendingInvites}).eq('id', spaceId);
     localStorage.setItem('mc_spaces', JSON.stringify(spaces));
     if(typeof notifyUsers === 'function') await notifyUsers([userId], '👋 Приглашение в группу', `${invitedBy} зовёт тебя в «${space.name}»`);
-    renderKnownContacts(spaceId);
+    renderKnownContacts(spaceId, containerId);
     toast('✓ Приглашение отправлено ' + name);
   } catch(e) { toast('Ошибка: '+e.message, true); }
 }
@@ -454,7 +510,7 @@ function offerInvite(query, space) {
   document.body.appendChild(div);
 }
 
-async function addMemberToSpace() {
+async function addMemberToSpace(overrideName) {
   const inp = document.getElementById('manage-member-inp'); // логин или телефон
   const query = inp.value.trim(); if(!query) return;
   const space = spaces.find(s=>s.id===managingSpaceId); if(!space) return;
@@ -469,15 +525,18 @@ async function addMemberToSpace() {
 
   if(!found) { offerInvite(query, space); return; }
 
+  // Если приглашали через выбор из телефонных контактов — берём имя, как оно записано у приглашающего,
+  // а не display_name из аккаунта приглашённого (иначе путаница при совпадении имён)
+  const inviteName = overrideName || found.display_name;
   const invitedBy = localStorage.getItem('mc_current_member') || currentUser?.display_name || 'Кто-то';
-  space.pendingInvites = [...(space.pendingInvites||[]), {user_id: found.id, name: found.display_name, invitedBy, invitedAt: new Date().toISOString()}];
+  space.pendingInvites = [...(space.pendingInvites||[]), {user_id: found.id, name: inviteName, invitedBy, invitedAt: new Date().toISOString()}];
   try {
     await sb.from('spaces').update({pendingInvites: space.pendingInvites}).eq('id', managingSpaceId);
     localStorage.setItem('mc_spaces', JSON.stringify(spaces));
     const title = '👋 Приглашение в группу';
     const body = `${invitedBy} зовёт тебя в «${space.name}»`;
     if(typeof notifyUsers === 'function') await notifyUsers([found.id], title, body);
-    toast('✓ Приглашение отправлено ' + found.display_name);
+    toast('✓ Приглашение отправлено ' + inviteName);
   } catch(e) { toast('Ошибка: '+e.message, true); }
 }
 
@@ -551,23 +610,41 @@ function updateMyPresenceCard(cardId, cardTitle) {
   presenceChannel.track(cardId ? { name: myName, cardId, cardTitle } : { name: myName });
 }
 
-// ── Presence «подглядыванием» для дашборда владельца (не заходя в кабинет) ──
-let ownerPresenceChannel = null, ownerPresenceSpaceId = null;
-function subscribeOwnerPresence(spaceId) {
-  if(ownerPresenceSpaceId === spaceId && ownerPresenceChannel) return;
-  if(ownerPresenceChannel) { sb.removeChannel(ownerPresenceChannel); ownerPresenceChannel = null; }
-  ownerPresenceSpaceId = spaceId;
-  ownerPresenceChannel = sb.channel('presence:' + spaceId)
-    .on('presence', { event: 'sync' }, () => renderOwnerPresence())
-    .subscribe();
+// ── Presence «подглядыванием» для дашборда владельца — сразу по всем моим группам ──
+let ownerPresenceChannels = new Map(); // spaceId -> channel
+
+function subscribeOwnerPresence() {
+  const ownedGroupIds = new Set((spaces||[]).filter(s =>
+    (s.type==='family'||s.type==='group') && s.owner_id===currentUser?.id && s.status!=='closed'
+  ).map(s=>s.id));
+  // отписываемся от групп, которые больше не актуальны (закрыты/удалены/я больше не владелец)
+  for(const [id, ch] of ownerPresenceChannels) {
+    if(!ownedGroupIds.has(id)) { sb.removeChannel(ch); ownerPresenceChannels.delete(id); }
+  }
+  ownedGroupIds.forEach(id => {
+    if(ownerPresenceChannels.has(id)) return; // уже подписаны
+    const ch = sb.channel('presence:' + id)
+      .on('presence', { event: 'sync' }, () => renderOwnerPresence())
+      .subscribe();
+    ownerPresenceChannels.set(id, ch);
+  });
+  renderOwnerPresence();
+}
+function unsubscribeOwnerPresence() {
+  ownerPresenceChannels.forEach(ch => sb.removeChannel(ch));
+  ownerPresenceChannels.clear();
 }
 function renderOwnerPresence() {
   const box = document.getElementById('lobby-presence-list');
-  if(!box || !ownerPresenceChannel) return;
-  const state = ownerPresenceChannel.presenceState();
-  const people = Object.values(state).flatMap(arr=>arr);
+  if(!box) return;
+  const people = [];
+  ownerPresenceChannels.forEach((ch, spaceId) => {
+    const space = spaces.find(s=>s.id===spaceId);
+    const state = ch.presenceState();
+    Object.values(state).flatMap(arr=>arr).forEach(p => people.push({...p, spaceName: space?.name||''}));
+  });
   box.innerHTML = people.length
-    ? people.map(p => `<div style="font-size:13px;padding:4px 0">🟢 ${esc(p.name)}${p.cardTitle?` · <span style="color:var(--t3)">${esc(p.cardTitle)}</span>`:''}</div>`).join('')
+    ? people.map(p => `<div style="font-size:13px;padding:4px 0">🟢 ${esc(p.name)} <span style="color:var(--t3)">· ${esc(p.spaceName)}</span>${p.cardTitle?` <span style="color:var(--t3)">— ${esc(p.cardTitle)}</span>`:''}</div>`).join('')
     : '<div style="color:var(--t3);font-size:12px">Никого нет онлайн</div>';
 }
 function unsubscribePresence() {

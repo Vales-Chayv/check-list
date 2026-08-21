@@ -408,7 +408,8 @@
         <div style="font-size:22px;font-weight:700">Мои карточки</div>
         <div style="font-size:14px;color:var(--t2);margin-top:4px">Создай аккаунт</div>
       </div>
-      <div class="fld"><label>Твоё имя</label><input id="auth-name" placeholder="Как тебя зовут?" dir="auto" onkeydown="if(event.key==='Enter')document.getElementById('auth-login').focus()"></div>
+      <div class="fld"><label>Имя</label><input id="auth-name" placeholder="Имя" dir="auto" onkeydown="if(event.key==='Enter')document.getElementById('auth-surname').focus()"></div>
+      <div class="fld"><label>Фамилия</label><input id="auth-surname" placeholder="Фамилия" dir="auto" onkeydown="if(event.key==='Enter')document.getElementById('auth-login').focus()"></div>
       <div class="fld">
         <label>Логин (для входа с любого устройства)</label>
         <input id="auth-login" placeholder="Например: slava_123" onkeydown="if(event.key==='Enter')document.getElementById('auth-pwd').focus()">
@@ -638,19 +639,15 @@
       <div class="fld"><label>Название</label><input id="new-space-name" placeholder="Например: Наша семья" dir="auto"></div>
       <div class="fld">
         <label>Тип</label>
-      <select id="new-space-type" onchange="document.getElementById('members-section').style.display=this.value==='family'?'flex':'none'">
+           <select id="new-space-type" onchange="document.getElementById('members-section').style.display=this.value==='family'?'flex':'none'; if(this.value==='family')renderNewSpaceContacts()">
           <option value="personal">🗂️ Личный</option>
           <option value="family">👥 Групповой</option>
         </select>
       </div>
       <div id="members-section" style="display:none;flex-direction:column;gap:8px">
         <div class="fld">
-          <label>Участники</label>
-          <div style="display:flex;gap:7px">
-            <input id="new-member-inp" placeholder="Имя участника..." dir="auto" onkeydown="if(event.key==='Enter'){addNewMember();event.preventDefault()}">
-            <button onclick="addNewMember()" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px 14px;cursor:pointer;color:var(--t2);font-size:16px">＋</button>
-          </div>
-          <div id="new-members-list" style="margin-top:5px"></div>
+          <label>Участники (пригласятся сразу)</label>
+          <div id="new-space-contacts" style="display:flex;flex-wrap:wrap;gap:6px"></div>
         </div>
       </div>
       <div class="fld"><label>Пароль (необязательно)</label><input id="new-space-pwd" type="password" placeholder="Защити кабинет паролем"></div>

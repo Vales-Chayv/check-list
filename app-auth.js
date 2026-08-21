@@ -70,13 +70,16 @@ function authShowErr(id, msg) {
 
 // ─── REGISTER ───────────────────────────────
 async function doRegister() {
-  const name     = document.getElementById('auth-name').value.trim();
+  const firstName = document.getElementById('auth-name').value.trim();
+  const surname    = document.getElementById('auth-surname').value.trim();
+  const name       = surname ? `${firstName} ${surname}` : firstName;
   const login    = document.getElementById('auth-login').value.trim().toLowerCase().replace(/\s+/g,'_');
   const pwd      = document.getElementById('auth-pwd').value;
   const pwd2     = document.getElementById('auth-pwd2').value;
   const remember = document.getElementById('auth-remember').checked;
 
-  if(!name)  { authShowErr('auth-reg-err','Введи имя'); return; }
+  if(!firstName) { authShowErr('auth-reg-err','Введи имя'); return; }
+  if(!surname)   { authShowErr('auth-reg-err','Введи фамилию'); return; }
   if(!login) { authShowErr('auth-reg-err','Введи логин'); return; }
   if(pwd.length < 4) { authShowErr('auth-reg-err','Пароль минимум 4 символа'); return; }
   if(pwd !== pwd2)   { authShowErr('auth-reg-err','Пароли не совпадают'); return; }
@@ -166,6 +169,7 @@ async function doLoginAuth() {
 // ─── LOGOUT ─────────────────────────────────
 async function logoutUser() {
   if(!confirm('Выйти из аккаунта?')) return;
+  if(typeof unsubscribeOwnerPresence === 'function') unsubscribeOwnerPresence();
   await sb.auth.signOut();
   currentUser = null;
   currentSpaceId = null; currentSpace = null;

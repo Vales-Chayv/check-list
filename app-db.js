@@ -319,10 +319,15 @@ function handleRealtimeSpace(payload) {
   const wasClosed = spaces[idx].status === 'closed';
   spaces[idx] = { ...spaces[idx], ...n };
   localStorage.setItem('mc_spaces', JSON.stringify(spaces));
-  if(n.status === 'closed' && !wasClosed) {
+    if(n.status === 'closed' && !wasClosed) {
     if(currentSpaceId === n.id) { currentSpace = spaces[idx]; render(); }
     if(typeof renderSpacesList === 'function' && document.getElementById('space-selector')?.style.display !== 'none') renderSpacesList();
     if(typeof showChatNotice === 'function') showChatNotice('🔒 Группа закрыта', `«${n.name}» закрыта и перемещена в архив`, null);
+  }
+  // Участник вышел из группы — живой попап владельцу
+  if(n.owner_id === myId && Array.isArray(o?.members) && Array.isArray(n.members) && n.members.length < o.members.length) {
+    const leftMember = o.members.find(om => !n.members.some(nm=>nm.user_id===om.user_id));
+    if(typeof showChatNotice === 'function') showChatNotice('🚪 Участник вышел', `${leftMember?.name||'Участник'} покинул(а) «${n.name}»`, null);
   }
 }
 
