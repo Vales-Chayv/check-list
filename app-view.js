@@ -783,7 +783,7 @@ async function mcConfirm(cardId, catName) {
   render();
   toast('✓ Карточка перемещена');
 }
-let moveAssignedTo = null, moveAssignedCompletions = null, moveDeleteSource = false, moveSelection = null, moveTargetCard = null;
+let moveAssignedTo = null, moveAssignedCompletions = null, moveDeleteSource = false, moveSelection = null, moveTargetCard = null, moveSessionNote = '';
 
 function openBulkTransferPicker(cardId) {
   const card = cards.find(c=>c.id===cardId); if(!card) return;
@@ -826,8 +826,8 @@ function confirmBulkSelection(cardId) {
 
 function moveEntry(cardId, selection) {
   const card = cards.find(c=>c.id===cardId); if(!card) return;
-  moveSelection = typeof selection === 'string' ? {entryIds:[selection], groupIds:[]} : selection;
-  moveAssignedTo = null; moveAssignedCompletions = null; moveDeleteSource = false; moveTargetCard = null;
+    moveSelection = typeof selection === 'string' ? {entryIds:[selection], groupIds:[]} : selection;
+  moveAssignedTo = null; moveAssignedCompletions = null; moveDeleteSource = false; moveTargetCard = null; moveSessionNote = '';
   const div = document.createElement('div');
   div.id = 'move-entry-dialog';
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
@@ -837,10 +837,12 @@ function moveEntry(cardId, selection) {
   const n = moveSelection.entryIds.length + moveSelection.groupIds.length;
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto">
     <div style="font-size:16px;font-weight:700;margin-bottom:4px">Перенести${n>1?` (${n})`:' запись'}</div>
-    <label style="display:flex;align-items:center;gap:8px;margin:8px 0 14px;font-size:13px;color:var(--t2);cursor:pointer">
+        <label style="display:flex;align-items:center;gap:8px;margin:8px 0 10px;font-size:13px;color:var(--t2);cursor:pointer">
       <input type="checkbox" id="move-delete-source" onchange="moveDeleteSource=this.checked">
       Стереть в источнике после переноса
     </label>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:6px">Текст-обращение (необязательно)</div>
+    <textarea id="move-session-note" oninput="moveSessionNote=this.value" placeholder="Привет, вот три пункта…" style="width:100%;min-height:50px;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:8px 10px;font-size:13px;color:var(--t1);font-family:inherit;resize:vertical;margin-bottom:14px;box-sizing:border-box"></textarea>
     <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Кабинет</div>
     <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
       <button onclick="selectMoveSpace('${cardId}','${currentSpaceId}',this)" style="background:var(--s2);border:1px solid var(--accent);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--accent);cursor:pointer;text-align:left;font-family:inherit">📂 Текущий кабинет</button>
@@ -860,7 +862,8 @@ function renderMoveAssignBlock(targetSpace, chatParticipants) {
   const block = document.getElementById('move-assign-block'); if(!block) return;
   moveAssignedTo = null; moveAssignedCompletions = null;
   if(!targetSpace || !(targetSpace.type==='family' || targetSpace.type==='group')) { block.innerHTML = ''; return; }
-  const pool = (chatParticipants && chatParticipants.length) ? chatParticipants : (targetSpace.members||[]).map(m=>m.name);
+  // Живой список участников группы, а не устаревший снимок chatParticipants на момент создания чата
+  const pool = (targetSpace.members||[]).map(m=>m.name);
   block.innerHTML = `<div style="margin:12px 0">
     <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Назначить (участники этого чата)</div>
     <div style="display:flex;flex-wrap:wrap;gap:4px">
@@ -972,7 +975,7 @@ function collectMoveEntries(fromCard) {
         ...e, id: uid(),
         sessionId: sharedSessionId,
         sessionCreator,
-        sessionNote: isFirst ? (e.sessionNote||null) : null,
+        sessionNote: isFirst ? (moveSessionNote.trim() || e.sessionNote || null) : null,
         sessionAtts: isFirst ? (e.sessionAtts||e.attachments||[]) : []
       };
       isFirst = false;
