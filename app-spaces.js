@@ -125,9 +125,26 @@ function spaceRowHTML(s) {
         ${s.password?'<span style="font-size:16px;opacity:.5">🔒</span>':'<span style="font-size:12px;color:var(--t3)">Открыть</span>'}
       </div>
       ${(!isClosed && s.type==='family' && isOwner)?`<button onclick="getShareLink('${s.id}')" style="background:rgba(232,197,106,.15);border:1px solid rgba(232,197,106,.3);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--accent);cursor:pointer" title="Пригласить">🔗</button><button onclick="openManageMembers('${s.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--t2);cursor:pointer" title="Участники">👥</button>`:''}
-      ${(!isClosed && s.type==='family' && isOwner)?`<button onclick="closeGroupSpace('${s.id}')" style="background:rgba(232,96,96,.12);border:1px solid rgba(232,96,96,.3);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--red);cursor:pointer" title="Закрыть группу">🔒</button>`:''}
-      ${!isClosed?`<button onclick="openEditSpace('${s.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--t2);cursor:pointer" title="Редактировать">✏️</button>`:''}
+           ${(!isClosed && s.type==='family' && isOwner)?`<button onclick="closeGroupSpace('${s.id}')" style="background:rgba(232,96,96,.12);border:1px solid rgba(232,96,96,.3);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--red);cursor:pointer" title="Закрыть группу">🔒</button>`:''}
+      ${!isClosed && (s.type!=='family' || isOwner) ? `<button onclick="openEditSpace('${s.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--t2);cursor:pointer" title="Редактировать">✏️</button>` : ''}
+      ${!isClosed && s.type==='family' && !isOwner && (s.members||[]).some(m=>m.user_id===currentUser?.id) ? `<button onclick="leaveGroup('${s.id}')" style="background:rgba(232,96,96,.12);border:1px solid rgba(232,96,96,.3);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--red);cursor:pointer" title="Выйти из группы">🚪</button>` : ''}
     </div>`;
+}
+
+async function leaveGroup(spaceId) {
+  const space = spaces.find(s=>s.id===spaceId); if(!space) return;
+  if(!confirm('Выйти из группы «' + space.name + '»?')) return;
+  const myName = (space.members||[]).find(m=>m.user_id===currentUser?.id)?.name;
+  space.members = (space.members||[]).filter(m=>m.user_id!==currentUser?.id);
+  space.members_auth = (space.members_auth||[]).filter(m=>m.user_id!==currentUser?.id);
+  spaces = spaces.filter(s=>s.id!==spaceId);
+  try {
+    await sb.from('spaces').update({members: space.members, members_auth: space.members_auth}).eq('id', spaceId);
+    localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+    renderSpacesList();
+    if(space.owner_id && typeof notifyUsers==='function') await notifyUsers([space.owner_id], '🚪 Участник вышел из группы', `${myName||'Участник'} покинул(а) «${space.name}»`);
+    toast('Ты вышел(ла) из группы');
+  } catch(e) { toast('Ошибка: '+e.message, true); }
 }
 
 function renderSpacesList() {
@@ -136,7 +153,11 @@ function renderSpacesList() {
   document.body.classList.toggle('owns-group', ownsGroup);
   if(ownsGroup && typeof renderLobbyPanelB === 'function') renderLobbyPanelB();
   const list = document.getElementById('spaces-list');
-  const active = spaces.filter(s=>s.status!=='closed');
+  const active = spaces.filter(s=>s.status!=='closed').sort((a,b) => {
+    const aInvite = (a.pendingInvites||[]).some(p=>p.user_id===currentUser?.id) ? 1 : 0;
+    const bInvite = (b.pendingInvites||[]).some(p=>p.user_id===currentUser?.id) ? 1 : 0;
+    return bInvite - aInvite;
+  });
   const closed = spaces.filter(s=>s.status==='closed');
   list.innerHTML = active.map(spaceRowHTML).join('')
     + (closed.length ? `<div onclick="toggleClosedSpaces()" style="text-align:center;font-size:13px;color:var(--t3);cursor:pointer;padding:10px 0">🔒 Закрытые группы (${closed.length}) ${showClosedSpaces?'▲':'▼'}</div>` : '')
@@ -223,54 +244,22 @@ function openCreateSpace() {
   document.getElementById('new-space-name').value = '';
   document.getElementById('new-space-pwd').value = '';
   document.getElementById('new-space-type').value = 'personal';
-  document.getElementById('members-section').style.display = 'none';
-  renderNewMembersList();
   document.getElementById('create-space-ov').classList.add('on');
   setTimeout(()=>document.getElementById('new-space-name').focus(), 300);
 }
 function closeCreateSpace() { document.getElementById('create-space-ov').classList.remove('on'); }
-let newSpaceMembers = [];
-function renderNewMembersList() {
-  const el = document.getElementById('new-members-list');
-  newSpaceMembers = [];
-  el.innerHTML = '';
-}
-function addNewMember() {
-  const inp = document.getElementById('new-member-inp');
-  const name = inp.value.trim(); if(!name) return;
-const email = (document.getElementById('manage-member-email')?.value||'').trim().toLowerCase();
-  if(newSpaceMembers.find(m=>m.name===name)) { inp.value=''; return; }
-  newSpaceMembers.push({name});
-  inp.value='';
-  const el = document.getElementById('new-members-list');
-  el.innerHTML = newSpaceMembers.map((m,i)=>`<div style="display:inline-flex;align-items:center;gap:5px;background:var(--s2);border:1px solid var(--b1);border-radius:18px;padding:4px 10px;margin:3px;font-size:13px">${esc(m.name)}<button onclick="newSpaceMembers.splice(${i},1);renderNewMembersEdit()" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:11px;margin-left:2px">✕</button></div>`).join('');
-}
-function renderNewMembersEdit() {
-  const el = document.getElementById('new-members-list');
-  el.innerHTML = newSpaceMembers.map((m,i)=>`<div style="display:inline-flex;align-items:center;gap:5px;background:var(--s2);border:1px solid var(--b1);border-radius:18px;padding:4px 10px;margin:3px;font-size:13px">${esc(m.name)}<button onclick="newSpaceMembers.splice(${i},1);renderNewMembersEdit()" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:11px;margin-left:2px">✕</button></div>`).join('');
-}
-async function ensureUserHasPhone() {
-  try {
-    const { data } = await sb.from('profiles').select('phone').eq('id', currentUser?.id).single();
-    if(data?.phone) return true;
-  } catch(e) {}
-  const phone = prompt('Для группового кабинета нужен номер телефона (для общения в группе):');
-  if(!phone || !phone.trim()) { toast('Номер телефона обязателен для групповых кабинетов', true); return false; }
-  try {
-    await sb.from('profiles').update({phone: phone.trim()}).eq('id', currentUser.id);
-    return true;
-  } catch(e) { toast('Ошибка сохранения телефона: '+e.message, true); return false; }
-}
 
 async function createSpace() {
   const name = document.getElementById('new-space-name').value.trim(); if(!name) return;
   const type = document.getElementById('new-space-type').value;
-  if(type === 'family') { if(!(await ensureUserHasPhone())) return; }
   const pwd  = document.getElementById('new-space-pwd').value.trim() || null;
   const id   = 'sp_' + uid();
   const share_token = uid().slice(0,12);
   const owner_id = currentUser?.id || null;
-  const space = {id, name, type, password:pwd, members:newSpaceMembers, share_token, owner_id};
+  const memberColors = ['#e8a83a','#5b9ee8','#a07de8','#5bb87a','#e85bb0','#5bc8e8','#e86060','#c8e85b'];
+  const initialMembers = type==='family' ? [{name: currentUser?.display_name||'', color: memberColors[0], user_id: owner_id}] : [];
+  const initialAuth = type==='family' && owner_id ? [{user_id: owner_id, name: currentUser?.display_name||''}] : [];
+  const space = {id, name, type, password:pwd, members:initialMembers, members_auth:initialAuth, share_token, owner_id};
   try {
     const {error} = await sb.from('spaces').insert(space);
     if(error) throw error;
@@ -281,10 +270,11 @@ async function createSpace() {
     await sb.from('categories').insert(defaultCats.map(c => ({...c, space_id: id})));
     spaces.push(space);
     localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+    if(localStorage.getItem('mc_current_member')===null || type==='family') localStorage.setItem('mc_current_member', currentUser?.display_name||'');
     closeCreateSpace();
     renderSpacesList();
     toast('✓ Кабинет «'+name+'» создан');
-    if(type === 'family') showShareLink(space);
+    if(type === 'family') openManageMembers(id);
   } catch(e) { toast('Ошибка: '+e.message, true); }
 }
 function showShareLink(space) {
@@ -311,11 +301,9 @@ function showShareLink(space) {
 // ─── MEMBER SELECTOR ────────────────────────
 async function afterPasswordOrDirect(id) {
   const space = spaces.find(s=>s.id===id); if(!space) return;
-  if(space.type==='family') { if(!(await ensureUserHasPhone())) return; }
   const members = space.members||[];
  if(space.type==='family' && members.length > 0) {
-    const userEmail = currentUser?.email?.toLowerCase()||'';
-    const matched = members.find(m => m.email && m.email.toLowerCase() === userEmail);
+    const matched = members.find(m => m.user_id && m.user_id === currentUser?.id);
     if(matched) {
       localStorage.setItem('mc_current_member', matched.name);
       setCurrentSpace(id, true);
