@@ -18,10 +18,12 @@ async function initSpaces() {
     if(el) el.textContent = 'Привет, ' + (currentUser.display_name||'') + ' 👋';
   }
   try {
-    const joinedIds = JSON.parse(localStorage.getItem('mc_joined_spaces')||'[]');
+       const joinedIds = JSON.parse(localStorage.getItem('mc_joined_spaces')||'[]');
     let query = sb.from('spaces').select('*').order('created_at');
     if(currentUser) {
-      query = query.or(`owner_id.eq.${currentUser.id}${joinedIds.length?',id.in.('+joinedIds.join(',')+')'  :''}`);
+      const memberFilter = `members_auth.cs.[{"user_id":"${currentUser.id}"}]`;
+      const inviteFilter = `pendingInvites.cs.[{"user_id":"${currentUser.id}"}]`;
+      query = query.or(`owner_id.eq.${currentUser.id}${joinedIds.length?',id.in.('+joinedIds.join(',')+')'  :''},${memberFilter},${inviteFilter}`);
     }
     const {data, error} = await query;
     if(error) throw error;
@@ -92,6 +94,22 @@ function spaceRowHTML(s) {
   const members = (s.members||[]).length;
   const isOwner = s.owner_id===currentUser?.id;
   const isClosed = s.status==='closed';
+  const myInvite = (s.pendingInvites||[]).find(p=>p.user_id===currentUser?.id);
+  if(myInvite) {
+    return `<div style="background:var(--s2);border:1px solid var(--accent);border-radius:var(--r);padding:18px 16px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px">
+        <div style="font-size:32px">👋</div>
+        <div style="flex:1">
+          <div style="font-size:17px;font-weight:700">${esc(s.name)}</div>
+          <div style="font-size:13px;color:var(--t2);margin-top:2px">${esc(myInvite.invitedBy)} зовёт тебя в группу</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="acceptGroupInvite('${s.id}')" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:10px;font-size:14px;font-weight:700;cursor:pointer">✓ Принять</button>
+        <button onclick="declineGroupInvite('${s.id}')" style="flex:1;background:var(--s1);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:10px;font-size:14px;cursor:pointer">✕ Отклонить</button>
+      </div>
+    </div>`;
+  }
   return `<div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:18px 16px;display:flex;align-items:center;gap:14px;margin-bottom:10px;opacity:${isClosed?.7:1}">
       <div onclick="onSpaceClick('${s.id}')" style="display:flex;align-items:center;gap:14px;flex:1;cursor:pointer">
         <div style="font-size:32px">${isClosed?'🔒':icon}</div>
@@ -390,24 +408,54 @@ async function addMemberToSpace() {
   const space = spaces.find(s=>s.id===managingSpaceId); if(!space) return;
 
   const found = await searchUserByLoginOrPhone(query);
-  const name = found ? found.display_name : query;
-  if((space.members||[]).find(m=>m.name===name)) { toast('Участник уже есть', true); inp.value=''; return; }
+  const alreadyMember = (space.members||[]).find(m=>found ? m.user_id===found.id : m.name===query);
+  const alreadyPending = (space.pendingInvites||[]).find(p=>found && p.user_id===found.id);
+  if(alreadyMember) { toast('Участник уже есть', true); inp.value=''; return; }
+  if(alreadyPending) { toast('Приглашение уже отправлено', true); inp.value=''; return; }
 
+  inp.value = '';
+
+  if(!found) { offerInvite(query, space); return; }
+
+  const invitedBy = localStorage.getItem('mc_current_member') || currentUser?.display_name || 'Кто-то';
+  space.pendingInvites = [...(space.pendingInvites||[]), {user_id: found.id, name: found.display_name, invitedBy, invitedAt: new Date().toISOString()}];
+  try {
+    await sb.from('spaces').update({pendingInvites: space.pendingInvites}).eq('id', managingSpaceId);
+    localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+    const title = '👋 Приглашение в группу';
+    const body = `${invitedBy} зовёт тебя в «${space.name}»`;
+    if(typeof notifyUsers === 'function') await notifyUsers([found.id], title, body);
+    toast('✓ Приглашение отправлено ' + found.display_name);
+  } catch(e) { toast('Ошибка: '+e.message, true); }
+}
+
+async function acceptGroupInvite(spaceId) {
+  const space = spaces.find(s=>s.id===spaceId); if(!space) return;
+  const invite = (space.pendingInvites||[]).find(p=>p.user_id===currentUser?.id); if(!invite) return;
   const memberColors = ['#e8a83a','#5b9ee8','#a07de8','#5bb87a','#e85bb0','#5bc8e8','#e86060','#c8e85b'];
   const usedColors = (space.members||[]).map(m=>m.color);
   const freeColors = memberColors.filter(c=>!usedColors.includes(c));
   const color = freeColors.length ? freeColors[0] : memberColors[Math.floor(Math.random()*memberColors.length)];
-
-  space.members = [...(space.members||[]), {name, color, user_id: found?.id||null, email: found?.email||null}];
-  if(found) space.members_auth = [...(space.members_auth||[]).filter(m=>m.user_id!==found.id), {user_id: found.id, name}];
-  inp.value = '';
-  renderManageMembersList();
-  renderSpacesList();
+  space.members = [...(space.members||[]), {name: invite.name, color, user_id: currentUser.id}];
+  space.members_auth = [...(space.members_auth||[]), {user_id: currentUser.id, name: invite.name}];
+  space.pendingInvites = (space.pendingInvites||[]).filter(p=>p.user_id!==currentUser.id);
   try {
-    await sb.from('spaces').update({members: space.members, members_auth: space.members_auth||[]}).eq('id', managingSpaceId);
+    await sb.from('spaces').update({members: space.members, members_auth: space.members_auth, pendingInvites: space.pendingInvites}).eq('id', spaceId);
     localStorage.setItem('mc_spaces', JSON.stringify(spaces));
-    if(found) toast('✓ ' + name + ' добавлен(а) — уже в приложении');
-    else { offerInvite(query, space); toast('Не найден — отправь приглашение'); }
+    renderSpacesList();
+    toast('✓ Ты в группе «' + space.name + '»');
+  } catch(e) { toast('Ошибка: '+e.message, true); }
+}
+
+async function declineGroupInvite(spaceId) {
+  const space = spaces.find(s=>s.id===spaceId); if(!space) return;
+  space.pendingInvites = (space.pendingInvites||[]).filter(p=>p.user_id!==currentUser?.id);
+  try {
+    await sb.from('spaces').update({pendingInvites: space.pendingInvites}).eq('id', spaceId);
+    spaces = spaces.filter(s=>s.id!==spaceId || (s.owner_id===currentUser?.id));
+    localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+    renderSpacesList();
+    toast('Приглашение отклонено');
   } catch(e) { toast('Ошибка: '+e.message, true); }
 }
 async function removeMemberFromSpace(name) {

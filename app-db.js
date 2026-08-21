@@ -303,6 +303,17 @@ function unsubscribeRealtimeSpaces() {
 function handleRealtimeSpace(payload) {
   const { new: n, old: o } = payload;
   if(!n || !spaces) return;
+  const myId = currentUser?.id;
+  const wasInvited = (o?.pendingInvites||[]).some(p=>p.user_id===myId);
+  const isInvited = (n.pendingInvites||[]).some(p=>p.user_id===myId);
+  if(myId && isInvited && !wasInvited) {
+    const idxNew = spaces.findIndex(s=>s.id===n.id);
+    if(idxNew===-1) spaces.push(n); else spaces[idxNew]=n;
+    localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+    if(typeof renderSpacesList === 'function' && document.getElementById('space-selector')?.style.display !== 'none') renderSpacesList();
+    const invite = n.pendingInvites.find(p=>p.user_id===myId);
+    if(typeof showChatNotice === 'function') showChatNotice('👋 Приглашение в группу', `${invite.invitedBy} зовёт тебя в «${n.name}»`, null);
+  }
   const idx = spaces.findIndex(s => s.id === n.id);
   if(idx === -1) return; // кабинет не в моём списке — не моё дело
   const wasClosed = spaces[idx].status === 'closed';
