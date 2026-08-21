@@ -616,7 +616,8 @@
     </div>
     <div style="padding:20px;display:flex;flex-direction:column;gap:12px">
       <div id="manage-members-list" style="display:flex;flex-direction:column;gap:8px"></div>
-             <button id="contacts-pick-btn" onclick="pickFromContacts()" style="display:none;width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px;margin-top:4px;cursor:pointer;color:var(--accent);font-size:14px;font-weight:600;font-family:inherit">📱 Выбрать из контактов</button>
+      <button id="contacts-pick-btn" onclick="pickFromContacts()" style="display:none;width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px;margin-top:4px;cursor:pointer;color:var(--accent);font-size:14px;font-weight:600;font-family:inherit">📱 Выбрать из контактов</button>
+      <div id="known-contacts-list"></div>
       <div style="display:flex;gap:7px;margin-top:8px">
         <input id="manage-member-inp" placeholder="Логин или телефон участника..." dir="auto" onkeydown="if(event.key==='Enter'){addMemberToSpace();event.preventDefault()}">
         <button onclick="addMemberToSpace()" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px 14px;cursor:pointer;color:var(--accent);font-size:16px">＋</button>
@@ -776,6 +777,7 @@
 <script src="app-render.js"></script>
 <script src="app-calc.js"></script>
 <script src="app-chat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="app-view.js"></script>
 <script src="app-edit.js"></script>
 <script src="app-archive.js"></script>

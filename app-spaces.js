@@ -293,7 +293,8 @@ function showShareLink(space) {
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1001;display:flex;align-items:center;justify-content:center;padding:20px';
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:24px;max-width:380px;width:100%">
     <div style="font-size:18px;font-weight:700;margin-bottom:10px">🔗 Пригласить в «${esc(space.name)}»</div>
-    <div style="font-size:13px;color:var(--t2);margin-bottom:12px">Отправь ссылку — человек сразу попадёт в этот кабинет</div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:12px">Отправь ссылку или дай отсканировать QR — человек получит приглашение с подтверждением</div>
+    <div id="share-qr-box" style="display:flex;justify-content:center;background:#fff;border-radius:var(--rsm);padding:14px;margin-bottom:10px"></div>
     <div style="background:var(--s2);border-radius:var(--rsm);padding:11px;font-size:12px;word-break:break-all;color:var(--accent);margin-bottom:10px">${link}</div>
     ${space.password?`<div style="font-size:13px;color:var(--t2);margin-bottom:12px">🔒 Пароль: <strong style="color:var(--t1)">${esc(space.password)}</strong></div>`:''}
     <div style="display:flex;gap:8px">
@@ -302,6 +303,10 @@ function showShareLink(space) {
     </div>
   </div>`;
   document.body.appendChild(div);
+  const qrBox = div.querySelector('#share-qr-box');
+  if(qrBox && typeof QRCode !== 'undefined') {
+    new QRCode(qrBox, { text: link, width: 180, height: 180, colorDark: '#0f0f0f', colorLight: '#ffffff' });
+  }
 }
 // ─── MEMBER SELECTOR ────────────────────────
 async function afterPasswordOrDirect(id) {
@@ -373,9 +378,48 @@ async function pickFromContacts() {
   } catch(e) { /* пользователь отменил выбор контакта */ }
 }
 
+function getKnownContacts(excludeSpaceId) {
+  const seen = new Map();
+  spaces.forEach(s => {
+    if(s.id === excludeSpaceId) return;
+    (s.members_auth||[]).forEach(m => {
+      if(m.user_id === currentUser?.id) return;
+      if(!seen.has(m.user_id)) seen.set(m.user_id, m.name);
+    });
+  });
+  return [...seen.entries()].map(([user_id,name])=>({user_id,name}));
+}
+
+function renderKnownContacts(spaceId) {
+  const box = document.getElementById('known-contacts-list');
+  if(!box) return;
+  const space = spaces.find(s=>s.id===spaceId);
+  const alreadyIn = new Set((space?.members_auth||[]).map(m=>m.user_id));
+  const alreadyInvited = new Set((space?.pendingInvites||[]).map(p=>p.user_id));
+  const known = getKnownContacts(spaceId).filter(c=>!alreadyIn.has(c.user_id) && !alreadyInvited.has(c.user_id));
+  box.innerHTML = known.length ? `<div style="font-size:12px;color:var(--t3);margin:10px 0 6px">Уже знакомые</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">
+      ${known.map(c=>`<button onclick="inviteKnownContact('${spaceId}','${c.user_id}','${esc(c.name)}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:6px 12px;font-size:13px;color:var(--t1);cursor:pointer">${esc(c.name)}</button>`).join('')}
+    </div>` : '';
+}
+
+async function inviteKnownContact(spaceId, userId, name) {
+  const space = spaces.find(s=>s.id===spaceId); if(!space) return;
+  const invitedBy = localStorage.getItem('mc_current_member') || currentUser?.display_name || 'Кто-то';
+  space.pendingInvites = [...(space.pendingInvites||[]), {user_id:userId, name, invitedBy, invitedAt:new Date().toISOString()}];
+  try {
+    await sb.from('spaces').update({pendingInvites: space.pendingInvites}).eq('id', spaceId);
+    localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+    if(typeof notifyUsers === 'function') await notifyUsers([userId], '👋 Приглашение в группу', `${invitedBy} зовёт тебя в «${space.name}»`);
+    renderKnownContacts(spaceId);
+    toast('✓ Приглашение отправлено ' + name);
+  } catch(e) { toast('Ошибка: '+e.message, true); }
+}
+
 function openManageMembers(id) {
   const btn = document.getElementById('contacts-pick-btn');
   if(btn) btn.style.display = ('contacts' in navigator && 'ContactsManager' in window) ? 'block' : 'none';
+  renderKnownContacts(id);
   managingSpaceId = id;
   const space = spaces.find(s=>s.id===id); if(!space) return;
   document.getElementById('manage-members-title').textContent = space.name + ' — Участники';
