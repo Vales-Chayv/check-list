@@ -62,7 +62,8 @@ spaces = Array.isArray(saved) ? saved : [];
             const {data:ownerProf} = await sb.from('profiles').select('display_name').eq('id', data.owner_id).single();
             inviterName = ownerProf?.display_name || 'Кто-то';
           } catch(e) {}
-          data.pendingInvites = [...(data.pendingInvites||[]), {user_id: currentUser.id, name: currentUser.display_name||'', invitedBy: inviterName, invitedAt: new Date().toISOString()}];
+          const asName = new URLSearchParams(window.location.search).get('as');
+          data.pendingInvites = [...(data.pendingInvites||[]), {user_id: currentUser.id, name: asName || currentUser.display_name||'', invitedBy: inviterName, invitedAt: new Date().toISOString()}];
           try { await sb.from('spaces').update({pendingInvites: data.pendingInvites}).eq('id', data.id); } catch(e) {}
         }
       }
@@ -493,8 +494,8 @@ async function searchUserByLoginOrPhone(query) {
   } catch(e) { return null; }
 }
 
-function offerInvite(query, space) {
-  const link = `${location.origin}${location.pathname}?space=${space.share_token}`;
+function offerInvite(query, space, contactName) {
+  const link = `${location.origin}${location.pathname}?space=${space.share_token}${contactName ? '&as=' + encodeURIComponent(contactName) : ''}`;
   const text = encodeURIComponent(`Присоединяйся к группе «${space.name}» в Моих карточках: ${link}`);
   const isPhone = /^\+?\d[\d\s\-()]{6,}$/.test(query);
   const div = document.createElement('div');
@@ -525,7 +526,7 @@ async function addMemberToSpace(overrideName) {
 
   inp.value = '';
 
-  if(!found) { offerInvite(query, space); return; }
+  if(!found) { offerInvite(query, space, overrideName); return; }
 
   // Если приглашали через выбор из телефонных контактов — берём имя, как оно записано у приглашающего,
   // а не display_name из аккаунта приглашённого (иначе путаница при совпадении имён)
