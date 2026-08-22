@@ -270,7 +270,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
     background: var(--s1); border-left: 1px solid var(--b1);
   }
   body.in-lobby.owns-group #lobby-panels { display: flex; }
- #lobby-panel-a { flex: 0 0 calc(var(--lobby-split-v) * 100%); min-height: 0; overflow-y: auto; padding: 14px 16px; display: flex; align-items: center; justify-content: center; color: var(--t3); font-size: 13px; }
+ #lobby-panel-a { flex: 0 0 calc(var(--lobby-split-v) * 100%); min-height: 0; overflow-y: auto; padding: 14px 16px; display: flex; align-items: stretch; justify-content: flex-start; color: var(--t3); font-size: 13px; }
   #lobby-panel-b { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px; }
   body.in-lobby.owns-group #lobby-h-handle {
     display: block; position: fixed; left: var(--split-left); right: 0;
