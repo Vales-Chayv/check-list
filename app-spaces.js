@@ -467,7 +467,6 @@ function openManageMembers(id) {
   managingSpaceId = id;
   const space = spaces.find(s=>s.id===id); if(!space) return;
   document.getElementById('manage-members-title').textContent = space.name + ' — Участники';
-  document.getElementById('manage-member-inp').value = '';
   renderManageMembersList();
   document.getElementById('manage-members-ov').classList.add('on');
 }
