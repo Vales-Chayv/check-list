@@ -640,8 +640,8 @@ function renderEventsFeedList(events) {
   const nowMs = Date.now();
   box.innerHTML = events.length ? events.map(ev => {
     const isNew = (nowMs - new Date(ev.created_at).getTime()) < 60000;
-    return `<div style="font-size:13px;padding:6px 4px;border-bottom:1px solid var(--b1);${isNew?'background:rgba(232,197,106,.15);border-radius:6px':''}">
-      <span>${eventIcon(ev.type)}</span> <strong>${esc(ev.actor_name||'')}</strong> ${esc(ev.description||'')}
+    return `<div style="display:block;width:100%;box-sizing:border-box;font-size:13px;padding:8px 6px;border-bottom:1px solid var(--b1);${isNew?'background:rgba(232,197,106,.15);border-radius:6px':''}">
+      <div style="display:flex;align-items:baseline;gap:4px;flex-wrap:wrap"><span>${eventIcon(ev.type)}</span> <strong>${esc(ev.actor_name||'')}</strong> <span>${esc(ev.description||'')}</span></div>
       <div style="color:var(--t3);font-size:11px;margin-top:2px">${esc(ev.space_name||'')} · ${new Date(ev.created_at).toLocaleString('ru',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>
     </div>`;
   }).join('') : '<div style="color:var(--t3);font-size:12px">Пока ничего не произошло</div>';
