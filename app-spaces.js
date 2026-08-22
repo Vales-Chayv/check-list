@@ -653,6 +653,44 @@ function setEventsFeedFilter(filter, btn) {
   loadEventsFeed();
 }
 
+function toggleClearEventsMenu(e) {
+  e.stopPropagation();
+  const menu = document.getElementById('clear-events-menu');
+  if(!menu) return;
+  if(menu.style.display === 'block') { menu.style.display = 'none'; return; }
+  const item = (label, onclick, danger) => `<div onclick="${onclick}" style="padding:9px 12px;font-size:13px;color:${danger?'var(--red)':'var(--t1)'};cursor:pointer;white-space:nowrap;border-radius:6px" onmouseover="this.style.background='var(--s1)'" onmouseout="this.style.background='transparent'">${label}</div>`;
+  menu.innerHTML =
+    item('За неделю', "clearEventsOlderThan(7)") +
+    item('За месяц', "clearEventsOlderThan(30)") +
+    item('За 3 месяца', "clearEventsOlderThan(90)") +
+    item('За год', "clearEventsOlderThan(365)") +
+    '<div style="height:1px;background:var(--b1);margin:4px 2px"></div>' +
+    item('🗑 Очистить всё', "clearEventsOlderThan(0)", true);
+  menu.style.display = 'block';
+  setTimeout(()=>document.addEventListener('click', function handler(ev){
+    if(!menu.contains(ev.target)) { menu.style.display='none'; document.removeEventListener('click', handler); }
+  }), 0);
+}
+
+async function clearEventsOlderThan(days) {
+  const ownedIds = (spaces||[]).filter(s=>(s.type==='family'||s.type==='group') && s.owner_id===currentUser?.id).map(s=>s.id);
+  if(!ownedIds.length) return;
+  const label = days===0 ? 'ВСЕ события без возможности восстановить' : `события старше указанного периода`;
+  if(!confirm(`Удалить ${label}?`)) return;
+  document.getElementById('clear-events-menu').style.display = 'none';
+  try {
+    let q = sb.from('group_events').delete().in('space_id', ownedIds);
+    if(days > 0) {
+      const cutoff = new Date(Date.now() - days*24*60*60*1000).toISOString();
+      q = q.lt('created_at', cutoff);
+    }
+    const { error } = await q;
+    if(error) throw error;
+    toast('✓ События удалены');
+    loadEventsFeed();
+  } catch(e) { toast('Ошибка: '+e.message, true); }
+}
+
 // ── Presence «подглядыванием» для дашборда владельца — сразу по всем моим группам ──
 let ownerPresenceChannels = new Map(); // spaceId -> channel
 

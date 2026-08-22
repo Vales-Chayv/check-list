@@ -461,8 +461,12 @@
   <button id="desktop-calc-toggle" onclick="toggleDesktopCalc()">🧮 Калькулятор</button>
 </div>
 <div id="lobby-panels">
-  <div id="lobby-panel-a" style="display:flex;flex-direction:column;width:100%;box-sizing:border-box">
-    <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;width:100%">🗓️ События</div>
+   <div id="lobby-panel-a" style="display:flex;flex-direction:column;width:100%;box-sizing:border-box;align-self:flex-start;position:relative">
+    <div style="display:flex;align-items:center;justify-content:space-between;width:100%;margin-bottom:8px">
+      <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em">🗓️ События</div>
+      <button onclick="toggleClearEventsMenu(event)" title="Очистить события" style="background:none;border:none;color:var(--t3);font-size:15px;cursor:pointer;padding:2px 6px;line-height:1">🗑</button>
+    </div>
+    <div id="clear-events-menu" style="display:none;position:absolute;top:28px;right:0;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:6px;z-index:60;box-shadow:0 6px 24px rgba(0,0,0,.5);min-width:170px"></div>
     <div style="display:flex;flex-direction:row;gap:6px;margin-bottom:10px;width:100%;box-sizing:border-box">
       <button class="events-filter-btn" onclick="setEventsFeedFilter('today',this)" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:8px;padding:6px;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">Сегодня</button>
       <button class="events-filter-btn" onclick="setEventsFeedFilter('week',this)" style="flex:1;background:transparent;border:1px solid var(--b1);color:var(--t2);border-radius:8px;padding:6px;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">Неделя</button>
