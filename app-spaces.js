@@ -625,7 +625,7 @@ async function loadEventsFeed() {
   if(eventsFeedFilter==='today') since = new Date(now.getFullYear(),now.getMonth(),now.getDate()).toISOString();
   else if(eventsFeedFilter==='week') since = new Date(now.getTime()-7*24*60*60*1000).toISOString();
   try {
-    let q = sb.from('events').select('*').in('space_id', ownedIds).order('created_at',{ascending:false}).limit(100);
+    let q = sb.from('group_events').select('*').in('space_id', ownedIds).order('created_at',{ascending:false}).limit(100);
     if(since) q = q.gte('created_at', since);
     const {data, error} = await q;
     if(error) throw error;
