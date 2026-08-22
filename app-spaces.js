@@ -477,8 +477,7 @@ async function pickFromContacts() {
     const phone = (c.tel && c.tel[0]) ? c.tel[0].replace(/[^\d+]/g,'') : '';
     if(!phone) { toast('У выбранного контакта нет номера телефона', true); return; }
     const contactName = (c.name && c.name[0]) ? c.name[0] : '';
-    document.getElementById('manage-member-inp').value = phone;
-    addMemberToSpace(contactName);
+    addMemberToSpace(phone, contactName);
   } catch(e) { /* пользователь отменил выбор контакта */ }
 }
 
@@ -575,20 +574,17 @@ function offerInvite(query, space, contactName) {
   document.body.appendChild(div);
 }
 
-async function addMemberToSpace(overrideName) {
-  const inp = document.getElementById('manage-member-inp'); // логин или телефон
-  const query = inp.value.trim(); if(!query) return;
+async function addMemberToSpace(query, overrideName) {
+  query = (query||'').trim(); if(!query) return;
   const space = spaces.find(s=>s.id===managingSpaceId); if(!space) return;
 
   const found = await searchUserByLoginOrPhone(query);
   const alreadyMember = (space.members||[]).find(m=>found ? m.user_id===found.id : m.name===query);
   const alreadyPending = (space.pendingInvites||[]).find(p=>found && p.user_id===found.id);
-  if(alreadyMember) { toast('Участник уже есть', true); inp.value=''; return; }
-  if(alreadyPending) { toast('Приглашение уже отправлено', true); inp.value=''; return; }
+  if(alreadyMember) { toast('Участник уже есть', true); return; }
+  if(alreadyPending) { toast('Приглашение уже отправлено', true); return; }
 
-  inp.value = '';
-
-  if(!found) { offerInvite(query, space, overrideName); return; }
+  if(!found) { offerInvite(query, space); return; }
 
   // Если приглашали через выбор из телефонных контактов — берём имя, как оно записано у приглашающего,
   // а не display_name из аккаунта приглашённого (иначе путаница при совпадении имён)
