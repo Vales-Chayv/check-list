@@ -316,8 +316,11 @@ async function viewToggleEntry(cardId, entryId) {
     card.status='done';
     card.history=[...(card.history||[]),{date:nowStr(),text:'Все записи выполнены → Готово',type:'status'}];
   }
-  render(); openView(cardId);
+   render(); openView(cardId);
   try{await dbUpdate(card);}catch(err){toast('Ошибка синхронизации',true);}
+  if(e.done && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof logEvent==='function') {
+    logEvent(currentSpaceId, currentSpace?.name, 'task_done', `выполнил(а) «${e.text||card.title}»`, cardId);
+  }
   maybeOfferReset(cardId, e.done);
 }
 
@@ -1151,6 +1154,9 @@ async function toggleMyCompletion(cardId, entryId, memberName) {
   entry.done = entry.completions.every(c=>c.done);
   render(); openView(cardId);
   try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
+  if(comp.done && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof logEvent==='function') {
+    logEvent(currentSpaceId, currentSpace?.name, 'task_done', `выполнил(а) «${entry.text||card.title}»`, cardId, memberName);
+  }
 }
 function aeToggleAssign(btn, val, event) {
   event.stopPropagation();

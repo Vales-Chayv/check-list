@@ -24,7 +24,8 @@ async function quickCreateChat(){
   cards.unshift(card);
   render();
   toast('✓ Чат создан');
-  await dbInsert(card);
+    await dbInsert(card);
+  if(typeof logEvent === 'function') logEvent(currentSpaceId, currentSpace?.name, 'chat_created', `создал(а) чат «${title.trim()}»`, card.id);
   openView(card.id);
 }
 
@@ -135,8 +136,9 @@ async function actuallyCloseChat(cardId) {
   const closedBody = `«${card.title}» закрыт и перемещён в архив`;
   showChatNotice(closedTitle, closedBody, cardId);
   // Уведомляем через push только тех, у кого есть привязанный аккаунт (members_auth), т.к. push идёт по user_id
-  const authIds = (currentSpace?.members_auth||[]).map(m=>m.user_id).filter(Boolean);
+   const authIds = (currentSpace?.members_auth||[]).map(m=>m.user_id).filter(Boolean);
   if(authIds.length) await notifyUsers(authIds, closedTitle, closedBody);
+  if(typeof logEvent === 'function') logEvent(currentSpaceId, currentSpace?.name, 'chat_closed', `закрыл(а) чат «${card.title}»`, cardId);
   toast('✓ Чат закрыт');
 }
 

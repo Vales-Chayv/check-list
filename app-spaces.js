@@ -143,6 +143,7 @@ async function leaveGroup(spaceId) {
     localStorage.setItem('mc_spaces', JSON.stringify(spaces));
     renderSpacesList();
     if(space.owner_id && typeof notifyUsers==='function') await notifyUsers([space.owner_id], '🚪 Участник вышел из группы', `${myName||'Участник'} покинул(а) «${space.name}»`);
+    if(typeof logEvent === 'function') logEvent(spaceId, space.name, 'member_left', 'покинул(а) группу', null, myName);
     toast('Ты вышел(ла) из группы');
   } catch(e) { toast('Ошибка: '+e.message, true); }
 }
@@ -152,8 +153,9 @@ function renderSpacesList() {
   const ownsGroup = (spaces||[]).some(s => (s.type==='family'||s.type==='group') && s.owner_id === currentUser?.id);
   document.body.classList.toggle('owns-group', ownsGroup);
   if(ownsGroup && typeof renderLobbyPanelB === 'function') renderLobbyPanelB();
-  if(ownsGroup && typeof subscribeOwnerPresence === 'function') subscribeOwnerPresence();
+   if(ownsGroup && typeof subscribeOwnerPresence === 'function') subscribeOwnerPresence();
   else if(typeof unsubscribeOwnerPresence === 'function') unsubscribeOwnerPresence();
+  if(ownsGroup && typeof loadEventsFeed === 'function') loadEventsFeed();
   const list = document.getElementById('spaces-list');
   const active = spaces.filter(s=>s.status!=='closed').sort((a,b) => {
     const aInvite = (a.pendingInvites||[]).some(p=>p.user_id===currentUser?.id) ? 1 : 0;
@@ -172,9 +174,10 @@ async function closeGroupSpace(id) {
   try { await sb.from('spaces').update({status:'closed'}).eq('id', id); } catch(e) {}
   localStorage.setItem('mc_spaces', JSON.stringify(spaces));
   renderSpacesList();
-  const closedTitle = '🔒 Группа закрыта';
+    const closedTitle = '🔒 Группа закрыта';
   const closedBody = `«${space.name}» закрыта и перемещена в архив`;
   if(typeof showChatNotice === 'function') showChatNotice(closedTitle, closedBody, null);
+  if(typeof logEvent === 'function') logEvent(id, space.name, 'group_closed', 'закрыл(а) группу', null);
   const authIds = (space.members_auth||[]).map(m=>m.user_id).filter(Boolean);
   if(authIds.length && typeof notifyUsers === 'function') await notifyUsers(authIds, closedTitle, closedBody);
   toast('✓ Группа закрыта');
@@ -551,8 +554,9 @@ async function acceptGroupInvite(spaceId) {
   space.pendingInvites = (space.pendingInvites||[]).filter(p=>p.user_id!==currentUser.id);
   try {
     await sb.from('spaces').update({members: space.members, members_auth: space.members_auth, pendingInvites: space.pendingInvites}).eq('id', spaceId);
-    localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+       localStorage.setItem('mc_spaces', JSON.stringify(spaces));
     renderSpacesList();
+    if(typeof logEvent === 'function') logEvent(spaceId, space.name, 'member_joined', 'присоединился(лась) к группе', null, invite.name);
     toast('✓ Ты в группе «' + space.name + '»');
   } catch(e) { toast('Ошибка: '+e.message, true); }
 }
@@ -607,6 +611,46 @@ function updateMyPresenceCard(cardId, cardTitle) {
   if(!presenceChannel) return;
   const myName = localStorage.getItem('mc_current_member') || '';
   presenceChannel.track(cardId ? { name: myName, cardId, cardTitle } : { name: myName });
+}
+
+// ── Лента событий («Сегодня / Неделя / Всё время») для владельца групп ──
+let eventsFeedFilter = 'today';
+async function loadEventsFeed() {
+  const box = document.getElementById('events-feed-list');
+  if(!box) return;
+  const ownedIds = (spaces||[]).filter(s=>(s.type==='family'||s.type==='group') && s.owner_id===currentUser?.id).map(s=>s.id);
+  if(!ownedIds.length) { box.innerHTML = '<div style="color:var(--t3);font-size:12px">Нет групп</div>'; return; }
+  let since = null;
+  const now = new Date();
+  if(eventsFeedFilter==='today') since = new Date(now.getFullYear(),now.getMonth(),now.getDate()).toISOString();
+  else if(eventsFeedFilter==='week') since = new Date(now.getTime()-7*24*60*60*1000).toISOString();
+  try {
+    let q = sb.from('events').select('*').in('space_id', ownedIds).order('created_at',{ascending:false}).limit(100);
+    if(since) q = q.gte('created_at', since);
+    const {data, error} = await q;
+    if(error) throw error;
+    renderEventsFeedList(data||[]);
+  } catch(e) { box.innerHTML = '<div style="color:var(--t3);font-size:12px">Ошибка загрузки</div>'; }
+}
+function eventIcon(type) {
+  return {task_done:'✅', member_left:'🚪', member_joined:'👋', chat_created:'💬', chat_closed:'🔒', group_closed:'🔒'}[type] || '•';
+}
+function renderEventsFeedList(events) {
+  const box = document.getElementById('events-feed-list'); if(!box) return;
+  const nowMs = Date.now();
+  box.innerHTML = events.length ? events.map(ev => {
+    const isNew = (nowMs - new Date(ev.created_at).getTime()) < 60000;
+    return `<div style="font-size:13px;padding:6px 4px;border-bottom:1px solid var(--b1);${isNew?'background:rgba(232,197,106,.15);border-radius:6px':''}">
+      <span>${eventIcon(ev.type)}</span> <strong>${esc(ev.actor_name||'')}</strong> ${esc(ev.description||'')}
+      <div style="color:var(--t3);font-size:11px;margin-top:2px">${esc(ev.space_name||'')} · ${new Date(ev.created_at).toLocaleString('ru',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>
+    </div>`;
+  }).join('') : '<div style="color:var(--t3);font-size:12px">Пока ничего не произошло</div>';
+}
+function setEventsFeedFilter(filter, btn) {
+  eventsFeedFilter = filter;
+  document.querySelectorAll('.events-filter-btn').forEach(b=>{ b.style.background='transparent'; b.style.color='var(--t2)'; });
+  if(btn) { btn.style.background='var(--accent)'; btn.style.color='#0f0f0f'; }
+  loadEventsFeed();
 }
 
 // ── Presence «подглядыванием» для дашборда владельца — сразу по всем моим группам ──

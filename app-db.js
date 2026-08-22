@@ -332,6 +332,13 @@ function handleRealtimeSpace(payload) {
   }
 }
 
+async function logEvent(spaceId, spaceName, type, description, cardId, actorNameOverride) {
+  try {
+    const actor_name = actorNameOverride || localStorage.getItem('mc_current_member') || currentUser?.display_name || '';
+    await sb.from('events').insert({ space_id: spaceId, space_name: spaceName, type, actor_name, description, card_id: cardId || null });
+  } catch(e) { console.log('logEvent error:', e.message); }
+}
+
 function handleRealtimeCard(payload) {
   const { eventType, new: n, old: o } = payload;
   if(eventType === 'INSERT') {
