@@ -4,6 +4,62 @@
 let spaces = [], currentSpaceId = null, currentSpace = null;
 let pendingSpaceId = null;
 let presenceChannel = null;
+let memberAliases = {}; // "spaceId||userId" -> личное имя, видно только текущему пользователю
+
+async function loadMemberAliases() {
+  if(!currentUser?.id) return;
+  try {
+    const {data, error} = await sb.from('member_aliases').select('*').eq('viewer_user_id', currentUser.id);
+    if(error) throw error;
+    memberAliases = {};
+    (data||[]).forEach(row => { memberAliases[row.space_id+'||'+row.target_user_id] = row.alias; });
+  } catch(e) { console.log('loadMemberAliases error:', e.message); }
+}
+function getDisplayName(spaceId, userId, fallbackName) {
+  return memberAliases[spaceId+'||'+userId] || fallbackName;
+}
+function openEditMemberAlias(spaceId, userId, officialName) {
+  const current = memberAliases[spaceId+'||'+userId] || '';
+  const div = document.createElement('div');
+  div.id = 'edit-alias-ov';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1002;display:flex;align-items:center;justify-content:center;padding:20px';
+  div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;max-width:340px;width:100%">
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">Личное имя для «${esc(officialName)}»</div>
+    <div style="font-size:12px;color:var(--t3);margin-bottom:12px">Видно только вам, на всех ваших устройствах</div>
+    <input id="alias-inp" value="${esc(current)}" placeholder="${esc(officialName)}" dir="auto" style="width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px;font-size:14px;color:var(--t1);font-family:inherit;box-sizing:border-box;margin-bottom:10px">
+    ${('contacts' in navigator && 'ContactsManager' in window) ? `<button onclick="pickContactNameForAlias()" style="width:100%;background:var(--s2);border:1px solid var(--b1);color:var(--accent);border-radius:var(--rsm);padding:9px;font-size:13px;cursor:pointer;margin-bottom:10px;font-family:inherit">📱 Взять имя из контактов</button>` : ''}
+    <div style="display:flex;gap:8px">
+      ${current ? `<button onclick="saveMemberAlias('${spaceId}','${userId}','')" style="flex:1;background:none;border:1px solid var(--red);color:var(--red);border-radius:var(--rsm);padding:10px;font-size:13px;cursor:pointer;font-family:inherit">Сбросить</button>` : ''}
+      <button onclick="document.getElementById('edit-alias-ov').remove()" style="flex:1;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:10px;font-size:13px;cursor:pointer;font-family:inherit">Отмена</button>
+      <button onclick="saveMemberAlias('${spaceId}','${userId}',document.getElementById('alias-inp').value.trim())" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Сохранить</button>
+    </div>
+  </div>`;
+  document.body.appendChild(div);
+  setTimeout(()=>document.getElementById('alias-inp')?.focus(), 100);
+}
+async function pickContactNameForAlias() {
+  try {
+    const contacts = await navigator.contacts.select(['name'], {multiple:false});
+    if(!contacts.length) return;
+    const n = (contacts[0].name && contacts[0].name[0]) ? contacts[0].name[0] : '';
+    if(n) document.getElementById('alias-inp').value = n;
+  } catch(e) {}
+}
+async function saveMemberAlias(spaceId, userId, alias) {
+  const key = spaceId+'||'+userId;
+  try {
+    if(!alias) {
+      await sb.from('member_aliases').delete().eq('space_id', spaceId).eq('viewer_user_id', currentUser.id).eq('target_user_id', userId);
+      delete memberAliases[key];
+    } else {
+      await sb.from('member_aliases').upsert({space_id: spaceId, viewer_user_id: currentUser.id, target_user_id: userId, alias, updated_at: new Date().toISOString()}, {onConflict:'space_id,viewer_user_id,target_user_id'});
+      memberAliases[key] = alias;
+    }
+    document.getElementById('edit-alias-ov')?.remove();
+    renderManageMembersList();
+    toast('✓ Сохранено');
+  } catch(e) { toast('Ошибка: '+e.message, true); }
+}
 // ─── INIT ───────────────────────────────────
 async function initSpaces() {
   const urlToken = new URLSearchParams(window.location.search).get('space');
@@ -35,8 +91,9 @@ spaces = Array.isArray(saved) ? saved : [];
     showSpaceSelector();
     return;
   }
-  localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+   localStorage.setItem('mc_spaces', JSON.stringify(spaces));
   if(typeof subscribeRealtimeSpaces === 'function') subscribeRealtimeSpaces();
+  if(typeof loadMemberAliases === 'function') loadMemberAliases();
    // Handle invite link — теперь тоже через приглашение с подтверждением, не тихое вступление
   if(urlToken) {
     try {
@@ -479,12 +536,17 @@ function renderManageMembersList() {
   const el = document.getElementById('manage-members-list');
   const members = space.members||[];
   if(!members.length) { el.innerHTML = '<div style="font-size:14px;color:var(--t3)">Нет участников</div>'; return; }
-  el.innerHTML = members.map(m =>
-    `<div style="display:flex;align-items:center;justify-content:space-between;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:11px 14px">
-      <span style="font-size:15px">${esc(m.name)}</span>
-      <button onclick="removeMemberFromSpace('${esc(m.name)}')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:18px;padding:0 4px">✕</button>
-    </div>`
-  ).join('');
+  el.innerHTML = members.map(m => {
+    const shown = m.user_id ? getDisplayName(managingSpaceId, m.user_id, m.name) : m.name;
+    const hasAlias = m.user_id && memberAliases[managingSpaceId+'||'+m.user_id];
+    return `<div style="display:flex;align-items:center;justify-content:space-between;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:11px 14px">
+      <span style="font-size:15px">${esc(shown)}${hasAlias?` <span style="color:var(--t3);font-size:11px">(${esc(m.name)})</span>`:''}</span>
+      <div style="display:flex;align-items:center;gap:10px">
+        ${m.user_id && m.user_id!==currentUser?.id ? `<button onclick="openEditMemberAlias('${managingSpaceId}','${m.user_id}','${esc(m.name)}')" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:15px;padding:0">✏️</button>` : ''}
+        <button onclick="removeMemberFromSpace('${esc(m.name)}')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:18px;padding:0 4px">✕</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 async function searchUserByLoginOrPhone(query) {
   const q = query.trim(); if(!q) return null;
