@@ -92,6 +92,13 @@ function openView(id) {
       if(!e.text) return '';
       const col = textColor||'var(--t1)';
 	  const borderCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t2)';
+// Личное имя участника (alias), если задано — иначе официальное «Имя Фамилия»
+function aliasedName(name) {
+  if(!name || typeof getDisplayName !== 'function' || !currentSpace) return name;
+  const m = (currentSpace.members||[]).find(mm=>mm.name===name);
+  return m?.user_id ? getDisplayName(currentSpaceId, m.user_id, name) : name;
+}
+
 const doneCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--green)';
 const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
       const myName = (localStorage.getItem('mc_current_member')||'').toLowerCase();
@@ -109,7 +116,7 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
       // Circles for completions (read-only, shown on click)
       const circlesHTML = isAll ? `
         <div id="comp_${e.id}" style="display:none;flex-direction:row;gap:3px;align-items:center;margin-left:4px">
-          ${e.completions.map(c=>`<div style="width:18px;height:18px;border-radius:50%;background:${c.done?'rgba(0,0,0,.45)':'rgba(0,0,0,.08)'};border:${c.done?'none':'1px dashed rgba(0,0,0,.25)'};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:${c.done?'white':'rgba(0,0,0,.4)'}" title="${esc(c.name)}">${esc(c.name.slice(0,1).toUpperCase())}</div>`).join('')}
+          ${e.completions.map(c=>{const dn=aliasedName(c.name);return `<div style="width:18px;height:18px;border-radius:50%;background:${c.done?'rgba(0,0,0,.45)':'rgba(0,0,0,.08)'};border:${c.done?'none':'1px dashed rgba(0,0,0,.25)'};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:${c.done?'white':'rgba(0,0,0,.4)'}" title="${esc(dn)}">${esc(dn.slice(0,1).toUpperCase())}</div>`}).join('')}
         </div>` : '';
 
      const isLocked = card.chatStatus === 'closed' || currentSpace?.status === 'closed';
@@ -131,7 +138,7 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
               <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                 <div style="font-size:10px;color:${dateCol};margin-top:1px">${e.date}</div>
-                ${e.assigned_to&&e.assigned_to!=='all'?`<span style="font-size:10px;color:${dateCol};font-weight:600">👤 ${esc(e.assigned_to)}</span>`:e.assigned_to==='all'?`<span style="font-size:10px;color:${dateCol}">👥 Для всех</span>`:''}
+                ${e.assigned_to&&e.assigned_to!=='all'?`<span style="font-size:10px;color:${dateCol};font-weight:600">👤 ${esc(aliasedName(e.assigned_to))}</span>`:e.assigned_to==='all'?`<span style="font-size:10px;color:${dateCol}">👥 Для всех</span>`:''}
                 ${isAll?`<div style="display:flex;align-items:center;gap:3px"><span onclick="toggleCompletions('${e.id}')" style="font-size:11px;font-weight:700;color:${col};cursor:pointer;background:${borderCol}22;border-radius:10px;padding:1px 6px">${doneCount}/${e.completions.length}</span>${circlesHTML}</div>`:''}
               </div>
               ${eDl?`<span style="font-size:10px;opacity:.7">⏰ ${eDl.text}</span>`:''}
@@ -180,7 +187,7 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
            ${hasFiles?`<div id="${stkId}_peek" style="position:absolute;bottom:-5px;left:-5px;right:8px;height:90%;background:${bottomColor};border-radius:10px;transform:rotate(1.2deg);z-index:0"></div>`:''}
           <div style="position:relative;z-index:1;background:linear-gradient(${hex2rgba(memberColor,.7)},${hex2rgba(memberColor,.7)}),#eaeaea;border-radius:10px;padding:14px 14px 16px;box-shadow:2px 3px 10px rgba(0,0,0,.3)">
             <div style="position:absolute;top:-16px;${isMe?'left:14px':'right:14px'};transform:rotate(${isMe?'-12':'12'}deg);filter:drop-shadow(1px 1px 3px rgba(0,0,0,.4))"><svg width="20" height="32" viewBox="0 0 20 32" fill="none"><path d="M10 1C6.1 1 3 4.1 3 8v14c0 3.9 3.1 7 7 7s7-3.1 7-7V6h-2.5v16c0 2.5-2 4.5-4.5 4.5S5.5 24.5 5.5 22V8c0-1.9 1.6-3.5 3.5-3.5S12.5 6.1 12.5 8v14h2.5V8c0-3.9-3.1-7-7-7z" fill="${clipColor}"/></svg></div>
-            <div style="font-size:12px;font-weight:700;color:rgba(0,0,0,.7);margin-bottom:6px;margin-top:8px">${creator?esc(creator):'?'}</div>
+            <div style="font-size:12px;font-weight:700;color:rgba(0,0,0,.7);margin-bottom:6px;margin-top:8px">${creator?esc(aliasedName(creator)):'?'}</div>
 <div style="font-size:10px;color:rgba(0,0,0,.45);margin-bottom:4px">${s.date}</div>
             ${s.note?`<div style="font-size:13px;color:rgba(0,0,0,.75);margin-bottom:8px;font-style:italic;line-height:1.5;word-break:break-word;white-space:pre-wrap" dir="auto">${esc(s.note)}</div>`:''}
             ${s.entries.map(e=>entryRowHTML(e,'rgba(0,0,0,0.75)')).join('')}
@@ -872,7 +879,7 @@ function renderMoveAssignBlock(targetSpace, chatParticipants) {
     <div style="display:flex;flex-wrap:wrap;gap:4px">
       <button type="button" class="move-assign-btn on" data-val="" onclick="moveToggleAssign(this,'',event)" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:var(--accent);color:#0f0f0f;cursor:pointer">👤 Никому</button>
       <button type="button" class="move-assign-btn" data-val="all" onclick="moveToggleAssign(this,'all',event)" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:transparent;color:var(--t2);cursor:pointer">👥 Все</button>
-      ${pool.map(name=>`<button type="button" class="move-assign-btn" data-val="${esc(name)}" onclick="moveToggleAssign(this,'${esc(name)}',event)" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:transparent;color:var(--t2);cursor:pointer">${esc(name)}</button>`).join('')}
+      ${pool.map(name=>`<button type="button" class="move-assign-btn" data-val="${esc(name)}" onclick="moveToggleAssign(this,'${esc(name)}',event)" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:transparent;color:var(--t2);cursor:pointer">${esc(aliasedName(name))}</button>`).join('')}
     </div>
   </div>`;
   block.dataset.pool = JSON.stringify(pool);
