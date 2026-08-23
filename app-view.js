@@ -1,3 +1,10 @@
+
+// Личное имя участника (alias), если задано — иначе официальное «Имя Фамилия»
+function aliasedName(name) {
+  if(!name || typeof getDisplayName !== 'function' || !currentSpace) return name;
+  const m = (currentSpace.members||[]).find(mm=>mm.name===name);
+  return m?.user_id ? getDisplayName(currentSpaceId, m.user_id, name) : name;
+}
 // ═══════════════════════════════════════════
 //  VIEW MODAL
 // ═══════════════════════════════════════════
@@ -92,12 +99,6 @@ function openView(id) {
       if(!e.text) return '';
       const col = textColor||'var(--t1)';
 	  const borderCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t2)';
-// Личное имя участника (alias), если задано — иначе официальное «Имя Фамилия»
-function aliasedName(name) {
-  if(!name || typeof getDisplayName !== 'function' || !currentSpace) return name;
-  const m = (currentSpace.members||[]).find(mm=>mm.name===name);
-  return m?.user_id ? getDisplayName(currentSpaceId, m.user_id, name) : name;
-}
 
 const doneCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--green)';
 const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
