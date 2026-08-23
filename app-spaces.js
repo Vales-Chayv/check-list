@@ -347,6 +347,7 @@ function showCreatedSpacePopup(spaceName, invitedNames) {
 async function createSpace() {
   const name = document.getElementById('new-space-name').value.trim(); if(!name) return;
   const type = document.getElementById('new-space-type').value;
+  if(type==='family' && !currentUser?.phone) { openPhoneRequiredModal(()=>createSpace()); return; }
   const pwd  = document.getElementById('new-space-pwd').value.trim() || null;
   const id   = 'sp_' + uid();
   const share_token = uid().slice(0,12);
@@ -474,7 +475,7 @@ async function pickFromContacts() {
     const contacts = await navigator.contacts.select(['name','tel'], {multiple:false});
     if(!contacts.length) return;
     const c = contacts[0];
-    const phone = (c.tel && c.tel[0]) ? c.tel[0].replace(/[^\d+]/g,'') : '';
+    const phone = (c.tel && c.tel[0]) ? normalizePhone(c.tel[0]) : '';
     if(!phone) { toast('У выбранного контакта нет номера телефона', true); return; }
     const contactName = (c.name && c.name[0]) ? c.name[0] : '';
     addMemberToSpace(phone, contactName);
@@ -549,10 +550,45 @@ function renderManageMembersList() {
 }
 async function searchUserByLoginOrPhone(query) {
   const q = query.trim(); if(!q) return null;
+  const qPhone = normalizePhone(q);
   try {
-    const { data } = await sb.from('profiles').select('id,display_name,login,phone,email').or(`login.eq.${q},phone.eq.${q}`).maybeSingle();
+    const { data } = await sb.from('profiles').select('id,display_name,login,phone,email').or(`login.eq.${q},phone.eq.${qPhone}`).maybeSingle();
     return data;
   } catch(e) { return null; }
+}
+
+function openPhoneRequiredModal(onSaved) {
+  window._phoneRequiredCallback = onSaved;
+  const div = document.createElement('div');
+  div.id = 'phone-required-ov';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1002;display:flex;align-items:center;justify-content:center;padding:20px';
+  div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:22px;max-width:360px;width:100%">
+    <div style="font-size:16px;font-weight:700;margin-bottom:8px">📱 Нужен номер телефона</div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:14px">Для групповых кабинетов нужен телефон — по нему тебя смогут находить и приглашать другие участники.</div>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <span style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 12px;font-size:14px;color:var(--t2)">+972</span>
+      <input id="phone-required-inp" type="tel" placeholder="501234567" dir="ltr" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px;font-size:14px;color:var(--t1);font-family:inherit;box-sizing:border-box">
+    </div>
+    <div id="phone-required-err" style="color:var(--red);font-size:12px;margin-bottom:10px;min-height:14px"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('phone-required-ov').remove()" style="flex:1;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:10px;font-size:13px;cursor:pointer;font-family:inherit">Отмена</button>
+      <button onclick="savePhoneAndContinue()" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Сохранить</button>
+    </div>
+  </div>`;
+  document.body.appendChild(div);
+  setTimeout(()=>document.getElementById('phone-required-inp')?.focus(), 100);
+}
+async function savePhoneAndContinue() {
+  const normalized = normalizePhone(document.getElementById('phone-required-inp').value.trim());
+  if(!normalized) { document.getElementById('phone-required-err').textContent = 'Введи номер телефона'; return; }
+  try {
+    await sb.from('profiles').update({phone: normalized}).eq('id', currentUser.id);
+    currentUser.phone = normalized;
+    document.getElementById('phone-required-ov')?.remove();
+    toast('✓ Телефон сохранён');
+    const cb = window._phoneRequiredCallback; window._phoneRequiredCallback = null;
+    if(typeof cb === 'function') cb();
+  } catch(e) { document.getElementById('phone-required-err').textContent = 'Ошибка: '+e.message; }
 }
 
 function offerInvite(query, space, contactName) {
@@ -603,6 +639,7 @@ async function addMemberToSpace(query, overrideName) {
 
 async function acceptGroupInvite(spaceId) {
   const space = spaces.find(s=>s.id===spaceId); if(!space) return;
+  if(!currentUser?.phone) { openPhoneRequiredModal(()=>acceptGroupInvite(spaceId)); return; }
   const invite = (space.pendingInvites||[]).find(p=>p.user_id===currentUser?.id); if(!invite) return;
   const memberColors = ['#e8a83a','#5b9ee8','#a07de8','#5bb87a','#e85bb0','#5bc8e8','#e86060','#c8e85b'];
   const usedColors = (space.members||[]).map(m=>m.color);

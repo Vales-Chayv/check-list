@@ -3,6 +3,16 @@
 // ═══════════════════════════════════════════
 let currentUser = null;
 
+// Нормализация номера: убирает +972 или ведущий 0, чтобы 0501234567 и +972501234567
+// сравнивались как одно и то же значимое число ("501234567")
+function normalizePhone(raw) {
+  let p = (raw||'').replace(/[^\d+]/g,'');
+  if(p.startsWith('+972')) p = p.slice(4);
+  else if(p.startsWith('972')) p = p.slice(3);
+  else if(p.startsWith('0')) p = p.slice(1);
+  return p;
+}
+
 async function initAuth() {
   // Офлайн режим — используем сохранённые данные
   if(!navigator.onLine) {
@@ -23,10 +33,11 @@ async function initAuth() {
     currentUser = session.user;
     // Load display name from profiles
     try {
-      const {data} = await sb.from('profiles').select('display_name,login').eq('id', session.user.id).single();
+           const {data} = await sb.from('profiles').select('display_name,login,phone').eq('id', session.user.id).single();
       if(data) {
         currentUser.display_name = data.display_name;
         currentUser.login = data.login;
+        currentUser.phone = data.phone;
       }
     } catch(e) {}
     if(!currentUser.display_name) currentUser.display_name = localStorage.getItem('mc_display_name') || '';
@@ -73,6 +84,7 @@ async function doRegister() {
   const firstName = document.getElementById('auth-name').value.trim();
   const surname    = document.getElementById('auth-surname').value.trim();
   const name       = surname ? `${firstName} ${surname}` : firstName;
+  const phone      = normalizePhone(document.getElementById('auth-phone').value.trim());
   const login    = document.getElementById('auth-login').value.trim().toLowerCase().replace(/\s+/g,'_');
   const pwd      = document.getElementById('auth-pwd').value;
   const pwd2     = document.getElementById('auth-pwd2').value;
@@ -101,11 +113,12 @@ async function doRegister() {
     if(error) throw error;
 
     // Save profile with login and email
-    await sb.from('profiles').insert({
+      await sb.from('profiles').insert({
       id: data.user.id,
       display_name: name,
       login: login,
-      email: email
+      email: email,
+      phone: phone || null
     });
 
     currentUser = data.user;
@@ -139,7 +152,7 @@ async function doLoginAuth() {
 
   try {
     // Find email by login
-    const {data:profile, error:pe} = await sb.from('profiles').select('email,display_name').eq('login', login).maybeSingle();
+       const {data:profile, error:pe} = await sb.from('profiles').select('email,display_name,phone').eq('login', login).maybeSingle();
     if(pe || !profile) { authShowErr('auth-log-err','❌ Логин не найден'); btn.disabled=false; btn.textContent='Войти'; return; }
 
     const {data, error} = await sb.auth.signInWithPassword({email: profile.email, password: pwd});
@@ -148,6 +161,7 @@ async function doLoginAuth() {
     currentUser = data.user;
     currentUser.display_name = profile.display_name;
     currentUser.login = login;
+    currentUser.phone = profile.phone;
 
     if(remember) {
       localStorage.setItem('mc_login',        login);
