@@ -18,6 +18,48 @@ async function loadMemberAliases() {
 function getDisplayName(spaceId, userId, fallbackName) {
   return memberAliases[userId] || fallbackName;
 }
+
+function offerAliasMatch(userId, contactName, officialName) {
+  return new Promise(resolve => {
+    if(!userId || !contactName || contactName===officialName) return resolve();
+    if(memberAliases[userId] === contactName) return resolve(); // уже так и показывается
+    const div = document.createElement('div');
+    div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1003;display:flex;align-items:center;justify-content:center;padding:20px';
+    div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;max-width:340px;width:100%">
+      <div style="font-size:15px;font-weight:700;margin-bottom:8px">📇 Найдено совпадение</div>
+      <div style="font-size:13px;color:var(--t2);margin-bottom:16px">«${esc(officialName)}» есть у вас в контактах как «${esc(contactName)}». Показывать его вам под этим именем?</div>
+      <div style="display:flex;gap:8px">
+        <button id="alias-match-no" style="flex:1;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:10px;font-size:13px;cursor:pointer;font-family:inherit">Нет</button>
+        <button id="alias-match-yes" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Да, показывать так</button>
+      </div>
+    </div>`;
+    document.body.appendChild(div);
+    div.querySelector('#alias-match-no').onclick = () => { div.remove(); resolve(); };
+    div.querySelector('#alias-match-yes').onclick = async () => {
+      await saveMemberAlias(null, userId, contactName);
+      div.remove();
+      resolve();
+    };
+  });
+}
+
+async function matchContactToMember() {
+  if(!('contacts' in navigator) || !('ContactsManager' in window)) return;
+  try {
+    const contacts = await navigator.contacts.select(['name','tel'], {multiple:false});
+    if(!contacts.length) return;
+    const c = contacts[0];
+    const phone = (c.tel && c.tel[0]) ? normalizePhone(c.tel[0]) : '';
+    const contactName = (c.name && c.name[0]) ? c.name[0] : '';
+    if(!phone) { toast('У контакта нет номера телефона', true); return; }
+    const { data: found } = await sb.from('profiles').select('id,display_name').eq('phone', phone).maybeSingle();
+    if(!found) { toast('Совпадений не найдено', true); return; }
+    const isKnown = spaces.some(s => (s.members||[]).some(m=>m.user_id===found.id));
+    if(!isKnown) { toast('Этот человек не состоит ни в одной из ваших групп', true); return; }
+    await offerAliasMatch(found.id, contactName, found.display_name);
+  } catch(e) { /* пользователь отменил выбор контакта */ }
+}
+
 function openEditMemberAlias(spaceId, userId, officialName) {
   const current = memberAliases[userId] || '';
   const div = document.createElement('div');
@@ -522,7 +564,10 @@ async function inviteKnownContact(spaceId, userId, name, containerId) {
 
 function openManageMembers(id) {
   const btn = document.getElementById('contacts-pick-btn');
-  if(btn) btn.style.display = ('contacts' in navigator && 'ContactsManager' in window) ? 'block' : 'none';
+  const matchBtn = document.getElementById('match-contact-btn');
+  const hasContactsApi = ('contacts' in navigator && 'ContactsManager' in window);
+  if(btn) btn.style.display = hasContactsApi ? 'block' : 'none';
+  if(matchBtn) matchBtn.style.display = hasContactsApi ? 'block' : 'none';
   renderKnownContacts(id);
   managingSpaceId = id;
   const space = spaces.find(s=>s.id===id); if(!space) return;
@@ -614,6 +659,7 @@ async function addMemberToSpace(query, overrideName) {
   const space = spaces.find(s=>s.id===managingSpaceId); if(!space) return;
 
   const found = await searchUserByLoginOrPhone(query);
+  if(found && overrideName) await offerAliasMatch(found.id, overrideName, found.display_name);
   const alreadyMember = (space.members||[]).find(m=>found ? m.user_id===found.id : m.name===query);
   const alreadyPending = (space.pendingInvites||[]).find(p=>found && p.user_id===found.id);
   if(alreadyMember) { toast('Участник уже есть', true); return; }
