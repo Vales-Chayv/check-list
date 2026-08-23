@@ -348,8 +348,20 @@ function handleRealtimeCard(payload) {
       cards = cards.filter(c => c.id !== n.id); local.delete('cards', n.id); // карточку перенесли в другой кабинет
     } else {
       const idx = cards.findIndex(c => c.id === n.id);
+      const previousEntries = idx !== -1 ? cards[idx].entries : null; // кэш ДО обновления — payload.old может быть неполным
       if(idx !== -1) { cards[idx] = n; local.put('cards', n); }
       else { cards.unshift(n); local.put('cards', n); }
+
+      // Новое сообщение в чате — живой попап тем, у кого приложение открыто (кроме самого отправителя)
+      if(Array.isArray(n.chatParticipants) && Array.isArray(previousEntries) && Array.isArray(n.entries) && n.entries.length > previousEntries.length) {
+        const myName = (localStorage.getItem('mc_current_member')||currentUser?.display_name||'').toLowerCase();
+        const newEntry = n.entries[0]; // новые записи добавляются в начало массива
+        const senderName = newEntry?.sessionCreator || '';
+        if(senderName && senderName.toLowerCase() !== myName && typeof showChatNotice === 'function') {
+          const preview = (newEntry.text || newEntry.sessionNote || '📎 Вложение').slice(0,60);
+          showChatNotice('💬 ' + n.title, `${senderName}: ${preview}`, n.id);
+        }
+      }
     }
     if(o && n.chatStatus !== o.chatStatus && typeof showChatNotice === 'function') {
       const myName = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';

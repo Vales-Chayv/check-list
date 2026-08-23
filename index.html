@@ -468,28 +468,40 @@
 </div>
 <div id="lobby-panels">
    <div id="lobby-panel-a" style="display:flex;flex-direction:column;width:100%;box-sizing:border-box;align-self:flex-start;position:relative">
-    <div style="display:flex;align-items:center;justify-content:space-between;width:100%;margin-bottom:8px">
-      <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em">🗓️ События</div>
-      <button onclick="toggleClearEventsMenu(event)" title="Очистить события" style="background:none;border:none;color:var(--t3);font-size:15px;cursor:pointer;padding:2px 6px;line-height:1">🗑</button>
+    <div id="lobby-panel-a-owner" style="display:flex;flex-direction:column;width:100%;box-sizing:border-box">
+      <div style="display:flex;align-items:center;justify-content:space-between;width:100%;margin-bottom:8px">
+        <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em">🗓️ События</div>
+        <button onclick="toggleClearEventsMenu(event)" title="Очистить события" style="background:none;border:none;color:var(--t3);font-size:15px;cursor:pointer;padding:2px 6px;line-height:1">🗑</button>
+      </div>
+      <div id="clear-events-menu" style="display:none;position:absolute;top:28px;right:0;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:6px;z-index:60;box-shadow:0 6px 24px rgba(0,0,0,.5);min-width:170px"></div>
+      <div style="display:flex;flex-direction:row;gap:6px;margin-bottom:10px;width:100%;box-sizing:border-box">
+        <button class="events-filter-btn" onclick="setEventsFeedFilter('today',this)" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:8px;padding:6px;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">Сегодня</button>
+        <button class="events-filter-btn" onclick="setEventsFeedFilter('week',this)" style="flex:1;background:transparent;border:1px solid var(--b1);color:var(--t2);border-radius:8px;padding:6px;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">Неделя</button>
+        <button class="events-filter-btn" onclick="setEventsFeedFilter('all',this)" style="flex:1;background:transparent;border:1px solid var(--b1);color:var(--t2);border-radius:8px;padding:6px;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">Всё время</button>
+      </div>
+      <div id="events-feed-list" style="display:flex;flex-direction:column;width:100%;box-sizing:border-box;max-height:260px;overflow-y:auto"></div>
     </div>
-    <div id="clear-events-menu" style="display:none;position:absolute;top:28px;right:0;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:6px;z-index:60;box-shadow:0 6px 24px rgba(0,0,0,.5);min-width:170px"></div>
-    <div style="display:flex;flex-direction:row;gap:6px;margin-bottom:10px;width:100%;box-sizing:border-box">
-      <button class="events-filter-btn" onclick="setEventsFeedFilter('today',this)" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:8px;padding:6px;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">Сегодня</button>
-      <button class="events-filter-btn" onclick="setEventsFeedFilter('week',this)" style="flex:1;background:transparent;border:1px solid var(--b1);color:var(--t2);border-radius:8px;padding:6px;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">Неделя</button>
-      <button class="events-filter-btn" onclick="setEventsFeedFilter('all',this)" style="flex:1;background:transparent;border:1px solid var(--b1);color:var(--t2);border-radius:8px;padding:6px;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">Всё время</button>
+    <div id="lobby-panel-a-member" style="display:none;flex-direction:column;width:100%;box-sizing:border-box">
+      <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;width:100%">🗓️ События за неделю</div>
+      <div id="member-events-feed-list" style="display:flex;flex-direction:column;width:100%;box-sizing:border-box;max-height:300px;overflow-y:auto"></div>
     </div>
-    <div id="events-feed-list" style="display:flex;flex-direction:column;width:100%;box-sizing:border-box;max-height:260px;overflow-y:auto"></div>
   </div>
    <div id="lobby-panel-b">
-    <div style="margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--b1)">
-      <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🟢 Онлайн сейчас</div>
-      <div id="lobby-presence-list"></div>
+    <div id="lobby-panel-b-owner" style="display:flex;flex-direction:column;width:100%">
+      <div style="margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--b1)">
+        <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🟢 Онлайн сейчас</div>
+        <div id="lobby-presence-list"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <select id="lobby-group-select" onchange="loadLobbyGroupTasks(this.value)" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:8px;padding:8px;color:var(--t1);font-size:13px;font-family:inherit"></select>
+        <select id="lobby-member-filter" onchange="renderLobbyTasksList()" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:8px;padding:8px;color:var(--t1);font-size:13px;font-family:inherit"></select>
+      </div>
+      <div id="lobby-tasks-list"></div>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:10px">
-      <select id="lobby-group-select" onchange="loadLobbyGroupTasks(this.value)" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:8px;padding:8px;color:var(--t1);font-size:13px;font-family:inherit"></select>
-      <select id="lobby-member-filter" onchange="renderLobbyTasksList()" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:8px;padding:8px;color:var(--t1);font-size:13px;font-family:inherit"></select>
+    <div id="lobby-panel-b-member" style="display:none;flex-direction:column;width:100%">
+      <div style="color:var(--t3);font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">📋 Мои задачи</div>
+      <div id="my-tasks-list"></div>
     </div>
-    <div id="lobby-tasks-list"></div>
   </div>
 </div>
 <div id="lobby-h-handle"></div>
@@ -651,14 +663,14 @@
       <button class="close-btn" onclick="closeCreateSpace()">✕</button>
     </div>
     <div style="padding:16px 20px;display:flex;flex-direction:column;gap:13px">
-      <div class="fld"><label>Название</label><input id="new-space-name" placeholder="Например: Наша семья" dir="auto"></div>
-      <div class="fld">
+          <div class="fld">
         <label>Тип</label>
            <select id="new-space-type" onchange="document.getElementById('members-section').style.display=this.value==='family'?'flex':'none'; if(this.value==='family')renderNewSpaceContacts()">
           <option value="personal">🗂️ Личный</option>
           <option value="family">👥 Групповой</option>
         </select>
       </div>
+      <div class="fld"><label>Название</label><input id="new-space-name" placeholder="Например: Наша семья" dir="auto"></div>
       <div id="members-section" style="display:none;flex-direction:column;gap:8px">
         <div class="fld">
           <label>Участники (пригласятся сразу)</label>

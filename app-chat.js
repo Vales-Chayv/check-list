@@ -164,11 +164,15 @@ async function chatFinishVoice(){
       sessionNote: null, sessionAtts: [att], sessionCreator: localStorage.getItem('mc_current_member')||currentUser?.display_name||'',
       assigned_to: null, completions: null, deadline: null
     };
-    card.entries = [...(card.entries||[]), entry];
+      card.entries = [entry, ...(card.entries||[])];
     await dbUpdate(card);
     render();
     openView(card.id);
     toast('✓ Голосовое отправлено');
+    if(Array.isArray(card.chatParticipants) && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof notifyUsers === 'function') {
+      const recipientIds = (currentSpace?.members_auth||[]).map(m=>m.user_id).filter(id=>id && id!==currentUser?.id);
+      if(recipientIds.length) await notifyUsers(recipientIds, '💬 ' + card.title, `${entry.sessionCreator}: 🎙️ Голосовое сообщение`);
+    }
   } catch(e) {
     toast('Ошибка загрузки', true);
   }

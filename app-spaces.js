@@ -251,10 +251,7 @@ function renderSpacesList() {
   document.getElementById('space-selector')?.classList.toggle('has-space', !!(spaces && spaces.length));
   const ownsGroup = (spaces||[]).some(s => (s.type==='family'||s.type==='group') && s.owner_id === currentUser?.id);
   document.body.classList.toggle('owns-group', ownsGroup);
-  if(ownsGroup && typeof renderLobbyPanelB === 'function') renderLobbyPanelB();
-   if(ownsGroup && typeof subscribeOwnerPresence === 'function') subscribeOwnerPresence();
-  else if(typeof unsubscribeOwnerPresence === 'function') unsubscribeOwnerPresence();
-  if(ownsGroup && typeof loadEventsFeed === 'function') loadEventsFeed();
+   renderLobbyPanels();
   const list = document.getElementById('spaces-list');
   const active = spaces.filter(s=>s.status!=='closed').sort((a,b) => {
     const aInvite = (a.pendingInvites||[]).some(p=>p.user_id===currentUser?.id) ? 1 : 0;
@@ -773,6 +770,87 @@ async function loadEventsFeed() {
     renderEventsFeedList(data||[]);
   } catch(e) { box.innerHTML = '<div style="color:var(--t3);font-size:12px">Ошибка загрузки</div>'; }
 }
+// ── Панели лобби: для владельца — как раньше; для участника — свой урезанный набор ──
+function renderLobbyPanels() {
+  const ownerA = document.getElementById('lobby-panel-a-owner');
+  const memberA = document.getElementById('lobby-panel-a-member');
+  const ownerB = document.getElementById('lobby-panel-b-owner');
+  const memberB = document.getElementById('lobby-panel-b-member');
+  if(!ownerA || !memberA || !ownerB || !memberB) return;
+
+  const ownedGroupIds = (spaces||[]).filter(s=>(s.type==='family'||s.type==='group') && s.owner_id===currentUser?.id && s.status!=='closed').map(s=>s.id);
+  const memberGroupIds = (spaces||[]).filter(s=>(s.type==='family'||s.type==='group') && s.owner_id!==currentUser?.id && s.status!=='closed').map(s=>s.id);
+
+  if(ownedGroupIds.length) {
+    ownerA.style.display = 'flex'; memberA.style.display = 'none';
+    ownerB.style.display = 'flex'; memberB.style.display = 'none';
+    if(typeof subscribeOwnerPresence === 'function') subscribeOwnerPresence();
+    if(typeof loadEventsFeed === 'function') loadEventsFeed();
+    if(typeof renderLobbyPanelB === 'function') renderLobbyPanelB();
+  } else {
+    if(typeof unsubscribeOwnerPresence === 'function') unsubscribeOwnerPresence();
+    ownerA.style.display = 'none'; memberA.style.display = 'flex';
+    ownerB.style.display = 'none'; memberB.style.display = 'flex';
+    loadMemberEventsFeed(memberGroupIds);
+    loadMyAssignedTasks(memberGroupIds);
+  }
+}
+
+async function loadMemberEventsFeed(memberSpaceIds) {
+  const box = document.getElementById('member-events-feed-list');
+  if(!box) return;
+  if(!memberSpaceIds.length) { box.innerHTML = '<div style="color:var(--t3);font-size:12px">Вы пока не состоите ни в одной группе</div>'; return; }
+  const since = new Date(Date.now() - 7*24*60*60*1000).toISOString();
+  try {
+    const { data, error } = await sb.from('group_events').select('*')
+      .in('space_id', memberSpaceIds)
+      .in('type', ['member_joined','member_left','chat_closed','group_closed'])
+      .gte('created_at', since)
+      .order('created_at', {ascending:false})
+      .limit(100);
+    if(error) throw error;
+    const nowMs = Date.now();
+    box.innerHTML = (data||[]).length ? data.map(ev => {
+      const isNew = (nowMs - new Date(ev.created_at).getTime()) < 60000;
+      return `<div style="display:block;width:100%;box-sizing:border-box;font-size:13px;padding:8px 6px;border-bottom:1px solid var(--b1);${isNew?'background:rgba(232,197,106,.15);border-radius:6px':''}">
+        <div style="display:flex;align-items:baseline;gap:4px;flex-wrap:wrap"><span>${eventIcon(ev.type)}</span> <strong>${esc(ev.actor_name||'')}</strong> <span>${esc(ev.description||'')}</span></div>
+        <div style="color:var(--t3);font-size:11px;margin-top:2px">${esc(ev.space_name||'')} · ${new Date(ev.created_at).toLocaleString('ru',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>
+      </div>`;
+    }).join('') : '<div style="color:var(--t3);font-size:12px">За неделю ничего не произошло</div>';
+  } catch(e) { box.innerHTML = '<div style="color:var(--t3);font-size:12px">Ошибка загрузки</div>'; }
+}
+
+async function loadMyAssignedTasks(memberSpaceIds) {
+  const box = document.getElementById('my-tasks-list');
+  if(!box) return;
+  if(!memberSpaceIds.length) { box.innerHTML = '<div style="color:var(--t3);font-size:12px">Вы пока не состоите ни в одной группе</div>'; return; }
+  try {
+    const { data, error } = await sb.from('cards').select('*').in('space_id', memberSpaceIds);
+    if(error) throw error;
+    const myName = (localStorage.getItem('mc_current_member')||currentUser?.display_name||'').toLowerCase();
+    const tasks = [];
+    (data||[]).forEach(card => {
+      const space = spaces.find(s=>s.id===card.space_id);
+      (card.entries||[]).forEach(e => {
+        if(e.done) return;
+        let mine = false;
+        if(e.assigned_to && e.assigned_to!=='all' && e.assigned_to.toLowerCase()===myName) mine = true;
+        if(e.assigned_to==='all' && (e.completions||[]).some(c=>c.name.toLowerCase()===myName && !c.done)) mine = true;
+        if(mine) tasks.push({ text: e.text, cardId: card.id, cardTitle: card.title, spaceId: card.space_id, spaceName: space?.name||'' });
+      });
+    });
+    box.innerHTML = tasks.length ? tasks.map(t => `
+      <div onclick="openTaskFromLobby('${t.spaceId}','${t.cardId}')" style="cursor:pointer;padding:8px 6px;border-bottom:1px solid var(--b1)">
+        <div style="font-size:13px;color:var(--t1)" dir="auto">${esc(t.text)}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:2px">${esc(t.cardTitle)} · ${esc(t.spaceName)}</div>
+      </div>`).join('') : '<div style="color:var(--t3);font-size:12px">Нет невыполненных задач</div>';
+  } catch(e) { box.innerHTML = '<div style="color:var(--t3);font-size:12px">Ошибка загрузки</div>'; }
+}
+async function openTaskFromLobby(spaceId, cardId) {
+  if(currentSpaceId !== spaceId && typeof setCurrentSpace === 'function') await setCurrentSpace(spaceId, true);
+  openView(cardId);
+}
+
 function eventIcon(type) {
   return {task_done:'✅', member_left:'🚪', member_joined:'👋', chat_created:'💬', chat_closed:'🔒', group_closed:'🔒'}[type] || '•';
 }

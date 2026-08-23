@@ -568,10 +568,16 @@ completions: completions,
   if(card.status === 'new') card.status = 'in_progress';
   if(!card.pinned && (card.entries||[]).filter(e=>e.text).length && (card.entries||[]).filter(e=>e.text).every(e=>e.done)) card.status='done';
 
-  closeAddEntry();
+   closeAddEntry();
   render();
   toast('✓ Сохранено');
   await dbUpdate(card);
+  if(Array.isArray(card.chatParticipants) && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof notifyUsers === 'function') {
+    const senderName = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
+    const preview = (sessionEntries[0]?.text || sessionNote || '📎 Вложение').slice(0,60);
+    const recipientIds = (currentSpace?.members_auth||[]).map(m=>m.user_id).filter(id=>id && id!==currentUser?.id);
+    if(recipientIds.length) await notifyUsers(recipientIds, '💬 ' + card.title, `${senderName}: ${preview}`);
+  }
   setTimeout(() => openView(aeCardId), 300);
 }
 
