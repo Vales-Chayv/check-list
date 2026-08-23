@@ -12,14 +12,14 @@ async function loadMemberAliases() {
     const {data, error} = await sb.from('member_aliases').select('*').eq('viewer_user_id', currentUser.id);
     if(error) throw error;
     memberAliases = {};
-    (data||[]).forEach(row => { memberAliases[row.space_id+'||'+row.target_user_id] = row.alias; });
+    (data||[]).forEach(row => { memberAliases[row.target_user_id] = row.alias; }); // сквозное имя — по всем группам сразу
   } catch(e) { console.log('loadMemberAliases error:', e.message); }
 }
 function getDisplayName(spaceId, userId, fallbackName) {
-  return memberAliases[spaceId+'||'+userId] || fallbackName;
+  return memberAliases[userId] || fallbackName;
 }
 function openEditMemberAlias(spaceId, userId, officialName) {
-  const current = memberAliases[spaceId+'||'+userId] || '';
+  const current = memberAliases[userId] || '';
   const div = document.createElement('div');
   div.id = 'edit-alias-ov';
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1002;display:flex;align-items:center;justify-content:center;padding:20px';
@@ -46,14 +46,13 @@ async function pickContactNameForAlias() {
   } catch(e) {}
 }
 async function saveMemberAlias(spaceId, userId, alias) {
-  const key = spaceId+'||'+userId;
   try {
     if(!alias) {
-      await sb.from('member_aliases').delete().eq('space_id', spaceId).eq('viewer_user_id', currentUser.id).eq('target_user_id', userId);
-      delete memberAliases[key];
+      await sb.from('member_aliases').delete().eq('viewer_user_id', currentUser.id).eq('target_user_id', userId);
+      delete memberAliases[userId];
     } else {
-      await sb.from('member_aliases').upsert({space_id: spaceId, viewer_user_id: currentUser.id, target_user_id: userId, alias, updated_at: new Date().toISOString()}, {onConflict:'space_id,viewer_user_id,target_user_id'});
-      memberAliases[key] = alias;
+      await sb.from('member_aliases').upsert({space_id: spaceId, viewer_user_id: currentUser.id, target_user_id: userId, alias, updated_at: new Date().toISOString()}, {onConflict:'viewer_user_id,target_user_id'});
+      memberAliases[userId] = alias;
     }
     document.getElementById('edit-alias-ov')?.remove();
     renderManageMembersList();
@@ -537,8 +536,8 @@ function renderManageMembersList() {
   const members = space.members||[];
   if(!members.length) { el.innerHTML = '<div style="font-size:14px;color:var(--t3)">Нет участников</div>'; return; }
   el.innerHTML = members.map(m => {
-    const shown = m.user_id ? getDisplayName(managingSpaceId, m.user_id, m.name) : m.name;
-    const hasAlias = m.user_id && memberAliases[managingSpaceId+'||'+m.user_id];
+       const shown = m.user_id ? getDisplayName(managingSpaceId, m.user_id, m.name) : m.name;
+    const hasAlias = m.user_id && memberAliases[m.user_id];
     return `<div style="display:flex;align-items:center;justify-content:space-between;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:11px 14px">
       <span style="font-size:15px">${esc(shown)}${hasAlias?` <span style="color:var(--t3);font-size:11px">(${esc(m.name)})</span>`:''}</span>
       <div style="display:flex;align-items:center;gap:10px">
