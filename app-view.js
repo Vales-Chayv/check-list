@@ -811,18 +811,26 @@ function openBulkTransferPicker(cardId) {
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
   const groupBlocks = groups.map(g => {
     const gEntries = entries.filter(e=>e.groupId===g.id);
-    return `<label style="display:flex;align-items:center;gap:8px;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 12px;cursor:pointer;margin-bottom:6px">
-      <input type="checkbox" class="bt-group-cb" data-groupid="${g.id}">
-      <div><div style="font-weight:700;color:var(--accent);font-size:13px">${esc(g.name)||'Без названия'}</div><div style="font-size:11px;color:var(--t3)">${gEntries.length} записей — весь раздел</div></div>
-    </label>`;
+    const itemRows = gEntries.map(e => `<label style="display:flex;align-items:flex-start;gap:8px;padding:6px 0 6px 26px;cursor:pointer">
+        <input type="checkbox" class="bt-entry-cb bt-entry-in-group" data-entryid="${e.id}" data-groupid="${g.id}" style="margin-top:2px">
+        <div style="font-size:13px" dir="auto">${esc(stripTags(e.text))}</div>
+      </label>`).join('');
+    return `<div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 12px;margin-bottom:6px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" class="bt-group-cb" data-groupid="${g.id}" onchange="bulkToggleGroup(this)">
+        <div><div style="font-weight:700;color:var(--accent);font-size:13px">${esc(g.name)||'Без названия'}</div><div style="font-size:11px;color:var(--t3)">${gEntries.length} записей — весь раздел</div></div>
+      </label>
+      ${itemRows ? `<div style="margin-top:4px">${itemRows}</div>` : ''}
+    </div>`;
   }).join('');
   const ungrouped = entries.filter(e=>!e.groupId);
   const entryBlocks = ungrouped.map(e => `<label style="display:flex;align-items:flex-start;gap:8px;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 12px;cursor:pointer;margin-bottom:6px">
       <input type="checkbox" class="bt-entry-cb" data-entryid="${e.id}" style="margin-top:2px">
-      <div style="font-size:13px">${esc(stripTags(e.text))}</div>
+      <div style="font-size:13px" dir="auto">${esc(stripTags(e.text))}</div>
     </label>`).join('');
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto">
-    <div style="font-size:16px;font-weight:700;margin-bottom:12px">Что перенести?</div>
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">Что перенести?</div>
+    <div style="font-size:12px;color:var(--t3);margin-bottom:12px">Отметьте «весь раздел» целиком или только нужные записи внутри</div>
     ${groupBlocks}
     ${entryBlocks}
     ${!groups.length && !ungrouped.length ? '<div style="color:var(--t3);font-size:13px">Нет записей</div>' : ''}
@@ -833,12 +841,22 @@ function openBulkTransferPicker(cardId) {
   </div>`;
   document.body.appendChild(div);
 }
+function bulkToggleGroup(cb) {
+  const groupId = cb.dataset.groupid;
+  document.querySelectorAll(`.bt-entry-in-group[data-groupid="${groupId}"]`).forEach(item => {
+    item.checked = cb.checked;
+    item.disabled = cb.checked;
+  });
+}
 function confirmBulkSelection(cardId) {
-  const entryIds = [...document.querySelectorAll('.bt-entry-cb:checked')].map(cb=>cb.dataset.entryid);
-  const groupIds = [...document.querySelectorAll('.bt-group-cb:checked')].map(cb=>cb.dataset.groupid);
-  if(!entryIds.length && !groupIds.length) { toast('Выбери хотя бы одну запись или раздел', true); return; }
+  const checkedGroupIds = [...document.querySelectorAll('.bt-group-cb:checked')].map(cb=>cb.dataset.groupid);
+  // индивидуальные записи — кроме тех, что уже покрыты выбором целого раздела (чтобы не задваивать)
+  const entryIds = [...document.querySelectorAll('.bt-entry-cb:checked')]
+    .filter(cb => !(cb.classList.contains('bt-entry-in-group') && checkedGroupIds.includes(cb.dataset.groupid)))
+    .map(cb=>cb.dataset.entryid);
+  if(!entryIds.length && !checkedGroupIds.length) { toast('Выбери хотя бы одну запись или раздел', true); return; }
   document.getElementById('bulk-transfer-ov')?.remove();
-  moveEntry(cardId, {entryIds, groupIds});
+  moveEntry(cardId, {entryIds, groupIds: checkedGroupIds});
 }
 
 function moveEntry(cardId, selection) {
