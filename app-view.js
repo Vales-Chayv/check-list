@@ -983,16 +983,30 @@ function selectMoveTarget(cardId, spaceId, idx, btn) {
 
 function collectMoveEntries(fromCard) {
   const picked = [];
+  const movedGroups = [];
+  const groupIdMap = {}; // старый groupId (в источнике) -> новый groupId (в цели)
   const sharedSessionId = uid();
   const sessionCreator = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
   let isFirst = true;
+
+  const sourceGroups = (fromCard.entryGroups||[]).filter(g => moveSelection.groupIds.includes(g.id));
+  sourceGroups.forEach(g => {
+    const newId = uid();
+    groupIdMap[g.id] = newId;
+    movedGroups.push({id: newId, name: g.name});
+  });
+  // Если переносим целый раздел и не ввели свой текст-обращение — используем название раздела как заголовок сообщения в чате
+  const autoNote = (!moveSessionNote.trim() && sourceGroups.length) ? sourceGroups[0].name : '';
+
   (fromCard.entries||[]).forEach(e => {
-    if(moveSelection.entryIds.includes(e.id) || (e.groupId && moveSelection.groupIds.includes(e.groupId))) {
+    const fromSelectedGroup = e.groupId && moveSelection.groupIds.includes(e.groupId);
+    if(moveSelection.entryIds.includes(e.id) || fromSelectedGroup) {
       const copy = {
         ...e, id: uid(),
+        groupId: fromSelectedGroup ? groupIdMap[e.groupId] : undefined,
         sessionId: sharedSessionId,
         sessionCreator,
-        sessionNote: isFirst ? (moveSessionNote.trim() || e.sessionNote || null) : null,
+        sessionNote: isFirst ? (moveSessionNote.trim() || autoNote || e.sessionNote || null) : null,
         sessionAtts: isFirst ? (e.sessionAtts||e.attachments||[]) : []
       };
       isFirst = false;
@@ -1000,7 +1014,7 @@ function collectMoveEntries(fromCard) {
       picked.push(copy);
     }
   });
-  return picked;
+  return { entries: picked, groups: movedGroups };
 }
 
 function stripMovedFromSource(fromCard) {
@@ -1015,7 +1029,7 @@ function stripMovedFromSource(fromCard) {
 
 async function confirmMove(fromCardId) {
   const fromCard = cards.find(c=>c.id===fromCardId); if(!fromCard || !moveTargetCard) return;
-  const movedEntries = collectMoveEntries(fromCard);
+  const {entries: movedEntries, groups: movedGroups} = collectMoveEntries(fromCard);
   if(!movedEntries.length) { toast('Нечего переносить', true); return; }
   stripMovedFromSource(fromCard);
   document.getElementById('move-entry-dialog')?.remove();
@@ -1024,12 +1038,14 @@ async function confirmMove(fromCardId) {
       const toCard = cards.find(c=>c.id===moveTargetCard.id);
       if(!toCard) { toast('Карточка не найдена', true); return; }
       toCard.entries = [...movedEntries, ...(toCard.entries||[])];
+      toCard.entryGroups = [...(toCard.entryGroups||[]), ...movedGroups];
       await dbUpdate(toCard);
     } else {
       const {data:toCardData} = await sb.from('cards').select('*').eq('id', moveTargetCard.id).single();
       if(!toCardData) { toast('Карточка не найдена', true); return; }
       const updatedEntries = [...movedEntries, ...(toCardData.entries||[])];
-      await sb.from('cards').update({entries: updatedEntries}).eq('id', moveTargetCard.id);
+      const updatedGroups = [...(toCardData.entryGroups||[]), ...movedGroups];
+      await sb.from('cards').update({entries: updatedEntries, entryGroups: updatedGroups}).eq('id', moveTargetCard.id);
     }
     if(moveDeleteSource && (fromCard.entries||[]).length === 0 && confirm('Карточка «' + fromCard.title + '» пуста. Удалить её?')) {
       deleteCardById(fromCard.id);
@@ -1043,7 +1059,7 @@ async function confirmMove(fromCardId) {
 
 async function createCardAndMove(fromCardId, spaceId, catName) {
   const fromCard = cards.find(c=>c.id===fromCardId); if(!fromCard) return;
-  const movedEntries = collectMoveEntries(fromCard);
+  const {entries: movedEntries, groups: movedGroups} = collectMoveEntries(fromCard);
   if(!movedEntries.length) { toast('Нечего переносить', true); return; }
   const title = prompt('Название новой карточки:');
   if(!title) return;
@@ -1051,7 +1067,7 @@ async function createCardAndMove(fromCardId, spaceId, catName) {
   const isChat = targetSpace?.type==='family' || targetSpace?.type==='group';
   const newCard = {
     id:uid(), title, category:catName, status:'in_progress', space_id:spaceId, created_at:today(),
-    entries:movedEntries, entryGroups:[], attachments:[], history:[],
+    entries:movedEntries, entryGroups:movedGroups, attachments:[], history:[],
     created_by:localStorage.getItem('mc_current_member')||currentUser?.display_name||'',
     chatParticipants: isChat ? (targetSpace.members||[]).map(m=>m.name) : undefined
   };
