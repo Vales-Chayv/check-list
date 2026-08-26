@@ -78,7 +78,12 @@ async function notifyUsers(userIds, title, body) {
   if(!userIds.length) return;
   try {
     await fetch(FUNC_URL, {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST',
+      headers: {
+        'Content-Type':'application/json',
+        'apikey': SB_ANON,
+        'Authorization': 'Bearer ' + SB_ANON
+      },
       body: JSON.stringify({ notifyUserIds: userIds, title, body })
     });
   } catch(e) { console.log('Push notify error:', e.message); }

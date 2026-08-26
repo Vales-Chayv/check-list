@@ -235,9 +235,13 @@ async function subscribeToPush() {
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUB)
       });
     }
-    await fetch(FUNC_URL, {
+     await fetch(FUNC_URL, {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: {
+        'Content-Type':'application/json',
+        'apikey': SB_ANON,
+        'Authorization': 'Bearer ' + SB_ANON
+      },
       body: JSON.stringify({
         subscription: sub.toJSON(),
         deviceName: navigator.userAgent.slice(0,60),
