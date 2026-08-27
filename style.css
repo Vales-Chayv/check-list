@@ -225,7 +225,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
     width: 85%; max-width: 360px;
     background: var(--s1);
     border-left: 1px solid var(--b1);
-    z-index: 500;
+    z-index: 1001;
     transform: translateX(100%);
     transition: transform .25s ease;
     box-shadow: -6px 0 24px rgba(0,0,0,.4);
