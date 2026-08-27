@@ -263,6 +263,44 @@ function renderSpacesList() {
     + (closed.length ? `<div onclick="toggleClosedSpaces()" style="text-align:center;font-size:13px;color:var(--t3);cursor:pointer;padding:10px 0">🔒 Закрытые группы (${closed.length}) ${showClosedSpaces?'▲':'▼'}</div>` : '')
     + (showClosedSpaces ? closed.map(spaceRowHTML).join('') : '');
 }
+
+// ── Мобильный свайп для открытия/закрытия панелей А/Б — в лобби и в кабинетах, но не в карточке/чате ──
+function canSwipeLobbyPanels() {
+  const cardOpen = document.getElementById('view-ov')?.classList.contains('on');
+  const editOpen = document.getElementById('edit-ov')?.classList.contains('on');
+  if(cardOpen || editOpen) return false;
+  return document.body.classList.contains('in-lobby') || !!currentSpaceId;
+}
+
+let lobbySwipeStartX = null, lobbySwipeStartY = null;
+document.addEventListener('touchstart', e => {
+  if(!canSwipeLobbyPanels()) return;
+  if(e.touches.length !== 1) return;
+  lobbySwipeStartX = e.touches[0].clientX;
+  lobbySwipeStartY = e.touches[0].clientY;
+}, {passive:true});
+
+document.addEventListener('touchend', e => {
+  if(lobbySwipeStartX === null) return;
+  const t = e.changedTouches[0];
+  const dx = (t?.clientX ?? lobbySwipeStartX) - lobbySwipeStartX;
+  const dy = (t?.clientY ?? lobbySwipeStartY) - lobbySwipeStartY;
+  lobbySwipeStartX = null; lobbySwipeStartY = null;
+  if(Math.abs(dx) < 60 || Math.abs(dy) > 80) return;
+  if(!canSwipeLobbyPanels()) return; // на случай если карточка открылась ровно во время жеста
+  const isOpen = document.body.classList.contains('lobby-panels-open');
+  if(dx < 0 && !isOpen) {
+    document.body.classList.add('lobby-panels-open');
+    if(typeof renderLobbyPanels === 'function') renderLobbyPanels();
+  } else if(dx > 0 && isOpen) {
+    closeLobbyPanelsSwipe();
+  }
+}, {passive:true});
+
+function closeLobbyPanelsSwipe() {
+  document.body.classList.remove('lobby-panels-open');
+}
+
 async function closeGroupSpace(id) {
   const space = spaces.find(s=>s.id===id); if(!space) return;
   if(!confirm('Закрыть группу «' + space.name + '»? Все её чаты станут доступны только для просмотра.')) return;
