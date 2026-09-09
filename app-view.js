@@ -19,6 +19,7 @@ function viewToggleGroup(cardId, groupId) {
 function openView(id) {
   const card = cards.find(c=>c.id===id); if(!card) return;
   if((currentSpace?.type==='family'||currentSpace?.type==='group') && typeof updateMyPresenceCard==='function') updateMyPresenceCard(id, card.title);
+  if(Array.isArray(card.chatParticipants) && typeof markChatRead==='function') markChatRead(id);
   (card.entryGroups||[]).forEach(g => { if(!viewGroupState.has(g.id)) viewGroupState.set(g.id, true); });
   const col = catColor(card.category);
   const entries = card.entries||[];

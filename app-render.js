@@ -515,7 +515,60 @@ function emptyHTML(h,p) {
 }
 
 function checkSVG() { return'<svg width="11" height="9" viewBox="0 0 11 9"><path d="M1 4l3 3 6-6" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'; }
-
+let chatReadMarks = {}; // cardId -> last_read_at (ISO строка) — когда я последний раз открывал этот чат
+let _readMarksLoaded = false;
+async function ensureChatReadMarksLoaded() {
+  if(_readMarksLoaded || !currentUser?.id) return;
+  _readMarksLoaded = true;
+  try {
+    const { data } = await sb.from('chat_read_marks').select('card_id,last_read_at').eq('user_id', currentUser.id);
+    chatReadMarks = {};
+    (data||[]).forEach(r => { chatReadMarks[r.card_id] = r.last_read_at; });
+    render();
+  } catch(e) { console.log('loadChatReadMarks error:', e.message); }
+}
+async function markChatRead(cardId) {
+  if(!currentUser?.id) return;
+  const now = new Date().toISOString();
+  chatReadMarks[cardId] = now;
+  try {
+    await sb.from('chat_read_marks').upsert({card_id: cardId, user_id: currentUser.id, last_read_at: now}, {onConflict: 'card_id,user_id'});
+  } catch(e) { console.log('markChatRead error:', e.message); }
+}
+function countUnreadEntries(card) {
+  const lastRead = chatReadMarks[card.id];
+  const entries = card.entries||[];
+  if(!lastRead) return entries.length;
+  const lastReadMs = new Date(lastRead).getTime();
+  return entries.filter(e => e.date && new Date(e.date).getTime() > lastReadMs).length;
+}
+let chatReadMarks = {}; // cardId -> last_read_at (ISO строка) — когда я последний раз открывал этот чат
+let _readMarksLoaded = false;
+async function ensureChatReadMarksLoaded() {
+  if(_readMarksLoaded || !currentUser?.id) return;
+  _readMarksLoaded = true;
+  try {
+    const { data } = await sb.from('chat_read_marks').select('card_id,last_read_at').eq('user_id', currentUser.id);
+    chatReadMarks = {};
+    (data||[]).forEach(r => { chatReadMarks[r.card_id] = r.last_read_at; });
+    render();
+  } catch(e) { console.log('loadChatReadMarks error:', e.message); }
+}
+async function markChatRead(cardId) {
+  if(!currentUser?.id) return;
+  const now = new Date().toISOString();
+  chatReadMarks[cardId] = now;
+  try {
+    await sb.from('chat_read_marks').upsert({card_id: cardId, user_id: currentUser.id, last_read_at: now}, {onConflict: 'card_id,user_id'});
+  } catch(e) { console.log('markChatRead error:', e.message); }
+}
+function countUnreadEntries(card) {
+  const lastRead = chatReadMarks[card.id];
+  const entries = card.entries||[];
+  if(!lastRead) return entries.length;
+  const lastReadMs = new Date(lastRead).getTime();
+  return entries.filter(e => e.date && new Date(e.date).getTime() > lastReadMs).length;
+}
 function cardHTML(card, isDone=false) {
   const col = catColor(card.category);
   const bg = hex2rgba(col, isDone?.09:.13);
@@ -535,7 +588,21 @@ function cardHTML(card, isDone=false) {
   const files = (card.attachments||[]).filter(a=>!a.type?.startsWith('image/'));
   const imgsHTML = imgs.length?`<div class="imgs">${imgs.slice(0,4).map((a,i)=>`<img class="img-t" src="${a.data}" onclick="event.stopPropagation();App.viewImg('${card.id}',${i})">`).join('')}${imgs.length>4?`<div style="width:52px;height:52px;border-radius:7px;background:rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">+${imgs.length-4}</div>`:''}</div>`:'';
   const filesHTML = files.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${files.map(f=>`<span class="file-chip">📎${esc(f.name.length>18?f.name.slice(0,16)+'…':f.name)}</span>`).join('')}</div>`:'';
-  const entriesHTML = entries.length?`<div class="entries-mini"><div style="font-size:11px;opacity:.55;margin-bottom:2px">Записи: ${doneEntries}/${entries.length}</div>${entries.slice(0,3).map(e=>`<div class="em-row"><div class="em-cb${e.done?' on':''}" onclick="event.stopPropagation();App.toggleEntry('${card.id}','${e.id}')">${e.done?checkSVG():''}</div><span class="em-text${e.done?' done':''}">${esc((t=>t.length>40?t.slice(0,38)+'…':t)(stripTags(e.text)))}</span></div>`).join('')}${entries.length>3?`<div style="font-size:11px;opacity:.4;padding-left:20px">...+${entries.length-3}</div>`:''}</div>`:'';
+  const isChatCard = (currentSpace?.type==='family'||currentSpace?.type==='group') && Array.isArray(card.chatParticipants);
+  if(isChatCard) ensureChatReadMarksLoaded();
+  const unreadCount = isChatCard ? countUnreadEntries(card) : 0;
+  const undoneCount = entries.length - doneEntries;
+  const lastEntry = entries.length ? [...entries].sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0] : null;
+  const lastPreview = lastEntry ? `${esc(lastEntry.sessionCreator||'')}: ${esc((t=>t.length>50?t.slice(0,48)+'…':t)(stripTags(lastEntry.text||lastEntry.sessionNote||'📎 Вложение')))}` : '';
+  const entriesHTML = isChatCard
+    ? (entries.length ? `<div class="entries-mini" style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+        <div style="flex:1;min-width:0;font-size:12px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lastPreview}</div>
+        <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
+          ${undoneCount>0?`<span style="font-size:10px;background:rgba(232,197,106,.15);color:var(--accent);padding:2px 7px;border-radius:9px;white-space:nowrap">☑ ${undoneCount}</span>`:''}
+          ${unreadCount>0?`<span style="font-size:10px;background:var(--red);color:#fff;padding:2px 7px;border-radius:9px;font-weight:700">${unreadCount}</span>`:''}
+        </div>
+      </div>` : '')
+    : (entries.length?`<div class="entries-mini"><div style="font-size:11px;opacity:.55;margin-bottom:2px">Записи: ${doneEntries}/${entries.length}</div>${entries.slice(0,3).map(e=>`<div class="em-row"><div class="em-cb${e.done?' on':''}" onclick="event.stopPropagation();App.toggleEntry('${card.id}','${e.id}')">${e.done?checkSVG():''}</div><span class="em-text${e.done?' done':''}">${esc((t=>t.length>40?t.slice(0,38)+'…':t)(stripTags(e.text)))}</span></div>`).join('')}${entries.length>3?`<div style="font-size:11px;opacity:.4;padding-left:20px">...+${entries.length-3}</div>`:''}</div>`:'');
   const hist=card.history||[];
   const lastChg=hist.length?`<span style="font-size:10px;opacity:.45;margin-left:auto">${hist[hist.length-1].date}</span>`:'';
 
@@ -561,6 +628,7 @@ function cardHTML(card, isDone=false) {
     </div>
   </div>`;
 }
+
 
 // ═══════════════════════════════════════════
 //  APP ACTIONS (called from inline HTML via App.*)
