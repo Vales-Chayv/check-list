@@ -542,33 +542,7 @@ function countUnreadEntries(card) {
   const lastReadMs = new Date(lastRead).getTime();
   return entries.filter(e => e.date && new Date(e.date).getTime() > lastReadMs).length;
 }
-let chatReadMarks = {}; // cardId -> last_read_at (ISO строка) — когда я последний раз открывал этот чат
-let _readMarksLoaded = false;
-async function ensureChatReadMarksLoaded() {
-  if(_readMarksLoaded || !currentUser?.id) return;
-  _readMarksLoaded = true;
-  try {
-    const { data } = await sb.from('chat_read_marks').select('card_id,last_read_at').eq('user_id', currentUser.id);
-    chatReadMarks = {};
-    (data||[]).forEach(r => { chatReadMarks[r.card_id] = r.last_read_at; });
-    render();
-  } catch(e) { console.log('loadChatReadMarks error:', e.message); }
-}
-async function markChatRead(cardId) {
-  if(!currentUser?.id) return;
-  const now = new Date().toISOString();
-  chatReadMarks[cardId] = now;
-  try {
-    await sb.from('chat_read_marks').upsert({card_id: cardId, user_id: currentUser.id, last_read_at: now}, {onConflict: 'card_id,user_id'});
-  } catch(e) { console.log('markChatRead error:', e.message); }
-}
-function countUnreadEntries(card) {
-  const lastRead = chatReadMarks[card.id];
-  const entries = card.entries||[];
-  if(!lastRead) return entries.length;
-  const lastReadMs = new Date(lastRead).getTime();
-  return entries.filter(e => e.date && new Date(e.date).getTime() > lastReadMs).length;
-}
+
 function cardHTML(card, isDone=false) {
   const col = catColor(card.category);
   const bg = hex2rgba(col, isDone?.09:.13);
