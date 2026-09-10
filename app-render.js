@@ -521,26 +521,25 @@ async function ensureChatReadMarksLoaded() {
   if(_readMarksLoaded || !currentUser?.id) return;
   _readMarksLoaded = true;
   try {
-    const { data } = await sb.from('chat_read_marks').select('card_id,last_read_at').eq('user_id', currentUser.id);
+    const { data } = await sb.from('chat_read_marks').select('card_id,last_read_count').eq('user_id', currentUser.id);
     chatReadMarks = {};
-    (data||[]).forEach(r => { chatReadMarks[r.card_id] = r.last_read_at; });
+    (data||[]).forEach(r => { chatReadMarks[r.card_id] = r.last_read_count||0; });
     render();
   } catch(e) { console.log('loadChatReadMarks error:', e.message); }
 }
 async function markChatRead(cardId) {
   if(!currentUser?.id) return;
-  const now = new Date().toISOString();
-  chatReadMarks[cardId] = now;
+  const count = (cards.find(c=>c.id===cardId)?.entries||[]).length;
+  chatReadMarks[cardId] = count;
   try {
-    await sb.from('chat_read_marks').upsert({card_id: cardId, user_id: currentUser.id, last_read_at: now}, {onConflict: 'card_id,user_id'});
+    await sb.from('chat_read_marks').upsert({card_id: cardId, user_id: currentUser.id, last_read_count: count, last_read_at: new Date().toISOString()}, {onConflict: 'card_id,user_id'});
+    if(typeof refreshChatWatchState === 'function') refreshChatWatchState();
   } catch(e) { console.log('markChatRead error:', e.message); }
 }
 function countUnreadEntries(card) {
-  const lastRead = chatReadMarks[card.id];
-  const entries = card.entries||[];
-  if(!lastRead) return entries.length;
-  const lastReadMs = new Date(lastRead).getTime();
-  return entries.filter(e => e.date && new Date(e.date).getTime() > lastReadMs).length;
+  const lastReadCount = chatReadMarks[card.id] ?? 0;
+  const total = (card.entries||[]).length;
+  return Math.max(0, total - lastReadCount);
 }
 
 function cardHTML(card, isDone=false) {
@@ -566,7 +565,8 @@ function cardHTML(card, isDone=false) {
   if(isChatCard) ensureChatReadMarksLoaded();
   const unreadCount = isChatCard ? countUnreadEntries(card) : 0;
   const undoneCount = entries.length - doneEntries;
-  const lastEntry = entries.length ? [...entries].sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0] : null;
+  const rawEntries = card.entries||[]; // сырой порядок (новые — в начале), без пересортировки по статусу done
+  const lastEntry = rawEntries.length ? rawEntries[0] : null;
   const lastPreview = lastEntry ? `${esc(lastEntry.sessionCreator||'')}: ${esc((t=>t.length>50?t.slice(0,48)+'…':t)(stripTags(lastEntry.text||lastEntry.sessionNote||'📎 Вложение')))}` : '';
   const entriesHTML = isChatCard
     ? (entries.length ? `<div class="entries-mini" style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">

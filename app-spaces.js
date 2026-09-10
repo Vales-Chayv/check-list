@@ -177,14 +177,14 @@ function showSpaceSelector() {
   if(cb) { cb.style.display = currentUser ? 'block' : 'none'; cb.textContent = '📅 ' + t('Календарь'); }
   document.getElementById('space-selector').style.display = 'flex';
   document.body.classList.add('in-lobby');
+  if(typeof subscribeGlobalChatWatch === 'function') subscribeGlobalChatWatch();
+  if(typeof refreshChatWatchState === 'function') refreshChatWatchState();
 }
 function hideSpaceSelector() {
   document.getElementById('space-selector').style.display = 'none';
   document.body.classList.remove('in-lobby');
 }
-function hideSpaceSelector() {
-  document.getElementById('space-selector').style.display = 'none';
-}
+
 function openCalendarFromLobby() {
   calFromLobby = true;
   hideSpaceSelector();
@@ -192,6 +192,56 @@ function openCalendarFromLobby() {
 }
 let showClosedSpaces = false;
 function toggleClosedSpaces(){ showClosedSpaces = !showClosedSpaces; renderSpacesList(); }
+
+let spacesUnreadCounts = {}; // spaceId -> суммарное число непрочитанных по всем чатам этого кабинета
+let _globalEntryCounts = {}; // cardId -> последнее известное число записей (для детекции новых сообщений где угодно в приложении)
+let _globalChatChannel = null;
+
+async function refreshChatWatchState() {
+  if(!currentUser?.id) return;
+  const groupIds = (spaces||[]).filter(s=>(s.type==='family'||s.type==='group') && s.status!=='closed').map(s=>s.id);
+  if(!groupIds.length) { spacesUnreadCounts = {}; renderSpacesList(); return; }
+  try {
+    const [{ data: allCards }, { data: marks }] = await Promise.all([
+      sb.from('cards').select('id,space_id,entries,chatParticipants,title').in('space_id', groupIds),
+      sb.from('chat_read_marks').select('card_id,last_read_count').eq('user_id', currentUser.id)
+    ]);
+    const markMap = {}; (marks||[]).forEach(m=>markMap[m.card_id]=m.last_read_count||0);
+    spacesUnreadCounts = {};
+    (allCards||[]).forEach(c => {
+      if(!Array.isArray(c.chatParticipants)) return;
+      const total = (c.entries||[]).length;
+      _globalEntryCounts[c.id] = total;
+      const unread = Math.max(0, total - (markMap[c.id]||0));
+      if(unread>0) spacesUnreadCounts[c.space_id] = (spacesUnreadCounts[c.space_id]||0) + unread;
+    });
+    renderSpacesList();
+  } catch(e) { console.log('refreshChatWatchState error:', e.message); }
+}
+
+function subscribeGlobalChatWatch() {
+  if(_globalChatChannel) return; // уже подписаны, повторно не нужно
+  _globalChatChannel = sb.channel('cards:all-watch')
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cards' }, payload => {
+      const n = payload.new;
+      const groupIds = (spaces||[]).filter(s=>(s.type==='family'||s.type==='group') && s.status!=='closed').map(s=>s.id);
+      if(!groupIds.includes(n.space_id) || !Array.isArray(n.chatParticipants)) return;
+      const prevCount = _globalEntryCounts[n.id] ?? (n.entries||[]).length;
+      const newTotal = (n.entries||[]).length;
+      if(newTotal > prevCount) {
+        const newEntry = (n.entries||[])[0];
+        const myName = (localStorage.getItem('mc_current_member')||currentUser?.display_name||'').toLowerCase();
+        const senderName = newEntry?.sessionCreator || '';
+        if(senderName && senderName.toLowerCase() !== myName && typeof showChatNotice === 'function') {
+          const preview = (newEntry.text || newEntry.sessionNote || '📎 Вложение').slice(0,60);
+          showChatNotice('💬 ' + n.title, `${senderName}: ${preview}`, n.id);
+        }
+      }
+      _globalEntryCounts[n.id] = newTotal;
+      refreshChatWatchState();
+    })
+    .subscribe();
+}
 
 function spaceRowHTML(s) {
   const icon = s.type==='family' ? '👨‍👩‍👧' : '🗂️';
@@ -218,7 +268,7 @@ function spaceRowHTML(s) {
       <div onclick="onSpaceClick('${s.id}')" style="display:flex;align-items:center;gap:14px;flex:1;cursor:pointer">
         <div style="font-size:32px">${isClosed?'🔒':icon}</div>
         <div style="flex:1">
-          <div style="font-size:17px;font-weight:700">${esc(s.name)}${isClosed?' <span style="font-size:11px;color:var(--t3);font-weight:400">(закрыта)</span>':''}</div>
+                   <div style="font-size:17px;font-weight:700;display:flex;align-items:center;gap:6px">${esc(s.name)}${isClosed?' <span style="font-size:11px;color:var(--t3);font-weight:400">(закрыта)</span>':''}${(!isClosed && spacesUnreadCounts[s.id])?`<span style="background:var(--red);color:#fff;font-size:11px;font-weight:700;padding:1px 7px;border-radius:9px">${spacesUnreadCounts[s.id]}</span>`:''}</div>
           ${s.type==='family'&&members?`<div style="font-size:12px;color:var(--t3);margin-top:2px">👥 ${members} участников</div>`:''}
         </div>
         ${s.password?'<span style="font-size:16px;opacity:.5">🔒</span>':'<span style="font-size:12px;color:var(--t3)">Открыть</span>'}

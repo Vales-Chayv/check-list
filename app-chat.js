@@ -74,7 +74,7 @@ function chatCancelVoice(){
   document.getElementById('chat-voice-ov')?.remove();
 }
 // ── Закрытие чата ──
-async function notifyUsers(userIds, title, body) {
+async function notifyUsers(userIds, title, body, senderId, senderName) {
   if(!userIds.length) return;
   try {
     await fetch(FUNC_URL, {
@@ -84,7 +84,7 @@ async function notifyUsers(userIds, title, body) {
         'apikey': SB_ANON,
         'Authorization': 'Bearer ' + SB_ANON
       },
-      body: JSON.stringify({ notifyUserIds: userIds, title, body })
+      body: JSON.stringify({ notifyUserIds: userIds, title, body, senderId, senderName })
     });
   } catch(e) { console.log('Push notify error:', e.message); }
 }
@@ -174,9 +174,9 @@ async function chatFinishVoice(){
     render();
     openView(card.id);
     toast('✓ Голосовое отправлено');
-    if(Array.isArray(card.chatParticipants) && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof notifyUsers === 'function') {
+        if(Array.isArray(card.chatParticipants) && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof notifyUsers === 'function') {
       const recipientIds = (currentSpace?.members_auth||[]).map(m=>m.user_id).filter(id=>id && id!==currentUser?.id);
-      if(recipientIds.length) await notifyUsers(recipientIds, '💬 ' + card.title, `${entry.sessionCreator}: 🎙️ Голосовое сообщение`);
+      if(recipientIds.length) await notifyUsers(recipientIds, '💬 ' + card.title, `{{name}}: 🎙️ Голосовое сообщение`, currentUser?.id, entry.sessionCreator);
     }
   } catch(e) {
     toast('Ошибка загрузки', true);
