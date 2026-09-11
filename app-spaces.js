@@ -831,11 +831,17 @@ async function subscribePresence(spaceId) {
   try {
     if(presenceChannel) { await sb.removeChannel(presenceChannel); presenceChannel = null; }
     const myName = localStorage.getItem('mc_current_member') || '';
-    presenceChannel = sb.channel('presence:' + spaceId)
-      .on('presence', { event: 'sync' }, () => updatePresenceUI())
-      .subscribe(async status => {
-        if(status === 'SUBSCRIBED') await presenceChannel.track({ name: myName });
-      });
+    // Если дашборд владельца уже создал канал для этого же кабинета — переиспользуем его, а не плодим второй с тем же именем
+    if(typeof ownerPresenceChannels !== 'undefined' && ownerPresenceChannels.has(spaceId)) {
+      presenceChannel = ownerPresenceChannels.get(spaceId);
+      await presenceChannel.track({ name: myName });
+    } else {
+      presenceChannel = sb.channel('presence:' + spaceId)
+        .on('presence', { event: 'sync' }, () => { updatePresenceUI(); if(typeof renderOwnerPresence==='function') renderOwnerPresence(); })
+        .subscribe(async status => {
+          if(status === 'SUBSCRIBED') await presenceChannel.track({ name: myName });
+        });
+    }
   } finally {
     _presenceSubscribing = false;
   }
@@ -1014,11 +1020,19 @@ function subscribeOwnerPresence() {
   ).map(s=>s.id));
   // отписываемся от групп, которые больше не актуальны (закрыты/удалены/я больше не владелец)
   for(const [id, ch] of ownerPresenceChannels) {
-    if(!ownedGroupIds.has(id)) { sb.removeChannel(ch); ownerPresenceChannels.delete(id); }
+    if(!ownedGroupIds.has(id)) {
+      if(ch !== presenceChannel) sb.removeChannel(ch); // канал, которым управляет subscribePresence, не трогаем — это не наш
+      ownerPresenceChannels.delete(id);
+    }
   }
   ownedGroupIds.forEach(id => {
     if(ownerPresenceChannels.has(id)) return; // уже подписаны
-    const ch = sb.channel('ownerpresence:' + id)
+    if(id === currentSpaceId && presenceChannel) {
+      // Я как раз нахожусь в этом кабинете — переиспользуем канал, который уже подписан через subscribePresence
+      ownerPresenceChannels.set(id, presenceChannel);
+      return;
+    }
+    const ch = sb.channel('presence:' + id)
       .on('presence', { event: 'sync' }, () => renderOwnerPresence())
       .subscribe();
     ownerPresenceChannels.set(id, ch);
@@ -1026,7 +1040,7 @@ function subscribeOwnerPresence() {
   renderOwnerPresence();
 }
 function unsubscribeOwnerPresence() {
-  ownerPresenceChannels.forEach(ch => sb.removeChannel(ch));
+  ownerPresenceChannels.forEach(ch => { if(ch !== presenceChannel) sb.removeChannel(ch); });
   ownerPresenceChannels.clear();
 }
 function renderOwnerPresence() {
