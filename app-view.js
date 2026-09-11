@@ -487,7 +487,7 @@ div.innerHTML = `<div class="entry-cb"></div>
   <div style="display:flex;flex-wrap:wrap;gap:4px">
     <button type="button" class="ae-assign-btn on" data-val="" onclick="aeToggleAssign(this,'',event)" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:var(--accent);color:#0f0f0f;cursor:pointer">👤 Никому</button>
     <button type="button" class="ae-assign-btn" data-val="all" onclick="aeToggleAssign(this,'all',event)" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:transparent;color:var(--t2);cursor:pointer">👥 Все</button>
-    ${(currentSpace?.members||[]).map(m=>`<button type="button" class="ae-assign-btn" data-val="${esc(m.name)}" onclick="aeToggleAssign(this,'${esc(m.name)}',event)" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:transparent;color:var(--t2);cursor:pointer">${esc(m.name)}</button>`).join('')}
+    ${(currentSpace?.members||[]).map(m=>`<button type="button" class="ae-assign-btn" data-val="${esc(m.name)}" onclick="aeToggleAssign(this,'${esc(m.name)}',event)" style="font-size:11px;padding:3px 8px;border-radius:12px;border:1px solid var(--b1);background:transparent;color:var(--t2);cursor:pointer">${esc(aliasedName(m.name))}</button>`).join('')}
   </div>
 </div>`:''}
     </div>

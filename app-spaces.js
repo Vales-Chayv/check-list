@@ -630,7 +630,7 @@ function renderKnownContacts(spaceId, containerId) {
   const known = getKnownContacts(spaceId).filter(c=>!alreadyIn.has(c.user_id) && !alreadyInvited.has(c.user_id));
   box.innerHTML = known.length ? `<div style="font-size:12px;color:var(--t3);margin:10px 0 6px">Уже знакомые</div>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">
-      ${known.map(c=>`<button onclick="inviteKnownContact('${spaceId}','${c.user_id}','${esc(c.name)}','${cid}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:6px 12px;font-size:13px;color:var(--t1);cursor:pointer">${esc(c.name)}</button>`).join('')}
+      ${known.map(c=>`<button onclick="inviteKnownContact('${spaceId}','${c.user_id}','${esc(c.name)}','${cid}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:6px 12px;font-size:13px;color:var(--t1);cursor:pointer">${esc(typeof getDisplayName==='function' ? getDisplayName(spaceId, c.user_id, c.name) : c.name)}</button>`).join('')}
     </div>` : '<div style="font-size:12px;color:var(--t3);margin:10px 0 6px">Нет новых знакомых для добавления</div>';
 }
 
@@ -914,7 +914,7 @@ async function loadMemberEventsFeed(memberSpaceIds) {
     box.innerHTML = (data||[]).length ? data.map(ev => {
       const isNew = (nowMs - new Date(ev.created_at).getTime()) < 60000;
       return `<div style="display:block;width:100%;box-sizing:border-box;font-size:13px;padding:8px 6px;border-bottom:1px solid var(--b1);${isNew?'background:rgba(232,197,106,.15);border-radius:6px':''}">
-        <div style="display:flex;align-items:baseline;gap:4px;flex-wrap:wrap"><span>${eventIcon(ev.type)}</span> <strong>${esc(ev.actor_name||'')}</strong> <span>${esc(ev.description||'')}</span></div>
+        <div style="display:flex;align-items:baseline;gap:4px;flex-wrap:wrap"><span>${eventIcon(ev.type)}</span> <strong>${esc(aliasedNameForSpace(ev.space_id, ev.actor_name||''))}</strong> <span>${esc(ev.description||'')}</span></div>
         <div style="color:var(--t3);font-size:11px;margin-top:2px">${esc(ev.space_name||'')} · ${new Date(ev.created_at).toLocaleString('ru',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>
       </div>`;
     }).join('') : '<div style="color:var(--t3);font-size:12px">За неделю ничего не произошло</div>';
@@ -950,6 +950,13 @@ async function loadMyAssignedTasks(memberSpaceIds) {
 async function openTaskFromLobby(spaceId, cardId) {
   if(currentSpaceId !== spaceId && typeof setCurrentSpace === 'function') await setCurrentSpace(spaceId, true);
   openView(cardId);
+}
+// Alias по имени + пространству (для мест, где нет прямого user_id, только имя строкой)
+function aliasedNameForSpace(spaceId, name) {
+  if(!name || typeof getDisplayName !== 'function') return name;
+  const space = (spaces||[]).find(s=>s.id===spaceId);
+  const m = (space?.members||[]).find(mm=>mm.name===name);
+  return m?.user_id ? getDisplayName(spaceId, m.user_id, name) : name;
 }
 
 function eventIcon(type) {
@@ -1067,7 +1074,7 @@ async function unsubscribePresence() {
     for(const [id, oc] of ownerPresenceChannels) {
       if(oc === ch) { reownId = id; ownerPresenceChannels.delete(id); break; }
     }
-        await sb.removeChannel(ch);
+       await sb.removeChannel(ch);
     if(reownId && (spaces||[]).some(s=>s.id===reownId && s.owner_id===currentUser?.id && s.status!=='closed')) {
       const stillExists = sb.getChannels().find(c => c.topic === 'realtime:presence:' + reownId);
       if(stillExists) {
@@ -1086,8 +1093,12 @@ function updatePresenceUI() {
   if(!presenceChannel) return;
   const myName = localStorage.getItem('mc_current_member') || '';
   const state = presenceChannel.presenceState();
-  const allNames = Object.values(state).flatMap(arr => arr.map(p => p.name));
-  const others = [...new Set(allNames)].filter(n => n !== myName);
+  const allPeople = Object.values(state).flatMap(arr => arr.map(p => ({name:p.name, user_id:p.user_id})));
+  const seen = new Set();
+  const others = allPeople.filter(p => {
+    if(p.name === myName || seen.has(p.name)) return false;
+    seen.add(p.name); return true;
+  });
   const lbl = document.getElementById('current-member-label');
   const countBtn = document.getElementById('presence-count-btn');
   if(lbl) lbl.textContent = '👤 ' + myName;
@@ -1110,8 +1121,8 @@ function showOnlineList() {
   const div = document.createElement('div');
   div.id = 'online-dropdown';
   div.style.cssText = 'position:fixed;top:52px;right:60px;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:8px;z-index:1000;min-width:140px;box-shadow:0 4px 20px rgba(0,0,0,.4)';
-  div.innerHTML = '<div style="font-size:12px;color:var(--t3);margin-bottom:6px">Сейчас онлайн:</div>' +
-    others.map(n => `<div style="font-size:14px;padding:4px 0">🟢 ${esc(n)}</div>`).join('');
+   div.innerHTML = '<div style="font-size:12px;color:var(--t3);margin-bottom:6px">Сейчас онлайн:</div>' +
+    others.map(p => `<div style="font-size:14px;padding:4px 0">🟢 ${esc((p.user_id && typeof getDisplayName==='function') ? getDisplayName(currentSpaceId, p.user_id, p.name) : p.name)}</div>`).join('');
   document.body.appendChild(div);
   setTimeout(() => document.addEventListener('click', function handler() {
     div.remove(); document.removeEventListener('click', handler);

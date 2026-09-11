@@ -571,7 +571,7 @@ function cardHTML(card, isDone=false) {
     : entries.length - doneEntries;
   const rawEntries = card.entries||[]; // сырой порядок (новые — в начале), без пересортировки по статусу done
   const lastEntry = rawEntries.length ? rawEntries[0] : null;
-  const lastPreview = lastEntry ? `${esc(lastEntry.sessionCreator||'')}: ${esc((t=>t.length>50?t.slice(0,48)+'…':t)(stripTags(lastEntry.text||lastEntry.sessionNote||'📎 Вложение')))}` : '';
+  const lastPreview = lastEntry ? `${esc(typeof aliasedName==='function' ? aliasedName(lastEntry.sessionCreator||'') : (lastEntry.sessionCreator||''))}: ${esc((t=>t.length>50?t.slice(0,48)+'…':t)(stripTags(lastEntry.text||lastEntry.sessionNote||'📎 Вложение')))}` : '';
   const entriesHTML = isChatCard
     ? (entries.length ? `<div class="entries-mini" style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
         <div style="flex:1;min-width:0;font-size:12px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lastPreview}</div>
