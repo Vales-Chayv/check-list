@@ -824,14 +824,21 @@ async function getShareLink(spaceId) {
   showShareLink(space);
 }
 // ─── PRESENCE ────────────────────────────────
-function subscribePresence(spaceId) {
-  unsubscribePresence();
-  const myName = localStorage.getItem('mc_current_member') || '';
-  presenceChannel = sb.channel('presence:' + spaceId)
-    .on('presence', { event: 'sync' }, () => updatePresenceUI())
-    .subscribe(async status => {
-      if(status === 'SUBSCRIBED') await presenceChannel.track({ name: myName });
-    });
+let _presenceSubscribing = false;
+async function subscribePresence(spaceId) {
+  if(_presenceSubscribing) return; // защита от повторного вызова, пока предыдущая подписка ещё не осела
+  _presenceSubscribing = true;
+  try {
+    if(presenceChannel) { await sb.removeChannel(presenceChannel); presenceChannel = null; }
+    const myName = localStorage.getItem('mc_current_member') || '';
+    presenceChannel = sb.channel('presence:' + spaceId)
+      .on('presence', { event: 'sync' }, () => updatePresenceUI())
+      .subscribe(async status => {
+        if(status === 'SUBSCRIBED') await presenceChannel.track({ name: myName });
+      });
+  } finally {
+    _presenceSubscribing = false;
+  }
 }
 function updateMyPresenceCard(cardId, cardTitle) {
   if(!presenceChannel) return;
@@ -1011,7 +1018,7 @@ function subscribeOwnerPresence() {
   }
   ownedGroupIds.forEach(id => {
     if(ownerPresenceChannels.has(id)) return; // уже подписаны
-        const ch = sb.channel('ownerpresence:' + id)
+    const ch = sb.channel('ownerpresence:' + id)
       .on('presence', { event: 'sync' }, () => renderOwnerPresence())
       .subscribe();
     ownerPresenceChannels.set(id, ch);
@@ -1036,7 +1043,7 @@ function renderOwnerPresence() {
     : '<div style="color:var(--t3);font-size:12px">Никого нет онлайн</div>';
 }
 function unsubscribePresence() {
-  if(presenceChannel) { sb.removeChannel(presenceChannel); presenceChannel = null; }
+  if(presenceChannel) { const ch = presenceChannel; presenceChannel = null; sb.removeChannel(ch); }
 }
 function updatePresenceUI() {
   if(!presenceChannel) return;
