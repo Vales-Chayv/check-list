@@ -1067,12 +1067,17 @@ async function unsubscribePresence() {
     for(const [id, oc] of ownerPresenceChannels) {
       if(oc === ch) { reownId = id; ownerPresenceChannels.delete(id); break; }
     }
-    await sb.removeChannel(ch); // дожидаемся полного снятия канала, прежде чем создавать новый с тем же именем
+        await sb.removeChannel(ch);
     if(reownId && (spaces||[]).some(s=>s.id===reownId && s.owner_id===currentUser?.id && s.status!=='closed')) {
-      const freshCh = sb.channel('presence:' + reownId)
-        .on('presence', { event: 'sync' }, () => renderOwnerPresence())
-        .subscribe();
-      ownerPresenceChannels.set(reownId, freshCh);
+      const stillExists = sb.getChannels().find(c => c.topic === 'realtime:presence:' + reownId);
+      if(stillExists) {
+        ownerPresenceChannels.set(reownId, stillExists); // канал ещё не до конца снят — переиспользуем как есть, без повторного .on()
+      } else {
+        const freshCh = sb.channel('presence:' + reownId)
+          .on('presence', { event: 'sync' }, () => renderOwnerPresence())
+          .subscribe();
+        ownerPresenceChannels.set(reownId, freshCh);
+      }
     }
     if(typeof renderOwnerPresence === 'function') renderOwnerPresence();
   }
