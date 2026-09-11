@@ -832,14 +832,14 @@ async function subscribePresence(spaceId) {
     if(presenceChannel) { await sb.removeChannel(presenceChannel); presenceChannel = null; }
     const myName = localStorage.getItem('mc_current_member') || '';
     // Если дашборд владельца уже создал канал для этого же кабинета — переиспользуем его, а не плодим второй с тем же именем
-    if(typeof ownerPresenceChannels !== 'undefined' && ownerPresenceChannels.has(spaceId)) {
+       if(typeof ownerPresenceChannels !== 'undefined' && ownerPresenceChannels.has(spaceId)) {
       presenceChannel = ownerPresenceChannels.get(spaceId);
-      await presenceChannel.track({ name: myName });
+      await presenceChannel.track({ name: myName, user_id: currentUser?.id });
     } else {
       presenceChannel = sb.channel('presence:' + spaceId)
         .on('presence', { event: 'sync' }, () => { updatePresenceUI(); if(typeof renderOwnerPresence==='function') renderOwnerPresence(); })
         .subscribe(async status => {
-          if(status === 'SUBSCRIBED') await presenceChannel.track({ name: myName });
+          if(status === 'SUBSCRIBED') await presenceChannel.track({ name: myName, user_id: currentUser?.id });
         });
     }
   } finally {
@@ -849,7 +849,7 @@ async function subscribePresence(spaceId) {
 function updateMyPresenceCard(cardId, cardTitle) {
   if(!presenceChannel) return;
   const myName = localStorage.getItem('mc_current_member') || '';
-  presenceChannel.track(cardId ? { name: myName, cardId, cardTitle } : { name: myName });
+  presenceChannel.track(cardId ? { name: myName, user_id: currentUser?.id, cardId, cardTitle } : { name: myName, user_id: currentUser?.id });
 }
 
 // ── Лента событий («Сегодня / Неделя / Всё время») для владельца групп ──
@@ -1050,14 +1050,35 @@ function renderOwnerPresence() {
   ownerPresenceChannels.forEach((ch, spaceId) => {
     const space = spaces.find(s=>s.id===spaceId);
     const state = ch.presenceState();
-    Object.values(state).flatMap(arr=>arr).forEach(p => people.push({...p, spaceName: space?.name||''}));
+    Object.values(state).flatMap(arr=>arr).forEach(p => people.push({...p, spaceName: space?.name||'', spaceId}));
   });
   box.innerHTML = people.length
-    ? people.map(p => `<div style="font-size:13px;padding:4px 0">🟢 ${esc(p.name)} <span style="color:var(--t3)">· ${esc(p.spaceName)}</span>${p.cardTitle?` <span style="color:var(--t3)">— ${esc(p.cardTitle)}</span>`:''}</div>`).join('')
+    ? people.map(p => {
+        const shown = (p.user_id && typeof getDisplayName==='function') ? getDisplayName(p.spaceId, p.user_id, p.name) : p.name;
+        return `<div style="font-size:13px;padding:4px 0">🟢 ${esc(shown)} <span style="color:var(--t3)">· ${esc(p.spaceName)}</span>${p.cardTitle?` <span style="color:var(--t3)">— ${esc(p.cardTitle)}</span>`:''}</div>`;
+      }).join('')
     : '<div style="color:var(--t3);font-size:12px">Никого нет онлайн</div>';
 }
 function unsubscribePresence() {
-  if(presenceChannel) { const ch = presenceChannel; presenceChannel = null; sb.removeChannel(ch); }
+  if(presenceChannel) {
+    const ch = presenceChannel;
+    presenceChannel = null;
+    // если этот канал совпадает с тем, что «одолжил» дашборд владельца — освобождаем запись и переподписываемся туда заново отдельным каналом
+    for(const [id, oc] of ownerPresenceChannels) {
+      if(oc === ch) {
+        ownerPresenceChannels.delete(id);
+        if((spaces||[]).some(s=>s.id===id && s.owner_id===currentUser?.id && s.status!=='closed')) {
+          const freshCh = sb.channel('presence:' + id)
+            .on('presence', { event: 'sync' }, () => renderOwnerPresence())
+            .subscribe();
+          ownerPresenceChannels.set(id, freshCh);
+        }
+        break;
+      }
+    }
+    sb.removeChannel(ch);
+    if(typeof renderOwnerPresence === 'function') renderOwnerPresence();
+  }
 }
 function updatePresenceUI() {
   if(!presenceChannel) return;
