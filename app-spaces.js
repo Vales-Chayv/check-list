@@ -1011,7 +1011,7 @@ function subscribeOwnerPresence() {
   }
   ownedGroupIds.forEach(id => {
     if(ownerPresenceChannels.has(id)) return; // уже подписаны
-    const ch = sb.channel('presence:' + id)
+        const ch = sb.channel('ownerpresence:' + id)
       .on('presence', { event: 'sync' }, () => renderOwnerPresence())
       .subscribe();
     ownerPresenceChannels.set(id, ch);
