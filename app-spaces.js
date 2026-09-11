@@ -1059,24 +1059,21 @@ function renderOwnerPresence() {
       }).join('')
     : '<div style="color:var(--t3);font-size:12px">Никого нет онлайн</div>';
 }
-function unsubscribePresence() {
+async function unsubscribePresence() {
   if(presenceChannel) {
     const ch = presenceChannel;
     presenceChannel = null;
-    // если этот канал совпадает с тем, что «одолжил» дашборд владельца — освобождаем запись и переподписываемся туда заново отдельным каналом
+    let reownId = null;
     for(const [id, oc] of ownerPresenceChannels) {
-      if(oc === ch) {
-        ownerPresenceChannels.delete(id);
-        if((spaces||[]).some(s=>s.id===id && s.owner_id===currentUser?.id && s.status!=='closed')) {
-          const freshCh = sb.channel('presence:' + id)
-            .on('presence', { event: 'sync' }, () => renderOwnerPresence())
-            .subscribe();
-          ownerPresenceChannels.set(id, freshCh);
-        }
-        break;
-      }
+      if(oc === ch) { reownId = id; ownerPresenceChannels.delete(id); break; }
     }
-    sb.removeChannel(ch);
+    await sb.removeChannel(ch); // дожидаемся полного снятия канала, прежде чем создавать новый с тем же именем
+    if(reownId && (spaces||[]).some(s=>s.id===reownId && s.owner_id===currentUser?.id && s.status!=='closed')) {
+      const freshCh = sb.channel('presence:' + reownId)
+        .on('presence', { event: 'sync' }, () => renderOwnerPresence())
+        .subscribe();
+      ownerPresenceChannels.set(reownId, freshCh);
+    }
     if(typeof renderOwnerPresence === 'function') renderOwnerPresence();
   }
 }
