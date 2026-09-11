@@ -531,6 +531,7 @@ async function markChatRead(cardId) {
   if(!currentUser?.id) return;
   const count = (cards.find(c=>c.id===cardId)?.entries||[]).length;
   chatReadMarks[cardId] = count;
+  render(); // сразу перерисовать список карточек, чтобы значок обновился визуально
   try {
     await sb.from('chat_read_marks').upsert({card_id: cardId, user_id: currentUser.id, last_read_count: count, last_read_at: new Date().toISOString()}, {onConflict: 'card_id,user_id'});
     if(typeof refreshChatWatchState === 'function') refreshChatWatchState();
@@ -561,10 +562,13 @@ function cardHTML(card, isDone=false) {
   const files = (card.attachments||[]).filter(a=>!a.type?.startsWith('image/'));
   const imgsHTML = imgs.length?`<div class="imgs">${imgs.slice(0,4).map((a,i)=>`<img class="img-t" src="${a.data}" onclick="event.stopPropagation();App.viewImg('${card.id}',${i})">`).join('')}${imgs.length>4?`<div style="width:52px;height:52px;border-radius:7px;background:rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">+${imgs.length-4}</div>`:''}</div>`:'';
   const filesHTML = files.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${files.map(f=>`<span class="file-chip">📎${esc(f.name.length>18?f.name.slice(0,16)+'…':f.name)}</span>`).join('')}</div>`:'';
-  const isChatCard = (currentSpace?.type==='family'||currentSpace?.type==='group') && Array.isArray(card.chatParticipants);
+    const isChatCard = (currentSpace?.type==='family'||currentSpace?.type==='group') && Array.isArray(card.chatParticipants);
   if(isChatCard) ensureChatReadMarksLoaded();
   const unreadCount = isChatCard ? countUnreadEntries(card) : 0;
-  const undoneCount = entries.length - doneEntries;
+  // В чате «невыполненные» — только реально назначенные задачи, а не любое сообщение
+  const undoneCount = isChatCard
+    ? entries.filter(e => e.assigned_to && (e.assigned_to==='all' ? !(e.completions||[]).every(c=>c.done) : !e.done)).length
+    : entries.length - doneEntries;
   const rawEntries = card.entries||[]; // сырой порядок (новые — в начале), без пересортировки по статусу done
   const lastEntry = rawEntries.length ? rawEntries[0] : null;
   const lastPreview = lastEntry ? `${esc(lastEntry.sessionCreator||'')}: ${esc((t=>t.length>50?t.slice(0,48)+'…':t)(stripTags(lastEntry.text||lastEntry.sessionNote||'📎 Вложение')))}` : '';
