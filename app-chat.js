@@ -27,21 +27,36 @@ function openNewChatDialog() {
       <button type="button" class="new-chat-cat-btn" data-cat="__other__" onclick="selectNewChatCat(this)" style="flex:1;background:transparent;border:1px solid var(--b1);color:var(--t2);border-radius:8px;padding:8px;font-size:13px;cursor:pointer;font-family:inherit">Другое</button>
     </div>
     <input id="new-chat-cat-custom" placeholder="Название рубрики" dir="auto" style="display:none;width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px;font-size:14px;color:var(--t1);font-family:inherit;box-sizing:border-box;margin-bottom:12px">
-    <div id="new-chat-color-section" style="margin-bottom:16px">
+       <div id="new-chat-color-section" style="margin-bottom:16px">
       <div style="font-size:13px;color:var(--t2);margin-bottom:6px">Цвет рубрики</div>
       <div id="new-chat-color-picker" style="display:flex;flex-wrap:wrap;gap:6px"></div>
     </div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:6px">Участники чата</div>
+    <div id="new-chat-members" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px"></div>
     <div style="display:flex;gap:8px">
       <button onclick="document.getElementById('new-chat-ov').remove()" style="flex:1;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;font-size:13px;cursor:pointer;font-family:inherit">Отмена</button>
       <button onclick="confirmCreateChat()" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Создать</button>
     </div>
   </div>`;
   document.body.appendChild(div);
-  window._newChatSelectedCat = 'Работа';
+   window._newChatSelectedCat = 'Работа';
   window._newChatSelectedColor = COLORS[0];
+  window._newChatMembers = new Set((currentSpace?.members||[]).map(m=>m.name)); // по умолчанию — все
   renderNewChatColorPicker();
   updateNewChatColorSectionVisibility();
+  renderNewChatMembers();
   setTimeout(()=>document.getElementById('new-chat-title')?.focus(), 100);
+}
+function renderNewChatMembers() {
+  const box = document.getElementById('new-chat-members'); if(!box) return;
+  box.innerHTML = (currentSpace?.members||[]).map(m => {
+    const on = window._newChatMembers.has(m.name);
+    return `<button type="button" onclick="toggleNewChatMember('${esc(m.name)}',this)" style="background:${on?'var(--accent)':'transparent'};color:${on?'#0f0f0f':'var(--t2)'};border:1px solid var(--b1);border-radius:14px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit">${esc(aliasedName(m.name))}</button>`;
+  }).join('');
+}
+function toggleNewChatMember(name, btn) {
+  if(window._newChatMembers.has(name)) { window._newChatMembers.delete(name); btn.style.background='transparent'; btn.style.color='var(--t2)'; }
+  else { window._newChatMembers.add(name); btn.style.background='var(--accent)'; btn.style.color='#0f0f0f'; }
 }
 
 function renderNewChatColorPicker() {
@@ -82,6 +97,7 @@ async function confirmCreateChat(){
     const { data, error } = await sb.from('categories').insert({name:catName, color, space_id: currentSpaceId}).select().single();
     if(!error && data) { cat = data; cats.push(cat); }
   }
+  if(!window._newChatMembers.size) { toast('Выбери хотя бы одного участника', true); return; }
   document.getElementById('new-chat-ov')?.remove();
 
   const card = {
@@ -93,7 +109,7 @@ async function confirmCreateChat(){
     reminder: {enabled:false, freq:'daily', days:[], intervalMin:null},
     history: [{date: nowStr(), text: 'Чат создан', type:'created'}],
     related_ids: [], today: false, pinned: false,
-    chatParticipants: (currentSpace?.members||[]).map(m=>m.name)
+    chatParticipants: [...window._newChatMembers]
   };
   cards.unshift(card);
   render();

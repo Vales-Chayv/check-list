@@ -20,6 +20,7 @@ function openView(id) {
   const card = cards.find(c=>c.id===id); if(!card) return;
   if((currentSpace?.type==='family'||currentSpace?.type==='group') && typeof updateMyPresenceCard==='function') updateMyPresenceCard(id, card.title);
   if(Array.isArray(card.chatParticipants) && typeof markChatRead==='function') markChatRead(id);
+  document.getElementById('view-ov')?.classList.toggle('chat-sheet', Array.isArray(card.chatParticipants));
   const col = catColor(card.category);
   const entries = card.entries||[];
   const atts = card.attachments||[];
