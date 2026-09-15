@@ -54,7 +54,7 @@ function openView(id) {
         <div style="font-size:12px;color:var(--t3);padding:6px 0">🔒 Чат закрыт — только просмотр</div>
         `:`
         <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
-          <button onclick="closeView();setTimeout(()=>openChatCompose('${id}'),200)" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:8px;padding:9px 14px;font-size:15px;font-weight:700;cursor:pointer">💬 Написать в чат</button>
+          <button onclick="closeView();setTimeout(()=>openChatCompose('${id}'),200)" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:8px;padding:9px 14px;font-size:15px;font-weight:700;cursor:pointer">📎</button>
           <button onclick="closeView();setTimeout(()=>openChatVoice('${id}'),200)" style="background:var(--s2);color:var(--accent);border:1px solid var(--b1);border-radius:8px;padding:9px 12px;font-size:15px;cursor:pointer">🎙️</button>
           ${card.chatStatus==='pending_close' && (typeof isGroupOwner==='function' && isGroupOwner())?`
             <button onclick="actuallyCloseChat('${id}')" style="background:rgba(91,184,122,.15);color:var(--green);border:1px solid rgba(91,184,122,.25);border-radius:8px;padding:9px 12px;font-size:13px;cursor:pointer">✅ Подтвердить закрытие</button>
@@ -164,18 +164,18 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
       const bottomColor = colorPairs[memberColor] || '#e8c56a';
       const clipColor = clipColors.find(c=>c!==memberColor&&c!==bottomColor) || '#e8c56a';
       const align = isMe ? 'flex-start' : 'flex-end';
-      const sAtts = s.atts||[];
-      const hasFiles = sAtts.length > 0;
-      const stkId = 'stk_'+id+'_'+si;
-      const showAddBtn = isMe && si === myLastIdx;
+          const sAtts = s.atts||[];
       const sImgs = sAtts.filter(a=>a.type?.startsWith('image/'));
       const sVideos = sAtts.filter(a=>a.type?.startsWith('video/'));
       const sAudios = sAtts.filter(a=>a.type?.startsWith('audio/'));
       const sFiles = sAtts.filter(a=>!a.type?.startsWith('image/')&&!a.type?.startsWith('video/')&&!a.type?.startsWith('audio/'));
+      const hasFiles = (sImgs.length + sVideos.length + sFiles.length) > 0; // аудио теперь не прячем за уголком — показываем сразу в сообщении
+      const stkId = 'stk_'+id+'_'+si;
+      const showAddBtn = isMe && si === myLastIdx;
+      const audioHTML = sAudios.length ? sAudios.map(a=>`<div style="margin:6px 0"><audio controls src="${a.data}" style="width:100%;height:36px"></audio></div>`).join('') : '';
       let filesHTML = '';
       if(sImgs.length) filesHTML+=`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px">${sImgs.map(a=>`<img src="${a.data}" style="width:70px;height:70px;object-fit:cover;border-radius:6px;cursor:pointer" onclick="openImgDirect('${a.data}')">`).join('')}</div>`;
       if(sVideos.length) filesHTML+=sVideos.map(a=>`<div style="width:80px;height:80px;border-radius:6px;overflow:hidden;cursor:pointer;position:relative;display:inline-block;margin:3px" onclick="openVideoViewer('${a.data}')"><video src="${a.data}" style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.3);font-size:20px">▶</div></div>`).join('');
-      if(sAudios.length) filesHTML+=sAudios.map(a=>`<audio controls src="${a.data}" style="width:100%;height:32px;margin-top:4px"></audio>`).join('');
       if(sFiles.length) filesHTML+=`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${sFiles.map(f=>`<a href="${f.data}" download="${esc(f.name)}" style="font-size:12px;color:rgba(0,0,0,.7);background:rgba(0,0,0,.1);padding:3px 8px;border-radius:10px;text-decoration:none">📎${esc(f.name)}</a>`).join('')}</div>`;
 
       // Folded corner SVG
@@ -191,7 +191,8 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
             <div style="position:absolute;top:-16px;${isMe?'left:14px':'right:14px'};transform:rotate(${isMe?'-12':'12'}deg);filter:drop-shadow(1px 1px 3px rgba(0,0,0,.4))"><svg width="20" height="32" viewBox="0 0 20 32" fill="none"><path d="M10 1C6.1 1 3 4.1 3 8v14c0 3.9 3.1 7 7 7s7-3.1 7-7V6h-2.5v16c0 2.5-2 4.5-4.5 4.5S5.5 24.5 5.5 22V8c0-1.9 1.6-3.5 3.5-3.5S12.5 6.1 12.5 8v14h2.5V8c0-3.9-3.1-7-7-7z" fill="${clipColor}"/></svg></div>
             <div style="font-size:12px;font-weight:700;color:rgba(0,0,0,.7);margin-bottom:6px;margin-top:8px">${creator?esc(aliasedName(creator)):'?'}</div>
 <div style="font-size:10px;color:rgba(0,0,0,.45);margin-bottom:4px">${s.date}</div>
-            ${s.note?`<div style="font-size:13px;color:rgba(0,0,0,.75);margin-bottom:8px;font-style:italic;line-height:1.5;word-break:break-word;white-space:pre-wrap" dir="auto">${esc(s.note)}</div>`:''}
+                     ${s.note?`<div style="font-size:13px;color:rgba(0,0,0,.75);margin-bottom:8px;font-style:italic;line-height:1.5;word-break:break-word;white-space:pre-wrap" dir="auto">${esc(s.note)}</div>`:''}
+            ${audioHTML}
             ${s.entries.map(e=>entryRowHTML(e,'rgba(0,0,0,0.75)')).join('')}
             ${showAddBtn?`<button onclick="openAddEntry('${id}','${s.sid}',true)" style="margin-top:8px;background:rgba(0,0,0,.1);border:none;border-radius:20px;padding:4px 12px;font-size:12px;color:rgba(0,0,0,.6);cursor:pointer;font-family:inherit">＋ Добавить</button>`:''}
             ${cornerHTML}
