@@ -54,20 +54,24 @@ return res;
 });
 
 self.addEventListener('push', e => {
-  let data = {title:'🔔 Напоминания', body:'Есть карточки на сегодня'};
-  try { if(e.data) data = e.data.json(); } catch{}
+  let data = {title:'🔔 Напоминания', body:'Есть карточки на сегодня', url:'https://vales-chayv.github.io/check-list/'};
+  try { if(e.data) data = {...data, ...e.data.json()}; } catch{}
   e.waitUntil(self.registration.showNotification(data.title, {
     body: data.body,
     icon: 'https://vales-chayv.github.io/check-list/icon-192.png',
-    tag: 'reminders', renotify: true,
-    data: {url: 'https://vales-chayv.github.io/check-list/'}
+    tag: 'msg-' + Date.now(), renotify: true,
+    data: {url: data.url}
   }));
 });
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();
+  const targetUrl = e.notification.data?.url || 'https://vales-chayv.github.io/check-list/';
   e.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(list => {
-    for(const c of list) if(c.url.includes('check-list') && 'focus' in c) return c.focus();
-    return clients.openWindow('https://vales-chayv.github.io/check-list/?view=checklist');
+    for(const c of list) if(c.url.includes('check-list') && 'focus' in c) {
+      if('navigate' in c) c.navigate(targetUrl);
+      return c.focus();
+    }
+    return clients.openWindow(targetUrl);
   }));
 });

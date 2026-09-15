@@ -167,6 +167,17 @@ spaces = Array.isArray(saved) ? saved : [];
       }
     } catch(e) {}
   }
+  // Открытие конкретного чата по ссылке из push-уведомления
+  const openSpaceId = new URLSearchParams(window.location.search).get('openSpace');
+  const openCardId = new URLSearchParams(window.location.search).get('openCard');
+  if(openSpaceId && openCardId) {
+    history.replaceState({}, '', window.location.pathname); // убираем параметры из адреса, чтобы не сработало повторно при обновлении
+    if(spaces.find(s=>s.id===openSpaceId)) {
+      await setCurrentSpace(openSpaceId, true);
+      setTimeout(()=>openView(openCardId), 300);
+      return;
+    }
+  }
   // Always show lobby — no auto-enter
   showSpaceSelector();
 }
@@ -232,9 +243,9 @@ function subscribeGlobalChatWatch() {
         const newEntry = (n.entries||[])[0];
         const myName = (localStorage.getItem('mc_current_member')||currentUser?.display_name||'').toLowerCase();
         const senderName = newEntry?.sessionCreator || '';
-        if(senderName && senderName.toLowerCase() !== myName && typeof showChatNotice === 'function') {
+              if(senderName && senderName.toLowerCase() !== myName && typeof showChatNotice === 'function') {
           const preview = (newEntry.text || newEntry.sessionNote || '📎 Вложение').slice(0,60);
-          showChatNotice('💬 ' + n.title, `${senderName}: ${preview}`, n.id);
+          showChatNotice('💬 ' + n.title, `${senderName}: ${preview}`, n.id, n.space_id);
         }
       }
       _globalEntryCounts[n.id] = newTotal;

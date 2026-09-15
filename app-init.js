@@ -95,6 +95,7 @@ document.getElementById('lock').style.display='none';
 
 // Start with auth check
 initAuth();
+checkURLParams();
 // ═══════════════════════════════════════════
 //  INTERVAL REMINDERS
 // ═══════════════════════════════════════════

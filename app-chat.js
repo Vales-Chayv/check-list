@@ -146,7 +146,7 @@ async function sendQuickChatMessage(cardId){
   if(Array.isArray(card.chatParticipants) && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof notifyUsers === 'function') {
     const senderName = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
     const recipientIds = (currentSpace?.members_auth||[]).map(m=>m.user_id).filter(id=>id && id!==currentUser?.id);
-    if(recipientIds.length) await notifyUsers(recipientIds, '💬 ' + card.title, `{{name}}: ${text.slice(0,60)}`, currentUser?.id, senderName);
+    if(recipientIds.length) await notifyUsers(recipientIds, '💬 ' + card.title, `{{name}}: ${text.slice(0,60)}`, currentUser?.id, senderName, `https://vales-chayv.github.io/check-list/?openSpace=${currentSpaceId}&openCard=${cardId}`);
   }
 }
 function renderChatQuickBar(cardId, card){
@@ -204,7 +204,7 @@ function chatCancelVoice(){
   document.getElementById('chat-voice-ov')?.remove();
 }
 // ── Закрытие чата ──
-async function notifyUsers(userIds, title, body, senderId, senderName) {
+async function notifyUsers(userIds, title, body, senderId, senderName, url) {
   if(!userIds.length) return;
   try {
     await fetch(FUNC_URL, {
@@ -214,12 +214,12 @@ async function notifyUsers(userIds, title, body, senderId, senderName) {
         'apikey': SB_ANON,
         'Authorization': 'Bearer ' + SB_ANON
       },
-      body: JSON.stringify({ notifyUserIds: userIds, title, body, senderId, senderName })
+      body: JSON.stringify({ notifyUserIds: userIds, title, body, senderId, senderName, url })
     });
   } catch(e) { console.log('Push notify error:', e.message); }
 }
 
-function showChatNotice(title, body, cardId) {
+function showChatNotice(title, body, cardId, spaceId) {
   const wrap = document.getElementById('notice-popups'); if(!wrap) return;
   const el = document.createElement('div');
   el.className = 'rem-pop';
@@ -231,9 +231,17 @@ function showChatNotice(title, body, cardId) {
       <button onclick="this.closest('.rem-pop').remove()" style="background:none;border:none;color:var(--t3);font-size:18px;cursor:pointer;line-height:1;padding:0">✕</button>
     </div>
     ${body?`<div style="font-size:12px;color:var(--t2);margin-bottom:10px">${esc(body)}</div>`:''}
-    ${cardId?`<button onclick="this.closest('.rem-pop').remove();openView('${cardId}')" style="width:100%;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:8px;font-size:13px;font-weight:700;cursor:pointer">Открыть</button>`:''}`;
+    ${cardId?`<button onclick="this.closest('.rem-pop').remove();openChatFromNotice('${spaceId||currentSpaceId||''}','${cardId}')" style="width:100%;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:8px;font-size:13px;font-weight:700;cursor:pointer">Открыть</button>`:''}`;
   wrap.appendChild(el);
   if(!cardId) setTimeout(()=>el.remove(), 6000);
+}
+async function openChatFromNotice(spaceId, cardId) {
+  if(spaceId && spaceId !== currentSpaceId && typeof setCurrentSpace === 'function') {
+    await setCurrentSpace(spaceId, true);
+    setTimeout(()=>openView(cardId), 200);
+  } else {
+    openView(cardId);
+  }
 }
 
 function isChatCreator(card) {
@@ -305,9 +313,9 @@ async function chatFinishVoice(){
     openView(card.id);
     setTimeout(()=>{ const sheet = document.querySelector('#view-ov .sheet'); if(sheet) sheet.scrollTop = 0; }, 50);
     toast('✓ Голосовое отправлено');
-        if(Array.isArray(card.chatParticipants) && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof notifyUsers === 'function') {
+    if(Array.isArray(card.chatParticipants) && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof notifyUsers === 'function') {
       const recipientIds = (currentSpace?.members_auth||[]).map(m=>m.user_id).filter(id=>id && id!==currentUser?.id);
-      if(recipientIds.length) await notifyUsers(recipientIds, '💬 ' + card.title, `{{name}}: 🎙️ Голосовое сообщение`, currentUser?.id, entry.sessionCreator);
+      if(recipientIds.length) await notifyUsers(recipientIds, '💬 ' + card.title, `{{name}}: 🎙️ Голосовое сообщение`, currentUser?.id, entry.sessionCreator, `https://vales-chayv.github.io/check-list/?openSpace=${currentSpaceId}&openCard=${card.id}`);
     }
   } catch(e) {
     toast('Ошибка загрузки', true);
