@@ -401,6 +401,7 @@ function setCurrentSpace(id, loadNew) {
   document.getElementById('space-pwd-ov').classList.remove('on');
   document.getElementById('space-member-ov').classList.remove('on');
 document.getElementById('current-space-name').textContent = currentSpace.name;
+    if(typeof updateNewCardBtnLabel === 'function') updateNewCardBtnLabel();
   const btn = document.getElementById('current-member-btn');
   const lbl = document.getElementById('current-member-label');
   if(btn && lbl) {
