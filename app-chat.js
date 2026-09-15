@@ -166,44 +166,6 @@ function renderChatQuickBar(cardId, card){
   inp.addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); sendQuickChatMessage(cardId); } });
 }
 
-async function sendQuickChatMessage(cardId){
-  const inp = document.getElementById('chat-quick-input');
-  const text = inp?.value.trim(); if(!text) return;
-  const card = cards.find(c=>c.id===cardId); if(!card) return;
-  const entry = {
-    id: uid(), text, date: nowStr(), done: false,
-    attachments: [], sessionId: uid(), sessionNote: null, sessionAtts: [],
-    sessionCreator: localStorage.getItem('mc_current_member')||currentUser?.display_name||'',
-    assigned_to: null, completions: null, deadline: null
-  };
-  card.entries = [entry, ...(card.entries||[])];
-  inp.value = '';
-  render();
-  openView(cardId);
-  await dbUpdate(card);
-  if(Array.isArray(card.chatParticipants) && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof notifyUsers === 'function') {
-    const senderName = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
-    const recipientIds = (currentSpace?.members_auth||[]).map(m=>m.user_id).filter(id=>id && id!==currentUser?.id);
-    if(recipientIds.length) await notifyUsers(recipientIds, '💬 ' + card.title, `{{name}}: ${text.slice(0,60)}`, currentUser?.id, senderName);
-  }
-}
-function renderChatQuickBar(cardId, card){
-  document.getElementById('chat-quick-bar')?.remove();
-  if(card.chatStatus==='closed') return;
-  const sheet = document.querySelector('#view-ov .sheet');
-  if(!sheet) return;
-  const bar = document.createElement('div');
-  bar.id = 'chat-quick-bar';
-  bar.style.cssText = 'position:sticky;bottom:0;display:flex;gap:8px;align-items:center;padding:10px 14px;background:var(--s1);border-top:1px solid var(--b1)';
-  bar.innerHTML = `
-    <input id="chat-quick-input" type="text" placeholder="Сообщение…" dir="auto" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:20px;padding:10px 16px;font-size:14px;color:var(--t1);font-family:inherit">
-    <button onclick="sendQuickChatMessage('${cardId}')" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:50%;width:40px;height:40px;font-size:16px;cursor:pointer;flex-shrink:0">➤</button>
-    <button onclick="openChatVoice('${cardId}')" style="background:var(--s2);color:var(--accent);border:1px solid var(--b1);border-radius:50%;width:40px;height:40px;font-size:16px;cursor:pointer;flex-shrink:0">🎙️</button>
-  `;
-  sheet.appendChild(bar);
-  const inp = bar.querySelector('#chat-quick-input');
-  inp.addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); sendQuickChatMessage(cardId); } });
-}
 async function openChatVoice(cardId){
   chatRecordingCardId = cardId;
   try {

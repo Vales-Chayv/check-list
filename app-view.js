@@ -20,7 +20,9 @@ function openView(id) {
   const card = cards.find(c=>c.id===id); if(!card) return;
   if((currentSpace?.type==='family'||currentSpace?.type==='group') && typeof updateMyPresenceCard==='function') updateMyPresenceCard(id, card.title);
   if(Array.isArray(card.chatParticipants) && typeof markChatRead==='function') markChatRead(id);
-  document.getElementById('view-ov')?.classList.toggle('chat-sheet', (currentSpace?.type==='family'||currentSpace?.type==='group') && Array.isArray(card.chatParticipants));
+  const isChatCardView = (currentSpace?.type==='family'||currentSpace?.type==='group') && Array.isArray(card.chatParticipants);
+  document.getElementById('view-ov')?.classList.toggle('chat-sheet', isChatCardView);
+  if(isChatCardView) setTimeout(()=>renderChatQuickBar(id, card), 0);
   const col = catColor(card.category);
   const entries = card.entries||[];
   const atts = card.attachments||[];
