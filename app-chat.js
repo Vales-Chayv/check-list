@@ -151,17 +151,17 @@ async function sendQuickChatMessage(cardId){
 function renderChatQuickBar(cardId, card){
   document.getElementById('chat-quick-bar')?.remove();
   if(card.chatStatus==='closed') return;
-  const sheet = document.querySelector('#view-ov .sheet');
-  if(!sheet) return;
+  const ov = document.getElementById('view-ov');
+  if(!ov) return;
   const bar = document.createElement('div');
   bar.id = 'chat-quick-bar';
-  bar.style.cssText = 'position:sticky;bottom:0;display:flex;gap:8px;align-items:center;padding:10px 14px;background:var(--s1);border-top:1px solid var(--b1)';
+  bar.style.cssText = 'position:absolute;left:0;right:0;bottom:0;z-index:50;display:flex;gap:8px;align-items:center;padding:10px 14px;background:var(--s1);border-top:1px solid var(--b1);box-sizing:border-box';
   bar.innerHTML = `
     <input id="chat-quick-input" type="text" placeholder="Сообщение…" dir="auto" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:20px;padding:10px 16px;font-size:14px;color:var(--t1);font-family:inherit">
     <button onclick="sendQuickChatMessage('${cardId}')" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:50%;width:40px;height:40px;font-size:16px;cursor:pointer;flex-shrink:0">➤</button>
     <button onclick="openChatVoice('${cardId}')" style="background:var(--s2);color:var(--accent);border:1px solid var(--b1);border-radius:50%;width:40px;height:40px;font-size:16px;cursor:pointer;flex-shrink:0">🎙️</button>
   `;
-  sheet.appendChild(bar);
+  ov.appendChild(bar);
   const inp = bar.querySelector('#chat-quick-input');
   inp.addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); sendQuickChatMessage(cardId); } });
 }
