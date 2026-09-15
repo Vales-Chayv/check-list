@@ -195,7 +195,7 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
 <div style="font-size:10px;color:rgba(0,0,0,.45);margin-bottom:4px">${s.date}</div>
                      ${s.note?`<div style="font-size:13px;color:rgba(0,0,0,.75);margin-bottom:8px;font-style:italic;line-height:1.5;word-break:break-word;white-space:pre-wrap" dir="auto">${esc(s.note)}</div>`:''}
             ${audioHTML}
-            ${s.entries.map(e=>entryRowHTML(e,'rgba(0,0,0,0.75)')).join('')}
+            ${s.entries.filter(e=>e.text).map(e=>entryRowHTML(e,'rgba(0,0,0,0.75)')).join('')}
             ${showAddBtn?`<button onclick="openAddEntry('${id}','${s.sid}',true)" style="margin-top:8px;background:rgba(0,0,0,.1);border:none;border-radius:20px;padding:4px 12px;font-size:12px;color:rgba(0,0,0,.6);cursor:pointer;font-family:inherit">＋ Добавить</button>`:''}
             ${cornerHTML}
           </div>

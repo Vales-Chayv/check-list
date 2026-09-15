@@ -131,9 +131,9 @@ async function sendQuickChatMessage(cardId){
   const inp = document.getElementById('chat-quick-input');
   const text = inp?.value.trim(); if(!text) return;
   const card = cards.find(c=>c.id===cardId); if(!card) return;
-  const entry = {
-    id: uid(), text, date: nowStr(), done: false,
-    attachments: [], sessionId: uid(), sessionNote: null, sessionAtts: [],
+   const entry = {
+    id: uid(), text: '', date: nowStr(), done: false,
+    attachments: [], sessionId: uid(), sessionNote: text, sessionAtts: [],
     sessionCreator: localStorage.getItem('mc_current_member')||currentUser?.display_name||'',
     assigned_to: null, completions: null, deadline: null
   };
@@ -141,6 +141,7 @@ async function sendQuickChatMessage(cardId){
   inp.value = '';
   render();
   openView(cardId);
+  setTimeout(()=>{ const sheet = document.querySelector('#view-ov .sheet'); if(sheet) sheet.scrollTop = 0; }, 50);
   await dbUpdate(card);
   if(Array.isArray(card.chatParticipants) && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof notifyUsers === 'function') {
     const senderName = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
@@ -293,15 +294,16 @@ async function chatFinishVoice(){
   try {
     const att = await uploadToStorage(file, card.id, null);
   const entry = {
-      id: uid(), text: '🎙️ Голосовое сообщение', date: nowStr(), done: false,
+      id: uid(), text: '', date: nowStr(), done: false,
       attachments: [], sessionId: uid(),
       sessionNote: null, sessionAtts: [att], sessionCreator: localStorage.getItem('mc_current_member')||currentUser?.display_name||'',
       assigned_to: null, completions: null, deadline: null
     };
-      card.entries = [entry, ...(card.entries||[])];
+    card.entries = [entry, ...(card.entries||[])];
     await dbUpdate(card);
     render();
     openView(card.id);
+    setTimeout(()=>{ const sheet = document.querySelector('#view-ov .sheet'); if(sheet) sheet.scrollTop = 0; }, 50);
     toast('✓ Голосовое отправлено');
         if(Array.isArray(card.chatParticipants) && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof notifyUsers === 'function') {
       const recipientIds = (currentSpace?.members_auth||[]).map(m=>m.user_id).filter(id=>id && id!==currentUser?.id);
