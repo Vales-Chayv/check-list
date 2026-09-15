@@ -1070,7 +1070,9 @@ function renderOwnerPresence() {
   ownerPresenceChannels.forEach((ch, spaceId) => {
     const space = spaces.find(s=>s.id===spaceId);
     const state = ch.presenceState();
-    Object.values(state).flatMap(arr=>arr).forEach(p => people.push({...p, spaceName: space?.name||'', spaceId}));
+    Object.values(state).flatMap(arr=>arr)
+      .filter(p => p.user_id !== currentUser?.id) // себя в списке "кто ещё онлайн" видеть незачем
+      .forEach(p => people.push({...p, spaceName: space?.name||'', spaceId}));
   });
   box.innerHTML = people.length
     ? people.map(p => {
