@@ -314,14 +314,28 @@ async function openPinnedCard(id){
 let filterNoDeadline = localStorage.getItem('mc_no_dl')==='1';
 let filterClosed = false;
 function toggleClosedFilter(){ filterClosed=!filterClosed; render(); }
+function updateTabsForSpaceType() {
+  const isChat = currentSpace?.type==='family' || currentSpace?.type==='group';
+  const todayTab = document.querySelector('.tab[data-view="today"]');
+  const checklistTab = document.querySelector('.tab[data-view="checklist"]');
+  const cardsTab = document.querySelector('.tab[data-view="cards"]');
+  const doneTab = document.querySelector('.tab[data-view="done"]');
+  if(todayTab) todayTab.style.display = isChat ? 'none' : '';
+  if(checklistTab) checklistTab.style.display = isChat ? 'none' : '';
+  if(cardsTab) cardsTab.textContent = isChat ? 'Чаты' : 'Все карточки';
+  if(doneTab) doneTab.textContent = isChat ? '🔒 Закрытые чаты' : '✅ Выполненные';
+  const todayNav = document.querySelector('.nav-btn[data-view="today"]');
+  const checklistNav = document.querySelector('.nav-btn[data-view="checklist"]');
+  if(todayNav) todayNav.style.display = isChat ? 'none' : '';
+  if(checklistNav) checklistNav.style.display = isChat ? 'none' : '';
+}
 function cardHasNoDeadline(c){ return !c.deadline && (c.entries||[]).every(e=>!e.deadline); }
 function toggleNoDeadline(){ filterNoDeadline=!filterNoDeadline; localStorage.setItem('mc_no_dl', filterNoDeadline?'1':'0'); render(); }
 function renderCats() {
   const bar = document.getElementById('cats');
   const all = filterCat==='all';
   let html = `<button class="cat-btn${all?' on':''}" style="${all?'border-color:rgba(255,255,255,.25)':''}" onclick="handleAllCatClick()">Все ▾</button>`;
-  if(view==='cards') html += `<button class="cat-btn${filterNoDeadline?' on':''}" style="${filterNoDeadline?'background:rgba(232,197,106,.15);border-color:var(--accent);color:var(--accent)':''}" onclick="toggleNoDeadline()">📅✕ Без срока</button>`;
-  if(view==='cards' && (currentSpace?.type==='family'||currentSpace?.type==='group')) html += `<button class="cat-btn${filterClosed?' on':''}" style="${filterClosed?'background:rgba(232,96,96,.15);border-color:var(--red);color:var(--red)':''}" onclick="toggleClosedFilter()">🔒 Закрытые</button>`;
+  if(view==='cards' && !(currentSpace?.type==='family'||currentSpace?.type==='group')) html += `<button class="cat-btn${filterNoDeadline?' on':''}" style="${filterNoDeadline?'background:rgba(232,197,106,.15);border-color:var(--accent);color:var(--accent)':''}" onclick="toggleNoDeadline()">📅✕ Без срока</button>`;
   cats.forEach((c,i) => {
     const col = c.color||'#888';
     const active = filterCat===c.name;
@@ -342,9 +356,11 @@ function renderCats() {
 }
 
 function renderMain() {
-  if(view==='cards') renderCards();
+  const isChatSpace = currentSpace?.type==='family' || currentSpace?.type==='group';
+  if(view==='cards') { if(isChatSpace) filterClosed = false; renderCards(); }
   else if(view==='today') renderToday();
   else if(view==='checklist') renderChecklist();
+  else if(view==='done' && isChatSpace) { filterClosed = true; renderCards(); }
   else renderDone();
 }
 

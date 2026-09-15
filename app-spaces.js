@@ -402,6 +402,7 @@ function setCurrentSpace(id, loadNew) {
   document.getElementById('space-member-ov').classList.remove('on');
 document.getElementById('current-space-name').textContent = currentSpace.name;
     if(typeof updateNewCardBtnLabel === 'function') updateNewCardBtnLabel();
+  if(typeof updateTabsForSpaceType === 'function') updateTabsForSpaceType();
   const btn = document.getElementById('current-member-btn');
   const lbl = document.getElementById('current-member-label');
   if(btn && lbl) {
@@ -486,11 +487,11 @@ async function createSpace() {
   try {
     const {error} = await sb.from('spaces').insert(space);
     if(error) throw error;
-    // Стартовые рубрики нового кабинета — записываем в базу как реальные
-    const defaultCats = type === 'family'
-      ? [{name:'Еда',color:'#5bb87a'},{name:'Уборка',color:'#5b9ee8'},{name:'Дети',color:'#a07de8'},{name:'Покупки',color:'#e8c56a'},{name:'Финансы',color:'#e88a3a'},{name:'Ремонт',color:'#e86060'}]
-      : [{name:'Работа',color:'#e8c56a'},{name:'Личное',color:'#5b9ee8'},{name:'Проекты',color:'#5bb87a'}];
-    await sb.from('categories').insert(defaultCats.map(c => ({...c, space_id: id})));
+       // Стартовые рубрики — только для личного кабинета; у группового/семейного рубрики появляются только вручную при создании чатов
+    const defaultCats = type === 'personal'
+      ? [{name:'Работа',color:'#e8c56a'},{name:'Личное',color:'#5b9ee8'},{name:'Проекты',color:'#5bb87a'}]
+      : [];
+    if(defaultCats.length) await sb.from('categories').insert(defaultCats.map(c => ({...c, space_id: id})));
       spaces.push(space);
     localStorage.setItem('mc_spaces', JSON.stringify(spaces));
     if(localStorage.getItem('mc_current_member')===null || type==='family') localStorage.setItem('mc_current_member', currentUser?.display_name||'');

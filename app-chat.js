@@ -7,25 +7,99 @@ function handleNewCardClick(){
   else openEdit();
 }
 
-async function quickCreateChat(){
-  const title = prompt('Название чата:');
-  if(!title || !title.trim()) return;
+function quickCreateChat(){
+  openNewChatDialog();
+}
+
+function openNewChatDialog() {
+  const div = document.createElement('div');
+  div.id = 'new-chat-ov';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
+  div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;max-width:360px;width:100%">
+    <div style="font-size:16px;font-weight:700;margin-bottom:14px">Новый чат</div>
+    <div style="margin-bottom:12px"><label style="font-size:13px;color:var(--t2);display:block;margin-bottom:4px">Название</label>
+      <input id="new-chat-title" placeholder="Например: Ужин в субботу" dir="auto" style="width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px;font-size:14px;color:var(--t1);font-family:inherit;box-sizing:border-box">
+    </div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:6px">Рубрика</div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <button type="button" class="new-chat-cat-btn on" data-cat="Работа" onclick="selectNewChatCat(this)" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:8px;padding:8px;font-size:13px;cursor:pointer;font-family:inherit">Работа</button>
+      <button type="button" class="new-chat-cat-btn" data-cat="Семья" onclick="selectNewChatCat(this)" style="flex:1;background:transparent;border:1px solid var(--b1);color:var(--t2);border-radius:8px;padding:8px;font-size:13px;cursor:pointer;font-family:inherit">Семья</button>
+      <button type="button" class="new-chat-cat-btn" data-cat="__other__" onclick="selectNewChatCat(this)" style="flex:1;background:transparent;border:1px solid var(--b1);color:var(--t2);border-radius:8px;padding:8px;font-size:13px;cursor:pointer;font-family:inherit">Другое</button>
+    </div>
+    <input id="new-chat-cat-custom" placeholder="Название рубрики" dir="auto" style="display:none;width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px;font-size:14px;color:var(--t1);font-family:inherit;box-sizing:border-box;margin-bottom:12px">
+    <div id="new-chat-color-section" style="margin-bottom:16px">
+      <div style="font-size:13px;color:var(--t2);margin-bottom:6px">Цвет рубрики</div>
+      <div id="new-chat-color-picker" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('new-chat-ov').remove()" style="flex:1;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;font-size:13px;cursor:pointer;font-family:inherit">Отмена</button>
+      <button onclick="confirmCreateChat()" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Создать</button>
+    </div>
+  </div>`;
+  document.body.appendChild(div);
+  window._newChatSelectedCat = 'Работа';
+  window._newChatSelectedColor = COLORS[0];
+  renderNewChatColorPicker();
+  updateNewChatColorSectionVisibility();
+  setTimeout(()=>document.getElementById('new-chat-title')?.focus(), 100);
+}
+
+function renderNewChatColorPicker() {
+  const box = document.getElementById('new-chat-color-picker'); if(!box) return;
+  box.innerHTML = COLORS.map(c => `<button type="button" onclick="selectNewChatColor('${c}',this)" style="width:26px;height:26px;border-radius:50%;background:${c};border:2px solid ${c===window._newChatSelectedColor?'var(--t1)':'transparent'};cursor:pointer"></button>`).join('');
+}
+function selectNewChatColor(color, btn) {
+  window._newChatSelectedColor = color;
+  document.querySelectorAll('#new-chat-color-picker button').forEach(b=>b.style.border='2px solid transparent');
+  btn.style.border = '2px solid var(--t1)';
+}
+function selectNewChatCat(btn) {
+  document.querySelectorAll('.new-chat-cat-btn').forEach(b=>{ b.classList.remove('on'); b.style.background='transparent'; b.style.color='var(--t2)'; });
+  btn.classList.add('on'); btn.style.background='var(--accent)'; btn.style.color='#0f0f0f';
+  const isOther = btn.dataset.cat === '__other__';
+  document.getElementById('new-chat-cat-custom').style.display = isOther ? 'block' : 'none';
+  window._newChatSelectedCat = isOther ? '' : btn.dataset.cat;
+  updateNewChatColorSectionVisibility();
+}
+function updateNewChatColorSectionVisibility() {
+  // Если рубрика уже существует в этом кабинете — используем её собственный цвет, палитру не показываем
+  const name = window._newChatSelectedCat;
+  const existing = (cats||[]).find(c=>c.name===name);
+  const section = document.getElementById('new-chat-color-section');
+  if(section) section.style.display = (name && existing) ? 'none' : 'block';
+}
+
+async function confirmCreateChat(){
+  const title = document.getElementById('new-chat-title').value.trim();
+  if(!title) { toast('Введи название чата', true); return; }
+  const isOther = document.querySelector('.new-chat-cat-btn.on')?.dataset.cat === '__other__';
+  const catName = isOther ? document.getElementById('new-chat-cat-custom').value.trim() : window._newChatSelectedCat;
+  if(!catName) { toast('Укажи рубрику', true); return; }
+
+  let cat = (cats||[]).find(c=>c.name===catName);
+  if(!cat) {
+    const color = window._newChatSelectedColor || COLORS[0];
+    const { data, error } = await sb.from('categories').insert({name:catName, color, space_id: currentSpaceId}).select().single();
+    if(!error && data) { cat = data; cats.push(cat); }
+  }
+  document.getElementById('new-chat-ov')?.remove();
+
   const card = {
     id: uid(), created_at: today(), space_id: currentSpaceId,
     created_by: localStorage.getItem('mc_current_member')||currentUser?.display_name||'',
-    title: title.trim(), body: '', category: cats[0]?.name || '',
+    title, body: '', category: catName,
     status: 'new', priority: 'normal', deadline: null, ball: '',
     assigned_to: null, attachments: [], entries: [], entryGroups: [],
     reminder: {enabled:false, freq:'daily', days:[], intervalMin:null},
     history: [{date: nowStr(), text: 'Чат создан', type:'created'}],
     related_ids: [], today: false, pinned: false,
-    chatParticipants: (currentSpace?.members||[]).map(m=>m.name) // пока = все участники группы, точечный выбор — отдельная фаза
+    chatParticipants: (currentSpace?.members||[]).map(m=>m.name)
   };
   cards.unshift(card);
   render();
   toast('✓ Чат создан');
-    await dbInsert(card);
-  if(typeof logEvent === 'function') logEvent(currentSpaceId, currentSpace?.name, 'chat_created', `создал(а) чат «${title.trim()}»`, card.id);
+  await dbInsert(card);
+  if(typeof logEvent === 'function') logEvent(currentSpaceId, currentSpace?.name, 'chat_created', `создал(а) чат «${title}»`, card.id);
   openView(card.id);
 }
 
