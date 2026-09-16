@@ -149,8 +149,10 @@ async function sendQuickChatMessage(cardId){
     if(recipientIds.length) await notifyUsers(recipientIds, '💬 ' + card.title, `{{name}}: ${text.slice(0,60)}`, currentUser?.id, senderName, `https://vales-chayv.github.io/check-list/?openSpace=${currentSpaceId}&openCard=${cardId}`);
   }
 }
+let _chatFanOpen = false;
 function renderChatQuickBar(cardId, card){
   document.getElementById('chat-quick-bar')?.remove();
+  _chatFanOpen = false;
   if(card.chatStatus==='closed') return;
   const ov = document.getElementById('view-ov');
   if(!ov) return;
@@ -158,13 +160,89 @@ function renderChatQuickBar(cardId, card){
   bar.id = 'chat-quick-bar';
   bar.style.cssText = 'position:absolute;left:0;right:0;bottom:0;z-index:50;display:flex;gap:8px;align-items:center;padding:10px 14px;background:var(--s1);border-top:1px solid var(--b1);box-sizing:border-box';
   bar.innerHTML = `
-    <input id="chat-quick-input" type="text" placeholder="Сообщение…" dir="auto" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:20px;padding:10px 16px;font-size:14px;color:var(--t1);font-family:inherit">
+    <div class="chat-attach-wrap">
+      <button id="chat-attach-btn" onclick="event.stopPropagation();toggleChatFan('${cardId}')">📎</button>
+      <input id="chat-quick-input" type="text" placeholder="Сообщение…" dir="auto" style="background:var(--s2);border:1px solid var(--b1);border-radius:20px;padding:10px 16px;font-size:14px;color:var(--t1);font-family:inherit">
+      <button class="chat-fan-petal" data-kind="photo" onclick="event.stopPropagation();pickChatAttachment('${cardId}','photo')" style="left:6px;top:50%;margin-top:-20px">🖼️</button>
+      <button class="chat-fan-petal" data-kind="video" onclick="event.stopPropagation();pickChatAttachment('${cardId}','video')" style="left:6px;top:50%;margin-top:-20px">🎥</button>
+      <button class="chat-fan-petal" data-kind="file" onclick="event.stopPropagation();pickChatAttachment('${cardId}','file')" style="left:6px;top:50%;margin-top:-20px">📄</button>
+      <button class="chat-fan-petal" data-kind="task" onclick="event.stopPropagation();pickChatAttachment('${cardId}','task')" style="left:6px;top:50%;margin-top:-20px">✅</button>
+    </div>
     <button onclick="sendQuickChatMessage('${cardId}')" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:50%;width:40px;height:40px;font-size:16px;cursor:pointer;flex-shrink:0">➤</button>
     <button onclick="openChatVoice('${cardId}')" style="background:var(--s2);color:var(--accent);border:1px solid var(--b1);border-radius:50%;width:40px;height:40px;font-size:16px;cursor:pointer;flex-shrink:0">🎙️</button>
   `;
   ov.appendChild(bar);
   const inp = bar.querySelector('#chat-quick-input');
   inp.addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); sendQuickChatMessage(cardId); } });
+}
+
+function toggleChatFan(cardId){
+  _chatFanOpen = !_chatFanOpen;
+  const btn = document.getElementById('chat-attach-btn');
+  const petals = document.querySelectorAll('.chat-fan-petal');
+  if(!btn) return;
+  btn.classList.toggle('open', _chatFanOpen);
+  btn.textContent = _chatFanOpen ? '📦' : '📎';
+  // Веер: первый лепесток прямо над кнопкой, дальше по кругу вправо-вниз, с небольшим шагом между кнопками
+  const radius = 66, step = 38;
+  petals.forEach((p, i) => {
+    if(_chatFanOpen){
+      const a = (i*step) * Math.PI/180;
+      const x = Math.sin(a)*radius;
+      const y = -Math.cos(a)*radius - 46; // -46 — та же величина, на которую поднимается сама кнопка
+      p.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) scale(1)`;
+      p.classList.add('open');
+    } else {
+      p.style.transform = 'translate(0,0) scale(.3)';
+      p.classList.remove('open');
+    }
+  });
+  if(_chatFanOpen) document.addEventListener('click', closeChatFanOnOutsideClick);
+}
+function closeChatFanOnOutsideClick(){
+  if(!_chatFanOpen) return;
+  _chatFanOpen = false;
+  const btn = document.getElementById('chat-attach-btn');
+  if(btn) { btn.classList.remove('open'); btn.textContent = '📎'; }
+  document.querySelectorAll('.chat-fan-petal').forEach(p => { p.style.transform = 'translate(0,0) scale(.3)'; p.classList.remove('open'); });
+  document.removeEventListener('click', closeChatFanOnOutsideClick);
+}
+
+function pickChatAttachment(cardId, kind){
+  closeChatFanOnOutsideClick();
+  if(kind === 'task') { closeView(); setTimeout(()=>openChatCompose(cardId), 200); return; }
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  if(kind === 'photo') inp.accept = 'image/*';
+  if(kind === 'video') inp.accept = 'video/*';
+  inp.onchange = () => { if(inp.files[0]) sendQuickAttachment(cardId, inp.files[0]); };
+  inp.click();
+}
+
+async function sendQuickAttachment(cardId, file){
+  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  toast('Загрузка…');
+  try {
+    const att = await uploadToStorage(file, card.id, null);
+    const kindLabel = file.type.startsWith('image/') ? '📷 Фото' : file.type.startsWith('video/') ? '🎥 Видео' : '📎 Файл';
+    const entry = {
+      id: uid(), text: '', date: nowStr(), done: false,
+      attachments: [], sessionId: uid(), sessionNote: null, sessionAtts: [att],
+      sessionCreator: localStorage.getItem('mc_current_member')||currentUser?.display_name||'',
+      assigned_to: null, completions: null, deadline: null
+    };
+    card.entries = [entry, ...(card.entries||[])];
+    await dbUpdate(card);
+    render();
+    openView(cardId);
+    setTimeout(()=>{ const sheet = document.querySelector('#view-ov .sheet'); if(sheet) sheet.scrollTop = 0; }, 50);
+    if(Array.isArray(card.chatParticipants) && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof notifyUsers === 'function') {
+      const senderName = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
+      const recipientIds = (currentSpace?.members_auth||[]).map(m=>m.user_id).filter(id=>id && id!==currentUser?.id);
+      if(recipientIds.length) await notifyUsers(recipientIds, '💬 ' + card.title, `{{name}}: ${kindLabel}`, currentUser?.id, senderName, `https://vales-chayv.github.io/check-list/?openSpace=${currentSpaceId}&openCard=${card.id}`);
+    }
+    toast('✓ Отправлено');
+  } catch(e) { toast('Ошибка загрузки', true); }
 }
 
 async function openChatVoice(cardId){
