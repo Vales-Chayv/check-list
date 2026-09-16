@@ -419,7 +419,7 @@ document.getElementById('current-space-name').textContent = currentSpace.name;
   if(btn && lbl) {
     const member = localStorage.getItem('mc_current_member');
     if(currentSpace.type === 'family' && member) {
-      lbl.textContent = member + ' онлайн';
+      lbl.textContent = 'Я онлайн';
       btn.style.display = 'inline-flex';
     } else {
       btn.style.display = 'none';
