@@ -138,6 +138,7 @@ async function sendQuickChatMessage(cardId){
     assigned_to: null, completions: null, deadline: null
   };
   card.entries = [entry, ...(card.entries||[])];
+  _activeAttachEntryId = null; // текст — граница; следующее вложение начнёт новый стикер
   inp.value = '';
   render();
   openView(cardId);
@@ -153,6 +154,7 @@ let _chatFanOpen = false;
 function renderChatQuickBar(cardId, card){
   document.getElementById('chat-quick-bar')?.remove();
   _chatFanOpen = false;
+  _activeAttachEntryId = null;
   if(card.chatStatus==='closed') return;
   const ov = document.getElementById('view-ov');
   if(!ov) return;
@@ -177,27 +179,27 @@ function renderChatQuickBar(cardId, card){
 }
 
 function toggleChatFan(cardId){
-  _chatFanOpen = !_chatFanOpen;
+  if(_chatFanOpen) {
+    // Кнопка уже открыта — повторное нажатие сразу выполняет последнее действие веера («Задача»), а не просто закрывает его
+    pickChatAttachment(cardId, 'task');
+    return;
+  }
+  _chatFanOpen = true;
   const btn = document.getElementById('chat-attach-btn');
   const petals = document.querySelectorAll('.chat-fan-petal');
   if(!btn) return;
-  btn.classList.toggle('open', _chatFanOpen);
-  btn.textContent = _chatFanOpen ? '📦' : '📎';
+  btn.classList.add('open');
+  btn.textContent = '📦';
   // Веер: первый лепесток прямо над кнопкой, дальше по кругу вправо-вниз, с небольшим шагом между кнопками
   const radius = 66, step = 38;
   petals.forEach((p, i) => {
-    if(_chatFanOpen){
-      const a = (i*step) * Math.PI/180;
-      const x = Math.sin(a)*radius;
-      const y = -Math.cos(a)*radius - 46; // -46 — та же величина, на которую поднимается сама кнопка
-      p.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) scale(1)`;
-      p.classList.add('open');
-    } else {
-      p.style.transform = 'translate(0,0) scale(.3)';
-      p.classList.remove('open');
-    }
+    const a = (i*step) * Math.PI/180;
+    const x = Math.sin(a)*radius;
+    const y = -Math.cos(a)*radius - 46; // -46 — та же величина, на которую поднимается сама кнопка
+    p.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) scale(1)`;
+    p.classList.add('open');
   });
-  if(_chatFanOpen) document.addEventListener('click', closeChatFanOnOutsideClick);
+  document.addEventListener('click', closeChatFanOnOutsideClick);
 }
 function closeChatFanOnOutsideClick(){
   if(!_chatFanOpen) return;
@@ -207,6 +209,8 @@ function closeChatFanOnOutsideClick(){
   document.querySelectorAll('.chat-fan-petal').forEach(p => { p.style.transform = 'translate(0,0) scale(.3)'; p.classList.remove('open'); });
   document.removeEventListener('click', closeChatFanOnOutsideClick);
 }
+
+let _activeAttachEntryId = null; // "черновой" стикер, в который собираются вложения, отправленные подряд через веер
 
 function pickChatAttachment(cardId, kind){
   closeChatFanOnOutsideClick();
@@ -225,21 +229,30 @@ async function sendQuickAttachment(cardId, file){
   try {
     const att = await uploadToStorage(file, card.id, null);
     const kindLabel = file.type.startsWith('image/') ? '📷 Фото' : file.type.startsWith('video/') ? '🎥 Видео' : '📎 Файл';
-    const entry = {
-      id: uid(), text: '', date: nowStr(), done: false,
-      attachments: [], sessionId: uid(), sessionNote: null, sessionAtts: [att],
-      sessionCreator: localStorage.getItem('mc_current_member')||currentUser?.display_name||'',
-      assigned_to: null, completions: null, deadline: null
-    };
-    card.entries = [entry, ...(card.entries||[])];
+    const myName = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
+
+    // Если есть активный "черновой" стикер этого же чата и он мой — крепим вложение в него, как в Telegram
+    const draft = card.entries.find(e=>e.id===_activeAttachEntryId && e.sessionCreator===myName);
+    if(draft) {
+      draft.sessionAtts = [...(draft.sessionAtts||[]), att];
+    } else {
+      const entry = {
+        id: uid(), text: '', date: nowStr(), done: false,
+        attachments: [], sessionId: uid(), sessionNote: null, sessionAtts: [att],
+        sessionCreator: myName,
+        assigned_to: null, completions: null, deadline: null
+      };
+      card.entries = [entry, ...(card.entries||[])];
+      _activeAttachEntryId = entry.id;
+    }
+
     await dbUpdate(card);
     render();
     openView(cardId);
     setTimeout(()=>{ const sheet = document.querySelector('#view-ov .sheet'); if(sheet) sheet.scrollTop = 0; }, 50);
     if(Array.isArray(card.chatParticipants) && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof notifyUsers === 'function') {
-      const senderName = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
       const recipientIds = (currentSpace?.members_auth||[]).map(m=>m.user_id).filter(id=>id && id!==currentUser?.id);
-      if(recipientIds.length) await notifyUsers(recipientIds, '💬 ' + card.title, `{{name}}: ${kindLabel}`, currentUser?.id, senderName, `https://vales-chayv.github.io/check-list/?openSpace=${currentSpaceId}&openCard=${card.id}`);
+      if(recipientIds.length) await notifyUsers(recipientIds, '💬 ' + card.title, `{{name}}: ${kindLabel}`, currentUser?.id, myName, `https://vales-chayv.github.io/check-list/?openSpace=${currentSpaceId}&openCard=${card.id}`);
     }
     toast('✓ Отправлено');
   } catch(e) { toast('Ошибка загрузки', true); }
