@@ -214,7 +214,7 @@ let _activeAttachEntryId = null; // "черновой" стикер, в кото
 
 function pickChatAttachment(cardId, kind){
   closeChatFanOnOutsideClick();
-  if(kind === 'task') { closeView(); setTimeout(()=>openChatCompose(cardId), 200); return; }
+  if(kind === 'task') { openChatCompose(cardId); return; }
   const inp = document.createElement('input');
   inp.type = 'file';
   if(kind === 'photo') inp.accept = 'image/*';
