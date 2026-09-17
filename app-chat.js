@@ -151,6 +151,23 @@ async function sendQuickChatMessage(cardId){
   }
 }
 let _chatFanOpen = false;
+let _attachPressTimer = null;
+let _attachLongPressFired = false;
+
+function startAttachPress(cardId){
+  _attachLongPressFired = false;
+  _attachPressTimer = setTimeout(() => {
+    _attachLongPressFired = true;
+    pickChatAttachment(cardId, 'task');
+  }, 1500);
+}
+function cancelAttachPress(){
+  if(_attachPressTimer) { clearTimeout(_attachPressTimer); _attachPressTimer = null; }
+}
+function handleAttachClick(cardId){
+  if(_attachLongPressFired) { _attachLongPressFired = false; return; } // клик после срабатывания долгого нажатия — уже обработан, второй раз не открываем веер
+  toggleChatFan(cardId);
+}
 function renderChatQuickBar(cardId, card){
   document.getElementById('chat-quick-bar')?.remove();
   _chatFanOpen = false;
@@ -163,7 +180,7 @@ function renderChatQuickBar(cardId, card){
   bar.style.cssText = 'position:absolute;left:0;right:0;bottom:0;z-index:50;display:flex;gap:8px;align-items:center;padding:10px 14px;background:var(--s1);border-top:1px solid var(--b1);box-sizing:border-box';
   bar.innerHTML = `
     <div class="chat-attach-wrap">
-      <button id="chat-attach-btn" onclick="event.stopPropagation();toggleChatFan('${cardId}')">📎</button>
+      <button id="chat-attach-btn" onclick="event.stopPropagation();handleAttachClick('${cardId}')" onpointerdown="startAttachPress('${cardId}')" onpointerup="cancelAttachPress()" onpointerleave="cancelAttachPress()" onpointercancel="cancelAttachPress()">📎</button>
       <input id="chat-quick-input" type="text" placeholder="Сообщение…" dir="auto" style="background:var(--s2);border:1px solid var(--b1);border-radius:20px;padding:10px 16px;font-size:14px;color:var(--t1);font-family:inherit">
       <button class="chat-fan-petal" data-kind="photo" onclick="event.stopPropagation();pickChatAttachment('${cardId}','photo')" style="left:6px;top:50%;margin-top:-20px">🖼️</button>
       <button class="chat-fan-petal" data-kind="video" onclick="event.stopPropagation();pickChatAttachment('${cardId}','video')" style="left:6px;top:50%;margin-top:-20px">🎥</button>
