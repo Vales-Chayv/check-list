@@ -333,10 +333,23 @@ function canSwipeLobbyPanels() {
   return document.body.classList.contains('in-lobby') || !!currentSpaceId;
 }
 
+function isInsideHorizontalScroller(target) {
+  let el = target;
+  while(el && el !== document.body) {
+    if(el.scrollWidth > el.clientWidth + 2) {
+      const style = getComputedStyle(el);
+      if(style.overflowX === 'auto' || style.overflowX === 'scroll') return true;
+    }
+    el = el.parentElement;
+  }
+  return false;
+}
+
 let lobbySwipeStartX = null, lobbySwipeStartY = null;
 document.addEventListener('touchstart', e => {
   if(!canSwipeLobbyPanels()) return;
   if(e.touches.length !== 1) return;
+  if(isInsideHorizontalScroller(e.target)) return; // не мешаем прокрутке рубрик/вкладок/фото
   lobbySwipeStartX = e.touches[0].clientX;
   lobbySwipeStartY = e.touches[0].clientY;
 }, {passive:true});
