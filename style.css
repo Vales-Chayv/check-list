@@ -265,7 +265,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
     opacity: 0; pointer-events: none; transition: opacity .15s;
   }
  body.cal-on #cal-ov { opacity: 1 !important; pointer-events: all !important; }
-  body.in-lobby.cal-on #cal-ov { bottom: auto; height: calc((100vh - 40px) * var(--lobby-split-v)); } /* в лобби — только поверх панели А, панель Б видна снизу */
+body.in-lobby.cal-on #cal-ov, body.in-cabinet.cal-on #cal-ov { bottom: auto; height: calc((100vh - 40px) * var(--lobby-split-v)); } /* в лобби — только поверх панели А, панель Б видна снизу */
 
   #desktop-calc-toggle {
     background: var(--s2); border: 1px solid var(--b1); border-radius: 18px; padding: 6px 12px;
@@ -281,7 +281,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
   }
  #calc-ov .sheet { transform: none; max-height: none; height: 100%; border-radius: 0; background: none; padding: 0; overflow: visible; }
   body.calc-on #calc-ov { opacity: 1 !important; pointer-events: all !important; }
-  body.in-lobby.calc-on #calc-ov { bottom: auto; height: calc((100vh - 40px) * var(--lobby-split-v)); }
+  body.in-lobby.calc-on #calc-ov, body.in-cabinet.calc-on #calc-ov { bottom: auto; height: calc((100vh - 40px) * var(--lobby-split-v)); }
   #calc-body { display: flex; height: 100%; gap: 16px; }
   #calc-left { display: flex; flex-direction: column; order: 1; flex: 1.3; min-width: 0; }
   #calc-right { display: flex; flex-direction: column; order: 2; flex: 1; min-width: 0; border-left: 1px solid var(--b1); padding-left: 16px; }
