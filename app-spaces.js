@@ -941,24 +941,27 @@ async function renderPersonalTasks() {
   try { all = await local.getAll('cards'); } catch(e) {}
   const today = new Date().toLocaleDateString('sv');
   const tasks = [];
-  all.filter(c => (c.space_id || 'personal') === 'personal').forEach(c => {
+    const personalIds = (spaces || []).filter(s => s.type === 'personal').map(s => s.id);
+  if(!personalIds.length) personalIds.push('personal');
+  all.filter(c => personalIds.includes(c.space_id || 'personal')).forEach(c => {
     (c.entries || []).forEach(e => {
-      if(e.inTasks && !e.done && e.text) tasks.push({ text: e.text, cardId: c.id, cardTitle: c.title, deadline: e.deadline || '' });
+      if(e.inTasks && !e.done && e.text) tasks.push({ text: e.text, cardId: c.id, spaceId: c.space_id || 'personal', cardTitle: c.title, deadline: e.deadline || '' });
     });
   });
   tasks.sort((a, b) => (a.deadline || '9999').localeCompare(b.deadline || '9999'));
   box.innerHTML = tasks.length ? tasks.map(t => {
     const over = t.deadline && t.deadline < today;
     const dl = t.deadline ? ` · <span style="${over ? 'color:var(--red,#e86060);font-weight:600' : ''}">⏰ ${esc(t.deadline.split('-').reverse().slice(0, 2).join('.'))}${over ? ' просрочено' : ''}</span>` : '';
-    return `<div onclick="openPersonalTask('${t.cardId}')" style="cursor:pointer;padding:8px 6px;border-bottom:1px solid var(--b1)">
+    return `<div onclick="openPersonalTask('${t.cardId}','${t.spaceId}')" style="cursor:pointer;padding:8px 6px;border-bottom:1px solid var(--b1)">
       <div style="font-size:13px;color:var(--t1)" dir="auto">${esc(t.text)}</div>
       <div style="font-size:11px;color:var(--t3);margin-top:2px">${esc(t.cardTitle || '')}${dl}</div>
     </div>`;
   }).join('') : '<div style="color:var(--t3);font-size:12px">Нет личных задач. Отметьте запись ⭐ в личном кабинете</div>';
 }
-async function openPersonalTask(cardId) {
-  if(currentSpaceId !== 'personal' && typeof setCurrentSpace === 'function') {
-    setCurrentSpace('personal', true);
+async function openPersonalTask(cardId, spaceId) {
+  spaceId = spaceId || 'personal';
+  if(currentSpaceId !== spaceId && typeof setCurrentSpace === 'function') {
+    setCurrentSpace(spaceId, true);
     for(let i = 0; i < 25 && !(cards || []).find(c => c.id === cardId); i++) await new Promise(r => setTimeout(r, 150));
   }
   openView(cardId);
