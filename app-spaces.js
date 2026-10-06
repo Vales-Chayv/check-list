@@ -188,6 +188,7 @@ function showSpaceSelector() {
   if(cb) { cb.style.display = currentUser ? 'block' : 'none'; cb.textContent = '📅 ' + t('Календарь'); }
   document.getElementById('space-selector').style.display = 'flex';
   document.body.classList.add('in-lobby');
+  document.body.classList.remove('in-cabinet');
   if(typeof subscribeGlobalChatWatch === 'function') subscribeGlobalChatWatch();
   if(typeof refreshChatWatchState === 'function') refreshChatWatchState();
 }
@@ -421,7 +422,9 @@ function setCurrentSpace(id, loadNew) {
   currentSpaceId = id;
   currentSpace = spaces.find(s=>s.id===id);
   localStorage.setItem('mc_current_space', id);
-  hideSpaceSelector();
+   hideSpaceSelector();
+  document.body.classList.add('in-cabinet');
+  if(typeof renderLobbyPanels === 'function') renderLobbyPanels();
   document.getElementById('space-pwd-ov').classList.remove('on');
   document.getElementById('space-member-ov').classList.remove('on');
 document.getElementById('current-space-name').textContent = currentSpace.name;
