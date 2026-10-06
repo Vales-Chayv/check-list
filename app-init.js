@@ -262,6 +262,7 @@ if(window.innerWidth >= 900) {
     if(_deskCalOpened) { desktopCalRefresh(); return; }
     if(typeof spaces === 'undefined' || !spaces || !spaces.length) return;
     _deskCalOpened = true;
+     document.body.classList.add('cal-on');
     if(typeof openCalendar === 'function') openCalendar();
     document.body.classList.remove('cal-on');
   } else {
