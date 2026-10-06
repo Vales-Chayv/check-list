@@ -148,6 +148,7 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
               ${eDl?`<span style="font-size:10px;opacity:.7">⏰ ${eDl.text}</span>`:''}
             </div>
           </div>
+          ${isGroupSpace ? '' : `<button onclick="toggleEntryStar('${id}','${e.id}')" style="background:none;border:none;cursor:pointer;font-size:15px;flex-shrink:0;padding:0 2px;opacity:${e.inTasks?1:.4}" title="В список задач">${e.inTasks?'⭐':'☆'}</button>`}
           ${isLocked ? '' : `<button class="entry-menu-btn" onclick="toggleEntryMenu(this,'${id}','${e.id}')">⋮</button>`}
         </div>
       </div>`;
@@ -311,6 +312,15 @@ function maybeOfferReset(cardId, justChecked) {
   const card = cards.find(c=>c.id===cardId); if(!card || !card.pinned || !justChecked) return;
   const allDone = (card.entries||[]).length>0 && (card.entries||[]).every(x=>x.done);
   if(allDone) setTimeout(()=>{ if(confirm('Все записи отмечены. Сбросить галочки?')) resetCardChecks(cardId); }, 120);
+}
+async function toggleEntryStar(cardId, entryId) {
+  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  const e = (card.entries||[]).find(x=>x.id===entryId); if(!e) return;
+  e.inTasks = !e.inTasks;
+  openView(cardId);
+  try { await dbUpdate(card); } catch(err) { toast('Ошибка синхронизации', true); }
+  if(typeof renderPersonalTasks === 'function') renderPersonalTasks();
+  toast(e.inTasks ? '⭐ В списке задач' : 'Убрано из списка задач');
 }
 async function viewToggleEntry(cardId, entryId) {
   const card=cards.find(c=>c.id===cardId); if(!card)return;
