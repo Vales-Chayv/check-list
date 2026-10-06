@@ -262,8 +262,8 @@ if(window.innerWidth >= 900) {
     if(_deskCalOpened) { desktopCalRefresh(); return; }
     if(typeof spaces === 'undefined' || !spaces || !spaces.length) return;
     _deskCalOpened = true;
-    document.body.classList.add('cal-on');
     if(typeof openCalendar === 'function') openCalendar();
+    document.body.classList.remove('cal-on');
   } else {
     if(_deskCalOpened) { _deskCalOpened = false; document.body.classList.remove('cal-on'); if(typeof closeCalendar === 'function') closeCalendar(); }
   }
@@ -274,7 +274,16 @@ function desktopCalRefresh() {
   if(_deskCalRefreshT) clearTimeout(_deskCalRefreshT);
  _deskCalRefreshT = setTimeout(() => { if(typeof calRefreshData === 'function') calRefreshData(); }, 1000);
 }
-
+// ── Кнопка «События» (ПК): исключает календарь и калькулятор, и наоборот ──
+function toggleDesktopEvents() {
+  const b = document.body.classList;
+  b.remove('cal-on', 'calc-on');
+  b.toggle('events-on');
+}
+new MutationObserver(() => {
+  const b = document.body.classList;
+  if(b.contains('events-on') && (b.contains('cal-on') || b.contains('calc-on'))) b.remove('events-on');
+}).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 // ── Ручка-разделитель панелей A/Б в лобби (ПК) ──
 (function initLobbySplitHandle() {
   const saved = localStorage.getItem('mc_lobby_split_v');

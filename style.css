@@ -310,6 +310,14 @@ body.in-lobby.cal-on #cal-ov, body.in-cabinet.cal-on #cal-ov { bottom: auto; hei
     height: 2px; transform: translateY(-50%); background: var(--b1);
   }
   #lobby-h-handle:hover::before { background: var(--accent); height: 3px; }
+    #desktop-events-toggle {
+    background: var(--s2); border: 1px solid var(--b1); border-radius: 18px; padding: 6px 12px;
+    color: var(--t2); font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  body.events-on #desktop-events-toggle { background: var(--accent); color: #0f0f0f; border-color: var(--accent); }
+  #lobby-panel-a { display: none !important; }
+  body.events-on #lobby-panel-a, body.cal-on #lobby-panel-a, body.calc-on #lobby-panel-a { display: flex !important; }
+  body:not(.events-on):not(.cal-on):not(.calc-on) #lobby-h-handle { display: none !important; }
  #cal-close-btn { display: none; }                 /* ✕ на ПК не нужен */
 #view-ov, #edit-ov, #ae-ov, #pin-strip-ov, #pin-popup-ov {
     inset: 0 auto 0 0; width: var(--split-left);    /* карточка/попап — в левой колонке, календарь справа виден */
