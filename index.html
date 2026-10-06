@@ -488,6 +488,13 @@
     </div>
   </div>
    <div id="lobby-panel-b">
+    <div id="lobby-b-tabs" style="display:flex;gap:6px;margin-bottom:12px">
+      <button id="lobby-tab-group" class="lobby-b-tab active" onclick="setLobbyBTab('group')">👥 Групповые</button>
+      <button id="lobby-tab-personal" class="lobby-b-tab" onclick="setLobbyBTab('personal')">⭐ Личные</button>
+    </div>
+    <div id="lobby-b-personal" style="display:none;flex-direction:column;width:100%">
+      <div id="personal-tasks-list"></div>
+    </div>
     <div id="lobby-panel-b-owner" style="display:flex;flex-direction:column;width:100%">
       <div style="margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--b1)">
         <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🟢 Онлайн сейчас</div>

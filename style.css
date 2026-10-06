@@ -240,6 +240,10 @@ body{display:flex;flex-direction:column;overflow:hidden}
   }
 }
 #lobby-h-handle { display: none; } /* ручка A/Б — видна только на ПК */
+.lobby-b-tab { background: var(--s2); border: 1px solid var(--b1); border-radius: 16px; padding: 5px 12px; color: var(--t2); font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.lobby-b-tab.active { background: var(--accent); color: #0f0f0f; border-color: var(--accent); }
+#lobby-panel-b.tab-personal > #lobby-panel-b-owner, #lobby-panel-b.tab-personal > #lobby-panel-b-member { display: none !important; }
+#lobby-panel-b.tab-personal > #lobby-b-personal { display: flex !important; }
 /* ── ПК (≥900px): карточки слева 40% / календарь справа 60% ── */
 @media (min-width:900px) {
   :root { --split-left: 40%; --lobby-split-v: 0.45; }

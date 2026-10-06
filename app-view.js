@@ -338,8 +338,8 @@ async function viewToggleEntry(cardId, entryId) {
     card.status='done';
     card.history=[...(card.history||[]),{date:nowStr(),text:'Все записи выполнены → Готово',type:'status'}];
   }
-   render(); openView(cardId);
-  try{await dbUpdate(card);}catch(err){toast('Ошибка синхронизации',true);}
+    try{await dbUpdate(card);}catch(err){toast('Ошибка синхронизации',true);}
+  if(typeof renderPersonalTasks === 'function') renderPersonalTasks();
   if(e.done && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof logEvent==='function') {
     logEvent(currentSpaceId, currentSpace?.name, 'task_done', `выполнил(а) «${e.text||card.title}»`, cardId);
   }
