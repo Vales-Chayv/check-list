@@ -564,7 +564,8 @@ if(onVals.includes('all')) {
       assigned_to: assignedTo,
 completions: completions,
       deadline,
-      groupId: targetGroupId
+           groupId: targetGroupId,
+      inTasks: !!deadline && !(currentSpace?.type==='family' || currentSpace?.type==='group')
     });
   });
   card.entries = [...sessionEntries, ...(card.entries||[])];
@@ -754,10 +755,12 @@ async function saveEntryEdit(cardId, entryId) {
   if(!stripTags(txt).trim()) return;
   entry.text = txt;
   const dl = document.getElementById('edit-entry-dl')?.value;
+if(dl && !entry.deadline && !(currentSpace?.type==='family' || currentSpace?.type==='group')) entry.inTasks = true;
 entry.deadline = dl || null;
   document.getElementById('edit-entry-dialog')?.remove();
   render(); openView(cardId);
-  try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
+    try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
+  if(typeof renderPersonalTasks === 'function') renderPersonalTasks();
 }
 
 let _mcTargetSpace = null;
