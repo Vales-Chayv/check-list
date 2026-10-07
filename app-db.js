@@ -103,7 +103,6 @@ async function _processSyncQueueInner() {
       } else if (op.type === 'update') {
         const merged = await mergeCardEntries(op.data);
         if (merged) op.data.entries = merged;
-        try { toast('🔧 очередь: ' + JSON.stringify(window._mergeDbg)); console.log('merge(queue)', window._mergeDbg); if(/тест|test/i.test(String(op.data.title || ''))) showMergeLog('ОЧЕРЕДЬ', op.data); } catch(e) {}
         const {id, ...data} = op.data;
         const {error} = await sb.from('cards').update(data).eq('id', id);
         if (error) throw error;
@@ -267,26 +266,11 @@ async function saveCardBases(list) {
     if(items.length) await local.putAll('meta', items);
   } catch(e) {}
 }
-function showMergeLog(tag, card) {
-  try {
-    const log = (window._mergeLogArr = window._mergeLogArr || []);
-    log.push(new Date().toLocaleTimeString() + ' ' + tag + ' «' + (card.title || '') + '»\n' + (window._mergeText || JSON.stringify(window._mergeDbg)));
-    while(log.length > 6) log.shift();
-    let p = document.getElementById('merge-log-panel');
-    if(!p) {
-      p = document.createElement('div'); p.id = 'merge-log-panel';
-      p.style.cssText = 'position:fixed;left:8px;right:8px;top:8px;max-height:70vh;overflow:auto;background:#000;color:#9f9;border:2px solid #e8c56a;border-radius:10px;padding:10px;z-index:99999;font:12px/1.4 monospace;white-space:pre-wrap;user-select:text';
-      document.body.appendChild(p);
-    }
-    p.innerHTML = '<div style="text-align:right"><button onclick="document.getElementById(\'merge-log-panel\').remove()" style="font-size:14px;padding:4px 12px">Закрыть ✕</button></div>';
-    const t = document.createElement('div'); t.textContent = log.join('\n———\n'); p.appendChild(t);
-  } catch(e) {}
-}
+
 async function mergeCardEntries(card) {
-  window._mergeText = '';
-  try {
+   try {
     const { data: srv, error } = await sb.from('cards').select('entries').eq('id', card.id).maybeSingle();
-    if(error || !srv) { window._mergeDbg = {why: error ? ('ошибка: ' + error.message) : 'карточки нет на сервере'}; return null; }
+    if(error || !srv) return null;
     const base = (await local.getMeta('base:' + card.id)) || null;
     const L = card.entries || [], S = srv.entries || [];
     const lm = new Map(L.filter(e => e && e.id).map(e => [e.id, e]));
@@ -311,12 +295,8 @@ async function mergeCardEntries(card) {
       }
     });
     const out = [...front, ...rest];
-    const nm = e => ((e && (e.text || e.sessionNote)) ? String(e.text || e.sessionNote).replace(/<[^>]*>/g, '').slice(0, 8) : String((e && e.id) || '?').slice(0, 4));
-    const nameById = {}; [...L, ...S].forEach(e => { if(e && e.id) nameById[e.id] = nm(e); });
-    window._mergeDbg = {L: L.length, S: S.length, base: base ? Object.keys(base).length : 'нет', out: out.length};
-    window._mergeText = 'У меня: ' + L.map(nm).join(', ') + '\nНа сервере: ' + S.map(nm).join(', ') + '\nБаза: ' + (base ? Object.keys(base).map(id => nameById[id] || id.slice(0, 4)).join(', ') : 'нет') + '\nИтог: ' + out.map(nm).join(', ');
-    return out;
-  } catch(e) { window._mergeDbg = {why: 'сбой: ' + e.message}; return null; }
+        return out;
+  } catch(e) { return null; }
 }
 async function dbInsert(card) {
   await local.put('cards', card);
@@ -334,8 +314,6 @@ async function dbUpdate(card) {
   if (navigator.onLine) {
     setSyncDot('sync');
     const merged = await mergeCardEntries(card);
-    try { if(/тест|test/i.test(String(card.title || ''))) showMergeLog('СОХРАНЕНИЕ', card); } catch(e) {}
-    try { if(window._mergeDbg && (window._mergeDbg.why || window._mergeDbg.L !== window._mergeDbg.out || window._mergeDbg.S !== window._mergeDbg.out)) { toast('🔧 слияние: ' + JSON.stringify(window._mergeDbg)); console.log('merge(save)', window._mergeDbg); } } catch(e) {}
     if(merged && stableStr(merged) !== stableStr(card.entries || [])) {
       card.entries = merged;
       await local.put('cards', card);
