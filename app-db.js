@@ -275,7 +275,7 @@ async function dbInsert(card) {
   } else { await queueOp({type:'insert',data:card}); setSyncDot('err'); }
 }
 
-aasync function dbUpdate(card) {
+async function dbUpdate(card) {
   await local.put('cards', card);
   if (navigator.onLine) {
     setSyncDot('sync');
