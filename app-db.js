@@ -192,6 +192,7 @@ async function syncFromServer() {
     await local.clear('cards');
     if(_keep.length) await local.putAll('cards', _keep);
     if(cr.data?.length) await local.putAll('cards', cr.data);
+    await saveCardBases(cr.data);
   const _allLocalCats = await local.getAll('categories');
     const _keepCats = _allLocalCats.filter(c => c.space_id !== currentSpaceId);
     await local.clear('categories');
@@ -210,24 +211,83 @@ applyCatsOrder(); setSyncDot('ok'); render(); startIntervalReminders();
     render();
   }
 }
-
+// ═══════════════════════════════════════════
+//  СЛИЯНИЕ ЗАПИСЕЙ (защита от потери данных при правках с двух устройств)
+// ═══════════════════════════════════════════
+function stableStr(v) {
+  if(v === null || typeof v !== 'object') return JSON.stringify(v === undefined ? null : v);
+  if(Array.isArray(v)) return '[' + v.map(stableStr).join(',') + ']';
+  return '{' + Object.keys(v).filter(k => v[k] !== undefined).sort().map(k => JSON.stringify(k) + ':' + stableStr(v[k])).join(',') + '}';
+}
+function entryHash(e) {
+  const s = stableStr(e); let h = 5381;
+  for(let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return h + ':' + s.length;
+}
+function cardBaseMap(card) {
+  const m = {};
+  (card.entries || []).forEach(e => { if(e && e.id) m[e.id] = entryHash(e); });
+  return m;
+}
+function saveCardBase(card) { return local.setMeta('base:' + card.id, cardBaseMap(card)).catch(() => {}); }
+function saveCardBases(list) {
+  if(!list || !list.length) return Promise.resolve();
+  return local.putAll('meta', list.map(c => ({ key: 'base:' + c.id, value: cardBaseMap(c) }))).catch(() => {});
+}
+async function mergeCardEntries(card) {
+  try {
+    const { data: srv, error } = await sb.from('cards').select('entries').eq('id', card.id).maybeSingle();
+    if(error || !srv) return null;
+    const base = (await local.getMeta('base:' + card.id)) || null;
+    const L = card.entries || [], S = srv.entries || [];
+    const lm = new Map(L.filter(e => e && e.id).map(e => [e.id, e]));
+    const sm = new Map(S.filter(e => e && e.id).map(e => [e.id, e]));
+    const front = [], rest = [];
+    L.forEach(l => {
+      if(!l || !l.id || sm.has(l.id)) return;
+      const b = base ? base[l.id] : undefined;
+      if(b === undefined || entryHash(l) !== b) front.push(l);   // новая или изменённая у меня; иначе её удалили на другом устройстве
+    });
+    S.forEach(s => {
+      if(!s || !s.id) { rest.push(s); return; }
+      const l = lm.get(s.id), b = base ? base[s.id] : undefined;
+      if(!l) {
+        if(b === undefined || entryHash(s) !== b) rest.push(s);  // новая на сервере или изменена там; иначе я её удалила
+      } else {
+        const hl = entryHash(l), hs = entryHash(s);
+        if(hl === hs) rest.push(l);
+        else if(b !== undefined && hs === b) rest.push(l);       // менялась только у меня
+        else if(b !== undefined && hl === b) rest.push(s);       // менялась только на другом устройстве
+        else rest.push(l);                                       // менялась на обоих — побеждает это устройство
+      }
+    });
+    return [...front, ...rest];
+  } catch(e) { return null; }
+}
 async function dbInsert(card) {
   await local.put('cards', card);
   if (navigator.onLine) {
     setSyncDot('sync');
     const {error}=await sb.from('cards').insert(card);
+    if(!error) saveCardBase(card);
     if(error){ if(error.code!=='23505') await queueOp({type:'insert',data:card}); setSyncDot('err'); }
     else setSyncDot('ok');
   } else { await queueOp({type:'insert',data:card}); setSyncDot('err'); }
 }
 
-async function dbUpdate(card) {
+aasync function dbUpdate(card) {
   await local.put('cards', card);
   if (navigator.onLine) {
     setSyncDot('sync');
+    const merged = await mergeCardEntries(card);
+    if(merged && stableStr(merged) !== stableStr(card.entries || [])) {
+      card.entries = merged;
+      await local.put('cards', card);
+      if(typeof render === 'function') render();
+    }
     const {id,...d}=card; const {error}=await sb.from('cards').update(d).eq('id',id);
     if(error){ await queueOp({type:'update',data:card}); setSyncDot('err'); }
-    else setSyncDot('ok');
+    else { saveCardBase(card); setSyncDot('ok'); }
   } else { await queueOp({type:'update',data:card}); setSyncDot('err'); }
 }
 
@@ -343,10 +403,12 @@ function handleRealtimeCard(payload) {
   const { eventType, new: n, old: o } = payload;
   if(eventType === 'INSERT') {
     if(!cards.find(c => c.id === n.id)) { cards.unshift(n); local.put('cards', n); }
+    saveCardBase(n);
 } else if(eventType === 'UPDATE') {
     if(n.space_id && currentSpaceId && n.space_id !== currentSpaceId) {
       cards = cards.filter(c => c.id !== n.id); local.delete('cards', n.id); // карточку перенесли в другой кабинет
     } else {
+      saveCardBase(n);
       const idx = cards.findIndex(c => c.id === n.id);
       const previousEntries = idx !== -1 ? cards[idx].entries : null; // кэш ДО обновления — payload.old может быть неполным
       if(idx !== -1) { cards[idx] = n; local.put('cards', n); }
