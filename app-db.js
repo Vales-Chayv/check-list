@@ -78,24 +78,40 @@ async function clearQueueItem(id) {
   return dbLocal('queue', 'readwrite', s => s.delete(id));
 }
 
-async function processSyncQueue() {
-  if (!navigator.onLine) return;
+let _queuePromise = null;
+function processSyncQueue() {
+  if (!navigator.onLine) return Promise.resolve();
+  if (!_queuePromise) _queuePromise = _processSyncQueueInner().finally(() => { _queuePromise = null; });
+  return _queuePromise;
+}
+async function _processSyncQueueInner() {
   const queue = await getQueue();
   if (!queue.length) return;
   console.log(`Syncing ${queue.length} pending operations...`);
-  for (const op of queue) {
+  // каждая правка карточки хранит её целиком — достаточно отправить последнюю для каждой карточки
+  const lastUpdate = {};
+  queue.forEach((o, i) => { if (o.type === 'update' && o.data) lastUpdate[o.data.id] = i; });
+  for (let i = 0; i < queue.length; i++) {
+    const op = queue[i];
     try {
+      if (op.type === 'update' && lastUpdate[op.data.id] !== i) { await clearQueueItem(op.id); continue; }
       if (op.type === 'insert') {
         const {error} = await sb.from('cards').insert(op.data);
         if (error && error.code !== '23505') throw error; // ignore duplicate
+        await clearQueueItem(op.id); saveCardBase(op.data);
+        continue;
       } else if (op.type === 'update') {
+        const merged = await mergeCardEntries(op.data);
+        if (merged) op.data.entries = merged;
         const {id, ...data} = op.data;
         const {error} = await sb.from('cards').update(data).eq('id', id);
         if (error) throw error;
+        await clearQueueItem(op.id); saveCardBase(op.data);
+        continue;
       } else if (op.type === 'delete') {
         const {error} = await sb.from('cards').delete().eq('id', op.data.id);
         if (error) throw error;
-} else if (op.type === 'insert_cat') {
+      } else if (op.type === 'insert_cat') {
         const {error} = await sb.from('categories').insert(op.data);
         if (error && error.code !== '23505') throw error;
       } else if (op.type === 'insert_event') {
@@ -180,6 +196,7 @@ async function prefetchAllSpaces() {
 async function syncFromServer() {
   if (!navigator.onLine) { setSyncDot('err'); render(); return; }
   try {
+  await processSyncQueue();
   const spaceIdForQuery = currentSpaceId || 'personal';
     let cardsQuery = sb.from('cards').select('*').order('created_at',{ascending:false}).eq('space_id', spaceIdForQuery);
     let catsQuery = sb.from('categories').select('*').eq('space_id', spaceIdForQuery);
@@ -229,10 +246,25 @@ function cardBaseMap(card) {
   (card.entries || []).forEach(e => { if(e && e.id) m[e.id] = entryHash(e); });
   return m;
 }
-function saveCardBase(card) { return local.setMeta('base:' + card.id, cardBaseMap(card)).catch(() => {}); }
-function saveCardBases(list) {
-  if(!list || !list.length) return Promise.resolve();
-  return local.putAll('meta', list.map(c => ({ key: 'base:' + c.id, value: cardBaseMap(c) }))).catch(() => {});
+async function pendingCardIds() {
+  try {
+    const q = await getQueue();
+    return new Set(q.filter(o => (o.type === 'update' || o.type === 'insert') && o.data && o.data.id).map(o => o.data.id));
+  } catch(e) { return new Set(); }
+}
+async function saveCardBase(card) {
+  try {
+    if((await pendingCardIds()).has(card.id)) return;
+    await local.setMeta('base:' + card.id, cardBaseMap(card));
+  } catch(e) {}
+}
+async function saveCardBases(list) {
+  try {
+    if(!list || !list.length) return;
+    const pend = await pendingCardIds();
+    const items = list.filter(c => !pend.has(c.id)).map(c => ({ key: 'base:' + c.id, value: cardBaseMap(c) }));
+    if(items.length) await local.putAll('meta', items);
+  } catch(e) {}
 }
 async function mergeCardEntries(card) {
   try {
