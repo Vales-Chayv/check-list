@@ -103,6 +103,7 @@ async function _processSyncQueueInner() {
       } else if (op.type === 'update') {
         const merged = await mergeCardEntries(op.data);
         if (merged) op.data.entries = merged;
+        try { toast('🔧 очередь: ' + JSON.stringify(window._mergeDbg)); console.log('merge(queue)', window._mergeDbg); } catch(e) {}
         const {id, ...data} = op.data;
         const {error} = await sb.from('cards').update(data).eq('id', id);
         if (error) throw error;
@@ -269,7 +270,7 @@ async function saveCardBases(list) {
 async function mergeCardEntries(card) {
   try {
     const { data: srv, error } = await sb.from('cards').select('entries').eq('id', card.id).maybeSingle();
-    if(error || !srv) return null;
+    if(error || !srv) { window._mergeDbg = {why: error ? ('ошибка: ' + error.message) : 'карточки нет на сервере'}; return null; }
     const base = (await local.getMeta('base:' + card.id)) || null;
     const L = card.entries || [], S = srv.entries || [];
     const lm = new Map(L.filter(e => e && e.id).map(e => [e.id, e]));
@@ -293,8 +294,10 @@ async function mergeCardEntries(card) {
         else rest.push(l);                                       // менялась на обоих — побеждает это устройство
       }
     });
-    return [...front, ...rest];
-  } catch(e) { return null; }
+    const out = [...front, ...rest];
+    window._mergeDbg = {L: L.length, S: S.length, base: base ? Object.keys(base).length : 'нет', out: out.length};
+    return out;
+  } catch(e) { window._mergeDbg = {why: 'сбой: ' + e.message}; return null; }
 }
 async function dbInsert(card) {
   await local.put('cards', card);
@@ -312,6 +315,7 @@ async function dbUpdate(card) {
   if (navigator.onLine) {
     setSyncDot('sync');
     const merged = await mergeCardEntries(card);
+    try { if(window._mergeDbg && (window._mergeDbg.why || window._mergeDbg.L !== window._mergeDbg.out || window._mergeDbg.S !== window._mergeDbg.out)) { toast('🔧 слияние: ' + JSON.stringify(window._mergeDbg)); console.log('merge(save)', window._mergeDbg); } } catch(e) {}
     if(merged && stableStr(merged) !== stableStr(card.entries || [])) {
       card.entries = merged;
       await local.put('cards', card);
