@@ -103,7 +103,7 @@ async function _processSyncQueueInner() {
       } else if (op.type === 'update') {
         const merged = await mergeCardEntries(op.data);
         if (merged) op.data.entries = merged;
-        try { toast('🔧 очередь: ' + JSON.stringify(window._mergeDbg)); console.log('merge(queue)', window._mergeDbg); } catch(e) {}
+        try { toast('🔧 очередь: ' + JSON.stringify(window._mergeDbg)); console.log('merge(queue)', window._mergeDbg); if(op.data.title && String(op.data.title).startsWith('ТЕСТ')) alert('ОЧЕРЕДЬ, карточка ' + op.data.title + '\n' + (window._mergeText || JSON.stringify(window._mergeDbg))); } catch(e) {}
         const {id, ...data} = op.data;
         const {error} = await sb.from('cards').update(data).eq('id', id);
         if (error) throw error;
@@ -268,6 +268,7 @@ async function saveCardBases(list) {
   } catch(e) {}
 }
 async function mergeCardEntries(card) {
+  window._mergeText = '';
   try {
     const { data: srv, error } = await sb.from('cards').select('entries').eq('id', card.id).maybeSingle();
     if(error || !srv) { window._mergeDbg = {why: error ? ('ошибка: ' + error.message) : 'карточки нет на сервере'}; return null; }
@@ -295,7 +296,10 @@ async function mergeCardEntries(card) {
       }
     });
     const out = [...front, ...rest];
+    const nm = e => ((e && (e.text || e.sessionNote)) ? String(e.text || e.sessionNote).replace(/<[^>]*>/g, '').slice(0, 8) : String((e && e.id) || '?').slice(0, 4));
+    const nameById = {}; [...L, ...S].forEach(e => { if(e && e.id) nameById[e.id] = nm(e); });
     window._mergeDbg = {L: L.length, S: S.length, base: base ? Object.keys(base).length : 'нет', out: out.length};
+    window._mergeText = 'У меня: ' + L.map(nm).join(', ') + '\nНа сервере: ' + S.map(nm).join(', ') + '\nБаза: ' + (base ? Object.keys(base).map(id => nameById[id] || id.slice(0, 4)).join(', ') : 'нет') + '\nИтог: ' + out.map(nm).join(', ');
     return out;
   } catch(e) { window._mergeDbg = {why: 'сбой: ' + e.message}; return null; }
 }
@@ -315,6 +319,7 @@ async function dbUpdate(card) {
   if (navigator.onLine) {
     setSyncDot('sync');
     const merged = await mergeCardEntries(card);
+    try { if(card.title && String(card.title).startsWith('ТЕСТ')) alert('СОХРАНЕНИЕ, карточка ' + card.title + '\n' + (window._mergeText || JSON.stringify(window._mergeDbg))); } catch(e) {}
     try { if(window._mergeDbg && (window._mergeDbg.why || window._mergeDbg.L !== window._mergeDbg.out || window._mergeDbg.S !== window._mergeDbg.out)) { toast('🔧 слияние: ' + JSON.stringify(window._mergeDbg)); console.log('merge(save)', window._mergeDbg); } } catch(e) {}
     if(merged && stableStr(merged) !== stableStr(card.entries || [])) {
       card.entries = merged;
