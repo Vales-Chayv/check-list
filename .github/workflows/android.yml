@@ -42,6 +42,9 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
+      - name: Show signing fingerprint
+        run: keytool -printcert -jarfile android/app/build/outputs/apk/debug/app-debug.apk | grep SHA256 || true
+
       - uses: actions/upload-artifact@v4
         with:
           name: mycards-apk
