@@ -1,0 +1,8 @@
+{
+  "appId": "app.mycards.mobile",
+  "appName": "Мои карточки",
+  "webDir": "www",
+  "server": {
+    "url": "https://vales-chayv.github.io/check-list/"
+  }
+}
