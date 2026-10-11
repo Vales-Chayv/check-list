@@ -146,9 +146,7 @@ async function sendQuickChatMessage(cardId){
   await dbUpdate(card);
   if(Array.isArray(card.chatParticipants) && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof notifyUsers === 'function') {
     const senderName = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
-    const _plain = sessionEntries.some(e => !e.assigned_to);
-    const _names = _plain ? null : [...new Set(sessionEntries.flatMap(e => e.assigned_to === 'all' ? (e.completions||[]).map(c => c.name) : [e.assigned_to]))];
-    const recipientIds = chatRecipientIds(card, _names);
+      const recipientIds = chatRecipientIds(card);
     if(recipientIds.length) await notifyUsers(recipientIds, '💬 ' + card.title, `{{name}}: ${text.slice(0,60)}`, currentUser?.id, senderName, `https://vales-chayv.github.io/check-list/?openSpace=${currentSpaceId}&openCard=${cardId}`);
   }
 }
@@ -270,7 +268,7 @@ async function sendQuickAttachment(cardId, file){
     openView(cardId);
     setTimeout(()=>{ const sheet = document.querySelector('#view-ov .sheet'); if(sheet) sheet.scrollTop = 0; }, 50);
     if(Array.isArray(card.chatParticipants) && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof notifyUsers === 'function') {
-      const recipientIds = (currentSpace?.members_auth||[]).map(m=>m.user_id).filter(id=>id && id!==currentUser?.id);
+      const recipientIds = chatRecipientIds(card);
       if(recipientIds.length) await notifyUsers(recipientIds, '💬 ' + card.title, `{{name}}: ${kindLabel}`, currentUser?.id, myName, `https://vales-chayv.github.io/check-list/?openSpace=${currentSpaceId}&openCard=${card.id}`);
     }
     toast('✓ Отправлено');

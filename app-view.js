@@ -590,7 +590,9 @@ completions: completions,
   if(Array.isArray(card.chatParticipants) && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof notifyUsers === 'function') {
     const senderName = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
     const preview = (sessionEntries[0]?.text || sessionNote || '📎 Вложение').slice(0,60);
-    const recipientIds = (currentSpace?.members_auth||[]).map(m=>m.user_id).filter(id=>id && id!==currentUser?.id);
+    const _plain = sessionEntries.some(e => !e.assigned_to);
+    const _names = _plain ? null : [...new Set(sessionEntries.flatMap(e => e.assigned_to === 'all' ? (e.completions||[]).map(c => c.name) : [e.assigned_to]))];
+    const recipientIds = chatRecipientIds(card, _names);
     if(recipientIds.length) await notifyUsers(recipientIds, '💬 ' + card.title, `{{name}}: ${preview}`, currentUser?.id, senderName, `https://vales-chayv.github.io/check-list/?openSpace=${currentSpaceId}&openCard=${card.id}`);
   }
   setTimeout(() => openView(aeCardId), 300);
