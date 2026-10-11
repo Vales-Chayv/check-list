@@ -146,7 +146,9 @@ async function sendQuickChatMessage(cardId){
   await dbUpdate(card);
   if(Array.isArray(card.chatParticipants) && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof notifyUsers === 'function') {
     const senderName = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
-    const recipientIds = (currentSpace?.members_auth||[]).map(m=>m.user_id).filter(id=>id && id!==currentUser?.id);
+    const _plain = sessionEntries.some(e => !e.assigned_to);
+    const _names = _plain ? null : [...new Set(sessionEntries.flatMap(e => e.assigned_to === 'all' ? (e.completions||[]).map(c => c.name) : [e.assigned_to]))];
+    const recipientIds = chatRecipientIds(card, _names);
     if(recipientIds.length) await notifyUsers(recipientIds, '💬 ' + card.title, `{{name}}: ${text.slice(0,60)}`, currentUser?.id, senderName, `https://vales-chayv.github.io/check-list/?openSpace=${currentSpaceId}&openCard=${cardId}`);
   }
 }
@@ -311,6 +313,20 @@ function chatCancelVoice(){
   chatRecordedChunks=[];
   document.getElementById('chat-voice-ov')?.remove();
 }
+// Кому слать пуш по чату: участники ЭТОГО чата (имена → аккаунты), без самого отправителя.
+// onlyNames — если задан, ограничиваем получателей этими именами (задача конкретным людям).
+function chatRecipientIds(card, onlyNames) {
+  const low = s => String(s||'').trim().toLowerCase();
+  const part = (card?.chatParticipants||[]).map(low);
+  const want = Array.isArray(onlyNames) ? onlyNames.map(low) : null;
+  const ids = new Set();
+  [...(currentSpace?.members||[]), ...(currentSpace?.members_auth||[])].forEach(m => {
+    const n = low(m?.name);
+    if(m?.user_id && part.includes(n) && (!want || want.includes(n))) ids.add(m.user_id);
+  });
+  ids.delete(currentUser?.id);
+  return [...ids];
+}
 // ── Закрытие чата ──
 async function notifyUsers(userIds, title, body, senderId, senderName, url) {
   if(!userIds.length) return;
@@ -374,7 +390,7 @@ async function requestCloseChat(cardId) {
   const closeReqTitle = '🔒 Запрос на закрытие чата';
   const closeReqBody = `«${card.title}» — просит закрыть ${localStorage.getItem('mc_current_member')||''}`;
   showChatNotice(closeReqTitle, closeReqBody, cardId);
-  if(ownerId) await notifyUsers([ownerId], closeReqTitle, closeReqBody);
+  if(ownerId) await notifyUsers([ownerId], closeReqTitle, closeReqBody, null, null, `https://vales-chayv.github.io/check-list/?openSpace=${currentSpaceId}&openCard=${card.id}`);
   toast('✓ Запрос отправлен создателю группы');
 }
 
@@ -388,7 +404,8 @@ async function actuallyCloseChat(cardId) {
   showChatNotice(closedTitle, closedBody, cardId);
   // Уведомляем через push только тех, у кого есть привязанный аккаунт (members_auth), т.к. push идёт по user_id
    const authIds = (currentSpace?.members_auth||[]).map(m=>m.user_id).filter(Boolean);
-  if(authIds.length) await notifyUsers(authIds, closedTitle, closedBody);
+  const _closedIds = chatRecipientIds(card);
+  if(_closedIds.length) await notifyUsers(_closedIds, closedTitle, closedBody, null, null, `https://vales-chayv.github.io/check-list/?openSpace=${currentSpaceId}&openCard=${card.id}`);
   if(typeof logEvent === 'function') logEvent(currentSpaceId, currentSpace?.name, 'chat_closed', `закрыл(а) чат «${card.title}»`, cardId);
   toast('✓ Чат закрыт');
 }
@@ -422,7 +439,7 @@ async function chatFinishVoice(){
     setTimeout(()=>{ const sheet = document.querySelector('#view-ov .sheet'); if(sheet) sheet.scrollTop = 0; }, 50);
     toast('✓ Голосовое отправлено');
     if(Array.isArray(card.chatParticipants) && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof notifyUsers === 'function') {
-      const recipientIds = (currentSpace?.members_auth||[]).map(m=>m.user_id).filter(id=>id && id!==currentUser?.id);
+      const recipientIds = chatRecipientIds(card);
       if(recipientIds.length) await notifyUsers(recipientIds, '💬 ' + card.title, `{{name}}: 🎙️ Голосовое сообщение`, currentUser?.id, entry.sessionCreator, `https://vales-chayv.github.io/check-list/?openSpace=${currentSpaceId}&openCard=${card.id}`);
     }
   } catch(e) {
