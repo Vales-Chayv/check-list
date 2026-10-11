@@ -3,14 +3,6 @@
 // ═══════════════════════════════════════════
 async function openSettings() {
   try {
-    const {data}=await sb.from('settings').select('*').eq('id',1).single();
-    if(data){
-      notifEnabled=data.notification_enabled;
-      document.getElementById('set-hour').value=String(data.notification_hour);
-      updateNotifToggleUI();
-    }
-  }catch{}
-  try {
     const {data:prof} = await sb.from('profiles').select('phone').eq('id', currentUser?.id).single();
     const phoneInp = document.getElementById('set-phone');
     if(phoneInp) phoneInp.value = prof?.phone || '';
@@ -28,20 +20,7 @@ async function savePhone() {
   } catch(e) { toast('Ошибка: '+e.message, true); }
 }
 function closeSettings() { document.getElementById('set-ov').classList.remove('on'); }
-function toggleNotif() { notifEnabled=!notifEnabled; updateNotifToggleUI(); }
-function updateNotifToggleUI() {
-  const t=document.getElementById('notif-track');
-  t.querySelector('.tog-knob').style.left=notifEnabled?'23px':'3px';
-  t.style.background=notifEnabled?'var(--accent)':'var(--s1)';
-}
-async function saveSettings() {
-  const hour=parseInt(document.getElementById('set-hour').value);
-  try{
-    const{error}=await sb.from('settings').update({notification_hour:hour,notification_enabled:notifEnabled}).eq('id',1);
-    if(error)throw error;
-    closeSettings(); toast('✓ Настройки сохранены');
-  }catch(e){toast('Ошибка: '+e.message,true);}
-}
+async function saveSettings() { closeSettings(); }
 function changePwd() {
   const v=document.getElementById('set-pwd').value.trim(); if(!v)return;
   localStorage.setItem('mc_pwd',v); document.getElementById('set-pwd').value='';
