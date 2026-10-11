@@ -17,6 +17,7 @@ function openEdit(id) {
   freqVal=card?.reminder?.freq||'daily';
   customDays=[...(card?.reminder?.days||[])];
   intervalMin = card?.reminder?.intervalMin || 30;
+  remHour = Number.isInteger(card?.reminder?.hour) ? card.reminder.hour : 9;
 
  const isFamily = currentSpace?.type === 'family';
   const isPersonal = currentSpace?.type === 'personal';
@@ -190,7 +191,22 @@ document.getElementById('seg-ball').addEventListener('click',e=>{
 
 // Reminder
 function toggleRem() { remOn=!remOn; updateRemUI(); }
+var remHour = 9;
+function syncRemHour() {
+  const sel = document.getElementById('rem-hour'); if(!sel) return;
+  if(!sel.options.length) {
+    for(let h = 0; h < 24; h++) {
+      const o = document.createElement('option');
+      o.value = h; o.textContent = String(h).padStart(2,'0') + ':00';
+      sel.appendChild(o);
+    }
+  }
+  sel.value = String(remHour);
+  document.getElementById('rem-hour-row').style.display = freqVal === 'interval' ? 'none' : 'flex';
+}
+document.getElementById('seg-freq').addEventListener('click', () => setTimeout(syncRemHour, 0));
 function updateRemUI() {
+  syncRemHour();
   const track=document.getElementById('rem-track');
   track.querySelector('.tog-knob').style.left=remOn?'23px':'3px';
   track.style.background=remOn?'var(--accent)':'var(--s1)';
@@ -496,7 +512,7 @@ async function saveCard() {
     attachments: isFamily&&!editId ? [] : tempAtt,
    entries:sessionEntries,
     entryGroups: groupedMode ? tempEntryGroups.filter(g=>g.name||!g._naming).map(({_naming,_expanded,...g})=>g) : [],
-    reminder:{enabled:remOn,freq:freqVal,days:customDays,intervalMin:freqVal==='interval'?intervalMin:null},
+    reminder:{enabled:remOn,freq:freqVal,days:customDays,hour:remHour,intervalMin:freqVal==='interval'?intervalMin:null},
     history:hist, related_ids:tempRelIds
   };
   setSaveBtns(false);

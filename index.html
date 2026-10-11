@@ -174,6 +174,10 @@
             <button class="seg-btn" data-freq="custom">Свои дни</button>
 			<button class="seg-btn" data-freq="interval">Интервал</button>
           </div>
+          <div id="rem-hour-row" style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;color:var(--t2)">Время напоминания</span>
+            <select id="rem-hour" onchange="remHour=parseInt(this.value)" style="background:var(--s1);border:1px solid var(--b1);border-radius:var(--rsm);padding:7px 10px;font-size:14px;color:var(--t1);font-family:inherit"></select>
+          </div>
           <div id="day-picker" style="display:none">
             <div class="days" id="days-row">
               <button class="day-btn" data-d="0">Пн</button>

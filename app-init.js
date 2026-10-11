@@ -249,7 +249,8 @@ async function subscribeToPush() {
       body: JSON.stringify({
         subscription: sub.toJSON(),
         deviceName: navigator.userAgent.slice(0,60),
-        userId: currentUser?.id || null
+        userId: currentUser?.id || null,
+        timezone: (Intl.DateTimeFormat().resolvedOptions().timeZone || null)
       })
     });
   } catch(e) { console.log('Push subscribe error:', e.message); }
