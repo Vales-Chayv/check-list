@@ -228,6 +228,9 @@ function urlBase64ToUint8Array(base64String) {
 async function subscribeToPush() {
   if(!('serviceWorker' in navigator) || !('PushManager' in window)) return;
   try {
+    // ждём, пока приложение узнает, кто вошёл (иначе подписка сохранится без владельца)
+    for(let i = 0; i < 600 && !currentUser?.id; i++) await new Promise(r => setTimeout(r, 500));
+    if(!currentUser?.id) return;
     const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
     if(!sub) {

@@ -82,17 +82,13 @@ async function subscribePush() {
   try {
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){toast('Разрешение не дано',true);return;}
-    const reg=await navigator.serviceWorker.ready;
-    const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64toUint8(VAPID_PUB)});
-    const device=/iPhone/.test(navigator.userAgent)?'iPhone':/Android/.test(navigator.userAgent)?'Android':'ПК';
-    const res=await fetch(FUNC_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_ANON},body:JSON.stringify({subscription:sub.toJSON(),deviceName:device})});
-    if(!res.ok){const t=await res.text();throw new Error(`${res.status}: ${t.slice(0,120)}`);}
+    await subscribeToPush();
     toast('✅ Уведомления включены!'); checkPushStatus();
   }catch(e){toast('Ошибка: '+(e.message||String(e)),true);}
 }
 
 async function unsubscribePush() {
-  try{const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();if(sub)await sub.unsubscribe();toast('Уведомления отключены');checkPushStatus();}
+  try{const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();if(sub){const ep=sub.endpoint;await sub.unsubscribe();try{await fetch(FUNC_URL,{method:'POST',headers:{'Content-Type':'application/json','apikey':SB_ANON,'Authorization':'Bearer '+SB_ANON},body:JSON.stringify({unsubscribe:true,endpoint:ep})});}catch(_e){}}toast('Уведомления отключены');checkPushStatus();}
   catch(e){toast('Ошибка',true);}
 }
 
