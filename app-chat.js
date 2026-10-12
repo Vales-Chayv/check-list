@@ -241,6 +241,26 @@ if('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('messa
   if(e.data && e.data.type === 'whichCard' && e.ports && e.ports[0]) e.ports[0].postMessage(window._openViewId || null);
 });
 
+// вернулись в приложение с открытым чатом — убираем его пуш и подтягиваем свежие сообщения
+async function _chatResumeSync() {
+  if(document.visibilityState !== 'visible') return;
+  const id = window._openViewId;
+  if(!id || !document.getElementById('view-ov')?.classList.contains('on')) return;
+  const card = cards.find(c => c.id === id); if(!card) return;
+  try { window.mcClearNative?.(id, card.title); } catch(e) {}
+  try { navigator.serviceWorker?.ready.then(reg => reg.getNotifications().then(list => list.forEach(n => { if((n.data?.url||'').includes('openCard='+id)) n.close(); }))); } catch(e) {}
+  try {
+    const { data } = await sb.from('cards').select('*').eq('id', id).maybeSingle();
+    if(data && window._openViewId === id && (data.entries||[]).length !== (card.entries||[]).length) {
+      const i = cards.findIndex(c => c.id === id); if(i >= 0) cards[i] = data;
+      openView(id);
+      if(typeof markChatRead === 'function') markChatRead(id);
+    }
+  } catch(e) {}
+}
+document.addEventListener('visibilitychange', _chatResumeSync);
+window.addEventListener('focus', _chatResumeSync);
+
 function toggleChatFan(cardId){
   if(_chatFanOpen) {
     // Кнопка уже открыта — повторное нажатие сразу выполняет последнее действие веера («Задача»), а не просто закрывает его
