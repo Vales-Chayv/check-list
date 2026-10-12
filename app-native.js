@@ -122,6 +122,15 @@
     } catch (e) { toast('Ошибка: ' + (e.message || String(e)), true); }
   };
 
+  // ── открыли чат — убираем именно его пуши из шторки Android ──
+  window.mcClearNative = async function (cardId) {
+    try {
+      const r = await PN.getDeliveredNotifications();
+      const mine = (r.notifications || []).filter(n => String((n.data && n.data.url) || '').includes('openCard=' + cardId));
+      if (mine.length) await PN.removeDeliveredNotifications({ notifications: mine });
+    } catch (e) { console.warn('clear native', e); }
+  };
+
   // ── старт: при каждом запуске обновляем токен, при первом запуске сами просим разрешение ──
   window.subscribeToPush();
 })();
