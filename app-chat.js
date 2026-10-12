@@ -115,6 +115,10 @@ async function confirmCreateChat(){
   render();
   toast('✓ Чат создан');
   await dbInsert(card);
+  try {
+    const _inv = chatRecipientIds(card);
+    if(_inv.length) await notifyUsers(_inv, '💬 Новый чат', `{{name}} пригласил(а) тебя в чат «${title}»`, currentUser?.id, card.created_by, `https://vales-chayv.github.io/check-list/?openSpace=${currentSpaceId}&openCard=${card.id}`);
+  } catch(e) { console.warn('invite push', e); }
   if(typeof logEvent === 'function') logEvent(currentSpaceId, currentSpace?.name, 'chat_created', `создал(а) чат «${title}»`, card.id);
   openView(card.id);
 }
