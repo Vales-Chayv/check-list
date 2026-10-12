@@ -31,6 +31,11 @@ jobs:
           npx cap add android
           npx cap sync android
 
+      - name: Add Firebase config
+        run: |
+          cp google-services.json android/app/google-services.json
+          grep -q POST_NOTIFICATIONS android/app/src/main/AndroidManifest.xml || sed -i 's#<application#<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <application#' android/app/src/main/AndroidManifest.xml
+
       - name: Point Gradle at the permanent test key
         run: |
           cat > "$GITHUB_WORKSPACE/sign.gradle" <<'EOF'
