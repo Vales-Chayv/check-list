@@ -21,6 +21,7 @@ function openView(id) {
   if((currentSpace?.type==='family'||currentSpace?.type==='group') && typeof updateMyPresenceCard==='function') updateMyPresenceCard(id, card.title);
   window._openViewId = id;
   // открыли чат — убираем его пуш из системного трея и его попап в приложении
+  try { window.mcClearNative?.(id); } catch(e) {}
   try {
     navigator.serviceWorker?.ready.then(reg => reg.getNotifications().then(list => list.forEach(n => { if((n.data?.url||'').includes('openCard='+id)) n.close(); })));
     document.querySelectorAll('#notice-popups .rem-pop').forEach(p => { if(p.innerHTML.includes("'"+id+"'")) p.remove(); });
