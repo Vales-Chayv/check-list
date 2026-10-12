@@ -1,4 +1,4 @@
-const CACHE = 'mc-v233';
+const CACHE = 'mc-v234';
 const APP_FILES = [
   '/check-list/',
   '/check-list/index.html',
@@ -56,12 +56,28 @@ return res;
 self.addEventListener('push', e => {
   let data = {title:'🔔 Напоминания', body:'Есть карточки на сегодня', url:'https://vales-chayv.github.io/check-list/'};
   try { if(e.data) data = {...data, ...e.data.json()}; } catch{}
-  e.waitUntil(self.registration.showNotification(data.title, {
-    body: data.body,
-    icon: 'https://vales-chayv.github.io/check-list/icon-192.png',
-    tag: 'msg-' + Date.now(), renotify: true,
-    data: {url: data.url}
-  }));
+  e.waitUntil((async () => {
+    const m = /[?&]openCard=([^&]+)/.exec(data.url || '');
+    if(m) {
+      const list = await clients.matchAll({type:'window', includeUncontrolled:true});
+      for(const c of list) {
+        if(c.visibilityState !== 'visible' || !c.focused) continue;
+        const open = await new Promise(res => {
+          const ch = new MessageChannel();
+          ch.port1.onmessage = ev => res(ev.data);
+          setTimeout(() => res(null), 400);
+          c.postMessage({type:'whichCard'}, [ch.port2]);
+        });
+        if(open === m[1]) return; // этот чат уже открыт на экране — пуш не нужен
+      }
+    }
+    await self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: 'https://vales-chayv.github.io/check-list/icon-192.png',
+      tag: 'msg-' + Date.now(), renotify: true,
+      data: {url: data.url}
+    });
+  })());
 });
 
 self.addEventListener('notificationclick', e => {

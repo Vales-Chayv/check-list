@@ -236,6 +236,11 @@ setInterval(() => {
   el.textContent = names.map(n => typeof aliasedName === 'function' ? aliasedName(n) : n).join(', ') + (names.length > 1 ? ' пишут…' : ' пишет…');
 }, 1000);
 
+// ответ service worker'у: какой чат сейчас открыт (чтобы не показывать лишний пуш)
+if('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => {
+  if(e.data && e.data.type === 'whichCard' && e.ports && e.ports[0]) e.ports[0].postMessage(window._openViewId || null);
+});
+
 function toggleChatFan(cardId){
   if(_chatFanOpen) {
     // Кнопка уже открыта — повторное нажатие сразу выполняет последнее действие веера («Задача»), а не просто закрывает его
