@@ -234,6 +234,18 @@ async function refreshChatWatchState() {
 function subscribeGlobalChatWatch() {
   if(_globalChatChannel) return; // уже подписаны, повторно не нужно
   _globalChatChannel = sb.channel('cards:all-watch')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cards' }, payload => {
+      const n = payload.new;
+      if(!n || !Array.isArray(n.chatParticipants)) return;
+      const groupIds = (spaces||[]).filter(s=>(s.type==='family'||s.type==='group') && s.status!=='closed').map(s=>s.id);
+      if(!groupIds.includes(n.space_id)) return;
+      const myName = (localStorage.getItem('mc_current_member')||currentUser?.display_name||'').toLowerCase().trim();
+      if(!myName) return;
+      const part = n.chatParticipants.map(x=>String(x).toLowerCase().trim());
+      if(!part.includes(myName)) return;
+      if(String(n.created_by||'').toLowerCase().trim() === myName) return;
+      if(typeof showChatNotice === 'function') showChatNotice('💬 Новый чат', `${n.created_by||'Кто-то'} пригласил(а) тебя в чат «${n.title}»`, n.id, n.space_id);
+    })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cards' }, payload => {
       const n = payload.new;
       const groupIds = (spaces||[]).filter(s=>(s.type==='family'||s.type==='group') && s.status!=='closed').map(s=>s.id);
