@@ -20,6 +20,11 @@ function openView(id) {
   const card = cards.find(c=>c.id===id); if(!card) return;
   if((currentSpace?.type==='family'||currentSpace?.type==='group') && typeof updateMyPresenceCard==='function') updateMyPresenceCard(id, card.title);
   window._openViewId = id;
+  // открыли чат — убираем его пуш из системного трея и его попап в приложении
+  try {
+    navigator.serviceWorker?.ready.then(reg => reg.getNotifications().then(list => list.forEach(n => { if((n.data?.url||'').includes('openCard='+id)) n.close(); })));
+    document.querySelectorAll('#notice-popups .rem-pop').forEach(p => { if(p.innerHTML.includes("'"+id+"'")) p.remove(); });
+  } catch(e) {}
   if(Array.isArray(card.chatParticipants) && typeof markChatRead==='function') markChatRead(id);
   const isChatCardView = (currentSpace?.type==='family'||currentSpace?.type==='group') && Array.isArray(card.chatParticipants);
   document.getElementById('view-ov')?.classList.toggle('chat-sheet', isChatCardView);
