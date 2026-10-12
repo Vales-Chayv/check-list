@@ -404,6 +404,18 @@ function showChatNotice(title, body, cardId, spaceId) {
   if(!cardId) setTimeout(()=>el.remove(), 6000);
 }
 async function openChatFromNotice(spaceId, cardId) {
+  // перед открытием подтягиваем свежую карточку из базы (реалтайм мог пропустить обновление)
+  try {
+    const { data } = await sb.from('cards').select('*').eq('id', cardId).maybeSingle();
+    if(data) {
+      const i = cards.findIndex(c => c.id === cardId);
+      if(i >= 0) cards[i] = data;
+      else if(!spaceId || spaceId === currentSpaceId) cards.unshift(data);
+    }
+  } catch(e) {}
+  return _openChatFromNoticeInner(spaceId, cardId);
+}
+async function _openChatFromNoticeInner(spaceId, cardId) {
   if(spaceId && spaceId !== currentSpaceId && typeof setCurrentSpace === 'function') {
     await setCurrentSpace(spaceId, true);
     setTimeout(()=>openView(cardId), 200);
