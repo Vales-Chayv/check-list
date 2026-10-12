@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "604670195960",
+    "project_id": "mycards-206aa",
+    "storage_bucket": "mycards-206aa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:604670195960:android:72ebb529d9762acf49630d",
+        "android_client_info": {
+          "package_name": "app.mycards.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDZJHskvFLLj3qg-dx2tXRq5LqJ4NmZ8UE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
