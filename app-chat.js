@@ -242,8 +242,8 @@ if('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('messa
 });
 
 // вернулись в приложение с открытым чатом — убираем его пуш и подтягиваем свежие сообщения
-async function _chatResumeSync() {
-  if(document.visibilityState !== 'visible') return;
+async function _chatResumeSync(e) {
+  if(!(e && e.type === 'resume') && document.visibilityState !== 'visible') return;
   const id = window._openViewId;
   if(!id || !document.getElementById('view-ov')?.classList.contains('on')) return;
   const card = cards.find(c => c.id === id); if(!card) return;
@@ -260,6 +260,14 @@ async function _chatResumeSync() {
 }
 document.addEventListener('visibilitychange', _chatResumeSync);
 window.addEventListener('focus', _chatResumeSync);
+document.addEventListener('resume', _chatResumeSync);
+window.addEventListener('pageshow', _chatResumeSync);
+// страховка для APK: пока чат открыт и приложение на экране, раз в 4 с убираем его пуш из шторки
+setInterval(() => {
+  if(!window.mcClearNative || !window._openViewId || document.visibilityState !== 'visible' || !document.hasFocus()) return;
+  const c = cards.find(x => x.id === window._openViewId);
+  if(c) window.mcClearNative(c.id, c.title);
+}, 4000);
 
 function toggleChatFan(cardId){
   if(_chatFanOpen) {
