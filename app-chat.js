@@ -199,6 +199,43 @@ function renderChatQuickBar(cardId, card){
   inp.addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); sendQuickChatMessage(cardId); } });
 }
 
+// ── «пишет…» в чате (через presence, без записи в базу) ──
+let _typingIdle = null, _typingLastSent = 0;
+function chatTypingPing(){
+  const cardId = window._openViewId;
+  if(!cardId || typeof presenceChannel === 'undefined' || !presenceChannel) return;
+  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  const myName = localStorage.getItem('mc_current_member') || '';
+  const now = Date.now();
+  if(now - _typingLastSent > 2500) {
+    _typingLastSent = now;
+    presenceChannel.track({ name: myName, user_id: currentUser?.id, cardId, cardTitle: card.title, typing: true });
+  }
+  clearTimeout(_typingIdle);
+  _typingIdle = setTimeout(()=>{
+    _typingLastSent = 0;
+    if(window._openViewId === cardId && typeof updateMyPresenceCard === 'function') updateMyPresenceCard(cardId, card.title);
+  }, 3000);
+}
+document.addEventListener('input', e => { if(e.target && e.target.id === 'chat-quick-input') chatTypingPing(); });
+setInterval(() => {
+  const ov = document.getElementById('view-ov');
+  let el = document.getElementById('chat-typing');
+  const cardId = window._openViewId;
+  if(!ov || !ov.classList.contains('on') || !cardId || typeof presenceChannel === 'undefined' || !presenceChannel || !document.getElementById('chat-quick-bar')) { el?.remove(); return; }
+  const names = [];
+  Object.values(presenceChannel.presenceState() || {}).forEach(arr => (arr||[]).forEach(p => {
+    if(p.typing && p.cardId === cardId && p.user_id !== currentUser?.id && p.name) names.push(p.name);
+  }));
+  if(!names.length) { el?.remove(); return; }
+  if(!el) {
+    el = document.createElement('div'); el.id = 'chat-typing';
+    el.style.cssText = 'position:absolute;left:0;right:0;bottom:62px;z-index:49;padding:4px 18px;font-size:12px;color:var(--t2);background:var(--s1);pointer-events:none';
+    ov.appendChild(el);
+  }
+  el.textContent = names.map(n => typeof aliasedName === 'function' ? aliasedName(n) : n).join(', ') + (names.length > 1 ? ' пишут…' : ' пишет…');
+}, 1000);
+
 function toggleChatFan(cardId){
   if(_chatFanOpen) {
     // Кнопка уже открыта — повторное нажатие сразу выполняет последнее действие веера («Задача»), а не просто закрывает его
