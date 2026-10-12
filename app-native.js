@@ -123,10 +123,10 @@
   };
 
   // ── открыли чат — убираем именно его пуши из шторки Android ──
-  window.mcClearNative = async function (cardId) {
+  window.mcClearNative = async function (cardId, cardTitle) {
     try {
       const r = await PN.getDeliveredNotifications();
-      const mine = (r.notifications || []).filter(n => String((n.data && n.data.url) || '').includes('openCard=' + cardId));
+      const mine = (r.notifications || []).filter(n => String((n.data && n.data.url) || '').includes('openCard=' + cardId) || (cardTitle && n.title === '💬 ' + cardTitle));
       if (mine.length) await PN.removeDeliveredNotifications({ notifications: mine });
     } catch (e) { console.warn('clear native', e); }
   };
