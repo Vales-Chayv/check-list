@@ -256,7 +256,7 @@ function subscribeGlobalChatWatch() {
         const newEntry = (n.entries||[])[0];
         const myName = (localStorage.getItem('mc_current_member')||currentUser?.display_name||'').toLowerCase();
         const senderName = newEntry?.sessionCreator || '';
-              if(senderName && senderName.toLowerCase() !== myName && typeof showChatNotice === 'function') {
+              if(senderName && senderName.toLowerCase() !== myName && window._openViewId !== n.id && typeof showChatNotice === 'function') {
           const preview = (newEntry.text || newEntry.sessionNote || '📎 Вложение').slice(0,60);
           showChatNotice('💬 ' + n.title, `${senderName}: ${preview}`, n.id, n.space_id);
         }

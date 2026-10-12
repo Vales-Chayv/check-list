@@ -447,6 +447,16 @@ function handleRealtimeCard(payload) {
       const previousEntries = idx !== -1 ? cards[idx].entries : null; // кэш ДО обновления — payload.old может быть неполным
       if(idx !== -1) { cards[idx] = n; local.put('cards', n); }
       else { cards.unshift(n); local.put('cards', n); }
+      if(previousEntries && (n.entries||[]).length !== previousEntries.length && window._openViewId === n.id && document.getElementById('view-ov')?.classList.contains('on')) {
+        const _sh = document.querySelector('#view-ov .sheet'); const _st = _sh ? _sh.scrollTop : 0;
+        const _drafts = [...document.querySelectorAll('#view-ov textarea, #view-ov input[type=text]')].map(x=>x.value);
+        openView(n.id);
+        setTimeout(()=>{
+          const s2 = document.querySelector('#view-ov .sheet'); if(s2) s2.scrollTop = _st;
+          [...document.querySelectorAll('#view-ov textarea, #view-ov input[type=text]')].forEach((x,i)=>{ if(_drafts[i]) x.value = _drafts[i]; });
+        }, 80);
+        if(typeof markChatRead === 'function') markChatRead(n.id);
+      }
     }
     if(o && n.chatStatus !== o.chatStatus && typeof showChatNotice === 'function') {
       const myName = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';

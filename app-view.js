@@ -19,6 +19,7 @@ function viewToggleGroup(cardId, groupId) {
 function openView(id) {
   const card = cards.find(c=>c.id===id); if(!card) return;
   if((currentSpace?.type==='family'||currentSpace?.type==='group') && typeof updateMyPresenceCard==='function') updateMyPresenceCard(id, card.title);
+  window._openViewId = id;
   if(Array.isArray(card.chatParticipants) && typeof markChatRead==='function') markChatRead(id);
   const isChatCardView = (currentSpace?.type==='family'||currentSpace?.type==='group') && Array.isArray(card.chatParticipants);
   document.getElementById('view-ov')?.classList.toggle('chat-sheet', isChatCardView);
@@ -275,6 +276,7 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
 
 function closeView() {
   document.getElementById('view-ov').classList.remove('on');
+  window._openViewId = null;
   if((currentSpace?.type==='family'||currentSpace?.type==='group') && typeof updateMyPresenceCard==='function') updateMyPresenceCard(null, null);
   if(window._foreignCat){ cats = cats.filter(k=>k.name!==window._foreignCat); window._foreignCat=null; }
   if(window._foreignCardId){ const fid=window._foreignCardId; window._foreignCardId=null; cards=cards.filter(c=>c.id!==fid); }
