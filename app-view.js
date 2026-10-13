@@ -77,6 +77,7 @@ function openView(id) {
           <button onclick="closeView();setTimeout(()=>openAddEntry('${id}'),200)" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:8px;padding:9px 14px;font-size:15px;font-weight:700;cursor:pointer">＋ Запись</button>
           <button onclick="closeView();setTimeout(()=>openBulkTransferPicker('${id}'),200)" style="background:var(--s2);color:var(--accent);border:1px solid var(--b1);border-radius:8px;padding:9px 12px;font-size:15px;cursor:pointer" title="Перенести несколько">📤</button>
         </div>`}
+       ${(card.status!=='done'&&currentSpace?.type!=='family'&&currentSpace?.type!=='group')?`<button onclick="openIntervalPicker('${id}')" style="background:${intervalRunActive(card)?'rgba(232,197,106,.3)':'var(--s2)'};color:var(--accent);border:1px solid rgba(232,197,106,.3);border-radius:8px;padding:9px 16px;font-size:15px;cursor:pointer">${intervalRunActive(card)?('⏱ Каждые '+intervalRunActive(card).everyMin+' мин ✕'):'⏱ Интервал'}</button>`:''}
         ${card.pinned?`<button onclick="resetCardChecks('${id}')" style="background:var(--s2);color:var(--t1);border:1px solid var(--b1);border-radius:8px;padding:9px 16px;font-size:15px;cursor:pointer">↺ Сбросить</button>`:''}
 		${(card.status!=='done'&&view!=='today'&&currentSpace?.type!=='family'&&currentSpace?.type!=='group')?`<button onclick="toggleToday('${id}')" style="background:${card.today?'rgba(232,197,106,.3)':'rgba(232,197,106,.1)'};color:var(--accent);border:1px solid rgba(232,197,106,.3);border-radius:8px;padding:9px 16px;font-size:15px;cursor:pointer">${card.today?'✕ Убрать из списка':'☆ На сегодня'}</button>`:''}
 		${card.status==='done'?`<button onclick="restoreCard('${id}')" style="background:rgba(91,184,122,.15);color:var(--green);border:1px solid rgba(91,184,122,.25);border-radius:8px;padding:9px 16px;font-size:15px;cursor:pointer">↩ Вернуть</button>`:''}
@@ -1145,6 +1146,51 @@ async function restoreCard(id) {
   render(); openView(id);
   try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
 }
+// ── Интервальное напоминание на карточке: на сегодня, до 00:00 ──
+function intervalTodayKey() {
+  return new Intl.DateTimeFormat('en-CA', {year:'numeric', month:'2-digit', day:'2-digit'}).format(new Date());
+}
+function intervalRunActive(card) {
+  const r = card && card.reminder && card.reminder.intervalRun;
+  return (r && r.everyMin && r.day === intervalTodayKey()) ? r : null;
+}
+function openIntervalPicker(id) {
+  const card = cards.find(c=>c.id===id); if(!card) return;
+  if(intervalRunActive(card)) { stopCardInterval(id); return; }
+  document.getElementById('interval-pick-ov')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'interval-pick-ov';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.onclick = e => { if(e.target === ov) ov.remove(); };
+  const b = m => `<button onclick="startCardInterval('${id}',${m})" style="background:var(--s1);border:1px solid var(--b1);color:var(--t1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;cursor:pointer;font-family:inherit">${m<60?m+' мин':(m/60)+' ч'}</button>`;
+  ov.innerHTML = `<div style="background:var(--s2);border:1px solid var(--accent);border-radius:var(--r);padding:18px;max-width:340px;width:100%">
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">⏱ Напоминать каждые…</div>
+    <div style="font-size:12px;color:var(--t3);margin-bottom:12px">Начиная с этого момента и до 00:00 сегодня</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${b(15)}${b(30)}${b(60)}${b(120)}</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input id="interval-pick-custom" type="number" min="5" max="720" placeholder="Своё (мин, от 5)" style="flex:1;font-size:13px">
+      <button onclick="startCardInterval('${id}', parseInt(document.getElementById('interval-pick-custom').value))" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer">OK</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+async function startCardInterval(id, mins) {
+  const card = cards.find(c=>c.id===id); if(!card) return;
+  if(!mins || mins < 5 || mins > 720) { toast('Укажи от 5 до 720 минут', true); return; }
+  document.getElementById('interval-pick-ov')?.remove();
+  card.reminder = { ...(card.reminder||{}), intervalRun: { everyMin: mins, startedAt: new Date().toISOString(), day: intervalTodayKey() } };
+  render(); openView(id);
+  toast('⏱ Напоминания каждые ' + mins + ' мин — до 00:00');
+  try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
+}
+async function stopCardInterval(id) {
+  const card = cards.find(c=>c.id===id); if(!card) return;
+  card.reminder = { ...(card.reminder||{}), intervalRun: null };
+  render(); openView(id);
+  toast('Интервальные напоминания выключены');
+  try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
+}
+
 async function toggleToday(id) {
   const card = cards.find(c=>c.id===id); if(!card) return;
   card.today = !card.today;
