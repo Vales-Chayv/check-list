@@ -512,7 +512,7 @@ async function saveCard() {
     attachments: isFamily&&!editId ? [] : tempAtt,
    entries:sessionEntries,
     entryGroups: groupedMode ? tempEntryGroups.filter(g=>g.name||!g._naming).map(({_naming,_expanded,...g})=>g) : [],
-    reminder:{enabled:remOn,freq:freqVal,days:customDays,hour:remHour,intervalMin:freqVal==='interval'?intervalMin:null},
+    reminder:{enabled:remOn,freq:freqVal,days:customDays,hour:remHour,intervalMin:freqVal==='interval'?intervalMin:null,intervalRun:oldCard?.reminder?.intervalRun||null},
     history:hist, related_ids:tempRelIds
   };
   setSaveBtns(false);
