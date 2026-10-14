@@ -36,6 +36,12 @@ jobs:
           cp google-services.json android/app/google-services.json
           grep -q POST_NOTIFICATIONS android/app/src/main/AndroidManifest.xml || sed -i 's#<application#<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <application#' android/app/src/main/AndroidManifest.xml
 
+      - name: Add alarm permissions
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          grep -q SCHEDULE_EXACT_ALARM $M || sed -i 's#<application#<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />\n    <application#' $M
+          grep -q RECEIVE_BOOT_COMPLETED $M || sed -i 's#<application#<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />\n    <application#' $M
+
       - name: Point Gradle at the permanent test key
         run: |
           cat > "$GITHUB_WORKSPACE/sign.gradle" <<'EOF'
