@@ -347,6 +347,9 @@ async function viewToggleEntry(cardId, entryId) {
     card.status='done';
     card.history=[...(card.history||[]),{date:nowStr(),text:'Все записи выполнены → Готово',type:'status'}];
   }
+    { const _sh = document.querySelector('#view-ov .sheet'); const _st = _sh ? _sh.scrollTop : 0;
+      render(); openView(cardId);
+      setTimeout(()=>{ const s2 = document.querySelector('#view-ov .sheet'); if(s2) s2.scrollTop = _st; }, 60); }
     try{await dbUpdate(card);}catch(err){toast('Ошибка синхронизации',true);}
   if(typeof renderPersonalTasks === 'function') renderPersonalTasks();
   if(e.done && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof logEvent==='function') {
