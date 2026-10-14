@@ -31,7 +31,7 @@ function openView(id) {
   document.getElementById('view-ov')?.classList.toggle('chat-sheet', isChatCardView);
   if(isChatCardView) setTimeout(()=>renderChatQuickBar(id, card), 0);
   const col = catColor(card.category);
-  const entries = card.entries||[];
+  const entries = [...(card.entries||[])].sort((a,b)=>(a.done===b.done)?0:a.done?1:-1);
   const atts = card.attachments||[];
   const imgs = atts.filter(a=>a.type?.startsWith('image/'));
   const files = atts.filter(a=>!a.type?.startsWith('image/'));
