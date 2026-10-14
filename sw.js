@@ -1,4 +1,4 @@
-const CACHE = 'mc-v243';
+const CACHE = 'mc-v244';
 const APP_FILES = [
   '/check-list/',
   '/check-list/index.html',
@@ -74,7 +74,7 @@ self.addEventListener('push', e => {
     await self.registration.showNotification(data.title, {
       body: data.body,
       icon: 'https://vales-chayv.github.io/check-list/icon-192.png',
-      tag: 'msg-' + Date.now(), renotify: true,
+      tag: data.tag || ('msg-' + Date.now()), renotify: true,
       data: {url: data.url}
     });
   })());
