@@ -126,11 +126,121 @@
   window.mcClearNative = async function (cardId, cardTitle) {
     try {
       const r = await PN.getDeliveredNotifications();
-      const mine = (r.notifications || []).filter(n => String((n.data && n.data.url) || '').includes('openCard=' + cardId) || (cardTitle && (n.title === '💬 ' + cardTitle || n.title === cardTitle)));
+      const mine = (r.notifications || []).filter(n => String((n.data && n.data.url) || '').includes('openCard=' + cardId) || (cardTitle && n.title === '💬 ' + cardTitle));
       if (mine.length) await PN.removeDeliveredNotifications({ notifications: mine });
     } catch (e) { console.warn('clear native', e); }
   };
+  // ── локальные будильники для интервальных напоминаний ──
+  const LN = cap.Plugins && cap.Plugins.LocalNotifications;
+  const ALARMS_KEY = 'mc_alarms';   // {cardId: номер последнего поставленного будильника}
+  const ALARMS_AHEAD = 100;         // сколько будильников ставим вперёд
+  const alarmsLoad = () => { try { return JSON.parse(localStorage.getItem(ALARMS_KEY) || '{}'); } catch (e) { return {}; } };
+  const alarmsSave = m => { try { localStorage.setItem(ALARMS_KEY, JSON.stringify(m)); } catch (e) {} };
+  function alarmBase(cardId) {
+    let h = 0;
+    for (let i = 0; i < cardId.length; i++) h = (h * 31 + cardId.charCodeAt(i)) >>> 0;
+    return (h % 20000) * 100000;
+  }
+  const alarmId = (cardId, k) => alarmBase(cardId) + (k % 100000);
 
+  async function alarmsPerm(ask) {
+    try {
+      let p = await LN.checkPermissions();
+      if (p.display !== 'granted' && ask) p = await LN.requestPermissions();
+      if (p.display !== 'granted') return false;
+    } catch (e) { return false; }
+    try {
+      const ex = await LN.checkExactNotificationSetting();
+      if (ex.exact_alarm !== 'granted' && ask) {
+        toast('Разреши «Будильники и напоминания» для этого приложения');
+        await LN.changeExactNotificationSetting();
+      }
+    } catch (e) {}
+    return true;
+  }
+
+  async function alarmsCancel(cardId) {
+    const map = alarmsLoad();
+    const lastK = map[cardId] || 0;
+    try {
+      const list = [];
+      for (let k = 1; k <= lastK; k++) list.push({ id: alarmId(cardId, k) });
+      if (list.length) await LN.cancel({ notifications: list });
+    } catch (e) { console.log('[native] alarms cancel', e && e.message); }
+    delete map[cardId];
+    alarmsSave(map);
+  }
+
+  async function alarmsFill(card, run) {
+    const every = parseInt(run.everyMin, 10);
+    const start = Date.parse(run.startedAt);
+    if (!every || isNaN(start)) return 0;
+    const step = every * 60000;
+    const now = Date.now();
+    const kNow = Math.floor((now - start) / step);
+    const map = alarmsLoad();
+    const lastK = map[card.id] || 0;
+    if (lastK - kNow >= 50) return 0; // запас ещё большой
+    const end = new Date(); end.setHours(24, 0, 0, 0);
+    const url = SITE_PREFIX + '?openSpace=' + encodeURIComponent(card.space_id) + '&openCard=' + encodeURIComponent(card.id);
+    const items = [];
+    let lastUsed = lastK;
+    for (let k = Math.max(lastK + 1, kNow + 1); items.length < ALARMS_AHEAD; k++) {
+      const t = start + k * step;
+      if (t >= end.getTime()) break;
+      if (t <= now + 3000) continue;
+      items.push({
+        id: alarmId(card.id, k),
+        title: card.title || 'Напоминание',
+        body: 'Напоминание · каждые ' + every + ' мин',
+        channelId: 'mc_default',
+        schedule: { at: new Date(t), allowWhileIdle: true },
+        extra: { url }
+      });
+      lastUsed = k;
+    }
+    if (!items.length) return 0;
+    await LN.schedule({ notifications: items });
+    map[card.id] = lastUsed;
+    alarmsSave(map);
+    return items.length;
+  }
+
+  // проверка: что стоит — актуально ли, при необходимости снять или дозавести
+  async function alarmsSync() {
+    if (!LN || typeof cards === 'undefined' || !Array.isArray(cards)) return;
+    const token = localStorage.getItem(TOKEN_KEY);
+    const map = alarmsLoad();
+    for (const cardId of Object.keys(map)) {
+      const card = cards.find(c => c.id === cardId);
+      if (!card) continue; // карточка из другого кабинета — не трогаем
+      const run = (typeof intervalRunActive === 'function') ? intervalRunActive(card) : null;
+      if (!run || card.status === 'done' || !token || run.localToken !== token) { await alarmsCancel(cardId); continue; }
+      try { await alarmsFill(card, run); } catch (e) {}
+    }
+  }
+
+  window.mcAlarmsStart = async function (card, run) {
+    try {
+      if (!LN || !localStorage.getItem(TOKEN_KEY)) return null;
+      if (!(await alarmsPerm(true))) return null;
+      await alarmsCancel(card.id);
+      const n = await alarmsFill(card, run);
+      return n > 0 ? localStorage.getItem(TOKEN_KEY) : null;
+    } catch (e) { console.log('[native] alarms start', e && e.message); return null; }
+  };
+  window.mcAlarmsCancel = alarmsCancel;
+  window.mcAlarmsSync = alarmsSync;
+
+  if (LN) {
+    LN.addListener('localNotificationActionPerformed', a => {
+      const url = a && a.notification && a.notification.extra && a.notification.extra.url;
+      if (url && url.indexOf(SITE_PREFIX) === 0 && url !== location.href) location.href = url;
+    });
+    setInterval(alarmsSync, 60000);
+    setTimeout(alarmsSync, 8000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) alarmsSync(); });
+  }
   // ── старт: при каждом запуске обновляем токен, при первом запуске сами просим разрешение ──
   window.subscribeToPush();
 })();

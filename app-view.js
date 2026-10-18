@@ -1181,13 +1181,16 @@ async function startCardInterval(id, mins) {
   const card = cards.find(c=>c.id===id); if(!card) return;
   if(!mins || mins < 5 || mins > 720) { toast('Укажи от 5 до 720 минут', true); return; }
   document.getElementById('interval-pick-ov')?.remove();
-  card.reminder = { ...(card.reminder||{}), intervalRun: { everyMin: mins, startedAt: new Date().toISOString(), day: intervalTodayKey() } };
+  const _run = { everyMin: mins, startedAt: new Date().toISOString(), day: intervalTodayKey() };
+  if(window.mcAlarmsStart) { try { const _tk = await window.mcAlarmsStart(card, _run); if(_tk) _run.localToken = _tk; } catch(e) {} }
+  card.reminder = { ...(card.reminder||{}), intervalRun: _run };
   render(); openView(id);
   toast('⏱ Напоминания каждые ' + mins + ' мин — до 00:00');
   try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
 }
 async function stopCardInterval(id) {
   const card = cards.find(c=>c.id===id); if(!card) return;
+  try { window.mcAlarmsCancel?.(id); } catch(e) {}
   card.reminder = { ...(card.reminder||{}), intervalRun: null };
   render(); openView(id);
   toast('Интервальные напоминания выключены');
