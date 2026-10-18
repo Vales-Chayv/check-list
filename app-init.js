@@ -165,37 +165,9 @@ function remPopupSnooze(id, mins) {
   showNextReminder();
 }
 
-function startIntervalReminders() {
-  if(_intervalRemTimer) clearInterval(_intervalRemTimer);
-  loadReminderCards();
-  let remTick = 0;
-  _intervalRemTimer = setInterval(() => {
-    if(remTick % 5 === 0 || !remCards.length) loadReminderCards();
-    remTick++;
-    const now = Date.now();
-   remCards.forEach(card => {
-      if(!card.reminder || !card.reminder.enabled || card.reminder.freq !== 'interval') return;
-      const live = (typeof calAllCards!=='undefined' && calAllCards.find(c=>c.id===card.id))
-                || (typeof cards!=='undefined' && cards.find(c=>c.id===card.id));
-      if((live ? live.status : card.status) === 'done') return;
-      const mins = card.reminder.intervalMin || 30;
-      const key = 'rem_last_' + card.id;
-      const last = parseInt(localStorage.getItem(key)||'0');
-      if(now - last >= mins * 60 * 1000) {
-        localStorage.setItem(key, now);
-        showReminderPopup(card);
-        if(typeof Notification !== 'undefined' && Notification.permission === 'granted' && navigator.serviceWorker) {
-          navigator.serviceWorker.ready.then(reg => reg.showNotification('🔔 Мои карточки', {
-            body: card.title,
-            icon: 'https://vales-chayv.github.io/check-list/icon-192.png',
-            tag: 'card-' + card.id,
-            renotify: true
-          })).catch(()=>{});
-        }
-      }
-    });
-  }, 60 * 1000);
-}
+// Старый «Интервал» убран: теперь интервальные напоминания — кнопка ⏱ в карточке + сервер (и будильники на APK).
+// Функция оставлена пустой, потому что её вызывают другие места.
+function startIntervalReminders() {}
 
 function askPushPermission() {
   if(typeof Notification === 'undefined') return;
