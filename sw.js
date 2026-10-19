@@ -1,4 +1,4 @@
-const CACHE = 'mc-v247';
+const CACHE = 'mc-v248';
 const APP_FILES = [
   '/check-list/',
   '/check-list/index.html',
@@ -15,11 +15,30 @@ const APP_FILES = [
   '/check-list/app-settings.js',
   '/check-list/app-init.js',
   '/check-list/app-utils.js',
+  '/check-list/app-calc.js',
+  '/check-list/app-chat.js',
+  '/check-list/app-calendar.js',
+  '/check-list/app-native.js',
+];
+// Внешние библиотеки (грузятся с CDN): без них приложение не запускается без интернета
+const CDN_FILES = [
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
 ];
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(APP_FILES).catch(()=>{}))
+    caches.open(CACHE).then(async cache => {
+      // по одному: если какой-то файл не скачался, остальные всё равно сохраняются
+      await Promise.all(APP_FILES.map(u => cache.add(u).catch(()=>{})));
+      await Promise.all(CDN_FILES.map(u => {
+        const req = new Request(u, {mode:'no-cors'});
+        return fetch(req).then(r => cache.put(req, r)).catch(()=>{});
+      }));
+    })
   );
 });
 self.addEventListener('message', e => {
@@ -41,11 +60,12 @@ self.addEventListener('fetch', e => {
     e.respondWith(fetch(e.request).catch(()=>new Response('{}',{headers:{'Content-Type':'application/json'}})));
     return;
   }
-  // App files — cache first, update in background
+  if(e.request.method !== 'GET') return;
+  // App files — cache first, update in background (ignoreSearch: адрес с ?openCard=… тоже открывается без интернета)
   e.respondWith(
-    caches.match(e.request).then(cached => {
+    caches.match(e.request, {ignoreSearch:true}).then(cached => {
       const network = fetch(e.request).then(res => {
-        if(res.ok) { const clone = res.clone(); caches.open(CACHE).then(c=>c.put(e.request,clone)); }
+        if(res.ok || res.type === 'opaque') { const clone = res.clone(); caches.open(CACHE).then(c=>c.put(e.request,clone)); }
 return res;
       }).catch(()=>cached);
       return cached || network.catch(()=>new Response('', {status: 404}));
