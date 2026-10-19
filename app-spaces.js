@@ -887,6 +887,21 @@ async function subscribePresence(spaceId) {
     _presenceSubscribing = false;
   }
 }
+// Самовосстановление присутствия после сворачивания/обрыва сети
+async function healPresence() {
+  try {
+    if(!currentUser?.id || !currentSpaceId || currentSpace?.type !== 'family') return;
+    if(!presenceChannel || presenceChannel.state !== 'joined') { await subscribePresence(currentSpaceId); return; }
+    const _id = window._openViewId;
+    const _c = _id && (cards||[]).find(x => x.id === _id);
+    updateMyPresenceCard(_c ? _id : null, _c ? _c.title : null);
+  } catch(e) {}
+}
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') healPresence(); });
+window.addEventListener('online', healPresence);
+window.addEventListener('focus', healPresence);
+document.addEventListener('resume', healPresence);
+setInterval(() => { if(document.visibilityState === 'visible' && presenceChannel && presenceChannel.state !== 'joined') healPresence(); }, 10000);
 function updateMyPresenceCard(cardId, cardTitle) {
   if(!presenceChannel) return;
   const myName = localStorage.getItem('mc_current_member') || '';
