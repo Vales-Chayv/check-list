@@ -172,8 +172,9 @@ async function doLoginAuth() {
       localStorage.removeItem('mc_display_name');
     }
 
-    hideAuthScreen();
+       hideAuthScreen();
     initSpaces();
+    try { if(typeof subscribeToPush === 'function') subscribeToPush(); } catch(e) {}
   } catch(e) {
     authShowErr('auth-log-err','❌ Неверный пароль');
     btn.disabled = false; btn.textContent = 'Войти';
@@ -184,6 +185,24 @@ async function doLoginAuth() {
 async function logoutUser() {
   if(!confirm('Выйти из аккаунта?')) return;
   if(typeof unsubscribeOwnerPresence === 'function') unsubscribeOwnerPresence();
+  // удаляем подписку этого устройства на пуши, чтобы они не шли после выхода
+  try {
+    const _unsub = { unsubscribe: true };
+    if(window.isNativeApp && window.isNativeApp()) {
+      const _tk = localStorage.getItem('mc_fcm_token');
+      if(_tk) _unsub.fcmToken = _tk;
+    } else if('serviceWorker' in navigator) {
+      const _reg = await navigator.serviceWorker.getRegistration();
+      const _sub = _reg && await _reg.pushManager.getSubscription();
+      if(_sub) _unsub.endpoint = _sub.endpoint;
+    }
+    if(_unsub.fcmToken || _unsub.endpoint) {
+      await Promise.race([
+        fetch(FUNC_URL, { method:'POST', headers:{'Content-Type':'application/json','apikey':SB_ANON,'Authorization':'Bearer '+SB_ANON}, body:JSON.stringify(_unsub) }),
+        new Promise(r => setTimeout(r, 3000))
+      ]);
+    }
+  } catch(e) {}
   await sb.auth.signOut();
   currentUser = null;
   currentSpaceId = null; currentSpace = null;
