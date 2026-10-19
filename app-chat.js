@@ -145,6 +145,7 @@ async function sendQuickChatMessage(cardId){
   _activeAttachEntryId = null; // текст — граница; следующее вложение начнёт новый стикер
   inp.value = '';
   try { localStorage.removeItem('mc_draft_' + cardId); } catch(e) {}
+  chatTypingStop();
   render();
   openView(cardId);
   setTimeout(()=>{ const sheet = document.querySelector('#view-ov .sheet'); if(sheet) sheet.scrollTop = 0; }, 50);
@@ -204,7 +205,7 @@ function renderChatQuickBar(cardId, card){
 }
 
 // ── «пишет…» в чате (через presence, без записи в базу) ──
-let _typingIdle = null, _typingLastSent = 0;
+let _typingIdle = null, _typingLastSent = 0, _typingKey = '';
 function chatTypingPing(){
   const cardId = window._openViewId;
   if(!cardId || typeof presenceChannel === 'undefined' || !presenceChannel) return;
@@ -216,34 +217,54 @@ function chatTypingPing(){
     presenceChannel.track({ name: myName, user_id: currentUser?.id, cardId, cardTitle: card.title, typing: true });
   }
   clearTimeout(_typingIdle);
-  _typingIdle = setTimeout(()=>{
-    _typingLastSent = 0;
-    if(window._openViewId === cardId && typeof updateMyPresenceCard === 'function') updateMyPresenceCard(cardId, card.title);
-  }, 3000);
+  _typingIdle = setTimeout(chatTypingStop, 3000);
+}
+// сразу снимаем «пишет…» (после отправки или когда поле очистили)
+function chatTypingStop(){
+  clearTimeout(_typingIdle);
+  _typingLastSent = 0;
+  const id = window._openViewId;
+  const card = id && cards.find(c=>c.id===id);
+  if(card && typeof updateMyPresenceCard === 'function') { try { updateMyPresenceCard(id, card.title); } catch(e) {} }
 }
 document.addEventListener('input', e => {
   if(!e.target || e.target.id !== 'chat-quick-input') return;
-  chatTypingPing();
+  if(e.target.value) chatTypingPing(); else chatTypingStop();
   const _cid = window._openViewId;
   if(_cid) { try { if(e.target.value) localStorage.setItem('mc_draft_' + _cid, e.target.value); else localStorage.removeItem('mc_draft_' + _cid); } catch(err) {} }
 });
+(function(){
+  if(document.getElementById('chat-typing-css')) return;
+  const st = document.createElement('style'); st.id = 'chat-typing-css';
+  st.textContent = '@keyframes mcdot{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}.mc-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--t2);margin-right:3px;animation:mcdot 1.2s infinite}.mc-dot:nth-child(2){animation-delay:.2s}.mc-dot:nth-child(3){animation-delay:.4s}';
+  document.head.appendChild(st);
+})();
 setInterval(() => {
   const ov = document.getElementById('view-ov');
   let el = document.getElementById('chat-typing');
   const cardId = window._openViewId;
-  if(!ov || !ov.classList.contains('on') || !cardId || typeof presenceChannel === 'undefined' || !presenceChannel || !document.getElementById('chat-quick-bar')) { el?.remove(); return; }
+  if(!ov || !ov.classList.contains('on') || !cardId || typeof presenceChannel === 'undefined' || !presenceChannel || !document.getElementById('chat-quick-bar')) { el?.remove(); _typingKey = ''; return; }
   const names = [];
   Object.values(presenceChannel.presenceState() || {}).forEach(arr => (arr||[]).forEach(p => {
     if(p.typing && p.cardId === cardId && p.user_id !== currentUser?.id && p.name) names.push(p.name);
   }));
-  if(!names.length) { el?.remove(); return; }
+  if(!names.length) { el?.remove(); _typingKey = ''; return; }
+  const key = names.join('|');
+  if(el && key === _typingKey) return;
+  _typingKey = key;
   if(!el) {
     el = document.createElement('div'); el.id = 'chat-typing';
-    el.style.cssText = 'position:absolute;left:0;right:0;bottom:62px;z-index:49;padding:4px 18px;font-size:12px;color:var(--t2);background:var(--s1);pointer-events:none';
+    el.style.cssText = 'position:absolute;left:14px;bottom:62px;z-index:49;pointer-events:none';
     ov.appendChild(el);
   }
-  el.textContent = names.map(n => typeof aliasedName === 'function' ? aliasedName(n) : n).join(', ') + (names.length > 1 ? ' пишут…' : ' пишет…');
-}, 1000);
+  const shown = names.slice(0, 3);
+  const av = shown.map((n, i) => {
+    const nm = String(typeof aliasedName === 'function' ? aliasedName(n) : n).trim();
+    return `<span style="width:22px;height:22px;border-radius:50%;background:var(--accent);color:#0f0f0f;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;box-sizing:border-box;${i ? 'margin-left:-6px;border:2px solid var(--s2);' : ''}">${esc(nm.charAt(0).toUpperCase())}</span>`;
+  }).join('');
+  const more = names.length > 3 ? `<span style="font-size:11px;color:var(--t2)">+${names.length - 3}</span>` : '';
+  el.innerHTML = `<div style="display:inline-flex;align-items:center;gap:8px;background:var(--s2);border:1px solid var(--b1);border-radius:16px;padding:4px 12px 4px 4px">${av}${more}<span><span class="mc-dot"></span><span class="mc-dot"></span><span class="mc-dot"></span></span></div>`;
+}, 300);
 
 // ответ service worker'у: какой чат сейчас открыт (чтобы не показывать лишний пуш)
 if('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => {
