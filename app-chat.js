@@ -144,6 +144,7 @@ async function sendQuickChatMessage(cardId){
   card.entries = [entry, ...(card.entries||[])];
   _activeAttachEntryId = null; // текст — граница; следующее вложение начнёт новый стикер
   inp.value = '';
+  try { localStorage.removeItem('mc_draft_' + cardId); } catch(e) {}
   render();
   openView(cardId);
   setTimeout(()=>{ const sheet = document.querySelector('#view-ov .sheet'); if(sheet) sheet.scrollTop = 0; }, 50);
@@ -173,6 +174,7 @@ function handleAttachClick(cardId){
   toggleChatFan(cardId);
 }
 function renderChatQuickBar(cardId, card){
+  const _hadFocus = !!(document.activeElement && document.activeElement.id === 'chat-quick-input');
   document.getElementById('chat-quick-bar')?.remove();
   _chatFanOpen = false;
   _activeAttachEntryId = null;
@@ -196,6 +198,8 @@ function renderChatQuickBar(cardId, card){
   `;
   ov.appendChild(bar);
   const inp = bar.querySelector('#chat-quick-input');
+  try { const _d = localStorage.getItem('mc_draft_' + cardId); if(_d) inp.value = _d; } catch(e) {}
+  if(_hadFocus) { inp.focus(); try { inp.setSelectionRange(inp.value.length, inp.value.length); } catch(e) {} }
   inp.addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); sendQuickChatMessage(cardId); } });
 }
 
@@ -217,7 +221,12 @@ function chatTypingPing(){
     if(window._openViewId === cardId && typeof updateMyPresenceCard === 'function') updateMyPresenceCard(cardId, card.title);
   }, 3000);
 }
-document.addEventListener('input', e => { if(e.target && e.target.id === 'chat-quick-input') chatTypingPing(); });
+document.addEventListener('input', e => {
+  if(!e.target || e.target.id !== 'chat-quick-input') return;
+  chatTypingPing();
+  const _cid = window._openViewId;
+  if(_cid) { try { if(e.target.value) localStorage.setItem('mc_draft_' + _cid, e.target.value); else localStorage.removeItem('mc_draft_' + _cid); } catch(err) {} }
+});
 setInterval(() => {
   const ov = document.getElementById('view-ov');
   let el = document.getElementById('chat-typing');
