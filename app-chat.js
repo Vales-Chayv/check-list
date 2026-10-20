@@ -15,7 +15,7 @@ function openNewChatDialog() {
   const div = document.createElement('div');
   div.id = 'new-chat-ov';
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
-  div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;max-width:360px;width:100%">
+  div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;max-width:360px;width:100%;max-height:calc(100vh - 40px);overflow-y:auto;box-sizing:border-box">
     <div style="font-size:16px;font-weight:700;margin-bottom:14px">Новый чат</div>
     <div style="margin-bottom:12px"><label style="font-size:13px;color:var(--t2);display:block;margin-bottom:4px">Название</label>
       <input id="new-chat-title" placeholder="Например: Ужин в субботу" dir="auto" style="width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px;font-size:14px;color:var(--t1);font-family:inherit;box-sizing:border-box">
@@ -39,7 +39,8 @@ function openNewChatDialog() {
     </div>
   </div>`;
   document.body.appendChild(div);
-   window._newChatSelectedCat = 'Работа';
+   div.querySelector('button[onclick*="new-chat-ov"]')?.parentElement?.classList.add('sticky-act');
+window._newChatSelectedCat = 'Работа';
   window._newChatSelectedColor = COLORS[0];
   window._newChatMembers = new Set((currentSpace?.members||[]).map(m=>m.name)); // по умолчанию — все
   renderNewChatColorPicker();
