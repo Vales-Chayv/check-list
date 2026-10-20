@@ -59,15 +59,29 @@ async function checkPushStatus() {
 
 async function subscribePush() {
   try {
-    const perm=await Notification.requestPermission();
-    if(perm!=='granted'){toast('Разрешение не дано',true);return;}
-    await subscribeToPush();
+    const perm = await Notification.requestPermission();
+    if(perm !== 'granted') { toast('Разрешение не дано', true); return; }
+    const ok = await subscribeToPush();
+    if(!ok) { toast('Не удалось включить уведомления. Проверь, что ты вошла в аккаунт', true); return; }
     toast('✅ Уведомления включены!'); checkPushStatus();
-  }catch(e){toast('Ошибка: '+(e.message||String(e)),true);}
+  } catch(e) { toast('Ошибка: ' + (e.message || String(e)), true); }
 }
 
 async function unsubscribePush() {
-  try{const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();if(sub){const ep=sub.endpoint;await sub.unsubscribe();try{await fetch(FUNC_URL,{method:'POST',headers:{'Content-Type':'application/json','apikey':SB_ANON,'Authorization':'Bearer '+SB_ANON},body:JSON.stringify({unsubscribe:true,endpoint:ep})});}catch(_e){}}toast('Уведомления отключены');checkPushStatus();}
-  catch(e){toast('Ошибка',true);}
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if(sub) {
+      try {
+        await fetch(FUNC_URL, {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json', 'apikey': SB_ANON, 'Authorization': 'Bearer ' + SB_ANON },
+          body: JSON.stringify({ unsubscribe: true, endpoint: sub.endpoint })
+        });
+      } catch(e) {}
+      await sub.unsubscribe();
+    }
+    toast('Уведомления отключены'); checkPushStatus();
+  } catch(e) { toast('Ошибка', true); }
 }
 
