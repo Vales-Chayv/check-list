@@ -540,7 +540,6 @@ async function actuallyCloseChat(cardId) {
   render(); openView(cardId);
  const closedTitle = '🔒 Чат закрыт';
   const closedBody = `«${card.title}» закрыт и перемещён в архив`;
-  showChatNotice(closedTitle, closedBody, cardId);
   // Уведомляем через push только тех, у кого есть привязанный аккаунт (members_auth), т.к. push идёт по user_id
    const authIds = (currentSpace?.members_auth||[]).map(m=>m.user_id).filter(Boolean);
   const _closedIds = chatRecipientIds(card);
