@@ -529,7 +529,6 @@ async function requestCloseChat(cardId) {
   const ownerId = currentSpace?.owner_id;
   const closeReqTitle = '🔒 Запрос на закрытие чата';
   const closeReqBody = `«${card.title}» — просит закрыть ${localStorage.getItem('mc_current_member')||''}`;
-  showChatNotice(closeReqTitle, closeReqBody, cardId);
   if(ownerId) await notifyUsers([ownerId], closeReqTitle, closeReqBody, null, null, `https://vales-chayv.github.io/check-list/?openSpace=${currentSpaceId}&openCard=${card.id}`);
   toast('✓ Запрос отправлен создателю группы');
 }
