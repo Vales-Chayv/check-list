@@ -1033,18 +1033,19 @@ async function loadMyAssignedTasks(memberSpaceIds) {
         let mine = false;
         if(e.assigned_to && e.assigned_to!=='all' && e.assigned_to.toLowerCase()===myName) mine = true;
         if(e.assigned_to==='all' && (e.completions||[]).some(c=>c.name.toLowerCase()===myName && !c.done)) mine = true;
-        if(mine) tasks.push({ text: e.text, cardId: card.id, cardTitle: card.title, spaceId: card.space_id, spaceName: space?.name||'' });
+        if(mine) tasks.push({ text: e.text, entryId: e.id, cardId: card.id, cardTitle: card.title, spaceId: card.space_id, spaceName: space?.name||'' });
       });
     });
     box.innerHTML = tasks.length ? tasks.map(t => `
-      <div onclick="openTaskFromLobby('${t.spaceId}','${t.cardId}')" style="cursor:pointer;padding:8px 6px;border-bottom:1px solid var(--b1)">
+      <div onclick="openTaskFromLobby('${t.spaceId}','${t.cardId}','${t.entryId}')" style="cursor:pointer;padding:8px 6px;border-bottom:1px solid var(--b1)">
         <div style="font-size:13px;color:var(--t1)" dir="auto">${esc(t.text)}</div>
         <div style="font-size:11px;color:var(--t3);margin-top:2px">${esc(t.cardTitle)} · ${esc(t.spaceName)}</div>
       </div>`).join('') : '<div style="color:var(--t3);font-size:12px">Нет невыполненных задач</div>';
   } catch(e) { box.innerHTML = '<div style="color:var(--t3);font-size:12px">Ошибка загрузки</div>'; }
 }
-async function openTaskFromLobby(spaceId, cardId) {
-  if(currentSpaceId !== spaceId && typeof setCurrentSpace === 'function') await setCurrentSpace(spaceId, true);
+async function openTaskFromLobby(spaceId, cardId, entryId) {
+  if(typeof goToMyTask === 'function') return goToMyTask(cardId, entryId || '', spaceId);
+  if(currentSpaceId !== spaceId && typeof setCurrentSpace === 'function') setCurrentSpace(spaceId, true);
   openView(cardId);
 }
 // Alias по имени + пространству (для мест, где нет прямого user_id, только имя строкой)
