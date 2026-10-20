@@ -198,34 +198,57 @@ function renderChatQuickBar(cardId, card){
     <button onclick="openChatVoice('${cardId}')" style="background:var(--s2);color:var(--accent);border:1px solid var(--b1);border-radius:50%;width:40px;height:40px;font-size:16px;cursor:pointer;flex-shrink:0">🎙️</button>
   `;
   ov.appendChild(bar);
+  chatTypingEnsure(cardId);
   const inp = bar.querySelector('#chat-quick-input');
   try { const _d = localStorage.getItem('mc_draft_' + cardId); if(_d) inp.value = _d; } catch(e) {}
   if(_hadFocus) { inp.focus(); try { inp.setSelectionRange(inp.value.length, inp.value.length); } catch(e) {} }
   inp.addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); sendQuickChatMessage(cardId); } });
 }
 
-// ── «пишет…» в чате (через presence, без записи в базу) ──
+// ── «пишет…» в чате: отдельный канал broadcast на каждый открытый чат (без хранения состояния и без базы) ──
+let _tc = null, _tcCard = null;
+const _typers = {};   // user_id -> {name, until}
 let _typingIdle = null, _typingLastSent = 0, _typingKey = '';
+function chatTypingEnsure(cardId){
+  if(!cardId || typeof sb === 'undefined') return null;
+  if(_tc && _tcCard === cardId && _tc.state !== 'closed' && _tc.state !== 'errored') return _tc;
+  chatTypingLeave();
+  try {
+    _tcCard = cardId;
+    _tc = sb.channel('typing:' + cardId, { config: { broadcast: { self: false } } });
+    _tc.on('broadcast', { event: 'typing' }, m => {
+        const p = m && m.payload;
+        if(p && p.user_id && p.user_id !== currentUser?.id) _typers[p.user_id] = { name: p.name || '', until: Date.now() + 4000 };
+      })
+      .on('broadcast', { event: 'stop' }, m => {
+        const p = m && m.payload;
+        if(p && p.user_id) delete _typers[p.user_id];
+      })
+      .subscribe();
+  } catch(e) { _tc = null; _tcCard = null; }
+  return _tc;
+}
+function chatTypingLeave(){
+  if(_tc) { try { sb.removeChannel(_tc); } catch(e) {} }
+  _tc = null; _tcCard = null; _typingLastSent = 0;
+  Object.keys(_typers).forEach(k => delete _typers[k]);
+}
+function chatTypingSend(event){
+  const ch = chatTypingEnsure(window._openViewId);
+  if(!ch || ch.state !== 'joined') return;
+  try { ch.send({ type: 'broadcast', event, payload: { name: localStorage.getItem('mc_current_member') || '', user_id: currentUser?.id } }); } catch(e) {}
+}
 function chatTypingPing(){
-  const cardId = window._openViewId;
-  if(!cardId || typeof presenceChannel === 'undefined' || !presenceChannel) return;
-  const card = cards.find(c=>c.id===cardId); if(!card) return;
-  const myName = localStorage.getItem('mc_current_member') || '';
   const now = Date.now();
-  if(now - _typingLastSent > 2500) {
-    _typingLastSent = now;
-    presenceChannel.track({ name: myName, user_id: currentUser?.id, cardId, cardTitle: card.title, typing: true });
-  }
+  if(now - _typingLastSent > 1500) { _typingLastSent = now; chatTypingSend('typing'); }
   clearTimeout(_typingIdle);
   _typingIdle = setTimeout(chatTypingStop, 3000);
 }
-// сразу снимаем «пишет…» (после отправки или когда поле очистили)
+// сразу снимаем «пишет…» (после отправки, когда поле очистили или перестала печатать)
 function chatTypingStop(){
   clearTimeout(_typingIdle);
+  if(_typingLastSent) chatTypingSend('stop');
   _typingLastSent = 0;
-  const id = window._openViewId;
-  const card = id && cards.find(c=>c.id===id);
-  if(card && typeof updateMyPresenceCard === 'function') { try { updateMyPresenceCard(id, card.title); } catch(e) {} }
 }
 document.addEventListener('input', e => {
   if(!e.target || e.target.id !== 'chat-quick-input') return;
@@ -243,11 +266,14 @@ setInterval(() => {
   const ov = document.getElementById('view-ov');
   let el = document.getElementById('chat-typing');
   const cardId = window._openViewId;
-  if(!ov || !ov.classList.contains('on') || !cardId || typeof presenceChannel === 'undefined' || !presenceChannel || !document.getElementById('chat-quick-bar')) { el?.remove(); _typingKey = ''; return; }
+  if(!cardId && _tc) chatTypingLeave();
+  if(!ov || !ov.classList.contains('on') || !cardId || !document.getElementById('chat-quick-bar')) { el?.remove(); _typingKey = ''; return; }
+  const now = Date.now();
   const names = [];
-  Object.values(presenceChannel.presenceState() || {}).forEach(arr => (arr||[]).forEach(p => {
-    if(p.typing && p.cardId === cardId && p.user_id !== currentUser?.id && p.name) names.push(p.name);
-  }));
+  Object.keys(_typers).forEach(k => {
+    if(_typers[k].until < now) delete _typers[k];
+    else if(_typers[k].name) names.push(_typers[k].name);
+  });
   if(!names.length) { el?.remove(); _typingKey = ''; return; }
   const key = names.join('|');
   if(el && key === _typingKey) return;
