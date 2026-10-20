@@ -15,7 +15,16 @@ function viewToggleGroup(cardId, groupId) {
   viewGroupState.set(groupId, cur === false ? true : false);
   openView(cardId);
 }
-
+async function addViewGroup(cardId) {
+  const card = cards.find(c => c.id === cardId); if(!card) return;
+  const name = (prompt('Название рубрики') || '').trim();
+  if(!name) return;
+  const _st = document.querySelector('#view-ov .sheet')?.scrollTop || 0;
+  card.entryGroups = [...(card.entryGroups||[]), { id: uid(), name }];
+  try { await dbUpdate(card); } catch(err) { toast('Ошибка синхронизации', true); }
+  openView(cardId);
+  setTimeout(() => { const s = document.querySelector('#view-ov .sheet'); if(s) s.scrollTop = _st; }, 60);
+}
 function openView(id) {
   const card = cards.find(c=>c.id===id); if(!card) return;
   if((currentSpace?.type==='family'||currentSpace?.type==='group') && typeof updateMyPresenceCard==='function') updateMyPresenceCard(id, card.title);
@@ -240,7 +249,7 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
         return `<div style="border:1px solid var(--b1);border-radius:var(--rsm);margin-bottom:8px;overflow:hidden">
           <div onclick="viewToggleGroup('${id}','${g.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--s2);cursor:pointer">
             <span style="font-size:13px;font-weight:700;color:var(--accent)">${esc(g.name)||'Без названия'}</span>
-            <span style="font-size:11px;color:var(--t3)">${gEntries.length} ${expanded?'▲':'▼'}</span>
+            <span style="display:flex;align-items:center;gap:10px"><button onclick="event.stopPropagation();openAddEntry('${id}',null,false,'${g.id}')" style="background:rgba(232,197,106,.15);color:var(--accent);border:1px solid rgba(232,197,106,.3);border-radius:6px;padding:2px 10px;font-size:15px;line-height:1.3;cursor:pointer">＋</button><span style="font-size:11px;color:var(--t3)">${gEntries.length} ${expanded?'▲':'▼'}</span></span>
           </div>
           ${expanded ? `<div style="padding:0 12px">${gEntries.map(e=>entryRowHTML(e,null)).join('')}</div>` : ''}
         </div>`;
@@ -248,7 +257,7 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
     } else {
       sessionsHTML = sessions.map((s,si) => isFamily ? stickerHTML(s,si) : plainSessionHTML(s,si)).join('');
     }
-    html+=`<div class="view-sec">${!isFamily?`<div class="view-lbl">Записи (${dc}/${entries.filter(e=>e.text).length})</div>`:''}${sessionsHTML}</div>`;
+    html+=`<div class="view-sec">${!isFamily?`<div class="view-lbl">Записи (${dc}/${entries.filter(e=>e.text).length})</div>`:''}${sessionsHTML}${(!isFamily&&entryGroups.length)?`<button onclick="addViewGroup('${id}')" style="width:100%;background:var(--s2);color:var(--accent);border:1px dashed rgba(232,197,106,.4);border-radius:var(--rsm);padding:10px;font-size:14px;cursor:pointer">＋ Новая рубрика</button>`:''}</div>`;
   }
 
   if(imgs.length) html+=`<div class="view-sec"><div class="view-lbl">Фото (${imgs.length})</div><div style="display:flex;flex-wrap:wrap;gap:7px">${imgs.map((a,i)=>`<img src="${a.data}" style="width:95px;height:95px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid rgba(255,255,255,.1)" onclick="App.viewImg('${id}',${i})">`).join('')}</div></div>`;
@@ -395,7 +404,7 @@ function openAddEntry(cardId, sessionId = null, hideNote = false, groupId = null
     if(card?.entryGroups?.length) {
       groupSel.style.display = 'block';
       groupSel.innerHTML = card.entryGroups.map(g=>`<option value="${g.id}">${esc(g.name)||'Без названия'}</option>`).join('') + `<option value="__new__">+ Новый раздел</option>`;
-      groupSel.value = card.entryGroups[0].id;
+      groupSel.value = (groupId && card.entryGroups.some(g => g.id === groupId)) ? groupId : card.entryGroups[0].id;
     } else {
       groupSel.style.display = 'none';
     }
