@@ -1,4 +1,4 @@
-const CACHE = 'mc-v253';
+const CACHE = 'mc-v254';
 const APP_FILES = [
   '/check-list/',
   '/check-list/index.html',
@@ -33,7 +33,7 @@ self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE).then(async cache => {
       // по одному: если какой-то файл не скачался, остальные всё равно сохраняются
-      await Promise.all(APP_FILES.map(u => cache.add(u).catch(()=>{})));
+      await Promise.all(APP_FILES.map(u => fetch(new Request(u, {cache:'reload'})).then(r => { if(!r.ok) throw 0; return cache.put(u, r); }).catch(()=>{})));
       await Promise.all(CDN_FILES.map(u => {
         const req = new Request(u, {mode:'no-cors'});
         return fetch(req).then(r => cache.put(req, r)).catch(()=>{});
@@ -64,7 +64,7 @@ self.addEventListener('fetch', e => {
   // App files — cache first, update in background (ignoreSearch: адрес с ?openCard=… тоже открывается без интернета)
   e.respondWith(
     caches.match(e.request, {ignoreSearch:true}).then(cached => {
-      const network = fetch(e.request).then(res => {
+      const network = fetch(e.request, {cache:'no-cache'}).then(res => {
         if(res.ok || res.type === 'opaque') { const clone = res.clone(); caches.open(CACHE).then(c=>c.put(e.request,clone)); }
 return res;
       }).catch(()=>cached);
