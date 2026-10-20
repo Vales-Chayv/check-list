@@ -364,7 +364,7 @@ async function viewToggleEntry(cardId, entryId) {
 let aeCardId = null, aeAtts = [], aeIsVoice = false, aeVoiceRec = null, aeWakeLock = null, aeStopResolve = null;
 let aeStickerSessionId = null;
 
-function openAddEntry(cardId, sessionId = null, hideNote = false) {
+function openAddEntry(cardId, sessionId = null, hideNote = false, groupId = null) {
   aeCardId = cardId;
   aeStickerSessionId = sessionId;
   aeAtts = [];
