@@ -130,14 +130,20 @@ function highlightTask(cardId, entryId){
   openView(cardId);
   if(!entryId) return;
   let tries = 0, firstSeen = 0;
+  const paint = (el, on) => {
+    el.style.transition = 'background .3s, outline-color .3s';
+    el.style.background = on ? 'rgba(255,214,64,.75)' : '';
+    el.style.outline = on ? '2px solid #e8c56a' : '';
+    el.style.outlineOffset = on ? '2px' : '';
+    el.style.borderRadius = on ? '6px' : '';
+  };
   const timer = setInterval(() => {
     tries++;
     const el = document.querySelector(`[data-entryid="${entryId}"]`);
     if(el){
       if(!firstSeen){ firstSeen = Date.now(); el.scrollIntoView({behavior:'smooth', block:'center'}); }
-      el.style.transition = 'background .3s';
-      el.style.background = 'rgba(232,197,106,.25)';
-      if(Date.now() - firstSeen > 2500){ el.style.background = ''; clearInterval(timer); return; }
+      if(Date.now() - firstSeen > 3000){ paint(el, false); clearInterval(timer); return; }
+      paint(el, true);
     }
     if(tries > 40) clearInterval(timer);
   }, 150);
