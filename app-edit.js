@@ -13,6 +13,7 @@ function openEdit(id) {
   tempRelIds=[...(card?.related_ids||[])];
   remOn=card?.reminder?.enabled||false;
   ballVal=card?.ball||'';
+  const _bw=document.getElementById('e-ball-who'); if(_bw) _bw.value=card?.ballWho||'';
   freqVal=card?.reminder?.freq||'daily';
   customDays=[...(card?.reminder?.days||[])];
   remHour = Number.isInteger(card?.reminder?.hour) ? card.reminder.hour : 9;
@@ -181,7 +182,16 @@ async function addCat() {
 // Ball
 function renderBall() {
   document.querySelectorAll('#seg-ball .seg-btn').forEach(b=>{ b.classList.toggle('on', b.dataset.ball===ballVal); });
+  const _bw=document.getElementById('e-ball-who'); if(_bw) _bw.style.display = ballVal==='theirs' ? 'block' : 'none';
 }
+(function(){
+  const seg=document.getElementById('seg-ball');
+  if(!seg || document.getElementById('e-ball-who')) return;
+  const i=document.createElement('input');
+  i.id='e-ball-who'; i.placeholder='У кого мяч? (имя)'; i.setAttribute('dir','auto'); i.style.cssText='display:none;margin-top:8px';
+  i.addEventListener('input', ()=>{ if(typeof checkDirty==='function') checkDirty(); });
+  seg.insertAdjacentElement('afterend', i);
+})();
 document.getElementById('seg-ball').addEventListener('click',e=>{
   const btn=e.target.closest('.seg-btn'); if(!btn)return;
   ballVal=btn.dataset.ball; renderBall();
@@ -490,6 +500,7 @@ async function saveCard() {
     status:finalStatus, priority:document.getElementById('e-priority').value||'normal',
     deadline:([...tempEntries].filter(e=>!e.done&&e.deadline).map(e=>e.deadline).sort()[0])||null,
     ball:isFamily?'':ballVal,
+    ballWho:(!isFamily&&ballVal==='theirs')?(document.getElementById('e-ball-who')?.value||'').trim():'',
     assigned_to:assignedTo,
     attachments: isFamily&&!editId ? [] : tempAtt,
    entries:sessionEntries,

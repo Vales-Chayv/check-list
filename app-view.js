@@ -58,7 +58,7 @@ function openView(id) {
           ${card.category?`<span style="font-size:12px;background:rgba(0,0,0,.2);padding:2px 10px;border-radius:10px;color:${col}">${esc(card.category)}</span>`:''}
           <span class="badge" style="color:${col}">${ST_LABELS[card.status]||''}</span>
           ${dl?`<span class="dl-badge ${dl.cls}">${dl.text}</span>`:''}
-          ${card.ball==='mine'?'<span style="font-size:12px;opacity:.7">⚽ У меня</span>':card.ball==='theirs'?'<span style="font-size:12px;opacity:.7">⚽ У них</span>':''}
+          ${card.ball==='mine'?'<span style="font-size:12px;opacity:.7">⚽ У меня</span>':card.ball==='theirs'?'<span style="font-size:12px;opacity:.7">⚽ У них'+(card.ballWho?': '+esc(card.ballWho):'')+'</span>':''}
         </div>
         ${currentSpace?.type!=='family'?`<div style="display:flex;gap:5px;margin-top:8px">
           <button onclick="toggleBall('${id}','')" style="padding:3px 10px;border-radius:12px;font-size:12px;cursor:pointer;border:1px solid var(--b2);background:${!card.ball?'var(--s2)':'transparent'};color:${!card.ball?'var(--t1)':'var(--t3)'}">—</button>
@@ -303,6 +303,7 @@ function closeView() {
 
 async function toggleBall(cardId, val) {
   const card = cards.find(c=>c.id===cardId); if(!card) return;
+  if(val==='theirs'){ const who = prompt('У кого мяч?', card.ballWho||''); if(who===null) return; card.ballWho = who.trim(); } else { card.ballWho = ''; }
   card.ball = val;
   render(); openView(cardId);
   try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
