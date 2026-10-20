@@ -30,6 +30,7 @@ function openView(id) {
   const isChatCardView = (currentSpace?.type==='family'||currentSpace?.type==='group') && Array.isArray(card.chatParticipants);
   document.getElementById('view-ov')?.classList.toggle('chat-sheet', isChatCardView);
   if(isChatCardView) setTimeout(()=>renderChatQuickBar(id, card), 0);
+  else { document.getElementById('chat-quick-bar')?.remove(); document.getElementById('chat-typing')?.remove(); }
   const col = catColor(card.category);
   const entries = [...(card.entries||[])].sort((a,b)=>(a.done===b.done)?0:a.done?1:-1);
   const atts = card.attachments||[];
