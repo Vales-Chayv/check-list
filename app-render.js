@@ -109,9 +109,19 @@ function closeMyTasksPopup(){ document.getElementById('my-tasks-ov').classList.r
 async function goToMyTask(cardId, entryId, spaceId){
   closeMyTasksPopup();
   if(spaceId !== currentSpaceId){
-    await setCurrentSpace(spaceId, true);
-    let tries=0;
-    (function wait(){ if((cards||[]).some(c=>c.id===cardId)){ highlightTask(cardId, entryId); return; } if(++tries>25) return; setTimeout(wait,120); })();
+    setCurrentSpace(spaceId, true);
+    // ждём, пока карточка появится в списке (до ~12 с); если за 2 с не пришла — подтягиваем её с сервера напрямую
+    for(let i = 0; i < 100; i++){
+      if(currentSpaceId !== spaceId) return;
+      if((cards||[]).some(c => c.id === cardId)){ highlightTask(cardId, entryId); return; }
+      if(i === 16){
+        try {
+          const { data } = await sb.from('cards').select('*').eq('id', cardId).maybeSingle();
+          if(data && currentSpaceId === spaceId && !(cards||[]).some(c => c.id === cardId)) cards.unshift(data);
+        } catch(e) {}
+      }
+      await new Promise(r => setTimeout(r, 120));
+    }
   } else {
     highlightTask(cardId, entryId);
   }
