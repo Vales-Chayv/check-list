@@ -128,15 +128,19 @@ async function goToMyTask(cardId, entryId, spaceId){
 }
 function highlightTask(cardId, entryId){
   openView(cardId);
-  setTimeout(()=>{
+  if(!entryId) return;
+  let tries = 0, firstSeen = 0;
+  const timer = setInterval(() => {
+    tries++;
     const el = document.querySelector(`[data-entryid="${entryId}"]`);
     if(el){
-      el.scrollIntoView({behavior:'smooth', block:'center'});
-      el.style.transition='background .3s';
-      el.style.background='rgba(232,197,106,.25)';
-      setTimeout(()=>{ el.style.background=''; }, 1600);
+      if(!firstSeen){ firstSeen = Date.now(); el.scrollIntoView({behavior:'smooth', block:'center'}); }
+      el.style.transition = 'background .3s';
+      el.style.background = 'rgba(232,197,106,.25)';
+      if(Date.now() - firstSeen > 2500){ el.style.background = ''; clearInterval(timer); return; }
     }
-  }, 350);
+    if(tries > 40) clearInterval(timer);
+  }, 150);
 }
 function toggleDesktopCalendar(){
   document.body.classList.remove('calc-on');
