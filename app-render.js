@@ -624,7 +624,7 @@ function cardHTML(card, isDone=false) {
 <div style="display:flex;justify-content:space-between;gap:7px;align-items:flex-start">
       <button onclick="event.stopPropagation();App.togglePin('${card.id}')" title="${card.pinned?'Открепить':'Закрепить'}" style="background:none;border:none;cursor:pointer;font-size:16px;padding:0;line-height:1;flex-shrink:0;margin-top:1px;${card.pinned?'':'opacity:.28;filter:grayscale(1)'}">📌</button>
       <div style="flex:1;min-width:0">
-        <div class="card-title" style="color:${col};${isDone?'text-decoration:line-through;opacity:.7':''}">${card.reminder?.enabled?'🔔 ':''}${pBadge}${esc(card.title)}</div>
+        <div class="card-title" style="color:${col};${isDone?'text-decoration:line-through;opacity:.7':''}">${card.reminder?.enabled?`<span onclick="event.stopPropagation();openRemPopup('${card.id}')" style="cursor:pointer">🔔 </span>`:''}${pBadge}${esc(card.title)}</div>
         ${bodyHTML}${entriesHTML}${imgsHTML}${filesHTML}
         <div class="card-meta">
           ${card.category?`<span class="cat-tag">${esc(card.category)}</span>`:''}
