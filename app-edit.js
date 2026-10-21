@@ -17,6 +17,8 @@ function openEdit(id) {
   freqVal=card?.reminder?.freq||'daily';
   customDays=[...(card?.reminder?.days||[])];
   remHour = Number.isInteger(card?.reminder?.hour) ? card.reminder.hour : 9;
+  remMonthDay = Number.isInteger(card?.reminder?.monthDay) ? card.reminder.monthDay : 1;
+  if(freqVal==='weekly') customDays=[Number.isInteger(customDays[0])?customDays[0]:0];
 
  const isFamily = currentSpace?.type === 'family';
   const isPersonal = currentSpace?.type === 'personal';
@@ -199,7 +201,18 @@ document.getElementById('seg-ball').addEventListener('click',e=>{
 
 // Reminder
 function toggleRem() { remOn=!remOn; updateRemUI(); }
-var remHour = 9;
+var remHour = 9, remMonthDay = 1;
+(function(){
+  const picker = document.getElementById('day-picker');
+  if(!picker || document.getElementById('rem-monthday-row')) return;
+  const row = document.createElement('div');
+  row.id = 'rem-monthday-row'; row.style.cssText = 'display:none;align-items:center;gap:8px';
+  row.innerHTML = '<span style="font-size:13px;color:var(--t2)">Число месяца</span><select id="rem-monthday" style="background:var(--s1);border:1px solid var(--b1);border-radius:var(--rsm);padding:7px 10px;font-size:14px;color:var(--t1);font-family:inherit"></select>';
+  const sel = row.querySelector('select');
+  for(let d = 1; d <= 31; d++) { const o = document.createElement('option'); o.value = d; o.textContent = d; sel.appendChild(o); }
+  sel.addEventListener('change', () => { remMonthDay = parseInt(sel.value, 10) || 1; });
+  picker.insertAdjacentElement('afterend', row);
+})();
 function syncRemHour() {
   const sel = document.getElementById('rem-hour'); if(!sel) return;
   if(!sel.options.length) {
@@ -211,6 +224,8 @@ function syncRemHour() {
   }
   sel.value = String(remHour);
   document.getElementById('rem-hour-row').style.display = 'flex';
+  const _mdSel = document.getElementById('rem-monthday'); if(_mdSel) _mdSel.value = String(remMonthDay);
+  const _mdRow = document.getElementById('rem-monthday-row'); if(_mdRow) _mdRow.style.display = freqVal==='monthly' ? 'flex' : 'none';
 }
 document.getElementById('seg-freq').addEventListener('click', () => setTimeout(syncRemHour, 0));
 function updateRemUI() {
@@ -223,17 +238,21 @@ function updateRemUI() {
     document.querySelectorAll('#seg-freq .seg-btn').forEach(b=>b.classList.toggle('on',b.dataset.freq===freqVal));
     document.getElementById('day-picker').style.display=freqVal==='custom'?'flex':'none';
     document.querySelectorAll('.day-btn').forEach(b=>b.classList.toggle('on',customDays.includes(+b.dataset.d)));
+    document.getElementById('day-picker').style.display=(freqVal==='custom'||freqVal==='weekly')?'flex':'none';
   }
 }
 document.getElementById('seg-freq').addEventListener('click',e=>{
   const btn=e.target.closest('.seg-btn'); if(!btn)return;
   freqVal=btn.dataset.freq;
+  if(freqVal==='weekly') customDays=[Number.isInteger(customDays[0])?customDays[0]:0];
+  setTimeout(()=>{ document.getElementById('day-picker').style.display=(freqVal==='custom'||freqVal==='weekly')?'flex':'none'; document.querySelectorAll('.day-btn').forEach(b=>b.classList.toggle('on',customDays.includes(+b.dataset.d))); }, 0);
   document.querySelectorAll('#seg-freq .seg-btn').forEach(b=>b.classList.toggle('on',b===btn));
   document.getElementById('day-picker').style.display=freqVal==='custom'?'flex':'none';
 });
 document.getElementById('days-row').addEventListener('click',e=>{
   const btn=e.target.closest('.day-btn'); if(!btn)return;
   const d=+btn.dataset.d; const i=customDays.indexOf(d);
+  if(freqVal==='weekly') { customDays=[d]; document.querySelectorAll('.day-btn').forEach(b=>b.classList.toggle('on',+b.dataset.d===d)); return; }
   if(i>=0)customDays.splice(i,1); else{customDays.push(d);customDays.sort();}
   btn.classList.toggle('on',customDays.includes(d));
 });
@@ -505,7 +524,7 @@ async function saveCard() {
     attachments: isFamily&&!editId ? [] : tempAtt,
    entries:sessionEntries,
     entryGroups: groupedMode ? tempEntryGroups.filter(g=>g.name||!g._naming).map(({_naming,_expanded,...g})=>g) : [],
-    reminder:{enabled:remOn,freq:freqVal,days:customDays,hour:remHour,intervalMin:oldCard?.reminder?.intervalMin||null,intervalRun:oldCard?.reminder?.intervalRun||null},
+    reminder:{enabled:remOn,freq:freqVal,days:customDays,hour:remHour,monthDay:remMonthDay,intervalMin:oldCard?.reminder?.intervalMin||null,intervalRun:oldCard?.reminder?.intervalRun||null},
     history:hist, related_ids:tempRelIds
   };
   setSaveBtns(false);

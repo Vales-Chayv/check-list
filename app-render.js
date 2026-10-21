@@ -816,4 +816,75 @@ function toggleCatsDropdown() {
     if(!dropdown.contains(e.target)){dropdown.style.display='none';document.removeEventListener('click',h);}
   }), 150);
 }
+// ── Окно «Напоминание» по нажатию на 🔔 в плитке карточки ──
+function openRemPopup(cardId) {
+  const card = (cards||[]).find(c => c.id === cardId); if(!card) return;
+  const r = card.reminder || {};
+  let freq = ['daily','weekly','custom','monthly'].includes(r.freq) ? r.freq : 'daily';
+  let days = Array.isArray(r.days) ? [...r.days] : [];
+  let hour = Number.isInteger(r.hour) ? r.hour : 9;
+  let monthDay = Number.isInteger(r.monthDay) ? r.monthDay : 1;
+  if(freq === 'weekly') days = [Number.isInteger(days[0]) ? days[0] : 0];
+  document.getElementById('rem-pop-ov')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'rem-pop-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.addEventListener('click', e => { if(e.target === ov) ov.remove(); });
+  const FREQS = [['daily','Каждый день'],['weekly','Раз в неделю'],['custom','Свои дни'],['monthly','Раз в месяц']];
+  const DAYS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+  const selStyle = 'background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:7px 10px;font-size:14px;color:var(--t1);font-family:inherit';
+  const hours = Array.from({length:24}, (_, h) => `<option value="${h}">${String(h).padStart(2,'0')}:00</option>`).join('');
+  const mdays = Array.from({length:31}, (_, i) => `<option value="${i+1}">${i+1}</option>`).join('');
+  ov.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;max-width:360px;width:100%;max-height:calc(100vh - 40px);overflow-y:auto;box-sizing:border-box">
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">🔔 Напоминание</div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:14px;word-break:break-word" dir="auto">${esc(card.title)}</div>
+    <div class="seg" id="rp-freq" style="flex-wrap:wrap">${FREQS.map(f => `<button type="button" class="seg-btn" data-f="${f[0]}" style="flex:1 1 45%">${f[1]}</button>`).join('')}</div>
+    <div id="rp-days" class="days" style="margin-top:10px">${DAYS.map((d, i) => `<button type="button" class="day-btn" data-d="${i}">${d}</button>`).join('')}</div>
+    <div id="rp-md" style="display:none;align-items:center;gap:8px;margin-top:10px"><span style="font-size:13px;color:var(--t2)">Число месяца</span><select id="rp-md-sel" style="${selStyle}">${mdays}</select></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:10px"><span style="font-size:13px;color:var(--t2)">Время напоминания</span><select id="rp-hour" style="${selStyle}">${hours}</select></div>
+    <div style="display:flex;gap:8px;margin-top:18px">
+      <button type="button" id="rp-cancel" style="flex:1;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;font-size:13px;cursor:pointer;font-family:inherit">Отмена</button>
+      <button type="button" id="rp-save" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Сохранить</button>
+    </div>
+    <button type="button" id="rp-off" style="width:100%;margin-top:10px;background:none;border:1px solid rgba(232,96,96,.3);color:var(--red);border-radius:var(--rsm);padding:10px;font-size:13px;cursor:pointer;font-family:inherit">Выключить напоминание</button>
+  </div>`;
+  document.body.appendChild(ov);
+  const q = s => ov.querySelector(s);
+  const paint = () => {
+    ov.querySelectorAll('#rp-freq .seg-btn').forEach(b => b.classList.toggle('on', b.dataset.f === freq));
+    q('#rp-days').style.display = (freq === 'custom' || freq === 'weekly') ? 'flex' : 'none';
+    ov.querySelectorAll('#rp-days .day-btn').forEach(b => b.classList.toggle('on', days.includes(+b.dataset.d)));
+    q('#rp-md').style.display = freq === 'monthly' ? 'flex' : 'none';
+  };
+  q('#rp-md-sel').value = String(monthDay);
+  q('#rp-hour').value = String(hour);
+  q('#rp-freq').addEventListener('click', e => {
+    const b = e.target.closest('.seg-btn'); if(!b) return;
+    freq = b.dataset.f;
+    if(freq === 'weekly') days = [Number.isInteger(days[0]) ? days[0] : 0];
+    paint();
+  });
+  q('#rp-days').addEventListener('click', e => {
+    const b = e.target.closest('.day-btn'); if(!b) return;
+    const d = +b.dataset.d;
+    if(freq === 'weekly') days = [d];
+    else { const i = days.indexOf(d); if(i >= 0) days.splice(i, 1); else { days.push(d); days.sort(); } }
+    paint();
+  });
+  q('#rp-md-sel').addEventListener('change', e => { monthDay = parseInt(e.target.value, 10) || 1; });
+  q('#rp-hour').addEventListener('change', e => { hour = parseInt(e.target.value, 10); });
+  q('#rp-cancel').addEventListener('click', () => ov.remove());
+  q('#rp-save').addEventListener('click', async () => {
+    if(freq === 'custom' && !days.length) { toast('Выбери хотя бы один день', true); return; }
+    card.reminder = { ...(card.reminder||{}), enabled: true, freq, days, hour, monthDay };
+    ov.remove(); render();
+    try { await dbUpdate(card); toast('✓ Напоминание сохранено'); } catch(e) { toast('Ошибка синхронизации', true); }
+  });
+  q('#rp-off').addEventListener('click', async () => {
+    card.reminder = { ...(card.reminder||{}), enabled: false };
+    ov.remove(); render();
+    try { await dbUpdate(card); toast('Напоминание выключено'); } catch(e) { toast('Ошибка синхронизации', true); }
+  });
+  paint();
+}
 
