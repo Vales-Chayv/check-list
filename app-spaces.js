@@ -390,6 +390,20 @@ function spDragFinish(e, save) {
 }
 function spGripUp(e) { spDragFinish(e, true); }
 function spGripCancel(e) { spDragFinish(e, false); }
+// ─── Выбор цвета значка кабинета (владелец) ───
+const SPACE_PALETTE = SPACE_COLORS.concat(['#e86060', '#c8e85b']);
+let _spaceColorPick = null; // null = автоматически по названию
+function renderSpaceColorPal(boxId, current) {
+  _spaceColorPick = current || null;
+  const box = document.getElementById(boxId); if(!box) return;
+  box.innerHTML = `<div class="swatch${!_spaceColorPick?' on':''}" onclick="pickSpaceColor(this,'${boxId}',null)" title="Автоматически" style="background:var(--s2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--t2)">A</div>`
+    + SPACE_PALETTE.map(c => `<div class="swatch${_spaceColorPick===c?' on':''}" style="background:${c}" onclick="pickSpaceColor(this,'${boxId}','${c}')"></div>`).join('');
+}
+function pickSpaceColor(el, boxId, c) {
+  _spaceColorPick = c;
+  document.querySelectorAll('#' + boxId + ' .swatch').forEach(x => x.classList.remove('on'));
+  el.classList.add('on');
+}
 function toggleSpaceActs(id) {
   if(lobbyOpenActs.has(id)) lobbyOpenActs.delete(id); else lobbyOpenActs.add(id);
   renderSpacesList();
@@ -642,6 +656,7 @@ function openCreateSpace() {
   document.getElementById('new-space-name').value = '';
   document.getElementById('new-space-pwd').value = '';
   document.getElementById('new-space-type').value = 'personal';
+  renderSpaceColorPal('new-space-pal', null);
   document.getElementById('create-space-ov').classList.add('on');
   setTimeout(()=>document.getElementById('new-space-name').focus(), 300);
 }
@@ -690,7 +705,7 @@ async function createSpace() {
   const memberColors = ['#e8a83a','#5b9ee8','#a07de8','#5bb87a','#e85bb0','#5bc8e8','#e86060','#c8e85b'];
   const initialMembers = type==='family' ? [{name: currentUser?.display_name||'', color: memberColors[0], user_id: owner_id}] : [];
   const initialAuth = type==='family' && owner_id ? [{user_id: owner_id, name: currentUser?.display_name||''}] : [];
-  const space = {id, name, type, password:pwd, members:initialMembers, members_auth:initialAuth, share_token, owner_id};
+  const space = {id, name, type, password:pwd, members:initialMembers, members_auth:initialAuth, share_token, owner_id, color:_spaceColorPick};
   try {
     const {error} = await sb.from('spaces').insert(space);
     if(error) throw error;
@@ -1403,6 +1418,8 @@ function openEditSpace(id) {
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:420px">
     <div style="font-size:16px;font-weight:700;margin-bottom:12px">Редактировать кабинет</div>
     <input id="edit-space-name-inp" value="${esc(space.name)}" dir="auto" style="width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px;font-size:15px;color:var(--t1);font-family:inherit;margin-bottom:12px">
+    <div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Цвет значка</div>
+    <div class="pal" id="edit-space-pal" style="margin-bottom:16px"></div>
     <div style="display:flex;gap:8px">
       <button onclick="saveSpaceName('${id}')" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:11px;font-size:14px;font-weight:700;cursor:pointer">Сохранить</button>
       <button onclick="document.getElementById('edit-space-dialog')?.remove()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px 16px;cursor:pointer">Отмена</button>
@@ -1410,6 +1427,7 @@ function openEditSpace(id) {
     <button onclick="deleteSpace('${id}')" style="width:100%;margin-top:10px;background:rgba(232,96,96,.15);color:var(--red);border:1px solid rgba(232,96,96,.25);border-radius:var(--rsm);padding:11px;font-size:14px;cursor:pointer">🗑 Удалить кабинет</button>
   </div>`;
   document.body.appendChild(div);
+  renderSpaceColorPal('edit-space-pal', space.color);
   setTimeout(()=>document.getElementById('edit-space-name-inp')?.focus(), 100);
 }
 
@@ -1418,11 +1436,12 @@ async function saveSpaceName(id) {
   const name = document.getElementById('edit-space-name-inp')?.value?.trim();
   if(!name) return;
   space.name = name;
+  space.color = _spaceColorPick;
   document.getElementById('edit-space-dialog')?.remove();
   localStorage.setItem('mc_spaces', JSON.stringify(spaces));
   renderSpacesList();
   try {
-    await sb.from('spaces').update({name}).eq('id', id);
-    toast('✓ Название изменено');
+    await sb.from('spaces').update({name, color:_spaceColorPick}).eq('id', id);
+    toast('✓ Сохранено');
   } catch(e) { toast('Ошибка: '+e.message, true); }
 }
