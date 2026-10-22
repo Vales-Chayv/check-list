@@ -291,11 +291,13 @@ function membersWord(n) {
 }
 // ─── ЛОББИ: виды кабинетов, фильтр, сортировка, закрепление (хранится на устройстве, отдельно для каждого пользователя) ───
 // Чтобы добавить новый вид кабинета в фильтр — допиши сюда одну строку: id, список type из базы и название кнопки.
+// icon и tag — обозначение вида на карточке; round — форма значка (круг / скруглённый квадрат).
 const SPACE_TYPES = [
-  {id:'group',    keys:['family','group'], label:'Групповые'},
-  {id:'personal', keys:['personal'],       label:'Личные'}
+  {id:'group',    keys:['family','group'], label:'Групповые', tag:'Групповой', icon:'👥', round:'50%'},
+  {id:'personal', keys:['personal'],       label:'Личные',    tag:'Личный',    icon:'👤', round:'16px'}
 ];
-const LOBBY_SORTS = [['recent','Недавние'], ['unread','Непрочитанные'], ['name','По имени']];
+const LOBBY_SORTS = [['recent','Недавние'], ['unread','Непрочитанные'], ['name','По имени'], ['mine','Мой порядок']];
+function spaceTypeOf(s) { return SPACE_TYPES.find(tp => tp.keys.includes(s.type)) || null; }
 let lobbyType = null, lobbySort = null;
 function lk(name) { return 'mc_' + name + '_' + (currentUser?.id || 'x'); }
 function getSpacePins() { try { return new Set(JSON.parse(localStorage.getItem(lk('pins')) || '[]')); } catch(e) { return new Set(); } }
@@ -315,7 +317,10 @@ function sortSpaces(arr) {
   const pins = getSpacePins(), opened = getSpaceOpened();
   const idx = new Map(arr.map((s, i) => [s.id, i]));
   const byOpened = (a, b) => (opened[b.id] || 0) - (opened[a.id] || 0);
+  const ord = getSpaceOrder();
+  const oi = s => { const i = ord.indexOf(s.id); return i < 0 ? 1e9 : i; };
   const cmp = {
+    mine:   (a, b) => oi(a) - oi(b),
     recent: byOpened,
     unread: (a, b) => (spacesUnreadCounts[b.id] || 0) - (spacesUnreadCounts[a.id] || 0) || byOpened(a, b),
     name:   (a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, {numeric:true, sensitivity:'base'})
@@ -327,14 +332,64 @@ function renderLobbyFilters(typeBtns, count) {
   let h = '';
   if(typeBtns.length > 1) {
     h += '<div class="lb-row">' + [{id:'all', label:'Все'}].concat(typeBtns).map(tp =>
-      `<button class="lb-chip${lobbyType===tp.id?' on':''}" onclick="setLobbyType('${tp.id}')">${t(tp.label)}</button>`).join('') + '</div>';
+      `<button class="lb-chip${lobbyType===tp.id?' on':''}" onclick="setLobbyType('${tp.id}')">${tp.icon ? tp.icon + ' ' : ''}${t(tp.label)}</button>`).join('') + '</div>';
   }
   if(count > 1) {
     h += '<div class="lb-row">' + LOBBY_SORTS.map(s =>
       `<button class="lb-chip sm${lobbySort===s[0]?' on':''}" onclick="setLobbySort('${s[0]}')">${t(s[1])}</button>`).join('') + '</div>';
+    if(lobbySort === 'mine') h += '<div style="font-size:11px;color:var(--t3);padding:0 2px 8px">Переставляй карточки, потянув за значок ≡</div>';
   }
   box.innerHTML = h;
 }
+// ─── «Мой порядок»: перетаскивание карточек за значок ≡ ───
+function getSpaceOrder() { try { return JSON.parse(localStorage.getItem(lk('order')) || '[]') || []; } catch(e) { return []; } }
+function saveLobbyOrder(ids) {
+  const regular = spaces.filter(s => s.status !== 'closed' && !(s.pendingInvites||[]).some(p => p.user_id === currentUser?.id));
+  const saved = getSpaceOrder();
+  const oi = s => { const i = saved.indexOf(s.id); return i < 0 ? 1e9 : i; };
+  const all = regular.map((s, i) => [s, i]).sort((a, b) => oi(a[0]) - oi(b[0]) || a[1] - b[1]).map(x => x[0].id);
+  const set = new Set(ids); let k = 0;
+  const merged = all.map(id => set.has(id) ? ids[k++] : id);
+  try { localStorage.setItem(lk('order'), JSON.stringify(merged)); } catch(e) {}
+}
+let _drag = null;
+function spGripDown(e, id) {
+  const card = e.currentTarget.closest('.sp-card'), list = document.getElementById('spaces-list');
+  if(!card || !list) return;
+  e.preventDefault();
+  _drag = {id, card, list, pid: e.pointerId, y0: e.clientY, s0: list.scrollTop, y: e.clientY, before: null};
+  card.classList.add('dragging');
+  try { e.currentTarget.setPointerCapture(e.pointerId); } catch(err) {}
+  requestAnimationFrame(spDragTick);
+}
+function spGripMove(e) { if(_drag && e.pointerId === _drag.pid) _drag.y = e.clientY; }
+function spDragTick() {
+  const d = _drag; if(!d) return;
+  if(!d.card.isConnected) { _drag = null; return; }
+  const lr = d.list.getBoundingClientRect();
+  if(d.y < lr.top + 50) d.list.scrollTop -= 10; else if(d.y > lr.bottom - 50) d.list.scrollTop += 10;
+  d.card.style.transform = `translateY(${d.y - d.y0 + (d.list.scrollTop - d.s0)}px)`;
+  const others = [...d.list.querySelectorAll('.sp-card[data-drag]')].filter(c => c !== d.card);
+  others.forEach(c => c.classList.remove('drop-before', 'drop-after'));
+  d.before = others.find(c => { const r = c.getBoundingClientRect(); return d.y < r.top + r.height / 2; }) || null;
+  if(d.before) d.before.classList.add('drop-before'); else if(others.length) others[others.length - 1].classList.add('drop-after');
+  requestAnimationFrame(spDragTick);
+}
+function spDragFinish(e, save) {
+  const d = _drag; if(!d || e.pointerId !== d.pid) return;
+  _drag = null;
+  d.card.classList.remove('dragging'); d.card.style.transform = '';
+  d.list.querySelectorAll('.sp-card').forEach(c => c.classList.remove('drop-before', 'drop-after'));
+  if(save) {
+    const ids = [...d.list.querySelectorAll('.sp-card[data-drag]')].map(c => c.dataset.drag).filter(x => x !== d.id);
+    const at = d.before ? ids.indexOf(d.before.dataset.drag) : ids.length;
+    ids.splice(at < 0 ? ids.length : at, 0, d.id);
+    saveLobbyOrder(ids);
+  }
+  renderSpacesList();
+}
+function spGripUp(e) { spDragFinish(e, true); }
+function spGripCancel(e) { spDragFinish(e, false); }
 function toggleSpaceActs(id) {
   if(lobbyOpenActs.has(id)) lobbyOpenActs.delete(id); else lobbyOpenActs.add(id);
   renderSpacesList();
@@ -386,11 +441,14 @@ function spaceRowHTML(s) {
   }
   const open = acts.length > 0 && lobbyOpenActs.has(s.id);
   const unread = (!isClosed && spacesUnreadCounts[s.id]) ? `<span style="background:var(--red);color:#fff;font-size:11px;font-weight:700;padding:1px 7px;border-radius:9px">${spacesUnreadCounts[s.id]}</span>` : '';
-  const sub = isGroup ? (members ? '👥 ' + membersWord(members) : 'Групповой') : 'Личный';
-  return `<div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:16px;margin-bottom:12px;opacity:${isClosed?.7:1}">
+  const tp = spaceTypeOf(s);
+  const sub = tp ? (tp.icon + ' ' + t(tp.tag) + (tp.id === 'group' && members ? ' · ' + membersWord(members) : '')) : (members ? '👥 ' + membersWord(members) : '');
+  const canDrag = lobbySort === 'mine' && !isClosed;
+  return `<div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:16px;margin-bottom:12px;opacity:${isClosed?.7:1}"${canDrag ? ` class="sp-card" data-drag="${s.id}"` : ' class="sp-card"'}>
     <div style="display:flex;align-items:center;gap:10px">
+      ${canDrag ? `<div class="sp-grip" onpointerdown="spGripDown(event,'${s.id}')" onpointermove="spGripMove(event)" onpointerup="spGripUp(event)" onpointercancel="spGripCancel(event)" title="Потяни, чтобы переставить">≡</div>` : ''}
       <div onclick="onSpaceClick('${s.id}')" style="display:flex;align-items:center;gap:14px;flex:1;min-width:0;cursor:pointer">
-        <div class="sp-av" style="background:${spaceColor(s)}">${esc(spaceInitials(s.name))}</div>
+        <div class="sp-av" style="background:${spaceColor(s)}${tp ? ';border-radius:' + tp.round : ''}">${esc(spaceInitials(s.name))}</div>
         <div style="flex:1;min-width:0">
           <div style="font-size:17px;font-weight:700;display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span dir="auto" style="overflow-wrap:anywhere">${esc(s.name)}</span>${s.password?'<span style="font-size:13px;opacity:.55">🔒</span>':''}${isClosed?'<span style="font-size:11px;color:var(--t3);font-weight:400">(закрыта)</span>':''}${unread}</div>
           <div style="font-size:12px;color:var(--t3);margin-top:3px">${sub}</div>

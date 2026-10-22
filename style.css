@@ -385,3 +385,7 @@ body.in-lobby.cal-on #cal-ov, body.in-cabinet.cal-on #cal-ov { bottom: auto; hei
 .lb-chip.on{background:var(--t1);color:var(--bg);border-color:var(--t1)}
 .lb-chip.sm{font-size:12px;padding:4px 11px}
 .lb-chip.sm.on{background:rgba(232,197,106,.15);color:var(--accent);border-color:rgba(232,197,106,.3)}
+.sp-grip{flex:none;touch-action:none;cursor:grab;color:var(--t3);font-size:24px;line-height:1;padding:8px 2px;user-select:none;-webkit-user-select:none}
+.sp-card.dragging{position:relative;z-index:20;box-shadow:0 8px 24px rgba(0,0,0,.6);transition:none}
+.sp-card.drop-before{box-shadow:0 -6px 0 0 var(--accent)}
+.sp-card.drop-after{box-shadow:0 6px 0 0 var(--accent)}
