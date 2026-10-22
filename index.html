@@ -352,6 +352,7 @@
         <button id="pwd-remove-btn" onclick="removePwd()" style="background:rgba(232,96,96,.1);color:var(--red);border:1px solid rgba(232,96,96,.2);border-radius:var(--rsm);padding:10px;font-size:14px;cursor:pointer;font-family:inherit;display:none">Убрать пароль</button>
       </div>
       <button onclick="saveSettings()" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:13px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Сохранить настройки</button>
+      <button onclick="logoutUser()" style="background:rgba(232,96,96,.1);color:var(--red);border:1px solid rgba(232,96,96,.2);border-radius:var(--rsm);padding:13px;font-size:15px;cursor:pointer;font-family:inherit">Выйти из аккаунта</button>
     </div>
   </div>
 </div>
@@ -412,21 +413,21 @@
 </div>
 
 <!-- Space Selector -->
-<div id="space-selector" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:998;flex-direction:column;align-items:center;justify-content:center;padding:30px 20px">
-  <div style="width:100%;max-width:400px">
+<div id="space-selector" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:998;flex-direction:column;align-items:stretch;justify-content:flex-start;padding:max(16px,env(safe-area-inset-top,16px)) 16px 0">
+  <div style="width:100%;flex:1;min-height:0;display:flex;flex-direction:column">
        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px">
       <div style="min-width:0">
         <div id="lobby-greet" style="font-size:13px;color:var(--t2)"></div>
         <div id="lobby-user" dir="auto" style="font-size:24px;font-weight:700;overflow-wrap:anywhere"></div>
       </div>
       <div style="display:flex;gap:8px;flex-shrink:0">
+        <button class="lobby-ib" onclick="openCreateSpace()" title="Создать кабинет" style="background:var(--accent);border-color:var(--accent);color:#0f0f0f;font-size:20px;font-weight:700">＋</button>
         <button id="lobby-cal-btn" class="lobby-ib" onclick="openCalendarFromLobby()" title="Календарь">📅</button>
         <button class="lobby-ib" onclick="openSettings()" title="Настройки">⚙️</button>
       </div>
     </div>
- <div id="spaces-list" style="max-height:60vh;overflow-y:auto"></div>
-    <button onclick="openCreateSpace()" style="width:100%;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);padding:14px;font-size:15px;font-weight:600;color:var(--accent);cursor:pointer;font-family:inherit;margin-top:4px">＋ Создать кабинет</button>
-    <button onclick="logoutUser()" style="width:100%;background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;font-family:inherit;margin-top:14px;padding:6px">Выйти из аккаунта</button>
+ <div id="lobby-filters"></div>
+ <div id="spaces-list" style="flex:1;min-height:0;overflow-y:auto;padding-bottom:calc(16px + var(--safe))"></div>
   </div>
 </div>
 

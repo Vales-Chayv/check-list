@@ -289,6 +289,52 @@ function membersWord(n) {
   const m = n % 10, c = n % 100;
   return n + (m === 1 && c !== 11 ? ' участник' : (m >= 2 && m <= 4 && (c < 10 || c >= 20) ? ' участника' : ' участников'));
 }
+// ─── ЛОББИ: виды кабинетов, фильтр, сортировка, закрепление (хранится на устройстве, отдельно для каждого пользователя) ───
+// Чтобы добавить новый вид кабинета в фильтр — допиши сюда одну строку: id, список type из базы и название кнопки.
+const SPACE_TYPES = [
+  {id:'group',    keys:['family','group'], label:'Групповые'},
+  {id:'personal', keys:['personal'],       label:'Личные'}
+];
+const LOBBY_SORTS = [['recent','Недавние'], ['unread','Непрочитанные'], ['name','По имени']];
+let lobbyType = null, lobbySort = null;
+function lk(name) { return 'mc_' + name + '_' + (currentUser?.id || 'x'); }
+function getSpacePins() { try { return new Set(JSON.parse(localStorage.getItem(lk('pins')) || '[]')); } catch(e) { return new Set(); } }
+function toggleSpacePin(id) {
+  const p = getSpacePins(); if(p.has(id)) p.delete(id); else p.add(id);
+  try { localStorage.setItem(lk('pins'), JSON.stringify([...p])); } catch(e) {}
+  renderSpacesList();
+}
+function getSpaceOpened() { try { return JSON.parse(localStorage.getItem(lk('opened')) || '{}') || {}; } catch(e) { return {}; } }
+function markSpaceOpened(id) {
+  const o = getSpaceOpened(); o[id] = Date.now();
+  try { localStorage.setItem(lk('opened'), JSON.stringify(o)); } catch(e) {}
+}
+function setLobbyType(id) { lobbyType = id; try { localStorage.setItem(lk('lobby_type'), id); } catch(e) {} renderSpacesList(); }
+function setLobbySort(id) { lobbySort = id; try { localStorage.setItem(lk('lobby_sort'), id); } catch(e) {} renderSpacesList(); }
+function sortSpaces(arr) {
+  const pins = getSpacePins(), opened = getSpaceOpened();
+  const idx = new Map(arr.map((s, i) => [s.id, i]));
+  const byOpened = (a, b) => (opened[b.id] || 0) - (opened[a.id] || 0);
+  const cmp = {
+    recent: byOpened,
+    unread: (a, b) => (spacesUnreadCounts[b.id] || 0) - (spacesUnreadCounts[a.id] || 0) || byOpened(a, b),
+    name:   (a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, {numeric:true, sensitivity:'base'})
+  }[lobbySort] || (() => 0);
+  return arr.slice().sort((a, b) => (pins.has(b.id) - pins.has(a.id)) || cmp(a, b) || (idx.get(a.id) - idx.get(b.id)));
+}
+function renderLobbyFilters(typeBtns, count) {
+  const box = document.getElementById('lobby-filters'); if(!box) return;
+  let h = '';
+  if(typeBtns.length > 1) {
+    h += '<div class="lb-row">' + [{id:'all', label:'Все'}].concat(typeBtns).map(tp =>
+      `<button class="lb-chip${lobbyType===tp.id?' on':''}" onclick="setLobbyType('${tp.id}')">${t(tp.label)}</button>`).join('') + '</div>';
+  }
+  if(count > 1) {
+    h += '<div class="lb-row">' + LOBBY_SORTS.map(s =>
+      `<button class="lb-chip sm${lobbySort===s[0]?' on':''}" onclick="setLobbySort('${s[0]}')">${t(s[1])}</button>`).join('') + '</div>';
+  }
+  box.innerHTML = h;
+}
 function toggleSpaceActs(id) {
   if(lobbyOpenActs.has(id)) lobbyOpenActs.delete(id); else lobbyOpenActs.add(id);
   renderSpacesList();
@@ -350,6 +396,7 @@ function spaceRowHTML(s) {
           <div style="font-size:12px;color:var(--t3);margin-top:3px">${sub}</div>
         </div>
       </div>
+      ${!isClosed ? `<button class="sp-star${getSpacePins().has(s.id)?' on':''}" onclick="toggleSpacePin('${s.id}')" aria-label="Закрепить" title="Закрепить вверху">${getSpacePins().has(s.id)?'★':'☆'}</button>` : ''}
       ${acts.length ? `<button class="sp-chev${open?' on':''}" onclick="toggleSpaceActs('${s.id}')" aria-label="Действия" title="Действия">▾</button>` : ''}
     </div>
     ${open ? `<div class="sp-acts">${acts.join('')}</div>` : ''}
@@ -378,14 +425,24 @@ function renderSpacesList() {
   const ownsGroup = (spaces||[]).some(s => (s.type==='family'||s.type==='group') && s.owner_id === currentUser?.id);
   document.body.classList.toggle('owns-group', ownsGroup);
    renderLobbyPanels();
+  if(lobbyType === null) lobbyType = localStorage.getItem(lk('lobby_type')) || 'all';
+  if(lobbySort === null) lobbySort = localStorage.getItem(lk('lobby_sort')) || 'recent';
   const list = document.getElementById('spaces-list');
-  const active = spaces.filter(s=>s.status!=='closed').sort((a,b) => {
-    const aInvite = (a.pendingInvites||[]).some(p=>p.user_id===currentUser?.id) ? 1 : 0;
-    const bInvite = (b.pendingInvites||[]).some(p=>p.user_id===currentUser?.id) ? 1 : 0;
-    return bInvite - aInvite;
-  });
-  const closed = spaces.filter(s=>s.status==='closed');
-  list.innerHTML = active.map(spaceRowHTML).join('')
+  const hasInvite = s => (s.pendingInvites||[]).some(p=>p.user_id===currentUser?.id);
+  const activeAll = spaces.filter(s=>s.status!=='closed');
+  const invites = activeAll.filter(hasInvite);
+  const regular = activeAll.filter(s=>!hasInvite(s));
+  const closedAll = spaces.filter(s=>s.status==='closed');
+  // кнопки фильтра появляются только для видов, у которых есть кабинеты
+  const typeBtns = SPACE_TYPES.filter(tp => regular.concat(closedAll).some(s=>tp.keys.includes(s.type)));
+  if(lobbyType !== 'all' && !typeBtns.some(tp=>tp.id===lobbyType)) lobbyType = 'all';
+  const flt = lobbyType === 'all' ? null : SPACE_TYPES.find(tp=>tp.id===lobbyType);
+  const match = s => !flt || flt.keys.includes(s.type);
+  const shown = sortSpaces(regular.filter(match));
+  const closed = closedAll.filter(match);
+  renderLobbyFilters(typeBtns, regular.length);
+  list.innerHTML = invites.map(spaceRowHTML).join('')
+    + shown.map(spaceRowHTML).join('')
     + (closed.length ? `<div onclick="toggleClosedSpaces()" style="text-align:center;font-size:13px;color:var(--t3);cursor:pointer;padding:10px 0">🔒 Закрытые группы (${closed.length}) ${showClosedSpaces?'▲':'▼'}</div>` : '')
     + (showClosedSpaces ? closed.map(spaceRowHTML).join('') : '');
 }
@@ -486,6 +543,7 @@ function setCurrentSpace(id, loadNew) {
   currentSpaceId = id;
   currentSpace = spaces.find(s=>s.id===id);
   localStorage.setItem('mc_current_space', id);
+  if(typeof markSpaceOpened === 'function') markSpaceOpened(id);
    hideSpaceSelector();
   document.body.classList.add('in-cabinet');
   if(typeof renderLobbyPanels === 'function') renderLobbyPanels();
