@@ -185,7 +185,8 @@ spaces = Array.isArray(saved) ? saved : [];
 function showSpaceSelector() {
   renderSpacesList();
   const cb = document.getElementById('lobby-cal-btn');
-  if(cb) { cb.style.display = currentUser ? 'block' : 'none'; cb.textContent = '📅 ' + t('Календарь'); }
+  if(cb) cb.style.display = currentUser ? 'flex' : 'none';
+  updateLobbyGreeting();
   document.getElementById('space-selector').style.display = 'flex';
   document.body.classList.add('in-lobby');
   document.body.classList.remove('in-cabinet');
@@ -193,6 +194,7 @@ function showSpaceSelector() {
   if(typeof refreshChatWatchState === 'function') refreshChatWatchState();
 }
 function hideSpaceSelector() {
+  lobbyOpenActs.clear(); // при выходе из лобби кнопки под линией снова скрыты
   document.getElementById('space-selector').style.display = 'none';
   document.body.classList.remove('in-lobby');
 }
@@ -267,8 +269,39 @@ function subscribeGlobalChatWatch() {
     .subscribe();
 }
 
+// ─── ЛОББИ: цвет, инициалы, раскрытие кнопок ───
+const SPACE_COLORS = ['#e8c56a','#5b9ee8','#5bb87a','#a07de8','#e88a3a','#e85bb0','#5bc8e8'];
+let lobbyOpenActs = new Set(); // кабинеты с раскрытыми кнопками; сбрасывается при выходе из лобби
+function spaceColor(s) {
+  if(s.color) return s.color; // выбранный владельцем (появится позже)
+  let h = 0; const n = s.name || '';
+  for(let i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) >>> 0;
+  return SPACE_COLORS[h % SPACE_COLORS.length];
+}
+function spaceInitials(name) {
+  const w = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if(!w.length) return '?';
+  const a = Array.from(w[0])[0] || '?';
+  const b = w.length > 1 ? (Array.from(w[1])[0] || '') : '';
+  return (a + b).toUpperCase();
+}
+function membersWord(n) {
+  const m = n % 10, c = n % 100;
+  return n + (m === 1 && c !== 11 ? ' участник' : (m >= 2 && m <= 4 && (c < 10 || c >= 20) ? ' участника' : ' участников'));
+}
+function toggleSpaceActs(id) {
+  if(lobbyOpenActs.has(id)) lobbyOpenActs.delete(id); else lobbyOpenActs.add(id);
+  renderSpacesList();
+}
+function updateLobbyGreeting() {
+  const g = document.getElementById('lobby-greet'), u = document.getElementById('lobby-user');
+  const hr = new Date().getHours();
+  const txt = hr < 5 ? 'Доброй ночи' : hr < 12 ? 'Доброе утро' : hr < 18 ? 'Добрый день' : 'Добрый вечер';
+  if(g) g.textContent = t(txt);
+  if(u) u.textContent = currentUser?.display_name || '';
+}
+
 function spaceRowHTML(s) {
-  const icon = s.type==='family' ? '👨‍👩‍👧' : '🗂️';
   const members = (s.members||[]).length;
   const isOwner = s.owner_id===currentUser?.id;
   const isClosed = s.status==='closed';
@@ -288,20 +321,39 @@ function spaceRowHTML(s) {
       </div>
     </div>`;
   }
-  return `<div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:18px 16px;display:flex;align-items:center;gap:14px;margin-bottom:10px;opacity:${isClosed?.7:1}">
-      <div onclick="onSpaceClick('${s.id}')" style="display:flex;align-items:center;gap:14px;flex:1;cursor:pointer">
-        <div style="font-size:32px">${isClosed?'🔒':icon}</div>
-        <div style="flex:1">
-                   <div style="font-size:17px;font-weight:700;display:flex;align-items:center;gap:6px">${esc(s.name)}${isClosed?' <span style="font-size:11px;color:var(--t3);font-weight:400">(закрыта)</span>':''}${(!isClosed && spacesUnreadCounts[s.id])?`<span style="background:var(--red);color:#fff;font-size:11px;font-weight:700;padding:1px 7px;border-radius:9px">${spacesUnreadCounts[s.id]}</span>`:''}</div>
-          ${s.type==='family'&&members?`<div style="font-size:12px;color:var(--t3);margin-top:2px">👥 ${members} участников</div>`:''}
+  const isGroup = s.type==='family';
+  const amMember = isGroup && !isOwner && (s.members||[]).some(m=>m.user_id===currentUser?.id);
+  const bb = 'border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer;font-family:inherit;';
+  const acts = [];
+  if(!isClosed && isGroup && isOwner) {
+    acts.push(`<button onclick="getShareLink('${s.id}')" style="${bb}background:rgba(232,197,106,.15);border:1px solid rgba(232,197,106,.3);color:var(--accent)">🔗 Пригласить</button>`);
+    acts.push(`<button onclick="openManageMembers('${s.id}')" style="${bb}background:var(--s1);border:1px solid var(--b1);color:var(--t2)">👥 Участники</button>`);
+  }
+  if(!isClosed && (!isGroup || isOwner)) {
+    acts.push(`<button onclick="openEditSpace('${s.id}')" style="${bb}background:var(--s1);border:1px solid var(--b1);color:var(--t2)">✏️ Изменить</button>`);
+  }
+  if(!isClosed && isGroup && isOwner) {
+    acts.push(`<button onclick="closeGroupSpace('${s.id}')" style="${bb}background:rgba(232,96,96,.12);border:1px solid rgba(232,96,96,.3);color:var(--red)">🔒 Закрыть</button>`);
+  }
+  if(!isClosed && amMember) {
+    acts.push(`<button onclick="leaveGroup('${s.id}')" style="${bb}background:rgba(232,96,96,.12);border:1px solid rgba(232,96,96,.3);color:var(--red)">🚪 Выйти</button>`);
+  }
+  const open = acts.length > 0 && lobbyOpenActs.has(s.id);
+  const unread = (!isClosed && spacesUnreadCounts[s.id]) ? `<span style="background:var(--red);color:#fff;font-size:11px;font-weight:700;padding:1px 7px;border-radius:9px">${spacesUnreadCounts[s.id]}</span>` : '';
+  const sub = isGroup ? (members ? '👥 ' + membersWord(members) : 'Групповой') : 'Личный';
+  return `<div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:16px;margin-bottom:12px;opacity:${isClosed?.7:1}">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div onclick="onSpaceClick('${s.id}')" style="display:flex;align-items:center;gap:14px;flex:1;min-width:0;cursor:pointer">
+        <div class="sp-av" style="background:${spaceColor(s)}">${esc(spaceInitials(s.name))}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:17px;font-weight:700;display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span dir="auto" style="overflow-wrap:anywhere">${esc(s.name)}</span>${s.password?'<span style="font-size:13px;opacity:.55">🔒</span>':''}${isClosed?'<span style="font-size:11px;color:var(--t3);font-weight:400">(закрыта)</span>':''}${unread}</div>
+          <div style="font-size:12px;color:var(--t3);margin-top:3px">${sub}</div>
         </div>
-        ${s.password?'<span style="font-size:16px;opacity:.5">🔒</span>':'<span style="font-size:12px;color:var(--t3)">Открыть</span>'}
       </div>
-      ${(!isClosed && s.type==='family' && isOwner)?`<button onclick="getShareLink('${s.id}')" style="background:rgba(232,197,106,.15);border:1px solid rgba(232,197,106,.3);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--accent);cursor:pointer" title="Пригласить">🔗</button><button onclick="openManageMembers('${s.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--t2);cursor:pointer" title="Участники">👥</button>`:''}
-           ${(!isClosed && s.type==='family' && isOwner)?`<button onclick="closeGroupSpace('${s.id}')" style="background:rgba(232,96,96,.12);border:1px solid rgba(232,96,96,.3);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--red);cursor:pointer" title="Закрыть группу">🔒</button>`:''}
-      ${!isClosed && (s.type!=='family' || isOwner) ? `<button onclick="openEditSpace('${s.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--t2);cursor:pointer" title="Редактировать">✏️</button>` : ''}
-      ${!isClosed && s.type==='family' && !isOwner && (s.members||[]).some(m=>m.user_id===currentUser?.id) ? `<button onclick="leaveGroup('${s.id}')" style="background:rgba(232,96,96,.12);border:1px solid rgba(232,96,96,.3);border-radius:7px;padding:7px 10px;font-size:14px;color:var(--red);cursor:pointer" title="Выйти из группы">🚪</button>` : ''}
-    </div>`;
+      ${acts.length ? `<button class="sp-chev${open?' on':''}" onclick="toggleSpaceActs('${s.id}')" aria-label="Действия" title="Действия">▾</button>` : ''}
+    </div>
+    ${open ? `<div class="sp-acts">${acts.join('')}</div>` : ''}
+  </div>`;
 }
 
 async function leaveGroup(spaceId) {
