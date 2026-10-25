@@ -339,7 +339,7 @@ new MutationObserver(() => {
 // Любое окно с липкой кнопкой внизу («Сохранить» / «Сохранить запись»): строка с курсором не заходит под кнопку
 function keepCaretAboveSticky(){
   const el = document.activeElement;
-  if(!el || !(el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+  if(!el || !(el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.isContentEditable)) return;
   const sheet = el.closest('.sheet');
   if(!sheet) return;
   const btn = sheet.querySelector('.sticky-act');
@@ -357,3 +357,4 @@ function keepCaretAboveSticky(){
 }
 document.addEventListener('input', function(){ setTimeout(keepCaretAboveSticky, 0); });
 document.addEventListener('focusin', function(){ setTimeout(keepCaretAboveSticky, 350); });
+document.addEventListener('click', function(){ setTimeout(keepCaretAboveSticky, 350); });
