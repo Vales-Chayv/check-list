@@ -136,13 +136,13 @@ async function openCalendar() {
     const ids = spaces.map(s=>s.id);
     let data = null;
     if(navigator.onLine){
-      const r = await sb.from('cards').select('*').in('space_id', ids).or('deadline.not.is.null,status.eq.done');
+      const r = await sb.from('cards').select('*').in('space_id', ids).not('deadline','is',null);
       data = r.data;
     }
-    if(!data){ const all = await local.getAll('cards'); data = all.filter(c => c.deadline || c.status==='done'); } // офлайн — из кэша
+    if(!data){ const all = await local.getAll('cards'); data = all.filter(c => c.deadline); } // офлайн — из кэша
     calAllCards = data||[];
   } catch(e) {
-    try { const all = await local.getAll('cards'); calAllCards = all.filter(c => c.deadline || c.status==='done'); }
+    try { const all = await local.getAll('cards'); calAllCards = all.filter(c => c.deadline); }
     catch(_) { calAllCards = [...cards]; }
   }
   try {
@@ -236,10 +236,10 @@ async function calRefreshData() { // лёгкое обновление коло�
   const ids = spaces.map(s=>s.id);
   try {
     if(navigator.onLine){
-      const {data} = await sb.from('cards').select('*').in('space_id', ids).or('deadline.not.is.null,status.eq.done');
+      const {data} = await sb.from('cards').select('*').in('space_id', ids).not('deadline','is',null);
       calAllCards = data || [];
     } else {
-      calAllCards = (await local.getAll('cards')).filter(c => (c.deadline || c.status==='done') && ids.includes(c.space_id));
+      calAllCards = (await local.getAll('cards')).filter(c => c.deadline && ids.includes(c.space_id));
     }
   } catch(e) {}
   try {
