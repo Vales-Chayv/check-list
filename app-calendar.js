@@ -136,13 +136,13 @@ async function openCalendar() {
     const ids = spaces.map(s=>s.id);
     let data = null;
     if(navigator.onLine){
-      const r = await sb.from('cards').select('*').in('space_id', ids).not('deadline','is',null);
+      const r = await sb.from('cards').select('*').in('space_id', ids).or('deadline.not.is.null,status.eq.done');
       data = r.data;
     }
-    if(!data){ const all = await local.getAll('cards'); data = all.filter(c => c.deadline); } // офлайн — из кэша
+    if(!data){ const all = await local.getAll('cards'); data = all.filter(c => c.deadline || c.status==='done'); } // офлайн — из кэша
     calAllCards = data||[];
   } catch(e) {
-    try { const all = await local.getAll('cards'); calAllCards = all.filter(c => c.deadline); }
+    try { const all = await local.getAll('cards'); calAllCards = all.filter(c => c.deadline || c.status==='done'); }
     catch(_) { calAllCards = [...cards]; }
   }
   try {
@@ -236,10 +236,10 @@ async function calRefreshData() { // лёгкое обновление коло�
   const ids = spaces.map(s=>s.id);
   try {
     if(navigator.onLine){
-      const {data} = await sb.from('cards').select('*').in('space_id', ids).not('deadline','is',null);
+      const {data} = await sb.from('cards').select('*').in('space_id', ids).or('deadline.not.is.null,status.eq.done');
       calAllCards = data || [];
     } else {
-      calAllCards = (await local.getAll('cards')).filter(c => c.deadline && ids.includes(c.space_id));
+      calAllCards = (await local.getAll('cards')).filter(c => (c.deadline || c.status==='done') && ids.includes(c.space_id));
     }
   } catch(e) {}
   try {
@@ -521,17 +521,26 @@ function calCabinetRubrics() {
   });
 }
 
+function calPlain(h) { // текст записи без форматирования
+  const d = document.createElement('div'); d.innerHTML = h || '';
+  return (d.textContent || '').replace(/\s+/g,' ').trim();
+}
+// Список «событий календаря»: каждая запись со сроком — отдельный пункт на своей дате;
+// карточка со своим сроком (не совпадающим с записями) — пункт без записи. Выполненные остаются (_done).
 function getCalCards() {
   const hasCabFilter = calShownCabs.size > 0;
-  return calAllCards.filter(c => {
-    if(c.status === 'done') return false;
-    if(!c.deadline) return false;
-    if(hasCabFilter && !calShownCabs.has(c.space_id)) return false;
-    if(!calEnabledCats.has(calCatKey(c.space_id, c.category))) return false;
-    if(calFilterMember !== 'all' && c.assigned_to !== calFilterMember) return false;
-    if(calFilterPriority !== 'all' && c.priority !== calFilterPriority) return false;
-    return true;
+  const out = [];
+  calAllCards.forEach(c => {
+    if(hasCabFilter && !calShownCabs.has(c.space_id)) return;
+    if(!calEnabledCats.has(calCatKey(c.space_id, c.category))) return;
+    if(calFilterMember !== 'all' && c.assigned_to !== calFilterMember) return;
+    if(calFilterPriority !== 'all' && c.priority !== calFilterPriority) return;
+    const cardDone = c.status === 'done';
+    const ents = (c.entries || []).filter(e => e && e.deadline);
+    ents.forEach(e => out.push({ ...c, deadline: e.deadline, _eid: e.id, _etext: calPlain(e.text), _done: !!e.done || cardDone }));
+    if(c.deadline && !ents.some(e => e.deadline === c.deadline)) out.push({ ...c, _eid: '', _etext: '', _done: cardDone });
   });
+  return out;
 }
 
 // ─── RENDER ──────────────────────────────────
@@ -578,7 +587,7 @@ const firstDay = new Date(y, m, 1);
     const isToday = dateStr === todayStr;
     const isSat = (startDow + d - 1) % 7 === 6;
     const dayCards = cardMap[dateStr] || [];
-    const hasUrgent = dayCards.some(c=>c.priority==='urgent');
+    const hasUrgent = dayCards.some(c=>c.priority==='urgent' && !c._done);
     const hasHigh = dayCards.some(c=>c.priority==='high');
 
     let bg = isToday ? 'rgba(232,197,106,.1)' : (isSat ? 'rgba(255,255,255,.14)' : 'var(--s2)');
@@ -594,7 +603,7 @@ const firstDay = new Date(y, m, 1);
       const col = calColor(c);
       const isUrgent = c.priority==='urgent';
       const isHigh = c.priority==='high';
-      html += `<div onclick="event.stopPropagation();showCalPopup('${c.id}',event)" style="font-size:10px;background:${hex2rgba(col,.2)};border-left:2px solid ${isUrgent?'var(--red)':isHigh?'var(--accent)':col};border-radius:3px;padding:2px 4px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--t1);cursor:pointer">${isUrgent?'🔥':isHigh?'⚡':''}${esc(c.title)}</div>`;
+      html += `<div onclick="event.stopPropagation();showCalPopup('${c.id}',event,'${c._eid||''}')" style="${c._done?'opacity:.45;text-decoration:line-through;':''}font-size:10px;background:${hex2rgba(col,.2)};border-left:2px solid ${isUrgent?'var(--red)':isHigh?'var(--accent)':col};border-radius:3px;padding:2px 4px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--t1);cursor:pointer">${isUrgent?'🔥':isHigh?'⚡':''}${esc(c.title)}</div>`;
     });
 
     if(dayCards.length > 3) {
@@ -639,7 +648,7 @@ function renderCalWeek() {
     const isToday = dateStr === todayStr;
     const isSat = d.getDay() === 6;
     const dayCards = cardMap[dateStr] || [];
-    const hasUrgent = dayCards.some(c=>c.priority==='urgent');
+    const hasUrgent = dayCards.some(c=>c.priority==='urgent' && !c._done);
 
     html += `<div style="background:${isToday?'rgba(232,197,106,.1)':isSat?'rgba(255,255,255,.14)':'var(--s2)'};border-radius:8px;border:${isToday?'1px solid var(--accent)':hasUrgent?'1px solid var(--red)':'1px solid var(--b1)'};padding:6px;min-height:120px">
       <div style="font-size:11px;color:var(--t3);margin-bottom:2px">${CAL_DAYS_RU[d.getDay()]}</div>
@@ -649,7 +658,7 @@ function renderCalWeek() {
 
     dayCards.forEach(c => {
       const col = calColor(c);
-      html += `<div onclick="showCalPopup('${c.id}',event)" style="font-size:11px;background:${hex2rgba(col,.2)};border-left:2px solid ${c.priority==='urgent'?'var(--red)':c.priority==='high'?'var(--accent)':col};border-radius:3px;padding:3px 5px;margin-bottom:3px;cursor:pointer;color:var(--t1)">${c.priority==='urgent'?'🔥':c.priority==='high'?'⚡':''}${esc(c.title.length>18?c.title.slice(0,16)+'…':c.title)}</div>`;
+      html += `<div onclick="showCalPopup('${c.id}',event,'${c._eid||''}')" style="${c._done?'opacity:.45;text-decoration:line-through;':''}font-size:11px;background:${hex2rgba(col,.2)};border-left:2px solid ${c.priority==='urgent'?'var(--red)':c.priority==='high'?'var(--accent)':col};border-radius:3px;padding:3px 5px;margin-bottom:3px;cursor:pointer;color:var(--t1)">${c.priority==='urgent'?'🔥':c.priority==='high'?'⚡':''}${esc(c.title.length>18?c.title.slice(0,16)+'…':c.title)}</div>`;
     });
 
     if(!dayCards.length && !calHolHtml(dateStr,'md') && !calEvtHtml(dateStr,'md')) {
@@ -692,8 +701,9 @@ function renderCalDay() {
       const col = calColor(c);
       const isUrgent = c.priority==='urgent';
       const isHigh = c.priority==='high';
-      html += `<div onclick="showCalPopup('${c.id}',event)" style="background:${hex2rgba(col,.15)};border-left:4px solid ${isUrgent?'var(--red)':isHigh?'var(--accent)':col};border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:8px;cursor:pointer">
+      html += `<div onclick="showCalPopup('${c.id}',event,'${c._eid||''}')" style="${c._done?'opacity:.55;':''}background:${hex2rgba(col,.15)};border-left:4px solid ${isUrgent?'var(--red)':isHigh?'var(--accent)':col};border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:8px;cursor:pointer">
         <div style="font-size:15px;font-weight:700;color:var(--t1);margin-bottom:4px">${isUrgent?'🔥 ':isHigh?'⚡ ':''}${esc(c.title)}</div>
+        ${c._etext?`<div style="font-size:13px;color:var(--t2);margin-bottom:4px;word-break:break-word;${c._done?'text-decoration:line-through':''}">${c._done?'☑':'☐'} ${esc(c._etext)}</div>`:''}
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <span style="font-size:12px;color:${col}">${esc(c.category||'')}</span>
           ${c.assigned_to?`<span style="font-size:12px;color:var(--accent)">👤 ${esc(c.assigned_to)}</span>`:''}
@@ -714,18 +724,21 @@ function calDayClick(dateStr, event) {
 }
 
 // ─── MINI POPUP ──────────────────────────────
-function showCalPopup(cardId, event) {
+function showCalPopup(cardId, event, eid) {
   event.stopPropagation();
   const card = calAllCards.find(c=>c.id===cardId) || cards.find(c=>c.id===cardId); if(!card) return;
   const popup = document.getElementById('cal-popup');
   const col = calColor(card);
-  const dl = card.deadline ? deadlineInfo(card.deadline) : null;
+  const ent = eid ? (card.entries||[]).find(e=>e.id===eid) : null;
+  const dlDate = ent ? ent.deadline : card.deadline;
+  const dl = (dlDate && !(ent && ent.done) && card.status!=='done') ? deadlineInfo(dlDate) : null;
 
   popup.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
       <div style="font-size:14px;font-weight:700;color:${col};flex:1;padding-right:8px">${card.priority==='urgent'?'🔥 ':card.priority==='high'?'⚡ ':''}${esc(card.title)}</div>
       <button onclick="document.getElementById('cal-popup').style.display='none'" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:16px;flex-shrink:0">✕</button>
     </div>
+    ${ent?`<div style="font-size:13px;color:var(--t1);background:var(--s2);border-radius:8px;padding:8px 10px;margin-bottom:8px;word-break:break-word;${ent.done?'text-decoration:line-through;opacity:.6':''}">${ent.done?'☑':'☐'} ${esc(calPlain(ent.text)||'(без текста)')}</div>`:''}
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
       ${card.category?`<span style="font-size:11px;background:${hex2rgba(col,.15)};color:${col};padding:2px 8px;border-radius:10px">${esc(card.category)}</span>`:''}
       ${dl?`<span style="font-size:11px;color:${dl.cls==='dl-now'?'var(--red)':'var(--accent)'}">${dl.text}</span>`:''}
@@ -733,14 +746,14 @@ function showCalPopup(cardId, event) {
     </div>
     <div style="display:flex;gap:6px">
        <button onclick="calOpenCard('${cardId}')" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:6px;padding:8px;font-size:13px;font-weight:700;cursor:pointer">Открыть</button>
-      <button onclick="calChangeDeadline('${cardId}')" style="background:var(--s2);border:1px solid var(--b1);color:var(--t1);border-radius:6px;padding:8px 10px;font-size:13px;cursor:pointer">📅</button>
-      <button onclick="calToggleDone('${cardId}')" style="background:var(--s2);border:1px solid var(--b1);color:var(--t1);border-radius:6px;padding:8px 10px;font-size:13px;cursor:pointer">✓</button>
+      <button onclick="calChangeDeadline('${cardId}','${eid||''}')" style="background:var(--s2);border:1px solid var(--b1);color:var(--t1);border-radius:6px;padding:8px 10px;font-size:13px;cursor:pointer">📅</button>
+      <button onclick="calToggleDone('${cardId}','${eid||''}')" style="background:var(--s2);border:1px solid var(--b1);color:var(--t1);border-radius:6px;padding:8px 10px;font-size:13px;cursor:pointer">✓</button>
     </div>
   `;
 
   // Position popup
   const x = event.clientX, y = event.clientY;
-  const pw = 280, ph = 140;
+  const pw = 280, ph = 200;
   const left = Math.min(x, window.innerWidth - pw - 10);
   const top = Math.min(y + 10, window.innerHeight - ph - 10);
   popup.style.left = left + 'px';
@@ -760,24 +773,40 @@ function calSyncCardEverywhere(card) {
   const i2 = cards.findIndex(c=>c.id===card.id); if(i2!==-1) cards[i2] = card;
 }
 
-async function calChangeDeadline(cardId) {
+async function calChangeDeadline(cardId, eid) {
   const card = calFindCard(cardId); if(!card) return;
-  const newDate = prompt('Новый дедлайн (ГГГГ-ММ-ДД):', card.deadline||'');
+  const ent = eid ? (card.entries||[]).find(e=>e.id===eid) : null;
+  const newDate = prompt(ent ? 'Новый срок записи (ГГГГ-ММ-ДД):' : 'Новый дедлайн (ГГГГ-ММ-ДД):', (ent ? ent.deadline : card.deadline) || '');
   if(!newDate) return;
-  card.deadline = newDate;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) { toast('Формат: ГГГГ-ММ-ДД', true); return; }
+  if(ent) {
+    ent.deadline = newDate;
+    const act = (card.entries||[]).filter(x=>!x.done&&x.deadline).map(x=>x.deadline).sort();
+    if(act.length) card.deadline = act[0];
+  } else card.deadline = newDate;
   calSyncCardEverywhere(card);
   document.getElementById('cal-popup').style.display='none';
   renderCalendar();
-  try { await dbUpdate(card); toast('✓ Дедлайн изменён'); } catch(e) { toast('Ошибка', true); }
+  try { await dbUpdate(card); toast('✓ Срок изменён'); } catch(e) { toast('Ошибка', true); }
 }
 
-async function calToggleDone(cardId) {
+async function calToggleDone(cardId, eid) {
   const card = calFindCard(cardId); if(!card) return;
-  card.status = card.status === 'done' ? 'in_progress' : 'done';
+  const ent = eid ? (card.entries||[]).find(e=>e.id===eid) : null;
+  if(ent) {
+    if(ent.completions && ent.completions.length) { toast('Эту запись отмечают участники — открой карточку', true); return; }
+    ent.done = !ent.done;
+    const act = (card.entries||[]).filter(x=>!x.done&&x.deadline).map(x=>x.deadline).sort();
+    if(act.length) card.deadline = act[0];
+    if(!card.pinned && (card.entries||[]).length>0 && (card.entries||[]).every(x=>x.done)) card.status = 'done';
+    else if(!ent.done && card.status === 'done') card.status = 'in_progress';
+  } else {
+    card.status = card.status === 'done' ? 'in_progress' : 'done';
+  }
   calSyncCardEverywhere(card);
   document.getElementById('cal-popup').style.display='none';
   renderCalendar();
-  try { await dbUpdate(card); toast(card.status==='done'?'✓ Выполнено':'↩ Возвращено'); } catch(e) { toast('Ошибка', true); }
+  try { await dbUpdate(card); toast((ent ? ent.done : card.status==='done') ? '✓ Выполнено' : '↩ Возвращено'); } catch(e) { toast('Ошибка', true); }
 }
 
 function calSetSpace(spaceId, btn) {
