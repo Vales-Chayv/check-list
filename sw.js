@@ -1,4 +1,4 @@
-const CACHE = 'mc-v274';
+const CACHE = 'mc-v275';
 const APP_FILES = [
   '/check-list/',
   '/check-list/index.html',
