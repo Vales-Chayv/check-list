@@ -335,7 +335,16 @@ new MutationObserver(() => {
     t = setTimeout(()=>document.body.classList.remove('fab-hide'), 700);
   }, true);
 })();
-
+// Окна (.sheet): липкие кнопки «Отмена / Сохранить» исчезают при прокрутке и возвращаются, когда прокрутка остановилась
+(function(){
+  let t = null;
+  document.addEventListener('scroll', function(e){
+    if(!e.target || !e.target.classList || !e.target.classList.contains('sheet')) return;
+    document.body.classList.add('sheet-scrolling');
+    clearTimeout(t);
+    t = setTimeout(()=>document.body.classList.remove('sheet-scrolling'), 600);
+  }, true);
+})();
 // Любое окно с липкой кнопкой внизу («Сохранить» / «Сохранить запись»): строка с курсором не заходит под кнопку
 function keepCaretAboveSticky(){
   const el = document.activeElement;
@@ -352,6 +361,10 @@ function keepCaretAboveSticky(){
       if(r.length) bottom = r[r.length-1].bottom;
     }
   }
+  // строка записи целиком (вместе с датой под текстом), если она не огромная
+  let p = el.parentElement;
+  while(p && p !== sheet && !p.querySelector('input[type="date"]')) p = p.parentElement;
+  if(p && p !== sheet) { const pr = p.getBoundingClientRect(); if(pr.height < 400) bottom = Math.max(bottom, pr.bottom); }
   const over = bottom - (btn.getBoundingClientRect().top - 16);
   if(over > 0) sheet.scrollTop += over;
 }

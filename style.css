@@ -130,6 +130,9 @@ body{display:flex;flex-direction:column;overflow:hidden}
 .btn-s{background:var(--s2);color:var(--t1);border:1px solid var(--b1);border-radius:var(--rsm);padding:13px 18px;font-size:15px;cursor:pointer;font-family:inherit}
 .btn-d{background:rgba(232,96,96,.1);color:var(--red);border:1px solid rgba(232,96,96,.2);border-radius:var(--rsm);padding:13px 18px;font-size:15px;cursor:pointer;font-family:inherit}
 .sticky-act{position:sticky;bottom:10px;z-index:5;box-shadow:0 0 0 10px var(--s1)}
+.btn-row.sticky-act{background:var(--s1)}
+.sticky-act{transition:opacity .2s}
+body.sheet-scrolling .sticky-act{opacity:0;pointer-events:none}
 /* Color palette */
 .pal{display:flex;gap:7px;flex-wrap:wrap}
 .swatch{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent;position:relative;overflow:hidden}
