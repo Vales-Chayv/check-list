@@ -1134,15 +1134,17 @@ function renderLobbyPanels() {
     loadMemberEventsFeed(memberGroupIds);
       loadMyAssignedTasks(memberGroupIds);
   }
-  if(lobbyBTab === 'personal') renderPersonalTasks();
+  if(lobbyBTab === 'personal' || lobbyBTab === 'all') renderPersonalTasks();
 }
 let lobbyBTab = 'group';
 function setLobbyBTab(tab) {
   lobbyBTab = tab;
   document.getElementById('lobby-panel-b')?.classList.toggle('tab-personal', tab === 'personal');
+  document.getElementById('lobby-panel-b')?.classList.toggle('tab-all', tab === 'all');
+  document.getElementById('lobby-tab-all')?.classList.toggle('active', tab === 'all');
   document.getElementById('lobby-tab-group')?.classList.toggle('active', tab === 'group');
   document.getElementById('lobby-tab-personal')?.classList.toggle('active', tab === 'personal');
-  if(tab === 'personal') renderPersonalTasks();
+  if(tab === 'personal' || tab === 'all') renderPersonalTasks();
 }
 async function renderPersonalTasks() {
   const box = document.getElementById('personal-tasks-list');

@@ -324,3 +324,25 @@ new MutationObserver(() => {
   h.addEventListener('mousedown', onDown);
   h.addEventListener('touchstart', onDown, { passive: false });
 })();
+
+// Телефон: «＋» и календарь прячутся во время прокрутки карточек, возвращаются через 0.7 с после остановки
+(function(){
+  let t = null;
+  document.addEventListener('scroll', function(e){
+    if(!e.target || e.target.id !== 'scroll' || window.innerWidth > 600) return;
+    document.body.classList.add('fab-hide');
+    clearTimeout(t);
+    t = setTimeout(()=>document.body.classList.remove('fab-hide'), 700);
+  }, true);
+})();
+
+// Окно «Запись»: при наборе текст не заходит под липкую кнопку «Сохранить запись»
+document.addEventListener('input', function(e){
+  const ta = e.target;
+  if(!ta || ta.tagName !== 'TEXTAREA' || !ta.closest('#ae-ov')) return;
+  const btn = document.querySelector('#ae-ov .sticky-act[onclick*="saveAddEntry"]');
+  const sheet = ta.closest('.sheet');
+  if(!btn || !sheet) return;
+  const over = ta.getBoundingClientRect().bottom - (btn.getBoundingClientRect().top - 14);
+  if(over > 0) sheet.scrollTop += over;
+});

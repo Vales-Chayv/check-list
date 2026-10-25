@@ -41,7 +41,7 @@ function openView(id) {
   if(isChatCardView) setTimeout(()=>renderChatQuickBar(id, card), 0);
   else { document.getElementById('chat-quick-bar')?.remove(); document.getElementById('chat-typing')?.remove(); }
   const col = catColor(card.category);
-  const entries = [...(card.entries||[])].sort((a,b)=>(a.done===b.done)?0:a.done?1:-1);
+  const entries = (currentSpace?.type==='family'||currentSpace?.type==='group') ? [...(card.entries||[])] : [...(card.entries||[])].sort((a,b)=>(a.done===b.done)?0:a.done?1:-1);
   const atts = card.attachments||[];
   const imgs = atts.filter(a=>a.type?.startsWith('image/'));
   const files = atts.filter(a=>!a.type?.startsWith('image/'));

@@ -203,6 +203,7 @@ async function logoutUser() {
       ]);
     }
   } catch(e) {}
+  document.getElementById('set-ov')?.classList.remove('on');
   await sb.auth.signOut();
   currentUser = null;
   currentSpaceId = null; currentSpace = null;

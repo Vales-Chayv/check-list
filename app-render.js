@@ -583,7 +583,8 @@ function cardHTML(card, isDone=false) {
   const col = catColor(card.category);
   const bg = hex2rgba(col, isDone?.09:.13);
   const border = hex2rgba(col, isDone?.2:.35);
-  const entries = [...(card.entries||[])].sort((a,b)=>(a.done===b.done)?0:a.done?1:-1);
+  const _isChatSp = currentSpace?.type==='family'||currentSpace?.type==='group';
+  const entries = _isChatSp ? [...(card.entries||[])] : [...(card.entries||[])].sort((a,b)=>(a.done===b.done)?0:a.done?1:-1);
   const doneEntries = entries.filter(e=>e.done).length;
   // Find nearest deadline among card and all undone entries
   const allDeadlines = [card.deadline, ...entries.filter(e=>!e.done).map(e=>e.deadline)]
@@ -622,7 +623,7 @@ function cardHTML(card, isDone=false) {
 
   return`<div class="card ${pcls}" style="background:${bg};border-color:${border}${isDone?';opacity:.75':''}" onclick="App.openView('${card.id}')">
 <div style="display:flex;justify-content:space-between;gap:7px;align-items:flex-start">
-      <button onclick="event.stopPropagation();App.togglePin('${card.id}')" title="${card.pinned?'Открепить':'Закрепить'}" style="background:none;border:none;cursor:pointer;font-size:16px;padding:0;line-height:1;flex-shrink:0;margin-top:1px;${card.pinned?'':'opacity:.28;filter:grayscale(1)'}">📌</button>
+      ${(currentSpace?.type==='family'||currentSpace?.type==='group')?'':`<button onclick="event.stopPropagation();App.togglePin('${card.id}')" title="${card.pinned?'Открепить':'Закрепить'}" style="background:none;border:none;cursor:pointer;font-size:16px;padding:0;line-height:1;flex-shrink:0;margin-top:1px;${card.pinned?'':'opacity:.28;filter:grayscale(1)'}">📌</button>`}
       <div style="flex:1;min-width:0">
         <div class="card-title" style="color:${col};${isDone?'text-decoration:line-through;opacity:.7':''}">${card.reminder?.enabled?`<span onclick="event.stopPropagation();openRemPopup('${card.id}')" style="cursor:pointer">🔔 </span>`:''}${pBadge}${esc(card.title)}</div>
         ${bodyHTML}${entriesHTML}${imgsHTML}${filesHTML}

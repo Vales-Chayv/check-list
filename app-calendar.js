@@ -581,7 +581,7 @@ const firstDay = new Date(y, m, 1);
     const hasUrgent = dayCards.some(c=>c.priority==='urgent');
     const hasHigh = dayCards.some(c=>c.priority==='high');
 
-    let bg = isToday ? 'rgba(232,197,106,.1)' : (isSat ? 'rgba(255,255,255,.05)' : 'var(--s2)');
+    let bg = isToday ? 'rgba(232,197,106,.1)' : (isSat ? 'rgba(255,255,255,.14)' : 'var(--s2)');
     let border = isToday ? '1px solid var(--accent)' : '1px solid transparent';
     if(hasUrgent) border = '1px solid var(--red)';
 
@@ -641,7 +641,7 @@ function renderCalWeek() {
     const dayCards = cardMap[dateStr] || [];
     const hasUrgent = dayCards.some(c=>c.priority==='urgent');
 
-    html += `<div style="background:${isToday?'rgba(232,197,106,.1)':isSat?'rgba(255,255,255,.05)':'var(--s2)'};border-radius:8px;border:${isToday?'1px solid var(--accent)':hasUrgent?'1px solid var(--red)':'1px solid var(--b1)'};padding:6px;min-height:120px">
+    html += `<div style="background:${isToday?'rgba(232,197,106,.1)':isSat?'rgba(255,255,255,.14)':'var(--s2)'};border-radius:8px;border:${isToday?'1px solid var(--accent)':hasUrgent?'1px solid var(--red)':'1px solid var(--b1)'};padding:6px;min-height:120px">
       <div style="font-size:11px;color:var(--t3);margin-bottom:2px">${CAL_DAYS_RU[d.getDay()]}</div>
       <div style="font-size:16px;font-weight:700;color:${isToday?'var(--accent)':hasUrgent?'var(--red)':'var(--t1)'};margin-bottom:6px">${d.getDate()}</div>`;
     html += calHolHtml(dateStr, 'md');
