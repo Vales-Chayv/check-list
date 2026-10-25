@@ -254,7 +254,7 @@ body{display:flex;flex-direction:column;overflow:hidden}
 #current-space-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .topbar > div { flex-shrink: 0; }
 /* окно «Запись»: текст не уходит под липкую кнопку */
-#ae-ov .sheet { scroll-padding-bottom: 100px; }
+.sheet { scroll-padding-bottom: 100px; }
 /* кнопки + и календарь прячутся при прокрутке (телефон) */
 .fab, #cal-btn { transition: transform .25s, opacity .25s; }
 body.fab-hide .fab, body.fab-hide #cal-btn { transform: translateY(140px); opacity: 0; pointer-events: none; }

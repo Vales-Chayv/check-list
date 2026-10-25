@@ -336,13 +336,24 @@ new MutationObserver(() => {
   }, true);
 })();
 
-// Окно «Запись»: при наборе текст не заходит под липкую кнопку «Сохранить запись»
-document.addEventListener('input', function(e){
-  const ta = e.target;
-  if(!ta || ta.tagName !== 'TEXTAREA' || !ta.closest('#ae-ov')) return;
-  const btn = document.querySelector('#ae-ov .sticky-act[onclick*="saveAddEntry"]');
-  const sheet = ta.closest('.sheet');
-  if(!btn || !sheet) return;
-  const over = ta.getBoundingClientRect().bottom - (btn.getBoundingClientRect().top - 14);
+// Любое окно с липкой кнопкой внизу («Сохранить» / «Сохранить запись»): строка с курсором не заходит под кнопку
+function keepCaretAboveSticky(){
+  const el = document.activeElement;
+  if(!el || !(el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+  const sheet = el.closest('.sheet');
+  if(!sheet) return;
+  const btn = sheet.querySelector('.sticky-act');
+  if(!btn) return;
+  let bottom = el.getBoundingClientRect().bottom;
+  if(el.isContentEditable) {
+    const sel = window.getSelection();
+    if(sel && sel.rangeCount) {
+      const r = sel.getRangeAt(0).getClientRects();
+      if(r.length) bottom = r[r.length-1].bottom;
+    }
+  }
+  const over = bottom - (btn.getBoundingClientRect().top - 16);
   if(over > 0) sheet.scrollTop += over;
-});
+}
+document.addEventListener('input', function(){ setTimeout(keepCaretAboveSticky, 0); });
+document.addEventListener('focusin', function(){ setTimeout(keepCaretAboveSticky, 350); });
