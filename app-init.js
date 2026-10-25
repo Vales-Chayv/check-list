@@ -340,6 +340,7 @@ new MutationObserver(() => {
   let t = null;
   document.addEventListener('scroll', function(e){
     if(!e.target || !e.target.classList || !e.target.classList.contains('sheet')) return;
+    if(Date.now() < (window._mcAutoScroll||0)) return;
     document.body.classList.add('sheet-scrolling');
     clearTimeout(t);
     t = setTimeout(()=>document.body.classList.remove('sheet-scrolling'), 600);
@@ -366,7 +367,7 @@ function keepCaretAboveSticky(){
   while(p && p !== sheet && !p.querySelector('input[type="date"]')) p = p.parentElement;
   if(p && p !== sheet) { const pr = p.getBoundingClientRect(); if(pr.height < 400) bottom = Math.max(bottom, pr.bottom); }
   const over = bottom - (btn.getBoundingClientRect().top - 16);
-  if(over > 0) sheet.scrollTop += over;
+  if(over > 0) { window._mcAutoScroll = Date.now() + 600; sheet.scrollTop += over; }
 }
 document.addEventListener('input', function(){ setTimeout(keepCaretAboveSticky, 0); });
 document.addEventListener('focusin', function(){ setTimeout(keepCaretAboveSticky, 350); });
