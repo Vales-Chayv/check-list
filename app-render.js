@@ -149,8 +149,9 @@ function highlightTask(cardId, entryId){
   }, 150);
 }
 function toggleDesktopCalendar(){
-  document.body.classList.remove('calc-on');
+   document.body.classList.remove('calc-on');
   document.body.classList.toggle('cal-on');
+  if(document.body.classList.contains('cal-on') && typeof desktopCalSync === 'function') desktopCalSync();
 }
 function renderLobbyPanelB() {
   const ownedGroups = (spaces||[]).filter(s => (s.type==='family'||s.type==='group') && s.owner_id === currentUser?.id);
