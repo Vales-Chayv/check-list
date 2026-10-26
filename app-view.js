@@ -1049,11 +1049,13 @@ async function selectMoveCat(cardId, spaceId, catName, btn) {
     } catch(e) { cardListEl.innerHTML = '<div style="font-size:13px;color:var(--red)">Ошибка загрузки</div>'; return; }
   }
   window._moveTargetCards = targetCards;
+  const _newCardBtn = `<button onclick="createCardAndMove('${cardId}','${spaceId}','${esc(catName)}')" style="background:transparent;border:1px dashed var(--b2);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--accent);cursor:pointer;text-align:left;font-family:inherit">＋ Новая карточка…</button>`;
   cardListEl.innerHTML = targetCards.length
     ? `<div style="font-size:12px;color:var(--t3);margin-bottom:4px">Выбери карточку:</div>` +
-      targetCards.map((c,i)=>`<button onclick="selectMoveTarget('${cardId}','${spaceId}',${i},this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">${esc(c.title)}</button>`).join('')
+      targetCards.map((c,i)=>`<button onclick="selectMoveTarget('${cardId}','${spaceId}',${i},this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">${esc(c.title)}</button>`).join('') + _newCardBtn
     : `<div style="font-size:13px;color:var(--t3);margin-bottom:8px">Нет карточек в этой рубрике</div>
    <button onclick="createCardAndMove('${cardId}','${spaceId}','${esc(catName)}')" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:10px 14px;font-size:14px;font-weight:700;cursor:pointer;width:100%">＋ Создать карточку и перенести</button>`;
+  renderMoveAssignBlock(spaces.find(s=>s.id===spaceId)); // «Кому из группы» — для новой и для существующей карточки в групповом кабинете
 }
 
 function selectMoveTarget(cardId, spaceId, idx, btn) {
@@ -1063,7 +1065,6 @@ function selectMoveTarget(cardId, spaceId, idx, btn) {
   if(!targetCard) return;
   moveTargetCard = {id: targetCard.id, spaceId};
   const targetSpace = spaces.find(s=>s.id===spaceId);
-  renderMoveAssignBlock(targetSpace, targetCard.chatParticipants);
   document.getElementById('move-confirm-block').innerHTML = `<button onclick="confirmMove('${cardId}')" style="width:100%;margin-top:10px;background:var(--accent);border:none;color:#0f0f0f;font-weight:700;border-radius:var(--rsm);padding:11px;cursor:pointer">Перенести</button>`;
 }
 
@@ -1140,7 +1141,39 @@ async function confirmMove(fromCardId) {
     }
     render(); openView(fromCardId);
     toast('✓ Перенесено');
+    if(!moveDeleteSource) askDeleteMoved(fromCardId, JSON.parse(JSON.stringify(moveSelection)));
   } catch(e) { toast('Ошибка: '+e.message, true); }
+}
+
+// Если «Стереть в источнике» не было отмечено — спросить после переноса
+function askDeleteMoved(fromCardId, sel) {
+  document.getElementById('del-moved-ov')?.remove();
+  const n = (sel.entryIds||[]).length + (sel.groupIds||[]).length;
+  const ov = document.createElement('div');
+  ov.id = 'del-moved-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:2200;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;max-width:340px;width:100%;box-sizing:border-box">
+    <div style="font-size:16px;font-weight:700;margin-bottom:6px">Удалить записи при переносе?</div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:16px">Перенесённое (${n}) уже скопировано. В этой карточке его можно убрать.</div>
+    <div style="display:flex;gap:8px">
+      <button type="button" id="dm-no" style="flex:1;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;font-size:14px;cursor:pointer;font-family:inherit">Оставить</button>
+      <button type="button" id="dm-yes" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:11px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Да, удалить</button>
+    </div></div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#dm-no').onclick = () => ov.remove();
+  ov.querySelector('#dm-yes').onclick = async () => {
+    ov.remove();
+    const c = cards.find(x => x.id === fromCardId); if(!c) return;
+    const prevSel = moveSelection, prevDel = moveDeleteSource;
+    moveSelection = sel; moveDeleteSource = true;
+    stripMovedFromSource(c);
+    moveSelection = prevSel; moveDeleteSource = prevDel;
+    if((c.entries||[]).length === 0 && confirm('Карточка «' + c.title + '» пуста. Удалить её?')) { closeView && closeView(); deleteCardById(c.id); return; }
+    c.deadline = ([...(c.entries||[])].filter(e => !e.done && e.deadline).map(e => e.deadline).sort()[0]) || null;
+    try { await dbUpdate(c); } catch(e) { toast('Ошибка', true); }
+    render(); openView(fromCardId);
+    toast('✓ Записи удалены из источника');
+  };
 }
 
 async function createCardAndMove(fromCardId, spaceId, catName) {
@@ -1169,6 +1202,7 @@ async function createCardAndMove(fromCardId, spaceId, catName) {
     document.getElementById('move-entry-dialog')?.remove();
     render(); openView(fromCardId);
     toast('✓ Карточка создана и запись перенесена');
+    if(!moveDeleteSource) askDeleteMoved(fromCardId, JSON.parse(JSON.stringify(moveSelection)));
   } catch(e) { toast('Ошибка: '+e.message, true); }
 }
 				
