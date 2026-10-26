@@ -2,7 +2,27 @@
 //  RENDER
 // ═══════════════════════════════════════════
 let memberFilterOn = false;
+// Короткая подпись расписания напоминания: «пн 09:00», «ежедн. 09:00», «15 числа 09:00»
+function remBadge(r) {
+  if(!r) return '';
+  const DN = ['пн','вт','ср','чт','пт','сб','вс'];
+  const t = String(Number.isInteger(r.hour) ? r.hour : 9).padStart(2,'0') + ':00';
+  const f = r.freq || 'daily';
+  if(f === 'weekly') return `${DN[Number.isInteger(r.days?.[0]) ? r.days[0] : 0]} ${t}`;
+  if(f === 'custom') { const d = [...(r.days||[])].sort((a,b)=>a-b).map(i=>DN[i]).filter(Boolean).join(','); return `${d||'—'} ${t}`; }
+  if(f === 'monthly') return `${parseInt(r.monthDay,10)||1} числа ${t}`;
+  if(f === 'interval') return `каждые ${r.intervalMin||''} мин`;
+  return `ежедн. ${t}`;
+}
+// Кнопка 🔔 в строке вкладок: показывать только карточки с напоминанием
+let filterBell = false;
+function toggleBellFilter() {
+  filterBell = !filterBell;
+  document.getElementById('bell-tab')?.classList.toggle('on', filterBell);
+  render();
+}
 function applyMemberFilter(arr) {
+  if(filterBell) arr = arr.filter(c => c.reminder?.enabled);
   if(!memberFilterOn) return arr;
   const name = localStorage.getItem('mc_current_member')||'';
   return arr.filter(c => c.assigned_to === name);
@@ -149,7 +169,7 @@ function highlightTask(cardId, entryId){
   }, 150);
 }
 function toggleDesktopCalendar(){
-   document.body.classList.remove('calc-on');
+  document.body.classList.remove('calc-on');
   document.body.classList.toggle('cal-on');
   if(document.body.classList.contains('cal-on') && typeof desktopCalSync === 'function') desktopCalSync();
 }
@@ -333,6 +353,12 @@ async function openPinnedCard(id){
   }, {passive:false});
 })();
 let filterNoDeadline = localStorage.getItem('mc_no_dl')==='1';
+// Сворачиваемые группы в списках карточек (состояние помнится)
+function grpOpen(key) { return localStorage.getItem('mc_grp_' + key) !== '1'; }
+function toggleGrp(key) { localStorage.setItem('mc_grp_' + key, grpOpen(key) ? '1' : '0'); render(); }
+function grpHeader(key, label, n, color) {
+  return `<div class="date-lbl" onclick="toggleGrp('${key}')" style="color:${color};cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none"><span style="font-size:11px;width:10px">${grpOpen(key)?'▾':'▸'}</span>${label}<span style="opacity:.6;font-weight:400">(${n})</span></div>`;
+}
 let filterClosed = false;
 function toggleClosedFilter(){ filterClosed=!filterClosed; render(); }
 function updateTabsForSpaceType() {
@@ -341,6 +367,8 @@ function updateTabsForSpaceType() {
   const checklistTab = document.querySelector('.tab[data-view="checklist"]');
   const cardsTab = document.querySelector('.tab[data-view="cards"]');
   const doneTab = document.querySelector('.tab[data-view="done"]');
+  const bellTab = document.getElementById('bell-tab');
+  if(bellTab) bellTab.style.display = isChat ? 'none' : '';
   if(todayTab) todayTab.style.display = isChat ? 'none' : '';
   if(checklistTab) checklistTab.style.display = isChat ? 'none' : '';
   if(cardsTab) cardsTab.textContent = isChat ? 'Чаты' : 'Все карточки';
@@ -406,15 +434,18 @@ function renderCards() {
 
   // Priority section always on top
   if(priority.length){
-    html+=`<div class="date-lbl" style="color:var(--red)">🔥 Срочные и важные</div>`;
-    html+=priority.map(c=>cardHTML(c)).join('');
+    html+=grpHeader('urgent','🔥 Срочные и важные',priority.length,'var(--red)');
+    if(grpOpen('urgent')) html+=priority.map(c=>cardHTML(c)).join('');
   }
 
   // Normal cards grouped by date
   const grouped={};
   normal.forEach(c=>{const d=(c.created_at||today()).slice(0,10);(grouped[d]=grouped[d]||[]).push(c);});
   const dates=Object.keys(grouped).sort((a,b)=>a.localeCompare(b));
-  html+=dates.map(d=>grouped[d].map(c=>cardHTML(c)).join('')).join('');
+  if(normal.length){
+    html+=grpHeader('other','📋 Остальные',normal.length,'var(--t2)');
+    if(grpOpen('other')) html+=dates.map(d=>grouped[d].map(c=>cardHTML(c)).join('')).join('');
+  }
 
   el.innerHTML=html;
 }
@@ -433,8 +464,8 @@ function renderToday() {
     .sort((a,b)=>{ const pd=PO[a.priority]-PO[b.priority]; if(pd!==0) return pd; return (a.deadline||'9999').localeCompare(b.deadline||'9999'); });
   const normal = todayCards.filter(c=>!c.priority||c.priority==='normal');
   let html = '';
-  if(priority.length) { html += `<div class="date-lbl" style="color:var(--red)">🔥 Срочные и важные</div>`; html += priority.map(c=>cardHTML(c)).join(''); }
-  html += normal.map(c=>cardHTML(c)).join('');
+  if(priority.length) { html += grpHeader('urgent','🔥 Срочные и важные',priority.length,'var(--red)'); if(grpOpen('urgent')) html += priority.map(c=>cardHTML(c)).join(''); }
+  if(normal.length) { html += grpHeader('other','📋 Остальные',normal.length,'var(--t2)'); if(grpOpen('other')) html += normal.map(c=>cardHTML(c)).join(''); }
   el.innerHTML = html;
 }
 
@@ -626,7 +657,7 @@ function cardHTML(card, isDone=false) {
 <div style="display:flex;justify-content:space-between;gap:7px;align-items:flex-start">
       ${(currentSpace?.type==='family'||currentSpace?.type==='group')?'':`<button onclick="event.stopPropagation();App.togglePin('${card.id}')" title="${card.pinned?'Открепить':'Закрепить'}" style="background:none;border:none;cursor:pointer;font-size:16px;padding:0;line-height:1;flex-shrink:0;margin-top:1px;${card.pinned?'':'opacity:.28;filter:grayscale(1)'}">📌</button>`}
       <div style="flex:1;min-width:0">
-        <div class="card-title" style="color:${col};${isDone?'text-decoration:line-through;opacity:.7':''}">${card.reminder?.enabled?`<span onclick="event.stopPropagation();openRemPopup('${card.id}')" style="cursor:pointer">🔔 </span>`:''}${pBadge}${esc(card.title)}</div>
+        <div class="card-title" style="color:${col};${isDone?'text-decoration:line-through;opacity:.7':''}">${card.reminder?.enabled?`<span onclick="event.stopPropagation();openRemPopup('${card.id}')" style="cursor:pointer;font-size:11px;font-weight:600;color:var(--accent);margin-right:5px">🔔 ${remBadge(card.reminder)}</span>`:''}${pBadge}${esc(card.title)}</div>
         ${bodyHTML}${entriesHTML}${imgsHTML}${filesHTML}
         <div class="card-meta">
           ${card.category?`<span class="cat-tag">${esc(card.category)}</span>`:''}
