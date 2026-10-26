@@ -1111,6 +1111,10 @@ function moveEntry(cardId, selection) {
     `<button onclick="selectMoveSpace('${cardId}','${s.id}',this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">${s.type==='family'?'👨‍👩‍👧':'🗂️'} ${esc(s.name)}</button>`
   ).join('');
   const n = moveSelection.entryIds.length + moveSelection.groupIds.length;
+  const _famLike = t => t==='family' || t==='group';
+  const _curFam = _famLike(currentSpace?.type);
+  const _chatGroups = spaces.filter(s => _famLike(s.type) && s.status!=='closed');
+  _mecSpace = null; _mecTarget = null;
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto">
     <div style="font-size:16px;font-weight:700;margin-bottom:4px">Перенести${n>1?` (${n})`:' запись'}</div>
         <label style="display:flex;align-items:center;gap:8px;margin:8px 0 10px;font-size:13px;color:var(--t2);cursor:pointer">
@@ -1119,6 +1123,8 @@ function moveEntry(cardId, selection) {
     </label>
     <div style="font-size:13px;color:var(--t2);margin-bottom:6px">Текст-обращение (необязательно)</div>
     <textarea id="move-session-note" oninput="moveSessionNote=this.value" placeholder="Привет, вот три пункта…" style="width:100%;min-height:50px;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:8px 10px;font-size:13px;color:var(--t1);font-family:inherit;resize:vertical;margin-bottom:14px;box-sizing:border-box"></textarea>
+    ${(!_curFam && _chatGroups.length) ? `<label style="display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:13px;color:var(--t1);cursor:pointer"><input type="checkbox" id="me-to-chat" onchange="mecToggleChat(this.checked)"> Отправить в чат группы</label>` : ''}
+    <div id="me-normal">
     <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Кабинет</div>
     <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
       <button onclick="selectMoveSpace('${cardId}','${currentSpaceId}',this)" style="background:var(--s2);border:1px solid var(--accent);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--accent);cursor:pointer;text-align:left;font-family:inherit">📂 Текущий кабинет</button>
@@ -1129,6 +1135,14 @@ function moveEntry(cardId, selection) {
     <div id="move-assign-block"></div>
     <div id="move-card-list" style="margin-top:12px;display:flex;flex-direction:column;gap:6px"></div>
     <div id="move-confirm-block"></div>
+    </div>
+    <div id="me-chat" style="display:none">
+      <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Группа</div>
+      <div id="mec-groups" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">${_chatGroups.map(s=>`<button onclick="mecSelectGroup('${cardId}','${s.id}',this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">👨‍👩‍👧 ${esc(s.name)}</button>`).join('')}</div>
+      <div id="mec-chats" style="display:flex;flex-direction:column;gap:6px"></div>
+      <div id="mec-assign-slot"></div>
+      <div id="mec-confirm"></div>
+    </div>
     <button onclick="document.getElementById('move-entry-dialog')?.remove()" style="width:100%;margin-top:12px;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;cursor:pointer">Отмена</button>
   </div>`;
   document.body.appendChild(div);
@@ -1267,6 +1281,164 @@ function selectMoveTarget(cardId, spaceId, idx, btn) {
   moveTargetCard = {id: targetCard.id, spaceId};
   const targetSpace = spaces.find(s=>s.id===spaceId);
   document.getElementById('move-confirm-block').innerHTML = `<button onclick="confirmMove('${cardId}')" style="width:100%;margin-top:10px;background:var(--accent);border:none;color:#0f0f0f;font-weight:700;border-radius:var(--rsm);padding:11px;cursor:pointer">Перенести</button>`;
+}
+
+// ── Окно «Сроки сегодня» (по нажатию на пуш о нескольких записях) ──
+let _dueRows = [];
+async function openDueDialog() {
+  const ids = spaces.filter(s => s.type==='personal' && s.status!=='closed').map(s => s.id);
+  let list = [];
+  try {
+    const { data, error } = await sb.from('cards').select('*').in('space_id', ids).not('deadline','is',null).neq('status','done');
+    if(error) throw error;
+    list = data || [];
+  } catch(e) {
+    try { list = (await local.getAll('cards')).filter(c => ids.includes(c.space_id) && c.deadline && c.status!=='done'); } catch(_) { list = []; }
+  }
+  const t = today();
+  _dueRows = [];
+  list.forEach(c => (c.entries||[]).forEach(e => { if(e && !e.done && e.text && e.deadline && String(e.deadline).slice(0,10) <= t) _dueRows.push({ c, e }); }));
+  _dueRows.sort((a,b) => String(a.e.deadline).localeCompare(String(b.e.deadline)));
+  if(!_dueRows.length) { toast('Сегодня сроков нет'); return; }
+  renderDueDialog();
+}
+function renderDueDialog() {
+  document.getElementById('due-ov')?.remove();
+  if(!_dueRows.length) { toast('✓ Все записи отмечены'); return; }
+  const t = today();
+  const nCards = new Set(_dueRows.map(r => r.c.id)).size;
+  const ov = document.createElement('div');
+  ov.id = 'due-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto;box-sizing:border-box">
+    <div style="font-size:16px;font-weight:700;margin-bottom:2px">Сроки сегодня</div>
+    <div style="font-size:12px;color:var(--t3);margin-bottom:10px">${_dueRows.length} зап. в ${nCards} карт.</div>
+    ${_dueRows.map((r,i) => {
+      const dl = String(r.e.deadline).slice(0,10);
+      const late = dl < t;
+      return `<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-top:1px solid var(--b1)">
+        <div onclick="dueDone(${i})" style="width:18px;height:18px;border-radius:4px;border:2px solid var(--t2);flex-shrink:0;margin-top:1px;cursor:pointer"></div>
+        <div style="flex:1;min-width:0"><div style="font-size:13px;word-break:break-word" dir="auto">${esc(stripTags(r.e.text))}</div><div style="font-size:11px;color:var(--t3)">${esc(r.c.title||'')}</div></div>
+        <div style="font-size:11px;color:${late?'var(--red)':'var(--accent)'};white-space:nowrap">${late?'просрочено':'сегодня'}</div>
+        <button onclick="dueOpen(${i})" style="background:none;border:none;color:var(--accent);font-size:18px;cursor:pointer;padding:0 2px" title="Открыть карточку">›</button>
+      </div>`;
+    }).join('')}
+    <button onclick="document.getElementById('due-ov').remove()" style="width:100%;margin-top:14px;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;cursor:pointer;font-family:inherit">Закрыть</button>
+  </div>`;
+  document.body.appendChild(ov);
+}
+async function dueDone(i) {
+  const r = _dueRows[i]; if(!r) return;
+  const { c, e } = r;
+  e.done = true;
+  const act = (c.entries||[]).filter(x => !x.done && x.deadline).map(x => x.deadline).sort();
+  c.deadline = act[0] || null;
+  if(!c.pinned && (c.entries||[]).length && (c.entries||[]).every(x => x.done)) {
+    c.status = 'done';
+    c.history = [...(c.history||[]), { date: nowStr(), text: 'Все записи выполнены → Готово', type: 'status' }];
+  }
+  const loc = cards.find(x => x.id === c.id);
+  if(loc && loc !== c) Object.assign(loc, c);
+  _dueRows = _dueRows.filter(x => x !== r);
+  renderDueDialog();
+  try { await dbUpdate(c); } catch(err) { toast('Ошибка синхронизации', true); }
+  try { render(); } catch(_) {}
+}
+async function dueOpen(i) {
+  const r = _dueRows[i]; if(!r) return;
+  document.getElementById('due-ov')?.remove();
+  await setCurrentSpace(r.c.space_id, true);
+  setTimeout(() => openView(r.c.id), 300);
+}
+
+// ── Записи карточки → одним списком в чат группы (с адресатом) ──
+let _mecSpace = null, _mecTarget = null, _mecChats = [];
+function mecToggleChat(on) {
+  document.getElementById('me-normal').style.display = on ? 'none' : 'block';
+  document.getElementById('me-chat').style.display = on ? 'block' : 'none';
+  const block = document.getElementById('move-assign-block');
+  if(block) {
+    block.innerHTML = ''; moveAssignedTo = null; moveAssignedCompletions = null; moveTargetCard = null;
+    if(on) document.getElementById('mec-assign-slot').appendChild(block);
+    else { const list = document.getElementById('move-card-list'); list.parentNode.insertBefore(block, list); }
+  }
+}
+async function mecSelectGroup(cardId, spaceId, btn) {
+  _mecSpace = spaceId; _mecTarget = null;
+  document.querySelectorAll('#mec-groups button').forEach(b=>{ b.style.borderColor='var(--b1)'; b.style.color='var(--t1)'; });
+  if(btn){ btn.style.borderColor='var(--accent)'; btn.style.color='var(--accent)'; }
+  document.getElementById('mec-confirm').innerHTML = '';
+  document.getElementById('move-assign-block').innerHTML = '';
+  const box = document.getElementById('mec-chats');
+  box.innerHTML = '<div style="font-size:13px;color:var(--t3)">Загрузка чатов…</div>';
+  let list = [];
+  try {
+    const { data } = await sb.from('cards').select('id,title,chatParticipants,chatStatus,status').eq('space_id', spaceId);
+    list = (data||[]).filter(c => Array.isArray(c.chatParticipants) && c.chatStatus !== 'closed' && c.status !== 'done');
+  } catch(e) { box.innerHTML = '<div style="font-size:13px;color:var(--red)">Ошибка загрузки</div>'; return; }
+  _mecChats = list;
+  const card = cards.find(c=>c.id===cardId);
+  box.innerHTML = `<div style="font-size:13px;color:var(--t2);margin:4px 0 2px">Чат</div>` +
+    list.map((c,i)=>`<button onclick="mecPick('${cardId}',${i},this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">${esc(c.title)}</button>`).join('') +
+    `<button onclick="mecPick('${cardId}',-1,this)" style="background:transparent;border:1px dashed var(--b2);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--accent);cursor:pointer;text-align:left;font-family:inherit">＋ Новый чат «${esc(card?.title||'')}»</button>`;
+}
+function mecPick(cardId, idx, btn) {
+  _mecTarget = idx >= 0 ? { type:'existing', card:_mecChats[idx] } : { type:'new' };
+  document.querySelectorAll('#mec-chats button').forEach(b=>{ b.style.borderColor = b.style.borderStyle==='dashed' ? 'var(--b2)' : 'var(--b1)'; });
+  if(btn) btn.style.borderColor = 'var(--accent)';
+  renderMoveAssignBlock(spaces.find(s=>s.id===_mecSpace));
+  document.getElementById('mec-confirm').innerHTML = `<div style="background:rgba(232,197,106,.12);border:1px solid rgba(232,197,106,.3);color:var(--accent);border-radius:var(--rsm);padding:9px 11px;font-size:12px;line-height:1.5;margin-top:10px">Все участники чата увидят эти записи.</div>
+    <button onclick="mecSend('${cardId}')" style="width:100%;margin-top:10px;background:var(--accent);border:none;color:#0f0f0f;font-weight:700;border-radius:var(--rsm);padding:11px;cursor:pointer">Отправить в чат</button>`;
+}
+async function mecSend(cardId) {
+  const fromCard = cards.find(c=>c.id===cardId);
+  const sp = spaces.find(s=>s.id===_mecSpace);
+  if(!fromCard || !sp || !_mecTarget) return;
+  if(moveAssignGuard(sp.id, () => mecSend(cardId))) return;
+  const me = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
+  window._cloneFailed = 0;
+  toast('⏳ Отправляю…');
+  const {entries: movedEntries} = await collectMoveEntries(fromCard);
+  if(!movedEntries.length) { toast('Нечего отправлять', true); return; }
+  let chatCard = null;
+  try {
+    if(_mecTarget.type === 'existing') {
+      const { data, error } = await sb.from('cards').select('*').eq('id', _mecTarget.card.id).single();
+      if(error || !data) throw new Error('Чат не найден');
+      chatCard = data;
+      const { error: ue } = await sb.from('cards').update({ entries: [...movedEntries, ...(data.entries||[])] }).eq('id', data.id);
+      if(ue) throw ue;
+    } else {
+      chatCard = {
+        id: uid(), title: fromCard.title, category: '', status: 'in_progress', space_id: sp.id, created_at: today(),
+        entries: movedEntries, entryGroups: [], attachments: [], history: [], body: '',
+        created_by: me, chatParticipants: (sp.members||[]).map(m=>m.name)
+      };
+      const { error: ie } = await sb.from('cards').insert(chatCard);
+      if(ie) throw ie;
+    }
+  } catch(e) { toast('Ошибка: ' + (e.message||e), true); return; }
+  document.getElementById('move-entry-dialog')?.remove();
+  stripMovedFromSource(fromCard);
+  try {
+    if(moveDeleteSource && (fromCard.entries||[]).length === 0 && confirm('Карточка «' + fromCard.title + '» пуста. Удалить её?')) deleteCardById(fromCard.id);
+    else { fromCard.deadline = ([...(fromCard.entries||[])].filter(e => !e.done && e.deadline).map(e => e.deadline).sort()[0]) || null; await dbUpdate(fromCard); }
+  } catch(e) {}
+  render(); try { openView(cardId); } catch(e) {}
+  toast('✓ Отправлено в чат «' + (chatCard.title||'') + '»' + (moveDeleteSource ? '' : ', у тебя осталось') + (window._cloneFailed ? ' (файлов не скопировано: ' + window._cloneFailed + ')' : ''));
+  try {
+    if(typeof notifyUsers === 'function') {
+      const low = s => String(s||'').trim().toLowerCase();
+      let names = null;
+      if(moveAssignedTo && moveAssignedTo !== 'all') names = [moveAssignedTo];
+      else if(moveAssignedTo === 'all' && moveAssignedCompletions) names = moveAssignedCompletions.map(c=>c.name);
+      const part = Array.isArray(chatCard.chatParticipants) ? chatCard.chatParticipants.map(low) : null;
+      const ids = [...new Set((sp.members||[]).filter(m => m.user_id && m.user_id !== currentUser?.id && (names ? names.map(low).includes(low(m.name)) : (!part || part.includes(low(m.name))))).map(m => m.user_id))];
+      const first = movedEntries.find(e=>e.text);
+      const txt = (moveSessionNote.trim() || (first ? stripTags(first.text) : 'Новые записи')) + (movedEntries.length > 1 ? ` (+${movedEntries.length-1})` : '');
+      if(ids.length) await notifyUsers(ids, '💬 ' + chatCard.title, `{{name}}: ${txt}`.slice(0,90), currentUser?.id, me, `https://vales-chayv.github.io/check-list/?openSpace=${sp.id}&openCard=${chatCard.id}`);
+    }
+  } catch(e) {}
 }
 
 async function collectMoveEntries(fromCard) {

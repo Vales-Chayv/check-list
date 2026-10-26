@@ -170,11 +170,22 @@ spaces = Array.isArray(saved) ? saved : [];
   // Открытие конкретного чата по ссылке из push-уведомления
   const openSpaceId = new URLSearchParams(window.location.search).get('openSpace');
   const openCardId = new URLSearchParams(window.location.search).get('openCard');
+  const openEntryId = new URLSearchParams(window.location.search).get('openEntry');
+  if(new URLSearchParams(window.location.search).get('showDue')) {
+    history.replaceState({}, '', window.location.pathname);
+    showSpaceSelector();
+    setTimeout(()=>{ if(typeof openDueDialog === 'function') openDueDialog(); }, 400);
+    return;
+  }
   if(openSpaceId && openCardId) {
     history.replaceState({}, '', window.location.pathname); // убираем параметры из адреса, чтобы не сработало повторно при обновлении
     if(spaces.find(s=>s.id===openSpaceId)) {
       await setCurrentSpace(openSpaceId, true);
       setTimeout(()=>openView(openCardId), 300);
+      if(openEntryId) setTimeout(()=>{
+        const el = document.querySelector('#view-ov .swipe-content[data-entryid="' + String(openEntryId).replace(/"/g,'') + '"]');
+        if(el) { el.scrollIntoView({block:'center'}); el.style.background = 'rgba(232,197,106,.28)'; el.style.borderRadius = '6px'; setTimeout(()=>{ el.style.background = 'transparent'; }, 3000); }
+      }, 900);
       return;
     }
   }
@@ -189,7 +200,7 @@ function showSpaceSelector() {
   updateLobbyGreeting();
   document.getElementById('space-selector').style.display = 'flex';
   document.body.classList.add('in-lobby');
-   document.body.classList.remove('in-cabinet');
+  document.body.classList.remove('in-cabinet');
   if(typeof desktopCalSync === 'function') desktopCalSync(); // ПК: загрузить календарь, даже если в кабинет ещё не заходили
   if(typeof subscribeGlobalChatWatch === 'function') subscribeGlobalChatWatch();
   if(typeof refreshChatWatchState === 'function') refreshChatWatchState();
