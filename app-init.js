@@ -335,6 +335,7 @@ new MutationObserver(() => {
     t = setTimeout(()=>document.body.classList.remove('fab-hide'), 700);
   }, true);
 })();
+
 // Окна (.sheet): липкие кнопки «Отмена / Сохранить» исчезают при прокрутке и возвращаются, когда прокрутка остановилась
 (function(){
   let t = null;
@@ -346,6 +347,7 @@ new MutationObserver(() => {
     t = setTimeout(()=>document.body.classList.remove('sheet-scrolling'), 600);
   }, true);
 })();
+
 // Любое окно с липкой кнопкой внизу («Сохранить» / «Сохранить запись»): строка с курсором не заходит под кнопку
 function keepCaretAboveSticky(){
   const el = document.activeElement;
@@ -372,3 +374,32 @@ function keepCaretAboveSticky(){
 document.addEventListener('input', function(){ setTimeout(keepCaretAboveSticky, 0); });
 document.addEventListener('focusin', function(){ setTimeout(keepCaretAboveSticky, 350); });
 document.addEventListener('click', function(){ setTimeout(keepCaretAboveSticky, 350); });
+
+// ── Настройка: во сколько напоминать о сроках записей (личные кабинеты). Хранится на сервере; -1 = выключено ──
+async function _entryHourCall(payload) {
+  const r = await fetch(FUNC_URL, { method:'POST', headers:{'Content-Type':'application/json','apikey':SB_ANON,'Authorization':'Bearer '+SB_ANON}, body: JSON.stringify(payload) });
+  if(!r.ok) throw new Error(r.status);
+  return r.json();
+}
+async function loadEntryPushHour() {
+  const sel = document.getElementById('set-entry-hour');
+  if(!sel || !currentUser?.id) return;
+  const cached = localStorage.getItem('mc_entry_hour');
+  sel.value = cached !== null ? cached : '9';
+  try {
+    const j = await _entryHourCall({ getEntryHour: true, userId: currentUser.id });
+    if(j && Number.isInteger(j.hour)) { sel.value = String(j.hour); localStorage.setItem('mc_entry_hour', String(j.hour)); }
+  } catch(e) {}
+}
+async function saveEntryPushHour() {
+  const sel = document.getElementById('set-entry-hour');
+  if(!sel || !currentUser?.id) return;
+  try {
+    await _entryHourCall({ setEntryHour: parseInt(sel.value, 10), userId: currentUser.id });
+    localStorage.setItem('mc_entry_hour', sel.value);
+    toast(sel.value === '-1' ? '✓ Напоминания о сроках записей выключены' : '✓ Напомню о сроках записей в ' + String(sel.value).padStart(2,'0') + ':00');
+  } catch(e) { toast('Не удалось сохранить', true); }
+}
+document.addEventListener('click', function(e){
+  if(e.target.closest && e.target.closest('[onclick^="openSettings"]')) setTimeout(loadEntryPushHour, 80);
+});

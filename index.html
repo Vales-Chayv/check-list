@@ -341,6 +341,11 @@
         <button id="push-off-btn" onclick="unsubscribePush()" style="display:none;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:8px;padding:7px 13px;font-size:13px;cursor:pointer">Отключить</button>
       </div>
           <div class="fld" style="border-top:1px solid var(--b1);padding-top:13px">
+        <label>⏰ Напоминать о сроках записей (личные кабинеты)</label>
+        <select id="set-entry-hour" onchange="saveEntryPushHour()"><option value="-1">Не напоминать</option><option value="5">05:00</option><option value="6">06:00</option><option value="7">07:00</option><option value="8">08:00</option><option value="9">09:00</option><option value="10">10:00</option><option value="11">11:00</option><option value="12">12:00</option><option value="13">13:00</option><option value="14">14:00</option><option value="15">15:00</option><option value="16">16:00</option><option value="17">17:00</option><option value="18">18:00</option><option value="19">19:00</option><option value="20">20:00</option><option value="21">21:00</option><option value="22">22:00</option><option value="23">23:00</option></select>
+        <span style="font-size:11px;color:var(--t3);line-height:1.5">В день срока записи придёт push в это время. По умолчанию 09:00</span>
+      </div>
+          <div class="fld" style="border-top:1px solid var(--b1);padding-top:13px">
         <label>Телефон</label>
         <input id="set-phone" type="tel" placeholder="+972...">
         <button onclick="savePhone()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t1);border-radius:var(--rsm);padding:10px;font-size:14px;cursor:pointer;font-family:inherit">Сохранить телефон</button>
