@@ -953,16 +953,43 @@ function moveEntry(cardId, selection) {
     </div>
     <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Рубрика</div>
     <div style="display:flex;flex-direction:column;gap:6px" id="move-cat-list"></div>
-    <div id="move-card-list" style="margin-top:12px;display:flex;flex-direction:column;gap:6px"></div>
     <div id="move-assign-block"></div>
+    <div id="move-card-list" style="margin-top:12px;display:flex;flex-direction:column;gap:6px"></div>
     <div id="move-confirm-block"></div>
     <button onclick="document.getElementById('move-entry-dialog')?.remove()" style="width:100%;margin-top:12px;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;cursor:pointer">Отмена</button>
   </div>`;
   document.body.appendChild(div);
 }
 
+// Если запись уходит в групповой кабинет и адресат не выбран — переспросить, чтобы не пропустить
+function moveAssignGuard(spaceId, next) {
+  const sp = spaces.find(s => s.id === spaceId);
+  if(!sp || !(sp.type==='family' || sp.type==='group')) return false;
+  if(moveAssignedTo !== null || window._moveAssignAsked) return false;
+  document.getElementById('move-assign-ask')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'move-assign-ask';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:2300;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;max-width:340px;width:100%;box-sizing:border-box">
+    <div style="font-size:16px;font-weight:700;margin-bottom:6px">Кому адресована запись?</div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:16px">Вы не выбрали, кому из группы она предназначена. Выбрать сейчас?</div>
+    <div style="display:flex;gap:8px">
+      <button type="button" id="ma-no" style="flex:1;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;font-size:14px;cursor:pointer;font-family:inherit">Нет, никому</button>
+      <button type="button" id="ma-yes" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:11px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Выбрать</button>
+    </div></div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#ma-yes').onclick = () => {
+    ov.remove();
+    const b = document.getElementById('move-assign-block');
+    if(b) { b.scrollIntoView({block:'center', behavior:'smooth'}); b.style.outline = '2px solid var(--accent)'; b.style.borderRadius = '8px'; setTimeout(()=>{ b.style.outline = ''; }, 1800); }
+  };
+  ov.querySelector('#ma-no').onclick = () => { ov.remove(); window._moveAssignAsked = true; next(); };
+  return true;
+}
+
 function renderMoveAssignBlock(targetSpace, chatParticipants) {
   const block = document.getElementById('move-assign-block'); if(!block) return;
+  window._moveAssignAsked = false;
   moveAssignedTo = null; moveAssignedCompletions = null;
   if(!targetSpace || !(targetSpace.type==='family' || targetSpace.type==='group')) { block.innerHTML = ''; return; }
   // Живой список участников группы, а не устаревший снимок chatParticipants на момент создания чата
@@ -980,6 +1007,7 @@ function renderMoveAssignBlock(targetSpace, chatParticipants) {
 
 function moveToggleAssign(btn, val, event) {
   event.stopPropagation();
+  if(val === '') window._moveAssignAsked = true; // «Никому» выбрано осознанно
   const wrap = document.getElementById('move-assign-block');
   const allBtns = wrap.querySelectorAll('.move-assign-btn');
   if(val === '' || val === 'all') {
@@ -1116,6 +1144,7 @@ function stripMovedFromSource(fromCard) {
 
 async function confirmMove(fromCardId) {
   const fromCard = cards.find(c=>c.id===fromCardId); if(!fromCard || !moveTargetCard) return;
+  if(moveAssignGuard(moveTargetCard.spaceId, () => confirmMove(fromCardId))) return;
   const {entries: movedEntries, groups: movedGroups} = collectMoveEntries(fromCard);
   if(!movedEntries.length) { toast('Нечего переносить', true); return; }
   stripMovedFromSource(fromCard);
@@ -1180,6 +1209,7 @@ async function createCardAndMove(fromCardId, spaceId, catName) {
   const fromCard = cards.find(c=>c.id===fromCardId); if(!fromCard) return;
   const {entries: movedEntries, groups: movedGroups} = collectMoveEntries(fromCard);
   if(!movedEntries.length) { toast('Нечего переносить', true); return; }
+  if(moveAssignGuard(spaceId, () => createCardAndMove(fromCardId, spaceId, catName))) return;
   const title = prompt('Название новой карточки:');
   if(!title) return;
   const targetSpace = spaces.find(s=>s.id===spaceId);
