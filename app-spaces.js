@@ -189,7 +189,8 @@ function showSpaceSelector() {
   updateLobbyGreeting();
   document.getElementById('space-selector').style.display = 'flex';
   document.body.classList.add('in-lobby');
-  document.body.classList.remove('in-cabinet');
+   document.body.classList.remove('in-cabinet');
+  if(typeof desktopCalSync === 'function') desktopCalSync(); // ПК: загрузить календарь, даже если в кабинет ещё не заходили
   if(typeof subscribeGlobalChatWatch === 'function') subscribeGlobalChatWatch();
   if(typeof refreshChatWatchState === 'function') refreshChatWatchState();
 }
