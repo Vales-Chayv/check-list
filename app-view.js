@@ -15,6 +15,31 @@ function viewToggleGroup(cardId, groupId) {
   viewGroupState.set(groupId, cur === false ? true : false);
   openView(cardId);
 }
+// Рубрики (разделы) в просмотре: переименовать / удалить вместе с записями
+async function renameViewGroup(cardId, groupId) {
+  const card = cards.find(c => c.id === cardId); if(!card) return;
+  const g = (card.entryGroups||[]).find(x => x.id === groupId); if(!g) return;
+  const name = (prompt('Название рубрики', g.name || '') || '').trim();
+  if(!name || name === g.name) return;
+  const _st = document.querySelector('#view-ov .sheet')?.scrollTop || 0;
+  g.name = name;
+  try { await dbUpdate(card); } catch(err) { toast('Ошибка синхронизации', true); }
+  openView(cardId);
+  setTimeout(() => { const s = document.querySelector('#view-ov .sheet'); if(s) s.scrollTop = _st; }, 60);
+}
+async function deleteViewGroup(cardId, groupId) {
+  const card = cards.find(c => c.id === cardId); if(!card) return;
+  const g = (card.entryGroups||[]).find(x => x.id === groupId); if(!g) return;
+  const n = (card.entries||[]).filter(e => e.groupId === groupId).length;
+  if(!confirm(`Удалить рубрику «${g.name || 'Без названия'}»${n ? ' вместе с записями (' + n + ')' : ''}?`)) return;
+  const _st = document.querySelector('#view-ov .sheet')?.scrollTop || 0;
+  card.entries = (card.entries||[]).filter(e => e.groupId !== groupId);
+  card.entryGroups = (card.entryGroups||[]).filter(x => x.id !== groupId);
+  card.deadline = ([...(card.entries||[])].filter(e => !e.done && e.deadline).map(e => e.deadline).sort()[0]) || null;
+  try { await dbUpdate(card); } catch(err) { toast('Ошибка синхронизации', true); }
+  render(); openView(cardId);
+  setTimeout(() => { const s = document.querySelector('#view-ov .sheet'); if(s) s.scrollTop = _st; }, 60);
+}
 async function addViewGroup(cardId) {
   const card = cards.find(c => c.id === cardId); if(!card) return;
   const name = (prompt('Название рубрики') || '').trim();
@@ -246,10 +271,11 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
       sessionsHTML = entryGroups.map(g => {
         const gEntries = entries.filter(e => e.groupId === g.id && e.text);
         const expanded = viewGroupState.get(g.id) !== false;
-        return `<div style="border:1px solid var(--b1);border-radius:var(--rsm);margin-bottom:8px;overflow:hidden">
-          <div onclick="viewToggleGroup('${id}','${g.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--s2);cursor:pointer">
-            <span style="font-size:13px;font-weight:700;color:var(--accent)">${esc(g.name)||'Без названия'}</span>
-            <span style="display:flex;align-items:center;gap:10px"><button onclick="event.stopPropagation();openAddEntry('${id}',null,false,'${g.id}')" style="background:rgba(232,197,106,.15);color:var(--accent);border:1px solid rgba(232,197,106,.3);border-radius:6px;padding:2px 10px;font-size:15px;line-height:1.3;cursor:pointer">＋</button><span style="font-size:11px;color:var(--t3)">${gEntries.length} ${expanded?'▲':'▼'}</span></span>
+        const gDone = gEntries.length > 0 && gEntries.every(e => e.done);
+        return `<div style="border:1px solid ${gDone?'rgba(91,184,122,.55)':'var(--b1)'};border-radius:var(--rsm);margin-bottom:8px;overflow:hidden">
+          <div onclick="viewToggleGroup('${id}','${g.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:${gDone?'rgba(91,184,122,.2)':'var(--s2)'};cursor:pointer">
+            <span style="font-size:13px;font-weight:700;color:${gDone?'var(--green)':'var(--accent)'}">${gDone?'✓ ':''}${esc(g.name)||'Без названия'}</span>
+            <span style="display:flex;align-items:center;gap:8px"><button onclick="event.stopPropagation();renameViewGroup('${id}','${g.id}')" title="Переименовать" style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;padding:2px 4px">✎</button><button onclick="event.stopPropagation();deleteViewGroup('${id}','${g.id}')" title="Удалить рубрику" style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;padding:2px 4px">🗑</button><button onclick="event.stopPropagation();openAddEntry('${id}',null,false,'${g.id}')" style="background:rgba(232,197,106,.15);color:var(--accent);border:1px solid rgba(232,197,106,.3);border-radius:6px;padding:2px 10px;font-size:15px;line-height:1.3;cursor:pointer">＋</button><span style="font-size:11px;color:var(--t3)">${gEntries.length} ${expanded?'▲':'▼'}</span></span>
           </div>
           ${expanded ? `<div style="padding:0 12px">${gEntries.map(e=>entryRowHTML(e,null)).join('')}</div>` : ''}
         </div>`;

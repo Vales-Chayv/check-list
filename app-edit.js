@@ -470,11 +470,41 @@ function renderRelatedList() {
   el.innerHTML=tempRelIds.map(id=>{const c=cards.find(x=>x.id===id);if(!c)return'';const col=catColor(c.category);return`<div style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:18px;border:1px solid ${hex2rgba(col,.4)};margin:3px;font-size:13px"><span style="color:${col}">🔗</span>${esc(c.title.length>24?c.title.slice(0,22)+'…':c.title)}<button onclick="rmRelated('${id}')" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:12px;padding:0;margin-left:2px">✕</button></div>`;}).join('');
 }
 
+// Подтверждение рубрики перед созданием новой карточки
+function confirmRubricThen(name, onYes) {
+  document.getElementById('cat-confirm-ov')?.remove();
+  const col = (typeof catColor === 'function' ? catColor(name) : '') || '#888';
+  const ov = document.createElement('div');
+  ov.id = 'cat-confirm-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:2100;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;max-width:340px;width:100%;box-sizing:border-box">
+    <div style="font-size:16px;font-weight:700;margin-bottom:10px">Выбранная рубрика верна?</div>
+    <div style="display:flex;align-items:center;gap:8px;background:var(--s2);border-radius:var(--rsm);padding:10px 12px;margin-bottom:16px;font-size:15px;word-break:break-word"><span style="width:10px;height:10px;border-radius:50%;background:${col};flex-shrink:0"></span><span dir="auto">${esc(name)}</span></div>
+    <div style="display:flex;gap:8px">
+      <button type="button" id="cc-no" style="flex:1;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;font-size:14px;cursor:pointer;font-family:inherit">Нет, изменить</button>
+      <button type="button" id="cc-yes" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:11px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Да, создать</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#cc-yes').onclick = () => { ov.remove(); onYes(); };
+  ov.querySelector('#cc-no').onclick = () => {
+    ov.remove();
+    document.querySelectorAll('.mtab').forEach(t=>t.classList.remove('on'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+    document.querySelector('.mtab')?.classList.add('on');
+    document.getElementById('p-main')?.classList.add('on');
+    const sel = document.getElementById('e-cat');
+    if(sel) { sel.scrollIntoView({block:'center'}); sel.focus(); try { sel.showPicker && sel.showPicker(); } catch(_) {} }
+  };
+}
+
 // Save
 async function saveCard() {
   const title=document.getElementById('e-title').value.trim(); if(!title)return;
   const catVal=document.getElementById('e-cat').value==='__new'?(cats[0]?.name||''):document.getElementById('e-cat').value;
   const isFamily = currentSpace?.type === 'family';
+  if(!editId && !isFamily && currentSpace?.type !== 'group' && catVal && !window._catOk) { confirmRubricThen(catVal, () => { window._catOk = true; saveCard(); }); return; }
+  window._catOk = false;
   const newStatus = isFamily ? (document.getElementById('e-status')?.value||'new') : document.getElementById('e-status').value;
   const assignedTo = isFamily ? (document.getElementById('e-assigned').value||null) : null;
   const oldCard=editId?cards.find(c=>c.id===editId):null;
