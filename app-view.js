@@ -821,6 +821,8 @@ function moveCardToSpace(cardId) {
   const curFam = currentSpace?.type==='family' || currentSpace?.type==='group';
   const famLike = t => t==='family' || t==='group';
   const targets = spaces.filter(s => s.id!==currentSpaceId && famLike(s.type)===curFam);
+  const chatGroups = spaces.filter(s => famLike(s.type) && s.status!=='closed');
+  _mccSpace = null; _mccTarget = null;
   const div = document.createElement('div');
   div.id = 'move-card-dialog';
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
@@ -830,14 +832,137 @@ function moveCardToSpace(cardId) {
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto">
     <div style="font-size:16px;font-weight:700;margin-bottom:4px">📦 Переместить карточку</div>
     <div style="font-size:13px;color:var(--t2);margin-bottom:10px">«${esc(card.title)}» → выбери кабинет</div>
+    ${(!curFam && chatGroups.length) ? `<label style="display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:13px;color:var(--t1);cursor:pointer"><input type="checkbox" id="mc-to-chat" onchange="mcToggleChat(this.checked)"> Отправить в чат группы</label>` : ''}
+    <div id="mc-normal">
     <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">${spaceBtns}</div>
     <div id="mc-cat-section" style="display:none">
       <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Рубрика в новом кабинете</div>
       <div style="display:flex;flex-direction:column;gap:6px" id="mc-cat-list"></div>
     </div>
+    </div>
+    <div id="mc-chat" style="display:none">
+      <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Группа</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">${chatGroups.map(s=>`<button onclick="mcChatSelectGroup('${cardId}','${s.id}',this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">👨‍👩‍👧 ${esc(s.name)}</button>`).join('')}</div>
+      <div id="mcc-chats" style="display:flex;flex-direction:column;gap:6px"></div>
+      <div id="mcc-confirm"></div>
+    </div>
     <button onclick="document.getElementById('move-card-dialog')?.remove()" style="width:100%;margin-top:12px;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;cursor:pointer">Отмена</button>
   </div>`;
   document.body.appendChild(div);
+}
+// Настоящая копия вложения: новый файл в хранилище, чтобы удаление исходной карточки не задевало копию
+async function cloneAtt(a) {
+  if(!a || !a.data) return a;
+  const url = String(a.data);
+  if(!url.includes('/attachments/') || !navigator.onLine) return { ...a, id: uid() }; // base64 или офлайн — независимая копия данных
+  const src = decodeURIComponent(url.split('/attachments/')[1].split('?')[0]);
+  const dst = uid() + '_' + String(a.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
+  try {
+    const { error } = await sb.storage.from('attachments').copy(src, dst);
+    if(!error) { const { data: { publicUrl } } = sb.storage.from('attachments').getPublicUrl(dst); return { ...a, id: uid(), data: publicUrl }; }
+  } catch(e) {}
+  try {
+    const blob = await (await fetch(url)).blob();
+    const f = new File([blob], a.name || 'file', { type: a.type || blob.type });
+    return await uploadToStorage(f);
+  } catch(e) {}
+  window._cloneFailed = (window._cloneFailed || 0) + 1;
+  return { ...a, id: uid() }; // не удалось скопировать — остаётся ссылка на оригинал
+}
+async function cloneAttList(list) {
+  const out = [];
+  for(const a of (list || [])) out.push(await cloneAtt(a));
+  return out;
+}
+
+// ── Карточка целиком → сообщение в чате группы ──
+let _mccSpace = null, _mccTarget = null, _mccChats = [];
+function mcToggleChat(on) {
+  document.getElementById('mc-normal').style.display = on ? 'none' : 'block';
+  document.getElementById('mc-chat').style.display = on ? 'block' : 'none';
+}
+async function mcChatSelectGroup(cardId, spaceId, btn) {
+  _mccSpace = spaceId; _mccTarget = null;
+  document.querySelectorAll('#mc-chat > div:nth-child(2) button').forEach(b=>{ b.style.borderColor='var(--b1)'; b.style.color='var(--t1)'; });
+  if(btn){ btn.style.borderColor='var(--accent)'; btn.style.color='var(--accent)'; }
+  document.getElementById('mcc-confirm').innerHTML = '';
+  const box = document.getElementById('mcc-chats');
+  box.innerHTML = '<div style="font-size:13px;color:var(--t3)">Загрузка чатов…</div>';
+  let list = [];
+  try {
+    const { data } = await sb.from('cards').select('id,title,chatParticipants,chatStatus,status').eq('space_id', spaceId);
+    list = (data||[]).filter(c => Array.isArray(c.chatParticipants) && c.chatStatus !== 'closed' && c.status !== 'done');
+  } catch(e) { box.innerHTML = '<div style="font-size:13px;color:var(--red)">Ошибка загрузки</div>'; return; }
+  _mccChats = list;
+  const card = cards.find(c=>c.id===cardId);
+  box.innerHTML = `<div style="font-size:13px;color:var(--t2);margin:4px 0 2px">Чат</div>` +
+    list.map((c,i)=>`<button onclick="mcChatPick('${cardId}',${i},this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">${esc(c.title)}</button>`).join('') +
+    `<button onclick="mcChatPick('${cardId}',-1,this)" style="background:transparent;border:1px dashed var(--b2);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--accent);cursor:pointer;text-align:left;font-family:inherit">＋ Новый чат «${esc(card?.title||'')}»</button>`;
+}
+function mcChatPick(cardId, idx, btn) {
+  _mccTarget = idx >= 0 ? { type:'existing', card:_mccChats[idx] } : { type:'new' };
+  document.querySelectorAll('#mcc-chats button').forEach(b=>{ b.style.borderColor = b.style.borderStyle==='dashed' ? 'var(--b2)' : 'var(--b1)'; });
+  if(btn) btn.style.borderColor = 'var(--accent)';
+  document.getElementById('mcc-confirm').innerHTML = `<div style="background:rgba(232,197,106,.12);border:1px solid rgba(232,197,106,.3);color:var(--accent);border-radius:var(--rsm);padding:9px 11px;font-size:12px;line-height:1.5;margin-top:10px">Все участники чата увидят содержимое карточки, включая личные данные.</div>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:var(--t1);cursor:pointer"><input type="checkbox" id="mcc-keep" checked> Оставить карточку у меня</label>
+    <button onclick="mcChatSend('${cardId}')" style="width:100%;margin-top:10px;background:var(--accent);border:none;color:#0f0f0f;font-weight:700;border-radius:var(--rsm);padding:11px;cursor:pointer">Понимаю, отправить</button>`;
+}
+async function mcChatSend(cardId) {
+  const card = cards.find(c=>c.id===cardId);
+  const sp = spaces.find(s=>s.id===_mccSpace);
+  if(!card || !sp || !_mccTarget) return;
+  const me = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
+  const sessionId = uid();
+  const note = [card.title, (card.body||'').trim()].filter(Boolean).join('\n');
+  const keepCard = !!document.getElementById('mcc-keep')?.checked;
+  document.getElementById('move-card-dialog')?.remove();
+  window._cloneFailed = 0;
+  if((card.attachments||[]).length || (card.entries||[]).some(e => (e.attachments||[]).length)) toast('⏳ Копирую файлы…');
+  const atts = await cloneAttList(card.attachments);
+  let bubbles = [];
+  for(const e of (card.entries||[])) {
+    if(!e || !(e.text || (e.attachments||[]).length)) continue;
+    bubbles.push({
+      id: uid(), text: e.text||'', date: e.date||nowStr(), done: !!e.done, attachments: await cloneAttList(e.attachments), deadline: e.deadline||null,
+      assigned_to: null, completions: null, sessionId, sessionCreator: me, sessionNote: null, sessionAtts: []
+    });
+  }
+  if(!bubbles.length) bubbles = [{ id: uid(), text:'', date: nowStr(), done:false, attachments:[], deadline:null, assigned_to:null, completions:null, sessionId, sessionCreator: me, sessionNote: note, sessionAtts: atts }];
+  else { bubbles[0].sessionNote = note; bubbles[0].sessionAtts = atts; }
+  let chatCard = null;
+  try {
+    if(_mccTarget.type === 'existing') {
+      const { data, error } = await sb.from('cards').select('*').eq('id', _mccTarget.card.id).single();
+      if(error || !data) throw new Error('Чат не найден');
+      chatCard = data;
+      const { error: ue } = await sb.from('cards').update({ entries: [...bubbles, ...(data.entries||[])] }).eq('id', data.id);
+      if(ue) throw ue;
+    } else {
+      chatCard = {
+        id: uid(), title: card.title, category: '', status: 'in_progress', space_id: sp.id, created_at: today(),
+        entries: bubbles, entryGroups: [], attachments: [], history: [], body: '',
+        created_by: me, chatParticipants: (sp.members||[]).map(m=>m.name)
+      };
+      const { error: ie } = await sb.from('cards').insert(chatCard);
+      if(ie) throw ie;
+    }
+  } catch(e) { toast('Ошибка: ' + (e.message||e), true); return; }
+  if(!keepCard) {
+    // исходную карточку убираем (файлы в хранилище не трогаем — они теперь в чате)
+    cards = cards.filter(c => c.id !== cardId);
+    try { await local.delete('cards', cardId); } catch(e) {}
+    try { const { error } = await sb.from('cards').delete().eq('id', cardId); if(error) await queueOp({type:'delete', data:{id:cardId}}); } catch(e) { try { await queueOp({type:'delete', data:{id:cardId}}); } catch(_) {} }
+    if(typeof closeView === 'function') closeView();
+  }
+  render();
+  toast('✓ Карточка отправлена в чат «' + (chatCard.title||'') + '»' + (keepCard ? ', у тебя осталась копия' : '') + (window._cloneFailed ? ' (файлов не скопировано: ' + window._cloneFailed + ')' : ''));
+  try {
+    if(typeof notifyUsers === 'function') {
+      const part = Array.isArray(chatCard.chatParticipants) ? chatCard.chatParticipants.map(x=>String(x).toLowerCase().trim()) : null;
+      const ids = [...new Set((sp.members||[]).filter(m => m.user_id && m.user_id !== currentUser?.id && (!part || part.includes(String(m.name).toLowerCase().trim()))).map(m => m.user_id))];
+      if(ids.length) await notifyUsers(ids, '💬 ' + chatCard.title, `{{name}}: ${card.title}`.slice(0,90), currentUser?.id, me, `https://vales-chayv.github.io/check-list/?openSpace=${sp.id}&openCard=${chatCard.id}`);
+    }
+  } catch(e) {}
 }
 async function mcSelectSpace(cardId, spaceId, btn) {
   _mcTargetSpace = spaceId;
@@ -1096,7 +1221,7 @@ function selectMoveTarget(cardId, spaceId, idx, btn) {
   document.getElementById('move-confirm-block').innerHTML = `<button onclick="confirmMove('${cardId}')" style="width:100%;margin-top:10px;background:var(--accent);border:none;color:#0f0f0f;font-weight:700;border-radius:var(--rsm);padding:11px;cursor:pointer">Перенести</button>`;
 }
 
-function collectMoveEntries(fromCard) {
+async function collectMoveEntries(fromCard) {
   const picked = [];
   const movedGroups = [];
   const groupIdMap = {}; // старый groupId (в источнике) -> новый groupId (в цели)
@@ -1113,7 +1238,7 @@ function collectMoveEntries(fromCard) {
   // Если переносим целый раздел и не ввели свой текст-обращение — используем название раздела как заголовок сообщения в чате
   const autoNote = (!moveSessionNote.trim() && sourceGroups.length) ? sourceGroups[0].name : '';
 
-  (fromCard.entries||[]).forEach(e => {
+  for(const e of (fromCard.entries||[])) {
     const fromSelectedGroup = e.groupId && moveSelection.groupIds.includes(e.groupId);
     if(moveSelection.entryIds.includes(e.id) || fromSelectedGroup) {
       const copy = {
@@ -1125,10 +1250,12 @@ function collectMoveEntries(fromCard) {
         sessionAtts: isFirst ? (e.sessionAtts||e.attachments||[]) : []
       };
       isFirst = false;
+      if((copy.attachments||[]).length) copy.attachments = await cloneAttList(copy.attachments);
+      if((copy.sessionAtts||[]).length) copy.sessionAtts = await cloneAttList(copy.sessionAtts);
       if(moveAssignedTo !== null) { copy.assigned_to = moveAssignedTo; copy.completions = moveAssignedCompletions; copy.done = false; }
       picked.push(copy);
     }
-  });
+  }
   return { entries: picked, groups: movedGroups };
 }
 
@@ -1145,7 +1272,7 @@ function stripMovedFromSource(fromCard) {
 async function confirmMove(fromCardId) {
   const fromCard = cards.find(c=>c.id===fromCardId); if(!fromCard || !moveTargetCard) return;
   if(moveAssignGuard(moveTargetCard.spaceId, () => confirmMove(fromCardId))) return;
-  const {entries: movedEntries, groups: movedGroups} = collectMoveEntries(fromCard);
+  const {entries: movedEntries, groups: movedGroups} = await collectMoveEntries(fromCard);
   if(!movedEntries.length) { toast('Нечего переносить', true); return; }
   stripMovedFromSource(fromCard);
   document.getElementById('move-entry-dialog')?.remove();
@@ -1207,11 +1334,11 @@ function askDeleteMoved(fromCardId, sel) {
 
 async function createCardAndMove(fromCardId, spaceId, catName) {
   const fromCard = cards.find(c=>c.id===fromCardId); if(!fromCard) return;
-  const {entries: movedEntries, groups: movedGroups} = collectMoveEntries(fromCard);
-  if(!movedEntries.length) { toast('Нечего переносить', true); return; }
   if(moveAssignGuard(spaceId, () => createCardAndMove(fromCardId, spaceId, catName))) return;
   const title = prompt('Название новой карточки:');
   if(!title) return;
+  const {entries: movedEntries, groups: movedGroups} = await collectMoveEntries(fromCard);
+  if(!movedEntries.length) { toast('Нечего переносить', true); return; }
   const targetSpace = spaces.find(s=>s.id===spaceId);
   const isChat = targetSpace?.type==='family' || targetSpace?.type==='group';
   const newCard = {
