@@ -100,6 +100,7 @@ function openView(id) {
         <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
           <button onclick="closeView();setTimeout(()=>openChatCompose('${id}'),200)" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:8px;padding:9px 14px;font-size:15px;font-weight:700;cursor:pointer">📎</button>
           <button onclick="closeView();setTimeout(()=>openChatVoice('${id}'),200)" style="background:var(--s2);color:var(--accent);border:1px solid var(--b1);border-radius:8px;padding:9px 12px;font-size:15px;cursor:pointer">🎙️</button>
+          ${(Array.isArray(card.chatParticipants) && ((typeof isChatCreator==='function' && isChatCreator(card)) || (typeof isGroupOwner==='function' && isGroupOwner())))?`<button onclick="openAddChatMember('${id}')" title="Добавить участника" style="background:var(--s2);color:var(--accent);border:1px solid var(--b1);border-radius:8px;padding:9px 12px;font-size:15px;cursor:pointer">👥＋</button>`:''}
           ${card.chatStatus==='pending_close' && (typeof isGroupOwner==='function' && isGroupOwner())?`
             <button onclick="actuallyCloseChat('${id}')" style="background:rgba(91,184,122,.15);color:var(--green);border:1px solid rgba(91,184,122,.25);border-radius:8px;padding:9px 12px;font-size:13px;cursor:pointer">✅ Подтвердить закрытие</button>
             <button onclick="rejectCloseChat('${id}')" style="background:var(--s2);color:var(--t2);border:1px solid var(--b1);border-radius:8px;padding:9px 12px;font-size:13px;cursor:pointer">❌ Отклонить</button>
@@ -850,6 +851,53 @@ function moveCardToSpace(cardId) {
   </div>`;
   document.body.appendChild(div);
 }
+// ── Добавить участников в существующий чат (создатель чата или владелец группы) ──
+function openAddChatMember(cardId) {
+  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  const low = s => String(s||'').trim().toLowerCase();
+  const inChat = new Set((card.chatParticipants||[]).map(low));
+  const cand = (currentSpace?.members||[]).filter(m => !inChat.has(low(m.name)));
+  if(!cand.length) { toast('Все участники группы уже в этом чате'); return; }
+  window._addChatSel = new Set();
+  document.getElementById('add-chat-member-ov')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'add-chat-member-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;max-width:360px;width:100%;box-sizing:border-box">
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">Добавить в чат</div>
+    <div style="font-size:12px;color:var(--t2);margin-bottom:12px">«${esc(card.title)}». Новые участники увидят всю переписку.</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">${cand.map(m=>`<button type="button" data-name="${esc(m.name)}" onclick="toggleAddChatMember(this)" style="background:transparent;color:var(--t2);border:1px solid var(--b1);border-radius:14px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit">${esc(aliasedName(m.name))}</button>`).join('')}</div>
+    <div style="display:flex;gap:8px">
+      <button type="button" onclick="document.getElementById('add-chat-member-ov').remove()" style="flex:1;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;font-size:13px;cursor:pointer;font-family:inherit">Отмена</button>
+      <button type="button" onclick="confirmAddChatMember('${cardId}')" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Добавить</button>
+    </div></div>`;
+  document.body.appendChild(ov);
+}
+function toggleAddChatMember(btn) {
+  const n = btn.dataset.name;
+  if(window._addChatSel.has(n)) { window._addChatSel.delete(n); btn.style.background='transparent'; btn.style.color='var(--t2)'; }
+  else { window._addChatSel.add(n); btn.style.background='var(--accent)'; btn.style.color='#0f0f0f'; }
+}
+async function confirmAddChatMember(cardId) {
+  const card = cards.find(c=>c.id===cardId); if(!card) return;
+  const names = [...(window._addChatSel||[])];
+  if(!names.length) { toast('Выбери хотя бы одного участника', true); return; }
+  document.getElementById('add-chat-member-ov')?.remove();
+  card.chatParticipants = [...(card.chatParticipants||[]), ...names];
+  card.history = [...(card.history||[]), { date: nowStr(), text: 'В чат добавлены: ' + names.join(', '), type: 'note' }];
+  render(); openView(cardId);
+  toast('✓ Участники добавлены');
+  try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); return; }
+  try {
+    const low = s => String(s||'').trim().toLowerCase();
+    const want = names.map(low);
+    const me = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
+    const ids = [...new Set([...(currentSpace?.members||[]), ...(currentSpace?.members_auth||[])].filter(m => m?.user_id && want.includes(low(m.name)) && m.user_id !== currentUser?.id).map(m => m.user_id))];
+    if(ids.length && typeof notifyUsers === 'function') await notifyUsers(ids, '💬 Тебя добавили в чат', `{{name}} добавил(а) тебя в чат «${card.title}»`, currentUser?.id, me, `https://vales-chayv.github.io/check-list/?openSpace=${currentSpaceId}&openCard=${card.id}`);
+    if(typeof logEvent === 'function') logEvent(currentSpaceId, currentSpace?.name, 'chat_member_added', `добавил(а) в чат «${card.title}»: ${names.join(', ')}`, cardId);
+  } catch(e) {}
+}
+
 // Настоящая копия вложения: новый файл в хранилище, чтобы удаление исходной карточки не задевало копию
 async function cloneAtt(a) {
   if(!a || !a.data) return a;
