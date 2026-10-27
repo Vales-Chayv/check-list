@@ -191,16 +191,24 @@ function evRemLabel(k) {
   return 'За ' + n + ' мин';
 }
 function evRemRender() {
-  const box = document.getElementById('ev-rem-chips'); if(!box) return;
+  const rows = document.getElementById('ev-rem-rows'), chips = document.getElementById('ev-rem-chips');
+  if(!rows || !chips) return;
   const hasTime = !!document.getElementById('ev-time')?.value;
   const keys = [...EV_REM_PRESETS, ...evRem.filter(k => !EV_REM_PRESETS.includes(k))];
-  box.innerHTML = keys.map(k => {
+  rows.innerHTML = keys.map((k, i) => {
     const on = evRem.includes(k), off = k[0] === 'm' && !hasTime;
-    return `<button type="button" onclick="evRemToggle('${k}')" style="border-radius:14px;padding:5px 12px;font-size:13px;cursor:pointer;font-family:inherit;border:1px solid var(--b1);${on?'background:var(--accent);color:#0f0f0f':'background:transparent;color:var(--t2)'};${off?'opacity:.4':''}">${evRemLabel(k)}</button>`;
+    return `<div onclick="evRemToggle('${k}')" style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;font-size:14px;cursor:pointer;${i ? 'border-top:1px solid var(--b1);' : ''}${off ? 'opacity:.4;' : ''}"><span>${evRemLabel(k)}</span><span style="color:var(--accent);font-weight:700">${on ? '✓' : ''}</span></div>`;
   }).join('');
+  chips.innerHTML = evRem.map(k => `<span onclick="evRemToggle('${k}')" style="background:rgba(232,197,106,.18);color:var(--accent);border-radius:14px;padding:3px 10px;font-size:12px;cursor:pointer">${evRemLabel(k)} ✕</span>`).join('');
+}
+function evRemTogglePanel() {
+  const p = document.getElementById('ev-rem-panel'); if(!p) return;
+  const open = p.style.display === 'none';
+  p.style.display = open ? 'block' : 'none';
+  document.getElementById('ev-rem-arrow').textContent = open ? '▴' : '▾';
 }
 function evRemToggle(k) {
-  if(k[0] === 'm' && !document.getElementById('ev-time').value) { toast('Сначала укажи время события', true); return; }
+  if(k[0] === 'm' && !evRem.includes(k) && !document.getElementById('ev-time').value) { toast('Сначала укажи время события', true); return; }
   evRem = evRem.includes(k) ? evRem.filter(x => x !== k) : [...evRem, k];
   evRemRender();
 }
@@ -225,11 +233,11 @@ function evRepeatChanged() {
 function openEventModal(dateStr, eventId) {
   evEditId = eventId || null;
   const sel = document.getElementById('ev-space');
-  sel.innerHTML = spaces.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
   const ev = evEditId ? calAllEvents.find(e => e.id === evEditId) : null;
   if(ev) {
     document.getElementById('ev-modal-title').textContent = 'Редактировать событие';
     sel.value = ev.space_id || (spaces[0] && spaces[0].id) || '';
+    { const sp = spaces.find(s => s.id === sel.value); const n = document.getElementById('ev-space-note'); if(n) n.textContent = sp ? (sp.type === 'personal' ? 'Личное событие' : 'Кабинет: ' + sp.name) : ''; }
     document.getElementById('ev-title').value = ev.title || '';
     document.getElementById('ev-date').value = ev.event_date || '';
     document.getElementById('ev-time').value = ev.event_time || '';
@@ -244,7 +252,12 @@ function openEventModal(dateStr, eventId) {
       else dateStr = calTodayStr();
     }
     document.getElementById('ev-modal-title').textContent = 'Новое событие';
-    sel.value = currentSpaceId || (spaces[0] && spaces[0].id) || '';
+    { // внутри кабинета — событие этого кабинета; из лобби — личное
+      const inCab = document.body.classList.contains('in-cabinet') && spaces.some(s => s.id === currentSpaceId);
+      const sp = inCab ? spaces.find(s => s.id === currentSpaceId) : (spaces.find(s => s.type === 'personal') || spaces[0]);
+      sel.value = sp ? sp.id : '';
+      const n = document.getElementById('ev-space-note'); if(n) n.textContent = sp ? (sp.type === 'personal' ? 'Личное событие' : 'Кабинет: ' + sp.name) : '';
+    }
     document.getElementById('ev-title').value = '';
     document.getElementById('ev-date').value = dateStr;
     document.getElementById('ev-time').value = '';
@@ -256,6 +269,7 @@ function openEventModal(dateStr, eventId) {
   }
   evRepeatChanged();
   evRemRender();
+  { const p = document.getElementById('ev-rem-panel'); if(p) { p.style.display = 'none'; document.getElementById('ev-rem-arrow').textContent = '▾'; } }
   document.getElementById('event-ov').classList.add('on');
 }
 function closeEventModal() {
