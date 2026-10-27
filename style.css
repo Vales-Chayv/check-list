@@ -311,6 +311,10 @@ body.in-lobby.cal-on #cal-ov, body.in-cabinet.cal-on #cal-ov { bottom: auto; hei
   #cal-body [style*="min-height:72px"], #cal-body [style*="min-height:120px"] { min-height: 0 !important; overflow: hidden; }
   #calc-ov .sheet { display: flex; flex-direction: column; }
   #calc-ov #calc-body { flex: 1; min-height: 0; height: auto; }
+  /* окно нового события — только поверх панели А, а не на весь экран */
+  #event-ov { inset: auto; top: 40px; bottom: 0; left: var(--split-left); right: 0; width: auto; align-items: stretch; background: var(--s1); border-left: 1px solid var(--b1); }
+  body.in-lobby #event-ov, body.in-cabinet #event-ov { bottom: auto; height: calc((100vh - 40px) * var(--lobby-split-v)); }
+  #event-ov .sheet { transform: none; max-height: none; height: 100%; border-radius: 0; overflow-y: auto; }
   #calc-left { overflow-y: auto; }
   #calc-current { font-size: clamp(20px, 4vh, 32px); margin-bottom: 6px; }
   #calc-pad { flex: 1; min-height: 0; grid-auto-rows: minmax(34px, 1fr); }

@@ -780,10 +780,10 @@ function renderCalWeek() {
 }
 
 function renderCalDay() {
-  const dateStr = calDate.toISOString().slice(0,10);
   const d = calDate.getDate();
   const m = calDate.getMonth();
   const y = calDate.getFullYear();
+  const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
   document.getElementById('cal-title').textContent = `${d} ${CAL_MONTHS_RU[m]} ${y}`;
 
   const todayStr = calTodayStr();
@@ -794,9 +794,9 @@ function renderCalDay() {
   html += calHolHtml(dateStr, 'lg');
   html += calEvtHtml(dateStr, 'lg');
   if(!filtered.length) {
-    html = `<div style="text-align:center;padding:40px;color:var(--t3)">
-      <div style="font-size:40px;margin-bottom:12px">📅</div>
-      <div>Нет карточек на этот день</div>
+    html += `<div style="text-align:center;padding:${html ? 20 : 40}px;color:var(--t3)">
+      ${html ? '' : '<div style="font-size:40px;margin-bottom:12px">📅</div>'}
+      <div>${html ? 'Карточек на этот день нет' : 'Нет карточек на этот день'}</div>
     </div>`;
   } else {
     // Sort by priority then title
