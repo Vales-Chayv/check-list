@@ -318,6 +318,7 @@ async function calRefreshData() { // лёгкое обновление коло�
   renderCalendar();
 }
 async function saveEvent() {
+  if(document.getElementById('ev-rem-n')?.value) evRemAddCustom(); // число набрано, но «＋» не нажато — добавляем само
   const space_id = document.getElementById('ev-space').value;
   const title = document.getElementById('ev-title').value.trim();
   const event_date = document.getElementById('ev-date').value;
@@ -378,15 +379,14 @@ async function evPopupCheck(force) {
     const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     evs.forEach(ev => {
       if(!calEventOccursOn(ev, ds)) return;
-      const key = ev.id + '|' + ds;
-      if(dis[key]) return;
       const time = ev.event_time ? String(ev.event_time).slice(0,5) : '';
-      const fires = ev.reminders.some(r => {
+      const fired = ev.reminders.filter(r => {
         if(r && Number.isFinite(r.d)) return new Date(d.getFullYear(), d.getMonth(), d.getDate() - r.d) <= now;
         if(r && Number.isFinite(r.m) && time) { const [hh, mm] = time.split(':').map(Number); return new Date(d.getFullYear(), d.getMonth(), d.getDate(), hh, mm - r.m) <= now; }
         return false;
-      });
-      if(fires) rows.push({ ev, ds, i, time, key });
+      }).map(r => Number.isFinite(r.d) ? 'd' + r.d : 'm' + r.m).sort().join(',');
+      const key = ev.id + '|' + ds + '|' + fired; // новое сработавшее напоминание снова показывает окно
+      if(fired && !dis[key]) rows.push({ ev, ds, i, time, key });
     });
   }
   if(!rows.length) return;
