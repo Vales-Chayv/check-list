@@ -1,4 +1,4 @@
-const CACHE = 'mc-v292';
+const CACHE = 'mc-v293';
 const APP_FILES = [
   '/check-list/',
   '/check-list/index.html',
@@ -18,6 +18,7 @@ const APP_FILES = [
   '/check-list/app-calc.js',
   '/check-list/app-chat.js',
   '/check-list/app-calendar.js',
+  '/check-list/app-search.js',
   '/check-list/app-native.js',
 ];
 // Внешние библиотеки (грузятся с CDN): без них приложение не запускается без интернета
