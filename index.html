@@ -27,6 +27,7 @@
   <button onclick="switchMember()" style="background:none;border:none;color:var(--accent);padding:6px 10px;cursor:pointer;font-family:inherit;font-size:13px"><span id="current-member-label">...</span></button>
   <button id="presence-count-btn" onclick="showOnlineList()" style="display:none;background:rgba(232,197,106,.15);border:none;border-left:1px solid rgba(232,197,106,.3);color:var(--accent);padding:6px 10px;cursor:pointer;font-family:inherit;font-size:13px"></button>
 </div>
+    <button onclick="openSearch()" title="Поиск" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:18px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit">🔍</button>
     <button onclick="openMyTasksPopup()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:18px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit">📋</button>
     <button onclick="openArchive()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:18px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit">📦</button>
     <button onclick="openSettings()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:18px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit">⚙️</button>
@@ -428,6 +429,7 @@
       </div>
       <div style="display:flex;gap:8px;flex-shrink:0">
         <button class="lobby-ib" onclick="openCreateSpace()" title="Создать кабинет" style="background:var(--accent);border-color:var(--accent);color:#0f0f0f;font-size:20px;font-weight:700">＋</button>
+        <button class="lobby-ib" onclick="openSearch()" title="Поиск">🔍</button>
         <button id="lobby-cal-btn" class="lobby-ib" onclick="openCalendarFromLobby()" title="Календарь">📅</button>
         <button class="lobby-ib" onclick="openSettings()" title="Настройки">⚙️</button>
       </div>
@@ -808,6 +810,7 @@
 <script src="app-archive.js"></script>
 <script src="app-settings.js"></script>
 <script src="app-calendar.js"></script>
+<script src="app-search.js"></script>
 <script src="app-init.js"></script>
 <script src="app-native.js"></script>
 </body>
