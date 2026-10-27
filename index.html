@@ -756,7 +756,7 @@
       <div class="fld"><label>Название</label><input id="ev-title" placeholder="Название события" dir="auto"></div>
       <div style="display:flex;gap:10px">
         <div class="fld" style="flex:1"><label>Дата</label><input id="ev-date" type="date"></div>
-        <div class="fld" style="flex:1"><label>Время</label><input id="ev-time" type="time"></div>
+        <div class="fld" style="flex:1"><label>Время</label><input id="ev-time" type="time" oninput="evRemRender()"></div>
       </div>
       <div style="display:flex;gap:10px">
         <div class="fld" style="flex:1"><label>Повтор</label><select id="ev-repeat" onchange="evRepeatChanged()">
@@ -767,6 +767,15 @@
           <option value="yearly">Каждый год</option>
         </select></div>
         <div class="fld" style="flex:1" id="ev-until-wrap"><label>Повтор до</label><input id="ev-until" type="date"></div>
+      </div>
+      <div class="fld"><label>Напомнить</label>
+        <div id="ev-rem-chips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
+          <input id="ev-rem-n" type="number" min="1" max="999" placeholder="Своё" style="width:72px">
+          <select id="ev-rem-u" style="flex:0 0 auto"><option value="m">мин</option><option value="h">ч</option><option value="d">дн</option></select>
+          <button type="button" onclick="evRemAddCustom()" style="padding:8px 12px;cursor:pointer">＋</button>
+        </div>
+        <div id="ev-rem-hint" style="font-size:11px;color:var(--t3);margin-top:6px">Минуты и часы — только если указано время события. Без времени напомним в 09:00 (час в настройках).</div>
       </div>
       <div class="fld"><label>Заметка</label><textarea id="ev-note" dir="auto" placeholder="Необязательно"></textarea></div>
       <div style="display:flex;gap:8px">
