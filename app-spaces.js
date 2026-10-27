@@ -171,6 +171,12 @@ spaces = Array.isArray(saved) ? saved : [];
   const openSpaceId = new URLSearchParams(window.location.search).get('openSpace');
   const openCardId = new URLSearchParams(window.location.search).get('openCard');
   const openEntryId = new URLSearchParams(window.location.search).get('openEntry');
+  if(new URLSearchParams(window.location.search).get('showEv')) {
+    history.replaceState({}, '', window.location.pathname);
+    showSpaceSelector();
+    setTimeout(()=>{ if(typeof evPopupCheck === 'function') evPopupCheck(true); }, 500);
+    return;
+  }
   if(new URLSearchParams(window.location.search).get('showDue')) {
     history.replaceState({}, '', window.location.pathname);
     showSpaceSelector();
@@ -204,6 +210,7 @@ function showSpaceSelector() {
   if(typeof desktopCalSync === 'function') desktopCalSync(); // ПК: загрузить календарь, даже если в кабинет ещё не заходили
   if(typeof subscribeGlobalChatWatch === 'function') subscribeGlobalChatWatch();
   if(typeof refreshChatWatchState === 'function') refreshChatWatchState();
+  if(typeof evPopupCheck === 'function') setTimeout(evPopupCheck, 800); // всплывающие напоминания о событиях
 }
 function hideSpaceSelector() {
   lobbyOpenActs.clear(); // при выходе из лобби кнопки под линией снова скрыты

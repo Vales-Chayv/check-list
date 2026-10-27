@@ -180,6 +180,44 @@ function closeCalendar() {
   if(calFromLobby) { calFromLobby = false; showSpaceSelector(); }
 }
 let evEditId = null;
+// ── Напоминания события: [{d:N}] за N дней, [{m:N}] за N минут до времени события ──
+let evRem = []; // ключи: 'd0','d1','m15'…
+const EV_REM_PRESETS = ['d0','d1','d3','d7','m0','m15','m60','m120'];
+function evRemLabel(k) {
+  const t = k[0], n = +k.slice(1);
+  if(t === 'd') return n === 0 ? 'В тот же день' : n === 1 ? 'За 1 день' : n === 7 ? 'За неделю' : 'За ' + n + ' дн.';
+  if(n === 0) return 'В момент события';
+  if(n >= 60 && n % 60 === 0) return 'За ' + (n/60) + ' ' + (n === 60 ? 'час' : (n/60) < 5 ? 'часа' : 'часов');
+  return 'За ' + n + ' мин';
+}
+function evRemRender() {
+  const box = document.getElementById('ev-rem-chips'); if(!box) return;
+  const hasTime = !!document.getElementById('ev-time')?.value;
+  const keys = [...EV_REM_PRESETS, ...evRem.filter(k => !EV_REM_PRESETS.includes(k))];
+  box.innerHTML = keys.map(k => {
+    const on = evRem.includes(k), off = k[0] === 'm' && !hasTime;
+    return `<button type="button" onclick="evRemToggle('${k}')" style="border-radius:14px;padding:5px 12px;font-size:13px;cursor:pointer;font-family:inherit;border:1px solid var(--b1);${on?'background:var(--accent);color:#0f0f0f':'background:transparent;color:var(--t2)'};${off?'opacity:.4':''}">${evRemLabel(k)}</button>`;
+  }).join('');
+}
+function evRemToggle(k) {
+  if(k[0] === 'm' && !document.getElementById('ev-time').value) { toast('Сначала укажи время события', true); return; }
+  evRem = evRem.includes(k) ? evRem.filter(x => x !== k) : [...evRem, k];
+  evRemRender();
+}
+function evRemAddCustom() {
+  const n = parseInt(document.getElementById('ev-rem-n').value, 10), u = document.getElementById('ev-rem-u').value;
+  if(!n || n < 1) { toast('Введи число', true); return; }
+  if(u !== 'd' && !document.getElementById('ev-time').value) { toast('Минуты и часы — только если указано время', true); return; }
+  const k = u === 'd' ? 'd' + Math.min(n, 14) : 'm' + Math.min(u === 'h' ? n * 60 : n, 20160);
+  if(!evRem.includes(k)) evRem.push(k);
+  document.getElementById('ev-rem-n').value = '';
+  evRemRender();
+}
+function evRemToArray() {
+  const hasTime = !!document.getElementById('ev-time').value;
+  const arr = evRem.filter(k => hasTime || k[0] === 'd').map(k => k[0] === 'd' ? { d: +k.slice(1) } : { m: +k.slice(1) });
+  return arr.length ? arr : null;
+}
 function evRepeatChanged() {
   const rep = document.getElementById('ev-repeat').value;
   document.getElementById('ev-until-wrap').style.display = (rep === 'none') ? 'none' : 'flex';
@@ -198,6 +236,7 @@ function openEventModal(dateStr, eventId) {
     document.getElementById('ev-repeat').value = ev.repeat || 'none';
     document.getElementById('ev-until').value = ev.repeat_until || '';
     document.getElementById('ev-note').value = ev.note || '';
+    evRem = (Array.isArray(ev.reminders) ? ev.reminders : []).map(r => r && Number.isFinite(r.d) ? 'd' + r.d : r && Number.isFinite(r.m) ? 'm' + r.m : null).filter(Boolean);
     document.getElementById('ev-delete-btn').style.display = 'block';
   } else {
     if(!dateStr) {
@@ -212,9 +251,11 @@ function openEventModal(dateStr, eventId) {
     document.getElementById('ev-repeat').value = 'none';
     document.getElementById('ev-until').value = '';
     document.getElementById('ev-note').value = '';
+    evRem = [];
     document.getElementById('ev-delete-btn').style.display = 'none';
   }
   evRepeatChanged();
+  evRemRender();
   document.getElementById('event-ov').classList.add('on');
 }
 function closeEventModal() {
@@ -277,7 +318,8 @@ async function saveEvent() {
     event_time: document.getElementById('ev-time').value || null,
     repeat,
     repeat_until: (repeat !== 'none' ? (document.getElementById('ev-until').value || null) : null),
-    note: document.getElementById('ev-note').value.trim() || null
+    note: document.getElementById('ev-note').value.trim() || null,
+    reminders: evRemToArray()
   };
   await local.put('events', obj);
   if(navigator.onLine) {
@@ -295,6 +337,71 @@ async function saveEvent() {
   closeEventModal();
   toast('✓ Сохранено');
 }
+// ── Всплывающее окно напоминаний о событиях (при открытии приложения) ──
+function evPopDismissed() { try { return JSON.parse(localStorage.getItem('mc_ev_dismissed') || '{}'); } catch(e) { return {}; } }
+async function evPopupCheck(force) {
+  if(!currentUser || document.getElementById('ev-pop-ov')) return;
+  if(!force && Date.now() - (window._evPopLast || 0) < 5 * 60000) return;
+  window._evPopLast = Date.now();
+  const ids = spaces.map(s => s.id);
+  if(!ids.length) return;
+  let evs = [];
+  try {
+    const { data, error } = await sb.from('events').select('*').in('space_id', ids).not('reminders','is',null);
+    if(error) throw error;
+    evs = data || [];
+  } catch(e) {
+    try { evs = (await local.getAll('events')).filter(ev => ids.includes(ev.space_id) && Array.isArray(ev.reminders)); } catch(_) { evs = []; }
+  }
+  evs = evs.filter(ev => Array.isArray(ev.reminders) && ev.reminders.length);
+  if(!evs.length) return;
+  const now = new Date(), todayS = calTodayStr();
+  const base = new Date(todayS + 'T00:00:00');
+  const dis = evPopDismissed();
+  const rows = [];
+  for(let i = 0; i <= 15; i++) {
+    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
+    const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    evs.forEach(ev => {
+      if(!calEventOccursOn(ev, ds)) return;
+      const key = ev.id + '|' + ds;
+      if(dis[key]) return;
+      const time = ev.event_time ? String(ev.event_time).slice(0,5) : '';
+      const fires = ev.reminders.some(r => {
+        if(r && Number.isFinite(r.d)) return new Date(d.getFullYear(), d.getMonth(), d.getDate() - r.d) <= now;
+        if(r && Number.isFinite(r.m) && time) { const [hh, mm] = time.split(':').map(Number); return new Date(d.getFullYear(), d.getMonth(), d.getDate(), hh, mm - r.m) <= now; }
+        return false;
+      });
+      if(fires) rows.push({ ev, ds, i, time, key });
+    });
+  }
+  if(!rows.length) return;
+  rows.sort((a,b) => a.ds.localeCompare(b.ds) || a.time.localeCompare(b.time));
+  window._evPopRows = rows;
+  const ov = document.createElement('div');
+  ov.id = 'ev-pop-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2400;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:380px;max-height:80vh;overflow-y:auto;box-sizing:border-box">
+    <div style="font-size:16px;font-weight:700;margin-bottom:2px">🔔 Напоминания</div>
+    <div style="font-size:12px;color:var(--t3);margin-bottom:10px">Сегодня и скоро</div>
+    ${rows.map(r => `<div style="padding:9px 0;border-top:1px solid var(--b1);display:flex;justify-content:space-between;gap:10px;font-size:13px">
+      <span style="word-break:break-word" dir="auto">${esc(r.ev.title || '')}${r.ev.note ? `<span style="display:block;font-size:11px;color:var(--t3)">${esc(r.ev.note)}</span>` : ''}</span>
+      <span style="white-space:nowrap;color:${r.i === 0 ? 'var(--accent)' : 'var(--t3)'}">${r.i === 0 ? 'сегодня' : r.i === 1 ? 'завтра' : 'через ' + r.i + ' дн.'}${r.time ? ' · ' + r.time : ''}</span>
+    </div>`).join('')}
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button onclick="document.getElementById('ev-pop-ov').remove()" style="flex:1;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;cursor:pointer;font-family:inherit">Позже</button>
+      <button onclick="evPopOk()" style="flex:1;background:var(--accent);border:none;color:#0f0f0f;font-weight:700;border-radius:var(--rsm);padding:11px;cursor:pointer;font-family:inherit">Понятно</button>
+    </div></div>`;
+  document.body.appendChild(ov);
+}
+function evPopOk() {
+  const dis = evPopDismissed(), t = Date.now();
+  (window._evPopRows || []).forEach(r => { dis[r.key] = t; });
+  Object.keys(dis).forEach(k => { if(t - dis[k] > 60 * 86400000) delete dis[k]; });
+  try { localStorage.setItem('mc_ev_dismissed', JSON.stringify(dis)); } catch(e) {}
+  document.getElementById('ev-pop-ov')?.remove();
+}
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible' && typeof evPopupCheck === 'function') evPopupCheck(); });
 async function deleteEvent() {
   if(!evEditId) return;
   if(!confirm('Удалить событие?')) return;
