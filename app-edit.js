@@ -52,7 +52,9 @@ document.getElementById('e-body').closest('.fld').style.display = isFamily ? 'fl
     sel.innerHTML = '<option value="">👨‍👩‍👧 Для всех</option>' +
       members.map(m=>`<option value="${esc(m)}"${defaultMember===m?' selected':''}>${esc(m)}</option>`).join('');
   } else {
-    document.getElementById('e-status').value=card?.status||'new';
+    { const _st = document.getElementById('e-status');
+      if(card?.status==='waiting' && ![..._st.options].some(o=>o.value==='waiting')) _st.add(new Option('Ожидание','waiting')); // старые карточки со статусом «Ожидание»
+      _st.value=card?.status||'new'; }
   }
 
   renderBall();
@@ -516,6 +518,10 @@ async function saveCard() {
   const cleanEntries=tempEntries.map(({_saved,...e})=>({...e,text:sanitizeRich(e.text)})).filter(e=>stripTags(e.text).trim());
   let finalStatus=isFamily ? 'new' : newStatus;
   if(cleanEntries.length>0&&cleanEntries.every(e=>e.done)&&!oldCard?.pinned) finalStatus='done';
+  else if(editId && !isFamily && currentSpace?.type!=='group' && finalStatus===oldStatus && (oldStatus==='new' || (oldStatus==='done' && cleanEntries.some(e=>!e.done)))) {
+    finalStatus='in_progress'; // любое изменение карточки → «В процессе»
+    hist.push({date:nowStr(),text:`Статус: ${ST_LABELS[oldStatus]} → ${ST_LABELS.in_progress}`,type:'status'});
+  }
 
   // Family space: wrap body+entries into session
   let sessionEntries = cleanEntries;
@@ -607,7 +613,7 @@ async function toggleEntry(cardId,entryId) {
   if(!card.pinned && (card.entries||[]).length>0&&(card.entries||[]).every(x=>x.done)){
     card.status='done';
     card.history=[...(card.history||[]),{date:nowStr(),text:'Все записи выполнены → Готово',type:'status'}];
-  }
+  } else if(typeof markInProgress==='function') markInProgress(card);
   render(); try{await dbUpdate(card);}catch(e){toast('Ошибка',true);}
   if(typeof maybeOfferReset==='function') maybeOfferReset(cardId, e.done);
 }

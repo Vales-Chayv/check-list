@@ -119,7 +119,6 @@
           <select id="e-status">
             <option value="new">Новая</option>
             <option value="in_progress">В процессе</option>
-            <option value="waiting">Ожидание</option>
             <option value="done">Готово</option>
           </select>
         </div>
@@ -281,7 +280,6 @@
               <select id="ae-status">
                 <option value="new">Новая</option>
                 <option value="in_progress">В процессе</option>
-                <option value="waiting">Ожидание</option>
                 <option value="done">Готово</option>
               </select>
             </div>
@@ -551,28 +549,24 @@
   </div>
   <div id="calc-pad">
     <button onclick="calcInput('C')" class="calc-op">C</button>
-    <button onclick="calcInput('(')" class="calc-op">(</button>
-    <button onclick="calcInput(')')" class="calc-op">)</button>
-    <button onclick="calcInput('⌫')" class="calc-op" aria-label="Стереть">⌫</button>
+    <button onclick="calcInput('±')" class="calc-op">±</button>
+    <button onclick="calcInput('%')" class="calc-op">%</button>
+    <button onclick="calcInput('÷')" class="calc-op">÷</button>
     <button onclick="calcInput('7')">7</button>
     <button onclick="calcInput('8')">8</button>
     <button onclick="calcInput('9')">9</button>
-    <button onclick="calcInput('÷')" class="calc-op">÷</button>
+    <button onclick="calcInput('×')" class="calc-op">×</button>
     <button onclick="calcInput('4')">4</button>
     <button onclick="calcInput('5')">5</button>
     <button onclick="calcInput('6')">6</button>
-    <button onclick="calcInput('×')" class="calc-op">×</button>
+    <button onclick="calcInput('-')" class="calc-op">−</button>
     <button onclick="calcInput('1')">1</button>
     <button onclick="calcInput('2')">2</button>
     <button onclick="calcInput('3')">3</button>
-    <button onclick="calcInput('-')" class="calc-op">−</button>
-    <button onclick="calcInput('0')">0</button>
-    <button onclick="calcInput('.')">.</button>
-    <button onclick="calcInput('%')" class="calc-op">%</button>
     <button onclick="calcInput('+')" class="calc-op">+</button>
-    <button onclick="calcInput('±')" class="calc-op">±</button>
-    <button onclick="calcExportPdf()" class="calc-pdf" aria-label="Сохранить ленту в PDF">PDF</button>
-  <button onclick="calcInput('=')" class="calc-eq" style="grid-column:span 2">=</button>
+    <button onclick="calcInput('0')" style="grid-column:span 2">0</button>
+    <button onclick="calcInput('.')">.</button>
+  <button onclick="calcInput('=')" class="calc-eq">=</button>
   </div>
   </div>
   </div>

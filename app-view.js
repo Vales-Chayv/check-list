@@ -371,6 +371,17 @@ async function toggleEntryStar(cardId, entryId) {
   if(typeof renderPersonalTasks === 'function') renderPersonalTasks();
   toast(e.inTasks ? '⭐ В списке задач' : 'Убрано из списка задач');
 }
+// Любое изменение в карточке: «Новая» → «В процессе»; «Готово» → «В процессе», если появилась невыполненная запись (только личные кабинеты)
+function markInProgress(card) {
+  if(!card) return false;
+  if(currentSpace?.type==='family' || currentSpace?.type==='group') return false;
+  const reopen = card.status==='done' && (card.entries||[]).some(x => x.text && !x.done);
+  if(card.status !== 'new' && !reopen) return false;
+  const old = card.status;
+  card.status = 'in_progress';
+  card.history = [...(card.history||[]), {date:nowStr(), text:`Статус: ${ST_LABELS[old]} → ${ST_LABELS.in_progress}`, type:'status'}];
+  return true;
+}
 async function viewToggleEntry(cardId, entryId) {
   const card=cards.find(c=>c.id===cardId); if(!card)return;
   const e=(card.entries||[]).find(x=>x.id===entryId); if(!e)return;
@@ -386,7 +397,7 @@ async function viewToggleEntry(cardId, entryId) {
   if(!card.pinned && (card.entries||[]).length>0&&(card.entries||[]).every(x=>x.done)){
     card.status='done';
     card.history=[...(card.history||[]),{date:nowStr(),text:'Все записи выполнены → Готово',type:'status'}];
-  }
+  } else markInProgress(card);
     { const _sh = document.querySelector('#view-ov .sheet'); const _st = _sh ? _sh.scrollTop : 0;
       render(); openView(cardId);
       setTimeout(()=>{ const s2 = document.querySelector('#view-ov .sheet'); if(s2) s2.scrollTop = _st; }, 60); }
@@ -633,6 +644,7 @@ completions: completions,
   }
 
   if(card.status === 'new') card.status = 'in_progress';
+  if(card.status === 'done' && sessionEntries.some(e => e.text && !e.done)) markInProgress(card);
   if(!card.pinned && (card.entries||[]).filter(e=>e.text).length && (card.entries||[]).filter(e=>e.text).every(e=>e.done)) card.status='done';
 
    closeAddEntry();
@@ -746,6 +758,7 @@ async function deleteEntry(cardId, entryId) {
   if(!confirm('Удалить запись?')) return;
   const card = cards.find(c=>c.id===cardId); if(!card) return;
   card.entries = (card.entries||[]).filter(e=>e.id!==entryId);
+  markInProgress(card);
   if(!card.entries.length && confirm('Записей в карточке не осталось. Удалить карточку?')) {
     closeView(); deleteCardById(cardId); return;
   }
@@ -796,6 +809,7 @@ async function saveEntryEdit(cardId, entryId) {
   const dl = document.getElementById('edit-entry-dl')?.value;
 if(dl && !entry.deadline && !(currentSpace?.type==='family' || currentSpace?.type==='group')) entry.inTasks = true;
 entry.deadline = dl || null;
+  markInProgress(card);
   document.getElementById('edit-entry-dialog')?.remove();
   render(); openView(cardId);
     try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
@@ -1587,13 +1601,13 @@ async function restoreCard(id) {
   render(); openView(id);
   try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
 }
-// ── Интервальное напоминание на карточке: на сегодня, до 00:00 ──
+// ── Интервальное напоминание на карточке: каждый день с 07:00 до 23:00, пока не выключено ──
 function intervalTodayKey() {
   return new Intl.DateTimeFormat('en-CA', {year:'numeric', month:'2-digit', day:'2-digit'}).format(new Date());
 }
 function intervalRunActive(card) {
   const r = card && card.reminder && card.reminder.intervalRun;
-  return (r && r.everyMin && r.day === intervalTodayKey()) ? r : null;
+  return (r && r.everyMin) ? r : null;
 }
 function openIntervalPicker(id) {
   const card = cards.find(c=>c.id===id); if(!card) return;
@@ -1606,7 +1620,7 @@ function openIntervalPicker(id) {
   const b = m => `<button onclick="startCardInterval('${id}',${m})" style="background:var(--s1);border:1px solid var(--b1);color:var(--t1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;cursor:pointer;font-family:inherit">${m<60?m+' мин':(m/60)+' ч'}</button>`;
   ov.innerHTML = `<div style="background:var(--s2);border:1px solid var(--accent);border-radius:var(--r);padding:18px;max-width:340px;width:100%">
     <div style="font-size:15px;font-weight:700;margin-bottom:4px">⏱ Напоминать каждые…</div>
-    <div style="font-size:12px;color:var(--t3);margin-bottom:12px">Начиная с этого момента и до 00:00 сегодня</div>
+    <div style="font-size:12px;color:var(--t3);margin-bottom:12px">Каждый день с 07:00 до 23:00, пока не выключишь</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${b(15)}${b(30)}${b(60)}${b(120)}</div>
     <div style="display:flex;gap:8px;align-items:center">
       <input id="interval-pick-custom" type="number" min="5" max="720" placeholder="Своё (мин, от 5)" style="flex:1;font-size:13px">
@@ -1623,7 +1637,7 @@ async function startCardInterval(id, mins) {
   if(window.mcAlarmsStart) { try { const _tk = await window.mcAlarmsStart(card, _run); if(_tk) _run.localToken = _tk; } catch(e) {} }
   card.reminder = { ...(card.reminder||{}), intervalRun: _run };
   render(); openView(id);
-  toast('⏱ Напоминания каждые ' + mins + ' мин — до 00:00');
+  toast('⏱ Напоминания каждые ' + mins + ' мин — ежедневно с 07:00 до 23:00');
   try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
 }
 async function stopCardInterval(id) {
