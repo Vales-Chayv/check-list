@@ -172,14 +172,16 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
       const hasAtts = (e.sessionAtts&&e.sessionAtts.length) || (e.attachments&&e.attachments.length);
       const swipeButtonsHTML = isGroupSpace
         ? `<button onclick="copyEntryToPersonal('${id}','${e.id}')" style="background:rgba(91,158,232,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer" title="Копировать в личный">📋</button>${hasAtts?`<button onclick="downloadEntryAttachments('${id}','${e.id}')" style="background:rgba(91,184,122,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer" title="Скачать">⬇️</button>`:''}`
-        : `<button onclick="deleteEntry('${id}','${e.id}')" style="background:rgba(232,96,96,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">🗑️</button>
+        : `<button onclick="toggleEntryFlag('${id}','${e.id}')" title="${e.flag?'Снять отметку':'Отметить'}" style="background:rgba(232,197,106,${e.flag?'1':'.85'});border:${e.flag?'2px solid #fff':'none'};border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">🚩</button>
+          <button onclick="deleteEntry('${id}','${e.id}')" style="background:rgba(232,96,96,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">🗑️</button>
           <button onclick="editEntry('${id}','${e.id}')" style="background:rgba(91,158,232,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">📝</button>
           <button onclick="moveEntry('${id}','${e.id}')" style="background:rgba(91,184,122,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">📤</button>`;
       return `<div class="swipe-entry-wrap" style="position:relative;overflow:hidden;border-bottom:1px solid ${borderCol}22">
         <div class="swipe-actions" style="position:absolute;left:0;top:0;bottom:0;display:flex;align-items:center;gap:4px;padding:0 8px;opacity:0;transition:opacity .2s">
           ${swipeButtonsHTML}
         </div>
-        <div class="swipe-content" data-cardid="${id}" data-entryid="${e.id}" style="position:relative;display:flex;align-items:flex-start;gap:8px;padding:5px 0;background:transparent;will-change:transform;transition:transform .2s">
+        <div class="swipe-content" data-cardid="${id}" data-entryid="${e.id}" ${isGroupSpace ? '' : 'data-open="180"'} style="position:relative;display:flex;align-items:flex-start;gap:8px;padding:5px 0;background:transparent;will-change:transform;transition:transform .2s;${(!isGroupSpace && e.flag) ? 'border-left:3px solid #e8c56a;padding-left:6px;' : ''}">
+          ${(!isGroupSpace && e.flag) ? '<span title="Отмечено" style="font-size:13px;flex-shrink:0;margin-top:1px">🚩</span>' : ''}
           ${checkboxHTML}
           <div style="flex:1">
             <div style="font-size:13px;color:${col};${e.done?'text-decoration:line-through;opacity:.5':''};word-break:break-word;overflow-wrap:break-word" dir="auto">${sanitizeRich(e.text)}</div>
@@ -676,41 +678,14 @@ function setupEntrySwipe() {
     const wrap = el.closest('.swipe-entry-wrap');
     const actions = wrap?.querySelector('.swipe-actions');
     const THRESHOLD = 60;
+    const OPEN = parseInt(el.dataset.open || '120', 10);
 
     function reset() {
       el.style.transform = 'translateX(0)';
       if(actions) actions.style.opacity = '0';
       swiped = false;
     }
-el.addEventListener('mousedown', e => {
-  startX = e.clientX;
-  startY = e.clientY;
-  swiped = false;
-  const onMove = e => {
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
-    if(Math.abs(dy) > Math.abs(dx)) return;
-    if(dx > 0) {
-      el.style.transform = `translateX(${Math.min(dx, 120)}px)`;
-      if(actions) actions.style.opacity = Math.min(dx/THRESHOLD, 1).toString();
-    }
-  };
-  const onUp = e => {
-    const dx = e.clientX - startX;
-    if(dx >= THRESHOLD) {
-      el.style.transform = 'translateX(120px)';
-      if(actions) actions.style.opacity = '1';
-      swiped = true;
-      document.querySelectorAll('.swipe-content').forEach(other => {
-        if(other !== el) { other.style.transform='translateX(0)'; other.closest('.swipe-entry-wrap')?.querySelector('.swipe-actions')?.style.setProperty('opacity','0'); }
-      });
-    } else { reset(); }
-    document.removeEventListener('mousemove', onMove);
-    document.removeEventListener('mouseup', onUp);
-  };
-  document.addEventListener('mousemove', onMove);
-  document.addEventListener('mouseup', onUp);
-});
+    // на ПК слайд мышью отключён: все действия — через меню «⋮»
     el.addEventListener('touchstart', e => {
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
@@ -722,7 +697,7 @@ el.addEventListener('mousedown', e => {
       const dy = e.touches[0].clientY - startY;
       if(Math.abs(dy) > Math.abs(dx)) return;
       if(dx > 0) {
-        el.style.transform = `translateX(${Math.min(dx, 120)}px)`;
+        el.style.transform = `translateX(${Math.min(dx, OPEN)}px)`;
         if(actions) actions.style.opacity = Math.min(dx/THRESHOLD, 1).toString();
         e.preventDefault();
       }
@@ -731,7 +706,7 @@ el.addEventListener('mousedown', e => {
     el.addEventListener('touchend', e => {
       const dx = e.changedTouches[0].clientX - startX;
       if(dx >= THRESHOLD) {
-        el.style.transform = 'translateX(120px)';
+        el.style.transform = `translateX(${OPEN}px)`;
         if(actions) actions.style.opacity = '1';
         swiped = true;
         document.querySelectorAll('.swipe-content').forEach(other => {
@@ -753,6 +728,18 @@ el.addEventListener('mousedown', e => {
   if('ontouchstart' in window) {
     document.querySelectorAll('.entry-menu-btn').forEach(b=>b.style.display='none');
   }
+}
+
+async function toggleEntryFlag(cardId, entryId) {
+  const card = cards.find(c => c.id === cardId); if(!card) return;
+  if(currentSpace?.type === 'family' || currentSpace?.type === 'group') return; // отметка — только в личных кабинетах
+  const e = (card.entries || []).find(x => x.id === entryId); if(!e) return;
+  if(e.flag) delete e.flag; else e.flag = true;
+  const sh = document.querySelector('#view-ov .sheet'); const st = sh ? sh.scrollTop : 0;
+  openView(cardId);
+  setTimeout(() => { const s2 = document.querySelector('#view-ov .sheet'); if(s2) s2.scrollTop = st; }, 60);
+  toast(e.flag ? '🚩 Запись отмечена' : 'Отметка снята');
+  try { await dbUpdate(card); } catch(err) { toast('Ошибка синхронизации', true); }
 }
 
 async function deleteEntry(cardId, entryId) {
@@ -1398,7 +1385,7 @@ async function mecSend(cardId) {
   const me = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
   window._cloneFailed = 0;
   toast('⏳ Отправляю…');
-  const {entries: movedEntries} = await collectMoveEntries(fromCard);
+  const {entries: movedEntries} = await collectMoveEntries(fromCard, sp.id);
   if(!movedEntries.length) { toast('Нечего отправлять', true); return; }
   let chatCard = null;
   try {
@@ -1441,7 +1428,9 @@ async function mecSend(cardId) {
   } catch(e) {}
 }
 
-async function collectMoveEntries(fromCard) {
+async function collectMoveEntries(fromCard, targetSpaceId) {
+  const _tSp = spaces.find(x => x.id === targetSpaceId);
+  const _toChat = !!_tSp && (_tSp.type === 'family' || _tSp.type === 'group');
   const picked = [];
   const movedGroups = [];
   const groupIdMap = {}; // старый groupId (в источнике) -> новый groupId (в цели)
@@ -1470,6 +1459,7 @@ async function collectMoveEntries(fromCard) {
         sessionAtts: isFirst ? (e.sessionAtts||e.attachments||[]) : []
       };
       isFirst = false;
+      if(_toChat) delete copy.flag; // в чате отметок нет
       if((copy.attachments||[]).length) copy.attachments = await cloneAttList(copy.attachments);
       if((copy.sessionAtts||[]).length) copy.sessionAtts = await cloneAttList(copy.sessionAtts);
       if(moveAssignedTo !== null) { copy.assigned_to = moveAssignedTo; copy.completions = moveAssignedCompletions; copy.done = false; }
@@ -1492,7 +1482,7 @@ function stripMovedFromSource(fromCard) {
 async function confirmMove(fromCardId) {
   const fromCard = cards.find(c=>c.id===fromCardId); if(!fromCard || !moveTargetCard) return;
   if(moveAssignGuard(moveTargetCard.spaceId, () => confirmMove(fromCardId))) return;
-  const {entries: movedEntries, groups: movedGroups} = await collectMoveEntries(fromCard);
+  const {entries: movedEntries, groups: movedGroups} = await collectMoveEntries(fromCard, moveTargetCard.spaceId);
   if(!movedEntries.length) { toast('Нечего переносить', true); return; }
   stripMovedFromSource(fromCard);
   document.getElementById('move-entry-dialog')?.remove();
@@ -1557,7 +1547,7 @@ async function createCardAndMove(fromCardId, spaceId, catName) {
   if(moveAssignGuard(spaceId, () => createCardAndMove(fromCardId, spaceId, catName))) return;
   const title = prompt('Название новой карточки:');
   if(!title) return;
-  const {entries: movedEntries, groups: movedGroups} = await collectMoveEntries(fromCard);
+  const {entries: movedEntries, groups: movedGroups} = await collectMoveEntries(fromCard, spaceId);
   if(!movedEntries.length) { toast('Нечего переносить', true); return; }
   const targetSpace = spaces.find(s=>s.id===spaceId);
   const isChat = targetSpace?.type==='family' || targetSpace?.type==='group';
@@ -1698,6 +1688,7 @@ function toggleEntryMenu(btn, cardId, entryId) {
     <button onclick="copyEntryToPersonal('${cardId}','${entryId}');this.closest('.entry-menu-popup').remove()" style="background:rgba(91,158,232,.85);border:none;border-radius:8px;width:40px;height:40px;font-size:20px;cursor:pointer" title="Копировать в личный">📋</button>
     <button onclick="downloadEntryAttachments('${cardId}','${entryId}');this.closest('.entry-menu-popup').remove()" style="background:rgba(91,184,122,.85);border:none;border-radius:8px;width:40px;height:40px;font-size:20px;cursor:pointer" title="Скачать">⬇️</button>
     ` : `
+    <button onclick="toggleEntryFlag('${cardId}','${entryId}');this.closest('.entry-menu-popup').remove()" title="Отметить / снять отметку" style="background:rgba(232,197,106,.9);border:none;border-radius:8px;width:40px;height:40px;font-size:20px;cursor:pointer">🚩</button>
     <button onclick="deleteEntry('${cardId}','${entryId}');this.closest('.entry-menu-popup').remove()" style="background:rgba(232,96,96,.85);border:none;border-radius:8px;width:40px;height:40px;font-size:20px;cursor:pointer">🗑️</button>
     <button onclick="editEntry('${cardId}','${entryId}');this.closest('.entry-menu-popup').remove()" style="background:rgba(91,158,232,.85);border:none;border-radius:8px;width:40px;height:40px;font-size:20px;cursor:pointer">📝</button>
     <button onclick="moveEntry('${cardId}','${entryId}');this.closest('.entry-menu-popup').remove()" style="background:rgba(91,184,122,.85);border:none;border-radius:8px;width:40px;height:40px;font-size:20px;cursor:pointer">📤</button>

@@ -1,7 +1,7 @@
 // ═══ Поиск по карточкам, записям, чатам, файлам и событиям ═══
 // Открывается лупой 🔍 (лобби и шапка кабинета). Серверная часть — SQL-функция search_cards.
 const SRCH_PREF_KEY = 'mc_search_prefs';
-let _srch = { scope: 'all', types: { cards: 1, entries: 1, chats: 1, files: 1, events: 1, done: 1 }, timer: null, seq: 0 };
+let _srch = { flagOnly: false, scope: 'all', types: { cards: 1, entries: 1, chats: 1, files: 1, events: 1, done: 1 }, timer: null, seq: 0 };
 
 function srchLoadPrefs() {
   try { const p = JSON.parse(localStorage.getItem(SRCH_PREF_KEY) || 'null'); if(p && p.types) _srch.types = { ..._srch.types, ...p.types }; } catch(e) {}
@@ -21,6 +21,7 @@ function openSearch() {
   document.getElementById('srch-ov')?.remove();
   srchLoadPrefs();
   _srch.scope = srchInCabinet() ? 'cab' : 'all';
+  _srch.flagOnly = false;
   if(!document.getElementById('srch-style')) {
     const st = document.createElement('style');
     st.id = 'srch-style';
@@ -60,13 +61,15 @@ function srchSetScope(k) { _srch.scope = k; srchRenderChips(); srchRun(); }
 function srchRenderFilter() {
   const box = document.getElementById('srch-filter'); if(!box) return;
   const items = [['cards', 'Карточки'], ['entries', 'Записи'], ['chats', 'Чаты'], ['files', 'Файлы'], ['events', 'События'], ['done', 'Завершённые']];
-  box.innerHTML = items.map(([k, l]) => `<button onclick="srchToggleType('${k}')" style="border-radius:14px;padding:4px 11px;font-size:12px;cursor:pointer;font-family:inherit;border:1px solid var(--b1);${_srch.types[k] ? 'background:rgba(232,197,106,.2);color:var(--accent)' : 'background:transparent;color:var(--t3);text-decoration:line-through'}">${l}</button>`).join('');
+  const flagBtn = `<button onclick="srchToggleFlag()" style="border-radius:14px;padding:4px 11px;font-size:12px;cursor:pointer;font-family:inherit;border:1px solid ${_srch.flagOnly ? 'var(--accent)' : 'var(--b1)'};${_srch.flagOnly ? 'background:var(--accent);color:#0f0f0f;font-weight:700' : 'background:transparent;color:var(--t2)'}">🚩 Только отмеченные</button>`;
+  box.innerHTML = flagBtn + items.map(([k, l]) => `<button onclick="srchToggleType('${k}')" style="border-radius:14px;padding:4px 11px;font-size:12px;cursor:pointer;font-family:inherit;border:1px solid var(--b1);${_srch.types[k] ? 'background:rgba(232,197,106,.2);color:var(--accent)' : 'background:transparent;color:var(--t3);text-decoration:line-through'}">${l}</button>`).join('');
 }
 function srchToggleFilter() {
   const f = document.getElementById('srch-filter'); const open = f.style.display === 'none';
   f.style.display = open ? 'flex' : 'none';
   document.getElementById('srch-farrow').textContent = open ? '▴' : '▾';
 }
+function srchToggleFlag() { _srch.flagOnly = !_srch.flagOnly; srchRenderFilter(); srchRun(); }
 function srchToggleType(k) { _srch.types[k] = _srch.types[k] ? 0 : 1; srchSavePrefs(); srchRenderFilter(); srchRun(); }
 function srchDebounce() { clearTimeout(_srch.timer); _srch.timer = setTimeout(srchRun, 350); }
 
@@ -81,6 +84,15 @@ function srchSnip(text, q) {
 function srchCardHits(c, q) {
   const T = _srch.types, ql = q.toLowerCase(), has = t => String(t || '').toLowerCase().includes(ql);
   const isChat = Array.isArray(c.chatParticipants), hits = [];
+  if(_srch.flagOnly) { // только отмеченные записи (в личных кабинетах)
+    (c.entries || []).forEach(e => {
+      if(!e || !e.flag) return;
+      const txt = srchPlain(e.text);
+      if(q && !has(txt)) return;
+      hits.push({ label: '🚩 запись', text: txt || '(без текста)', entryId: e.id });
+    });
+    return { hits, titleHit: false };
+  }
   let titleHit = false;
   if(T.cards) {
     if(has(c.title)) { titleHit = true; hits.push({ label: 'название', text: c.title }); }
@@ -105,30 +117,32 @@ async function srchRun() {
   const q = (document.getElementById('srch-q')?.value || '').trim();
   const res = document.getElementById('srch-res'), info = document.getElementById('srch-info');
   if(!res) return;
-  if(q.length < 2) { info.textContent = ''; res.innerHTML = '<div style="text-align:center;padding:40px 10px;color:var(--t3);font-size:13px">Введи минимум 2 буквы</div>'; return; }
+  if(q.length < 2 && !_srch.flagOnly) { info.textContent = ''; res.innerHTML = '<div style="text-align:center;padding:40px 10px;color:var(--t3);font-size:13px">Введи минимум 2 буквы</div>'; return; }
   const my = ++_srch.seq;
   info.textContent = 'Ищу…';
   const ids = srchScopeIds();
   const like = q.replace(/[\\%_]/g, m => '\\' + m);
+  const useFlagRpc = _srch.flagOnly && q.length < 2;
   let cardsRaw = [], evsRaw = [];
   try {
     if(!navigator.onLine) throw new Error('offline');
     const [r1, r2] = await Promise.all([
-      sb.rpc('search_cards', { q: like, space_ids: ids, lim: 60 }),
-      _srch.types.events ? sb.from('events').select('*').in('space_id', ids).or(`title.ilike."%${like.replace(/"/g, '')}%",note.ilike."%${like.replace(/"/g, '')}%"`).limit(30) : Promise.resolve({ data: [] })
+      useFlagRpc ? sb.rpc('search_flagged', { space_ids: ids, lim: 100 }) : sb.rpc('search_cards', { q: like, space_ids: ids, lim: 60 }),
+      (_srch.types.events && !_srch.flagOnly) ? sb.from('events').select('*').in('space_id', ids).or(`title.ilike."%${like.replace(/"/g, '')}%",note.ilike."%${like.replace(/"/g, '')}%"`).limit(30) : Promise.resolve({ data: [] })
     ]);
     if(r1.error) throw r1.error;
     cardsRaw = r1.data || []; evsRaw = (r2 && r2.data) || [];
   } catch(e) {
     try { // офлайн или функции ещё нет — ищем в том, что сохранено на устройстве
       cardsRaw = (await local.getAll('cards')).filter(c => ids.includes(c.space_id));
-      evsRaw = _srch.types.events ? (await local.getAll('events')).filter(ev => ids.includes(ev.space_id) && (String(ev.title || '').toLowerCase().includes(q.toLowerCase()) || String(ev.note || '').toLowerCase().includes(q.toLowerCase()))) : [];
+      evsRaw = (_srch.types.events && !_srch.flagOnly) ? (await local.getAll('events')).filter(ev => ids.includes(ev.space_id) && (String(ev.title || '').toLowerCase().includes(q.toLowerCase()) || String(ev.note || '').toLowerCase().includes(q.toLowerCase()))) : [];
     } catch(_) {}
   }
   if(my !== _srch.seq) return; // пришёл более новый запрос
   const rows = [];
   cardsRaw.forEach(c => {
     if(c.status === 'done' && !_srch.types.done) return;
+    if(_srch.flagOnly && Array.isArray(c.chatParticipants)) return;
     const { hits, titleHit } = srchCardHits(c, q);
     if(hits.length) rows.push({ c, hits, titleHit });
   });
@@ -141,7 +155,7 @@ async function srchRun() {
   const cardHtml = rows.map((r, i) => `<div onclick="srchOpenRow(${i})" style="padding:10px 4px;border-top:1px solid var(--b1);cursor:pointer;${r.c.status === 'done' ? 'opacity:.6' : ''}">
       <div style="font-size:14px;font-weight:600;word-break:break-word" dir="auto">${esc(r.c.title || '')}</div>
       <div style="font-size:11px;color:var(--t3);margin:1px 0 3px">${esc(spName(r.c.space_id))}${r.c.category ? ' · ' + esc(r.c.category) : ''}${r.c.status === 'done' ? ' · завершена' : ''}</div>
-      ${r.hits.slice(0, 3).map(h => `<div style="font-size:13px;color:var(--t2);word-break:break-word" dir="auto"><span style="font-size:10px;color:var(--t3)">${esc(h.label)}</span> ${srchSnip(h.text, q)}</div>`).join('')}
+      ${r.hits.slice(0, 3).map(h => `<div style="font-size:13px;color:var(--t2);word-break:break-word" dir="auto"><span style="font-size:10px;color:var(--t3)">${esc(h.label)}</span> ${q ? srchSnip(h.text, q) : esc(h.text.slice(0, 120))}</div>`).join('')}
       ${r.hits.length > 3 ? `<div style="font-size:11px;color:var(--t3)">…и ещё ${r.hits.length - 3}</div>` : ''}
     </div>`).join('');
   const evHtml = evsRaw.length ? `<div style="font-size:12px;color:var(--accent);font-weight:700;margin:12px 0 2px">События</div>` + evsRaw.map((ev, i) => `<div onclick="srchOpenEvent(${i})" style="padding:10px 4px;border-top:1px solid var(--b1);cursor:pointer">
