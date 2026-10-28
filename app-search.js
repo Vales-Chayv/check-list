@@ -81,9 +81,15 @@ function srchSnip(text, q) {
   const s = Math.max(0, i - 30), e = Math.min(text.length, i + q.length + 60);
   return (s > 0 ? '…' : '') + esc(text.slice(s, i)) + '<mark>' + esc(text.slice(i, i + q.length)) + '</mark>' + esc(text.slice(i + q.length, e)) + (e < text.length ? '…' : '');
 }
+// чат определяем по типу кабинета: у личных карточек chatParticipants может быть пустым массивом
+function srchIsChat(c) {
+  const sp = spaces.find(x => x.id === c.space_id);
+  if(sp) return sp.type === 'family' || sp.type === 'group';
+  return Array.isArray(c.chatParticipants) && c.chatParticipants.length > 0;
+}
 function srchCardHits(c, q) {
   const T = _srch.types, ql = q.toLowerCase(), has = t => String(t || '').toLowerCase().includes(ql);
-  const isChat = Array.isArray(c.chatParticipants), hits = [];
+  const hits = [], isChat = srchIsChat(c);
   if(_srch.flagOnly) { // только отмеченные записи (в личных кабинетах)
     (c.entries || []).forEach(e => {
       if(!e || !e.flag) return;
@@ -138,6 +144,7 @@ async function srchRun() {
       evsRaw = (_srch.types.events && !_srch.flagOnly) ? (await local.getAll('events')).filter(ev => ids.includes(ev.space_id) && (String(ev.title || '').toLowerCase().includes(q.toLowerCase()) || String(ev.note || '').toLowerCase().includes(q.toLowerCase()))) : [];
     } catch(_) {}
   }
+  const _srvCount = cardsRaw.length;
   if(_srch.flagOnly) { // добавляем то, что отмечено на этом устройстве, даже если ещё не дошло до сервера
     try {
       const have = new Set(cardsRaw.map(c => c.id));
@@ -148,7 +155,7 @@ async function srchRun() {
   const rows = [];
   cardsRaw.forEach(c => {
     if(c.status === 'done' && !_srch.types.done) return;
-    if(_srch.flagOnly && Array.isArray(c.chatParticipants)) return;
+    if(_srch.flagOnly && srchIsChat(c)) return;
     const { hits, titleHit } = srchCardHits(c, q);
     if(hits.length) rows.push({ c, hits, titleHit });
   });
@@ -156,7 +163,7 @@ async function srchRun() {
   const spName = id => { const s = spaces.find(x => x.id === id); return s ? (s.type === 'personal' ? 'Личное' : s.name) : ''; };
   const total = rows.length + evsRaw.length;
   info.textContent = total ? 'Найдено: ' + total : '';
-  if(!total) { res.innerHTML = '<div style="text-align:center;padding:40px 10px;color:var(--t3);font-size:13px">Ничего не найдено</div>'; return; }
+  if(!total) { res.innerHTML = '<div style="text-align:center;padding:40px 10px;color:var(--t3);font-size:13px">Ничего не найдено' + (_srch.flagOnly ? `<br><span style="font-size:11px">карточек для проверки: ${cardsRaw.length} (с сервера ${_srvCount}), кабинетов: ${ids.length}</span>` : '') + '</div>'; return; }
   window._srchRows = rows; window._srchEvs = evsRaw;
   const cardHtml = rows.map((r, i) => `<div onclick="srchOpenRow(${i})" style="padding:10px 4px;border-top:1px solid var(--b1);cursor:pointer;${r.c.status === 'done' ? 'opacity:.6' : ''}">
       <div style="font-size:14px;font-weight:600;word-break:break-word" dir="auto">${esc(r.c.title || '')}</div>
