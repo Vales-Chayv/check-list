@@ -358,6 +358,10 @@ async function dbAddCat(cat) {
   await local.put('categories', catWithSpace);
   if (navigator.onLine) {
     const {error}=await sb.from('categories').insert(catWithSpace);
+    if(error) {
+      console.log('dbAddCat error:', error.code, error.message, catWithSpace);
+      toast('Рубрика «' + cat.name + '» не сохранилась на сервере: ' + (error.message || error.code), true);
+    }
     if(error && error.code!=='23505') await queueOp({type:'insert_cat',data:catWithSpace});
   } else { await queueOp({type:'insert_cat',data:catWithSpace}); }
 }
