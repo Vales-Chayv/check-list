@@ -229,7 +229,12 @@ body.sheet-scrolling .sticky-act{opacity:0;pointer-events:none}
 #calc-pad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 0 4px 4px }
 #calc-pad button { background: #262626; border: 1px solid #3a3a3a; border-radius: 10px; padding: 18px 0; color: #fff; font-size: 18px; font-weight: 600; cursor: pointer; font-family: inherit; }
 #calc-pad button.calc-op { background: #1c1c1c; color: var(--accent); }
-#calc-pad button.calc-eq { background: var(--accent); color: #0f0f0f; font-weight: 700; grid-column: span 4; }
+#calc-pad button.calc-eq { background: var(--accent); color: #0f0f0f; font-weight: 700; grid-column: span 2; }
+#calc-pad button.calc-pdf { background: transparent; border: 1px dashed #5b9ee8; color: #5b9ee8; font-size: 14px; letter-spacing: .04em; }
+#calc-current.calc-sm { font-size: 22px !important; }
+#calc-current.calc-xs { font-size: 16px !important; }
+#calc-current { min-height: 1.3em; max-height: 4.6em; overflow-y: auto; }
+#calc-history div span { min-width: 0; word-break: break-all; }
 #split-handle { display: none; } /* ручка-разделитель, видна только на ПК */
 #desktop-cal-toolbar { display: none; } /* панель с кнопкой календаря — видна только на ПК */
 #lobby-panels { display: none; }

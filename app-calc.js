@@ -7,8 +7,7 @@ function openCalcMobile(){ document.getElementById('calc-ov').classList.add('on'
 function calcHasHistory(){ return (document.getElementById('calc-history')?.children.length || 0) > 0; }
 function calcClearAll(){
   document.getElementById('calc-history').innerHTML = '';
-  document.getElementById('calc-current').textContent = '0';
-  calcAcc = null; calcOp = null; calcFresh = true;
+  calcExpr = '0'; calcFresh = true; calcShow();
 }
 
 function closeCalcMobile(){
@@ -96,12 +95,104 @@ async function calcSaveTapeAsCard(){
   }
 }
 
-// ── PDF: лента в печатный вид (в окне печати выбрать «Сохранить как PDF») ──
-function calcExportPdf(){
+// ── PDF: на телефоне — файл (поделиться/скачать), на ПК — окно печати ──
+function calcPdfDate(){
+  const d = new Date();
+  return String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + d.getFullYear();
+}
+function calcPdfPages(rows, dd){
+  // рисуем страницы A4 на canvas (кириллица без шрифтов), затем кладём картинки в PDF
+  const W = 1240, H = 1754, M = 90, LH = 54;
+  const pages = [];
+  let cv, cx, y;
+  const newPage = first => {
+    cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    cx = cv.getContext('2d');
+    cx.fillStyle = '#fff'; cx.fillRect(0,0,W,H);
+    cx.fillStyle = '#222'; cx.textBaseline = 'alphabetic';
+    y = M + 30;
+    if(first){
+      cx.font = 'bold 44px Arial, sans-serif'; cx.textAlign = 'left';
+      cx.fillText('Расчёт · ' + dd, M, y); y += 36;
+      cx.strokeStyle = '#bbb'; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(M,y); cx.lineTo(W-M,y); cx.stroke(); y += LH;
+    }
+    pages.push(cv);
+  };
+  newPage(true);
+  rows.forEach(r => {
+    if(y > H - M - 80) newPage(false);
+    cx.font = '32px Arial, sans-serif';
+    cx.textAlign = 'right'; cx.font = 'bold 34px Arial, sans-serif';
+    const rw = cx.measureText(r.res).width;
+    cx.fillText(r.res, W-M, y);
+    cx.textAlign = 'left'; cx.font = '32px Arial, sans-serif';
+    let txt = r.expr;
+    const maxW = W - 2*M - rw - 30;
+    while(cx.measureText(txt).width > maxW && txt.length > 4) txt = txt.slice(0,-2);
+    if(txt !== r.expr) txt += '…';
+    cx.fillText(txt, M, y);
+    cx.strokeStyle = '#e2e2e2'; cx.lineWidth = 1; cx.beginPath(); cx.moveTo(M,y+16); cx.lineTo(W-M,y+16); cx.stroke();
+    y += LH;
+  });
+  const last = pages[pages.length-1].getContext('2d');
+  last.fillStyle = '#888'; last.font = '24px Arial, sans-serif'; last.textAlign = 'left';
+  last.fillText('Мои карточки · калькулятор', M, H - M + 20);
+  return pages.map(c => {
+    const b64 = c.toDataURL('image/jpeg', 0.92).split(',')[1];
+    const bin = atob(b64), u8 = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) u8[i] = bin.charCodeAt(i);
+    return {w: c.width, h: c.height, jpg: u8};
+  });
+}
+function calcBuildPdf(pgs){
+  const enc = new TextEncoder();
+  const chunks = []; let len = 0; const offs = [];
+  const put = d => { const u = typeof d === 'string' ? enc.encode(d) : d; chunks.push(u); len += u.length; };
+  const n = pgs.length;
+  put('%PDF-1.4\n');
+  const objStart = id => { offs[id] = len; put(id + ' 0 obj\n'); };
+  objStart(1); put('<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+  objStart(2); put('<< /Type /Pages /Count ' + n + ' /Kids [' + pgs.map((_,i) => (3+i*3) + ' 0 R').join(' ') + '] >>\nendobj\n');
+  pgs.forEach((p,i) => {
+    const pg = 3+i*3, ct = pg+1, im = pg+2;
+    objStart(pg); put('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im0 ' + im + ' 0 R >> >> /Contents ' + ct + ' 0 R >>\nendobj\n');
+    const cs = 'q 595 0 0 842 0 0 cm /Im0 Do Q';
+    objStart(ct); put('<< /Length ' + cs.length + ' >>\nstream\n' + cs + '\nendstream\nendobj\n');
+    objStart(im); put('<< /Type /XObject /Subtype /Image /Width ' + p.w + ' /Height ' + p.h + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + p.jpg.length + ' >>\nstream\n');
+    put(p.jpg); put('\nendstream\nendobj\n');
+  });
+  const total = 3 + n*3;
+  const xref = len;
+  put('xref\n0 ' + total + '\n0000000000 65535 f \n');
+  for(let id=1; id<total; id++) put(String(offs[id]).padStart(10,'0') + ' 00000 n \n');
+  put('trailer\n<< /Size ' + total + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF');
+  return new Blob(chunks, {type: 'application/pdf'});
+}
+async function calcExportPdf(){
   const rows = calcTapeRows();
   if(!rows.length){ toast('Лента пуста — нечего сохранять'); return; }
-  const d = new Date();
-  const dd = String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + d.getFullYear();
+  const dd = calcPdfDate();
+  const desktop = window.matchMedia && window.matchMedia('(pointer:fine)').matches && window.innerWidth >= 900;
+  if(desktop){ calcPrintTape(rows, dd); return; }
+  try {
+    const blob = calcBuildPdf(calcPdfPages(rows, dd));
+    const name = 'Расчёт ' + dd + '.pdf';
+    const file = new File([blob], name, {type: 'application/pdf'});
+    if(navigator.canShare && navigator.canShare({files: [file]})){
+      try { await navigator.share({files: [file], title: name}); return; }
+      catch(err){ if(err && err.name === 'AbortError') return; }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    toast('📄 PDF сохранён: ' + name);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch(err){
+    console.log('calcExportPdf error:', err);
+    toast('Не удалось создать PDF', true);
+  }
+}
+function calcPrintTape(rows, dd){
   const e = t => String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>Расчёт ${dd}</title>
 <style>body{font-family:Arial,sans-serif;color:#222;margin:28px}h1{font-size:20px;margin:0 0 8px;font-weight:600}
@@ -134,6 +225,7 @@ document.addEventListener('keydown', ev => {
   else if(k === '*' || k === 'x' || k === 'X' || k === '×') v = '×';
   else if(k === '/' || k === '÷') v = '÷';
   else if(k === '%') v = '%';
+  else if(k === '(' || k === ')') v = k;
   else if(k === 'Enter' || k === '=') v = '=';
   else if(k === 'Backspace') v = '⌫';
   else if(k === 'Delete' || k === 'c' || k === 'C') v = 'C';
@@ -150,46 +242,143 @@ function toggleCalcDesign(){
   arrow.textContent = open ? '▴' : '▾';
 }
 
-// ── Арифметика ──
-let calcAcc = null, calcOp = null, calcFresh = true;
+// ── Арифметика: выражение целиком, со скобками и приоритетом действий ──
+let calcExpr = '0', calcFresh = true;
 function calcFmt(n){ return Math.round(n*10000)/10000 + ''; }
-function calcInput(v){
+function calcPretty(e){ return e.replace(/-/g,'−'); }
+function calcShow(){
   const disp = document.getElementById('calc-current');
-  let cur = disp.textContent;
-  if(v==='C'){ calcAcc=null; calcOp=null; calcFresh=true; disp.textContent='0'; return; }
+  if(!disp) return;
+  disp.textContent = calcPretty(calcExpr);
+  const n = calcExpr.length;
+  disp.classList.toggle('calc-sm', n > 12 && n <= 24);
+  disp.classList.toggle('calc-xs', n > 24);
+}
+// безопасный разбор без eval; % после числа = /100, а в «100+10%» — 10% от 100
+function calcEval(src){
+  const t = src.replace(/\s+/g,'');
+  let p = 0;
+  const peek = () => t[p];
+  function expr(){
+    let left = term();
+    while(peek()==='+' || peek()==='-'){
+      const op = t[p++];
+      const r = term();
+      const right = r.pct ? left.v * r.v : r.v;
+      left = {v: op==='+' ? left.v + right : left.v - right};
+    }
+    return left;
+  }
+  function term(){
+    let left = factor();
+    let single = true;
+    while(peek()==='×' || peek()==='÷'){
+      single = false;
+      const op = t[p++];
+      const r = factor();
+      if(op==='÷'){ if(r.v===0) throw new Error('div0'); left = {v: left.v / r.v}; }
+      else left = {v: left.v * r.v};
+    }
+    return single ? left : {v: left.v};
+  }
+  function factor(){
+    if(peek()==='-'){ p++; const f = factor(); return {v: -f.v, pct: f.pct}; }
+    if(peek()==='+'){ p++; return factor(); }
+    let node;
+    if(peek()==='('){
+      p++; node = {v: expr().v};
+      if(peek()===')') p++; else throw new Error('paren');
+    } else {
+      const m = /^\d+\.?\d*|^\.\d+/.exec(t.slice(p));
+      if(!m) throw new Error('syntax');
+      p += m[0].length; node = {v: parseFloat(m[0])};
+    }
+    while(peek()==='%'){ p++; node = {v: node.v / 100, pct: true}; }
+    return node;
+  }
+  const r = expr();
+  if(p !== t.length) throw new Error('syntax');
+  if(!isFinite(r.v)) throw new Error('num');
+  return r.v;
+}
+function calcInput(v){
+  const isOp = c => c==='+' || c==='-' || c==='×' || c==='÷';
+  const last = () => calcExpr[calcExpr.length-1];
+  if(v==='C'){ calcExpr='0'; calcFresh=true; calcShow(); return; }
   if(v==='⌫'){
     if(calcFresh) return;
-    cur = cur.length > 1 ? cur.slice(0,-1) : '0';
-    if(cur === '-' ) cur = '0';
-    disp.textContent = cur; return;
-  }
-  if(v==='±'){ disp.textContent = calcFmt(parseFloat(cur||'0') * -1); return; }
-  if(v==='%'){ disp.textContent = calcFmt(parseFloat(cur||'0') / 100); return; }
-  if(['+','-','×','÷'].includes(v)){
-    if(calcAcc!==null && calcOp && !calcFresh) calcAcc = calcApply(calcAcc, parseFloat(cur), calcOp);
-    else calcAcc = parseFloat(cur||'0');
-    calcOp = v; calcFresh = true; return;
+    calcExpr = calcExpr.length > 1 ? calcExpr.slice(0,-1) : '0';
+    if(calcExpr==='-') calcExpr='0';
+    calcShow(); return;
   }
   if(v==='='){
-    if(calcOp!==null){
-      const b = parseFloat(cur);
-      const result = calcApply(calcAcc, b, calcOp);
-      calcAddHistory(`${calcFmt(calcAcc)} ${calcOp} ${calcFmt(b)} =`, calcFmt(result));
-      disp.textContent = calcFmt(result);
-      calcAcc = null; calcOp = null; calcFresh = true;
-    }
+    if(calcFresh) return;
+    let e = calcExpr;
+    while(e.length && (isOp(e[e.length-1]) || e[e.length-1]==='(')) e = e.slice(0,-1);
+    if(!e){ return; }
+    const open = (e.match(/\(/g)||[]).length - (e.match(/\)/g)||[]).length;
+    if(open > 0) e += ')'.repeat(open);
+    if(/^-?\d+\.?\d*$/.test(e)) { calcExpr = e; calcFresh = true; calcShow(); return; } // просто число — считать нечего
+    let res;
+    try { res = calcEval(e); }
+    catch(err){ toast(err.message==='div0' ? 'Делить на ноль нельзя' : 'Проверь выражение', true); return; }
+    calcAddHistory(calcPretty(e) + ' =', calcFmt(res));
+    calcExpr = calcFmt(res); calcFresh = true; calcShow();
     return;
   }
-  if(calcFresh || cur==='0'){ cur = (v==='.') ? '0.' : v; calcFresh=false; }
-  else cur += v;
-  disp.textContent = cur;
-}
-function calcApply(a,b,op){
-  if(op==='+') return a+b;
-  if(op==='-') return a-b;
-  if(op==='×') return a*b;
-  if(op==='÷') return b!==0 ? a/b : 0;
-  return b;
+  if(v==='±'){
+    if(calcFresh && calcExpr!=='0'){ calcExpr = calcExpr.startsWith('-') ? calcExpr.slice(1) : '-' + calcExpr; calcShow(); return; }
+    const m = /(\d+\.?\d*|\.\d+)$/.exec(calcExpr);
+    if(!m) return;
+    const pre = calcExpr.slice(0, m.index), b = pre[pre.length-1];
+    if(b==='-' && (pre.length===1 || '(×÷'.includes(pre[pre.length-2]))) calcExpr = pre.slice(0,-1) + m[0];
+    else if(b==='-') calcExpr = pre.slice(0,-1) + '+' + m[0];
+    else if(b==='+') calcExpr = pre.slice(0,-1) + '-' + m[0];
+    else calcExpr = pre + '-' + m[0];
+    calcShow(); return;
+  }
+  if(calcFresh){
+    if(isOp(v) || v==='%'){ calcFresh = false; } // продолжаем с результата
+    else { calcExpr = '0'; calcFresh = false; }
+  }
+  if(isOp(v)){
+    if(calcExpr==='0' && v==='-'){ calcExpr = '-'; calcShow(); return; }
+    if(isOp(last())){
+      if(v==='-' && (last()==='×' || last()==='÷')) calcExpr += v;
+      else if(calcExpr.length>1 && isOp(calcExpr[calcExpr.length-2]) && last()==='-') calcExpr = calcExpr.slice(0,-2) + v;
+      else calcExpr = calcExpr.slice(0,-1) + v;
+    } else if(last()==='('){
+      if(v==='-') calcExpr += v;
+    } else calcExpr += v;
+    calcShow(); return;
+  }
+  if(v==='('){
+    if(calcExpr==='0') calcExpr = '(';
+    else if(/[\d.)%]/.test(last())) calcExpr += '×(';
+    else calcExpr += '(';
+    calcShow(); return;
+  }
+  if(v===')'){
+    const open = (calcExpr.match(/\(/g)||[]).length - (calcExpr.match(/\)/g)||[]).length;
+    if(open > 0 && /[\d)%]/.test(last())) calcExpr += ')';
+    calcShow(); return;
+  }
+  if(v==='%'){
+    if(/[\d)]/.test(last())) calcExpr += '%';
+    calcShow(); return;
+  }
+  // цифра или точка
+  const lastNum = /(\d*\.?\d*)$/.exec(calcExpr)[1];
+  if(v==='.'){
+    if(lastNum.includes('.')) return;
+    if(/[)%]/.test(last())) return;
+    calcExpr += (lastNum==='' ? '0.' : '.');
+  } else {
+    if(/[)%]/.test(last())) calcExpr += '×';
+    if(lastNum==='0') calcExpr = calcExpr.slice(0,-1) + v;
+    else calcExpr += v;
+  }
+  calcShow();
 }
 function calcAddHistory(expr, result){
   const hist = document.getElementById('calc-history');
@@ -198,14 +387,13 @@ function calcAddHistory(expr, result){
   const a = document.createElement('span'); a.textContent = expr;
   const b = document.createElement('b'); b.textContent = result;
   row.append(a, b);
-  row.onclick = () => { document.getElementById('calc-current').textContent = result; calcFresh = true; };
+  row.onclick = () => { calcExpr = result; calcFresh = true; calcShow(); };
   hist.appendChild(row);
   hist.scrollTop = hist.scrollHeight;
 }
 function calcSetResult(expr, result){
-  document.getElementById('calc-current').textContent = calcFmt(result);
+  calcExpr = calcFmt(result); calcFresh = true; calcShow();
   calcAddHistory(expr, calcFmt(result));
-  calcFresh = true; calcAcc = null; calcOp = null;
 }
 
 // ── Дизайн-инструменты ──
