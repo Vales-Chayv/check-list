@@ -159,7 +159,7 @@ function populateCatSel(sel) {
   const s=document.getElementById('e-cat');
   s.innerHTML=cats.map(c=>`<option value="${c.name}"${c.name===sel?' selected':''}>${esc(c.name)}</option>`).join('')+'<option value="__new">+ Новая рубрика</option>';
 }
-function onCatChange() { if(document.getElementById('e-cat').value==='__new'){document.getElementById('new-cat-box').style.display='flex';initPalette();} }
+function onCatChange() { if(document.getElementById('e-cat').value==='__new'){document.getElementById('new-cat-box').style.display='flex';initPalette(); setTimeout(()=>{ const i=document.getElementById('e-new-cat'); if(i){ i.scrollIntoView({block:'center',behavior:'smooth'}); i.focus(); } }, 80);} }
 function initPalette() {
   const usedColors = new Set(cats.map(c=>c.color));
   document.getElementById('cat-pal').innerHTML = COLORS.map(c => {

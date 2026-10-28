@@ -380,9 +380,69 @@ function updateTabsForSpaceType() {
 }
 function cardHasNoDeadline(c){ return !c.deadline && (c.entries||[]).every(e=>!e.deadline); }
 function toggleNoDeadline(){ filterNoDeadline=!filterNoDeadline; localStorage.setItem('mc_no_dl', filterNoDeadline?'1':'0'); render(); }
+// Выбор нескольких рубрик сразу (личные кабинеты)
+let filterCats = [];
+function catMatch(c) { return filterCats.length ? filterCats.includes(c.category) : (filterCat === 'all' || c.category === filterCat); }
+function catMultiOpen() {
+  const dd = document.getElementById('cats-dropdown'); if(!dd) return;
+  dd.innerHTML = `<div style="font-size:12px;color:var(--t3);padding:2px 6px 6px">Отметь рубрики</div>` +
+    cats.map(c => `<label style="display:flex;align-items:center;gap:8px;padding:7px 6px;cursor:pointer;font-size:13px"><input type="checkbox" class="cat-multi-cb" value="${esc(c.name)}" ${filterCats.includes(c.name) ? 'checked' : ''}><span class="cat-dot" style="background:${c.color || '#888'}"></span>${esc(c.name)}</label>`).join('') +
+    `<div style="display:flex;gap:6px;padding:8px 4px 2px"><button onclick="event.stopPropagation();catMultiApply()" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:8px;font-weight:700;cursor:pointer;font-family:inherit">Применить</button><button onclick="event.stopPropagation();document.getElementById('cats-dropdown').style.display='none'" style="background:var(--s1);color:var(--t2);border:1px solid var(--b1);border-radius:var(--rsm);padding:8px 12px;cursor:pointer;font-family:inherit">Отмена</button></div>`;
+}
+function catMultiApply() {
+  const names = [...document.querySelectorAll('#cats-dropdown .cat-multi-cb:checked')].map(i => i.value);
+  filterCats = names;
+  if(names.length) filterCat = 'all';
+  document.getElementById('cats-dropdown').style.display = 'none';
+  render();
+}
+function catMultiClear() { filterCats = []; render(); }
+// ── Изменить цвет рубрики (долгое нажатие / правая кнопка мыши) ──
+function openCatEdit(idx) {
+  const cat = cats[idx]; if(!cat) return;
+  document.getElementById('cat-edit-ov')?.remove();
+  const pal = (typeof COLORS !== 'undefined' && COLORS.length) ? COLORS : ['#e8c56a','#e8a63a','#e86060','#e85bb0','#c05be8','#a07de8','#5b9ee8','#5bc8e8','#5be8d0','#5bb87a','#8ee85b','#c8e85b'];
+  window._catEditColor = cat.color || pal[0];
+  const ov = document.createElement('div');
+  ov.id = 'cat-edit-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2600;display:flex;align-items:center;justify-content:center;padding:20px';
+  const sw = c => `<div onclick="catEditPick('${c}',this)" style="width:30px;height:30px;border-radius:50%;background:${c};cursor:pointer;${c === window._catEditColor ? 'outline:3px solid #fff;outline-offset:1px' : ''}"></div>`;
+  ov.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;max-width:340px;width:100%;box-sizing:border-box">
+    <div style="font-size:16px;font-weight:700;margin-bottom:2px">Рубрика</div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:12px" dir="auto">${esc(cat.name)}</div>
+    <div style="font-size:12px;color:var(--t3);margin-bottom:6px">Цвет</div>
+    <div id="cat-edit-pal" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">${pal.map(sw).join('')}</div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button onclick="document.getElementById('cat-edit-ov').remove()" style="flex:1;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;cursor:pointer;font-family:inherit">Отмена</button>
+      <button onclick="catSaveColor(${idx})" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:11px;font-weight:700;cursor:pointer;font-family:inherit">Сохранить</button>
+    </div>
+    <button onclick="document.getElementById('cat-edit-ov').remove();App.deleteCat(${idx})" style="width:100%;background:none;border:1px solid var(--b1);color:var(--red);border-radius:var(--rsm);padding:9px;cursor:pointer;font-family:inherit;font-size:13px">Удалить рубрику</button>
+  </div>`;
+  document.body.appendChild(ov);
+}
+function catEditPick(c, el) {
+  window._catEditColor = c;
+  document.querySelectorAll('#cat-edit-pal div').forEach(d => { d.style.outline = ''; });
+  el.style.outline = '3px solid #fff'; el.style.outlineOffset = '1px';
+}
+async function catSaveColor(idx) {
+  const cat = cats[idx], color = window._catEditColor; if(!cat || !color) return;
+  cat.color = color;
+  document.getElementById('cat-edit-ov')?.remove();
+  render();
+  const sid = currentSpaceId || 'personal';
+  try { await local.put('categories', { ...cat, space_id: sid, catKey: catKey(sid, cat.name) }); } catch(e) {}
+  try {
+    const q = sb.from('categories').update({ color }).eq('name', cat.name);
+    const { error } = await (currentSpaceId ? q.eq('space_id', currentSpaceId) : q.is('space_id', null));
+    if(error) throw error;
+    toast('✓ Цвет изменён');
+  } catch(e) { toast('Цвет изменён только на этом устройстве', true); }
+}
 function renderCats() {
+  filterCats = filterCats.filter(n => cats.some(c => c.name === n));
   const bar = document.getElementById('cats');
-  const all = filterCat==='all';
+  const all = filterCat==='all' && !filterCats.length;
   let html = `<button class="cat-btn${all?' on':''}" style="${all?'border-color:rgba(255,255,255,.25)':''}" onclick="handleAllCatClick()">Все ▾</button>`;
   if(view==='cards' && !(currentSpace?.type==='family'||currentSpace?.type==='group')) html += `<button class="cat-btn${filterNoDeadline?' on':''}" style="${filterNoDeadline?'background:rgba(232,197,106,.15);border-color:var(--accent);color:var(--accent)':''}" onclick="toggleNoDeadline()">📅✕ Без срока</button>`;
   cats.forEach((c,i) => {
@@ -392,7 +452,7 @@ function renderCats() {
     const border = active ? hex2rgba(col,.5) : 'rgba(255,255,255,.08)';
     html += `<button class="cat-btn${active?' on':''}" style="background:${bg};border-color:${border}" draggable="true"
       onclick="App.setCat(${i})"
-      oncontextmenu="event.preventDefault();event.stopPropagation();App.deleteCat(${i});return false"
+      oncontextmenu="event.preventDefault();event.stopPropagation();openCatEdit(${i});return false"
       ondragstart="App.startCatDrag(${i})"
       ondragover="event.preventDefault();App.dragCatOver(${i})"
       ondrop="event.preventDefault();App.dropCat(${i})"
@@ -402,6 +462,11 @@ function renderCats() {
     <span class="cat-dot" style="background:${col}"></span>${esc(c.name)}</button>`;
   });
   bar.innerHTML = html;
+  const strip = document.getElementById('cats-strip');
+  if(strip) {
+    if(filterCats.length) { strip.style.display = 'flex'; strip.innerHTML = `<span dir="auto" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Рубрики: ${filterCats.map(esc).join(', ')}</span><button onclick="catMultiClear()" style="flex-shrink:0;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:14px;padding:3px 10px;font-size:12px;cursor:pointer;font-family:inherit">Отменить выбор</button>`; }
+    else { strip.style.display = 'none'; strip.innerHTML = ''; }
+  }
 }
 
 function renderMain() {
@@ -416,7 +481,7 @@ function renderMain() {
 function renderCards() {
   const el=document.getElementById('scroll');
   const PO={urgent:0,high:1,normal:2};
- const filtered=applyMemberFilter(cards.filter(c=>c.status!=='done'&&(filterCat==='all'||c.category===filterCat)&&(!filterNoDeadline||cardHasNoDeadline(c))&&(filterClosed ? c.chatStatus==='closed' : c.chatStatus!=='closed')));
+ const filtered=applyMemberFilter(cards.filter(c=>c.status!=='done'&&catMatch(c)&&(!filterNoDeadline||cardHasNoDeadline(c))&&(filterClosed ? c.chatStatus==='closed' : c.chatStatus!=='closed')));
   const isChatSpace = currentSpace?.type==='family' || currentSpace?.type==='group';
   if(!filtered.length){el.innerHTML=emptyHTML(filterClosed?'Нет закрытых чатов':filterNoDeadline?'Нет карточек без срока':isChatSpace?'Нет чатов':'Нет карточек', filterClosed?'Закрытые чаты появятся здесь':filterNoDeadline?'Все карточки имеют дату':isChatSpace?'Создать первый чат':'Создай первую карточку');return;}
 
@@ -511,7 +576,7 @@ function renderChecklist() {
   const PO = {urgent:0, high:1, normal:2};
   const agg = !!clSelectedCabs;
   const src = agg ? (window._clCache||[]) : cards;
-  let rem = src.filter(c=>c.reminder?.enabled && c.status!=='done' && (agg || filterCat==='all' || c.category===filterCat));
+  let rem = src.filter(c=>c.reminder?.enabled && c.status!=='done' && (agg || catMatch(c)));
   if(!agg) rem = applyMemberFilter(rem);
 
   const chip = (label, on, onclick) => `<button onclick="${onclick}" style="background:${on?'rgba(232,197,106,.15)':'var(--s2)'};border:1px solid ${on?'var(--accent)':'var(--b1)'};border-radius:14px;padding:4px 12px;font-size:12px;color:${on?'var(--accent)':'var(--t2)'};cursor:pointer;white-space:nowrap;flex-shrink:0">${label}</button>`;
@@ -568,7 +633,7 @@ function renderChecklist() {
 
 function renderDone() {
   const el = document.getElementById('scroll');
-  const done = applyMemberFilter(cards.filter(c=>c.status==='done'&&(filterCat==='all'||c.category===filterCat)));
+  const done = applyMemberFilter(cards.filter(c=>c.status==='done'&&catMatch(c)));
   if(!done.length){el.innerHTML=emptyHTML('Нет выполненных','Карточки со статусом «Готово» появятся здесь');return;}
   const grouped={};
   done.forEach(c=>{const d=(c.created_at||today()).slice(0,10);(grouped[d]=grouped[d]||[]).push(c);});
@@ -681,7 +746,7 @@ function cardHTML(card, isDone=false) {
 //  APP ACTIONS (called from inline HTML via App.*)
 // ═══════════════════════════════════════════
 const App = {
-  setCat(idx) { filterCat = idx===-1 ? 'all' : cats[idx].name; render(); },
+  setCat(idx) { filterCats = []; filterCat = idx===-1 ? 'all' : cats[idx].name; render(); },
   _catHoldTimer: null,
   _dragIdx: null,
   _touchDragIdx: null, _touchStartX: 0, _touchStartY: 0, _touchDragging: false, _touchOverIdx: undefined,
@@ -723,7 +788,7 @@ const App = {
     App._touchDragIdx = null; App._touchDragging = false; App._touchOverIdx = undefined;
   },
   startCatHold(idx, el) {
-    App._catHoldTimer = setTimeout(() => { App._catHoldTimer=null; App.deleteCat(idx); }, 1800);
+    App._catHoldTimer = setTimeout(() => { App._catHoldTimer=null; openCatEdit(idx); }, 1200);
   },
   cancelCatHold() {
     if(App._catHoldTimer) { clearTimeout(App._catHoldTimer); App._catHoldTimer=null; }
@@ -831,13 +896,14 @@ function toggleCatsDropdown() {
   if(dropdown.style.display !== 'none') { dropdown.style.display = 'none'; return; }
   dropdown.dir = currentLang === 'he' ? 'rtl' : 'ltr'; // кружок сам встанет с нужной стороны
   // Fill with categories
-  const all = filterCat==='all';
+  const all = filterCat==='all' && !filterCats.length;
   let html = `<button class="cat-btn${all?' on':''}" style="display:block;width:100%;text-align:left;${all?'border-color:rgba(255,255,255,.25)':''}" onclick="App.setCat(-1);document.getElementById('cats-dropdown').style.display='none'">Все</button>`;
   cats.forEach((c,i) => {
     const col = c.color||'#888';
     const active = filterCat===c.name;
    html += `<button class="cat-btn${active?' on':''}" style="display:block;width:100%;text-align:left;background:${active?hex2rgba(col,.15):'transparent'};border-color:${active?hex2rgba(col,.5):'rgba(255,255,255,.08)'}" onclick="App.setCat(${i});document.getElementById('cats-dropdown').style.display='none'"><span class="cat-dot" style="display:inline-block;vertical-align:middle;margin-inline-end:6px;background:${col}"></span>${esc(c.name)}</button>`;
   });
+  if(!(currentSpace?.type==='family'||currentSpace?.type==='group')) html += `<button class="cat-btn" style="display:block;width:100%;text-align:left;margin-top:4px;color:var(--accent)" onclick="event.stopPropagation();catMultiOpen()">☑ Выбрать несколько…</button>`;
   dropdown.innerHTML = html;
   // Position below cats bar
   const rect = catsBar.getBoundingClientRect();

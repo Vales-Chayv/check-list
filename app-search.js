@@ -127,7 +127,7 @@ async function srchRun() {
   try {
     if(!navigator.onLine) throw new Error('offline');
     const [r1, r2] = await Promise.all([
-      useFlagRpc ? sb.rpc('search_flagged', { space_ids: ids, lim: 100 }) : sb.rpc('search_cards', { q: like, space_ids: ids, lim: 60 }),
+      useFlagRpc ? sb.from('cards').select('*').in('space_id', ids).contains('entries', [{ flag: true }]).limit(100) : sb.rpc('search_cards', { q: like, space_ids: ids, lim: 60 }),
       (_srch.types.events && !_srch.flagOnly) ? sb.from('events').select('*').in('space_id', ids).or(`title.ilike."%${like.replace(/"/g, '')}%",note.ilike."%${like.replace(/"/g, '')}%"`).limit(30) : Promise.resolve({ data: [] })
     ]);
     if(r1.error) throw r1.error;
@@ -136,6 +136,12 @@ async function srchRun() {
     try { // офлайн или функции ещё нет — ищем в том, что сохранено на устройстве
       cardsRaw = (await local.getAll('cards')).filter(c => ids.includes(c.space_id));
       evsRaw = (_srch.types.events && !_srch.flagOnly) ? (await local.getAll('events')).filter(ev => ids.includes(ev.space_id) && (String(ev.title || '').toLowerCase().includes(q.toLowerCase()) || String(ev.note || '').toLowerCase().includes(q.toLowerCase()))) : [];
+    } catch(_) {}
+  }
+  if(_srch.flagOnly) { // добавляем то, что отмечено на этом устройстве, даже если ещё не дошло до сервера
+    try {
+      const have = new Set(cardsRaw.map(c => c.id));
+      (await local.getAll('cards')).forEach(c => { if(ids.includes(c.space_id) && !have.has(c.id) && (c.entries || []).some(e => e && e.flag)) cardsRaw.push(c); });
     } catch(_) {}
   }
   if(my !== _srch.seq) return; // пришёл более новый запрос
