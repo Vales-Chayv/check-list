@@ -218,13 +218,17 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
       const sVideos = sAtts.filter(a=>a.type?.startsWith('video/'));
       const sAudios = sAtts.filter(a=>a.type?.startsWith('audio/'));
       const sFiles = sAtts.filter(a=>!a.type?.startsWith('image/')&&!a.type?.startsWith('video/')&&!a.type?.startsWith('audio/'));
-      const hasFiles = (sImgs.length + sVideos.length + sFiles.length) > 0; // аудио теперь не прячем за уголком — показываем сразу в сообщении
+      const tiles = mediaTilesOf(sAtts);
+      const gid = 'mg_' + id + '_' + si;
+      const mediaOnly = tiles.length > 0 && !s.note && !s.entries.some(e => e.text);
+      const inlineTiles = (!mediaOnly && tiles.length <= 2) ? tiles : [];
+      const trayTiles = (!mediaOnly && tiles.length >= 3) ? tiles : [];
+      const hasFiles = (trayTiles.length + sFiles.length) > 0; // аудио не прячем за уголком
       const stkId = 'stk_'+id+'_'+si;
       const showAddBtn = isMe && si === myLastIdx;
       const audioHTML = sAudios.length ? sAudios.map(a=>`<div style="margin:6px 0"><audio controls src="${a.data}" style="width:100%;height:36px"></audio></div>`).join('') : '';
       let filesHTML = '';
-      if(sImgs.length) filesHTML+=`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px">${sImgs.map(a=>`<img src="${a.data}" style="width:70px;height:70px;object-fit:cover;border-radius:6px;cursor:pointer" onclick="openImgDirect('${a.data}')">`).join('')}</div>`;
-      if(sVideos.length) filesHTML+=sVideos.map(a=>`<div style="width:80px;height:80px;border-radius:6px;overflow:hidden;cursor:pointer;position:relative;display:inline-block;margin:3px" onclick="openVideoViewer('${a.data}')"><video src="${a.data}" style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.3);font-size:20px">▶</div></div>`).join('');
+      if(trayTiles.length) filesHTML += `<div id="${stkId}_strip" data-tray="${stkId}">${mediaStripHTML(trayTiles, gid)}</div><div id="${stkId}_mos" data-tray="${stkId}" style="display:none">${mediaMosaicHTML(trayTiles, gid)}</div><div id="${stkId}_hd" data-tray="${stkId}" data-lbl="▾ показать все (${trayTiles.length})" onclick="toggleTrayMosaic('${stkId}')" style="text-align:center;font-size:12px;color:rgba(255,255,255,.92);padding:7px 0 2px;cursor:pointer;user-select:none">▾ показать все (${trayTiles.length})</div>`;
       if(sFiles.length) filesHTML+=`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${sFiles.map(f=>`<a href="${f.data}" download="${esc(f.name)}" style="font-size:12px;color:rgba(0,0,0,.7);background:rgba(0,0,0,.1);padding:3px 8px;border-radius:10px;text-decoration:none">📎${esc(f.name)}</a>`).join('')}</div>`;
 
       // Folded corner SVG
@@ -233,6 +237,15 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
         <div style="position:absolute;bottom:2px;right:2px;width:0;height:0;border-style:solid;border-width:24px 24px 0 0;border-color:transparent ${bottomColor} transparent transparent"></div>
       </div>` : '';
 
+     if(mediaOnly) {
+        const _chips = sFiles.length ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${sFiles.map(f=>`<a href="${f.data}" download="${esc(f.name)}" class="file-action">📎${esc(f.name)}</a>`).join('')}</div>` : '';
+        return `<div style="display:flex;justify-content:${align};margin:12px 0 6px"><div style="width:min(80%,330px)">
+          <div style="font-size:10px;color:var(--t3);margin:0 2px 3px;text-align:${isMe?'left':'right'}">${creator?esc(aliasedName(creator)):'?'} · ${s.date}</div>
+          ${mediaMosaicHTML(tiles, gid)}
+          ${audioHTML}${_chips}
+          ${showAddBtn?`<button onclick="openAddEntry('${id}','${s.sid}',true)" style="margin-top:6px;background:var(--s2);border:1px solid var(--b1);border-radius:20px;padding:4px 12px;font-size:12px;color:var(--t2);cursor:pointer;font-family:inherit">＋ Добавить</button>`:''}
+        </div></div>`;
+      }
      return `<div style="display:flex;justify-content:${align};margin:16px 0 4px">
         <div style="max-width:88%;min-width:55%;position:relative;${hasFiles?'padding-bottom:14px':''}">
            ${hasFiles?`<div id="${stkId}_peek" style="position:absolute;bottom:-5px;left:-5px;right:8px;height:90%;background:${bottomColor};border-radius:10px;transform:rotate(1.2deg);z-index:0"></div>`:''}
@@ -242,6 +255,7 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
 <div style="font-size:10px;color:rgba(0,0,0,.45);margin-bottom:4px">${s.date}</div>
                      ${s.note?`<div style="font-size:13px;color:rgba(0,0,0,.75);margin-bottom:8px;font-style:italic;line-height:1.5;word-break:break-word;white-space:pre-wrap" dir="auto">${esc(s.note)}</div>`:''}
             ${audioHTML}
+            ${inlineTiles.length?`<div style="margin:6px 0 8px">${mediaMosaicHTML(inlineTiles, gid)}</div>`:''}
             ${s.entries.filter(e=>e.text).map(e=>entryRowHTML(e,'rgba(0,0,0,0.75)')).join('')}
             ${showAddBtn?`<button onclick="openAddEntry('${id}','${s.sid}',true)" style="margin-top:8px;background:rgba(0,0,0,.1);border:none;border-radius:20px;padding:4px 12px;font-size:12px;color:rgba(0,0,0,.6);cursor:pointer;font-family:inherit">＋ Добавить</button>`:''}
             ${cornerHTML}
@@ -261,8 +275,12 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
       const sVideos = sAtts.filter(a=>a.type?.startsWith('video/'));
       const sFiles = sAtts.filter(a=>!a.type?.startsWith('image/')&&!a.type?.startsWith('video/')&&!a.type?.startsWith('audio/'));
       let sAttHTML = '';
+      const _tl = mediaTilesOf(sAtts);
+      if(_tl.length >= 2) sAttHTML += mediaStackHTML(_tl, 'mg_' + id + '_p' + si);
+      else {
       if(sImgs.length) sAttHTML+=`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">${sImgs.map(a=>`<img src="${a.data}" style="width:80px;height:80px;object-fit:cover;border-radius:7px;cursor:pointer" onclick="openImgDirect('${a.data}')">`).join('')}</div>`;
       if(sVideos.length) sAttHTML+=sVideos.map(a=>`<div style="width:95px;height:95px;border-radius:8px;overflow:hidden;cursor:pointer;position:relative;display:inline-block" onclick="openVideoViewer('${a.data}')"><video src="${a.data}" style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.3);font-size:24px">▶</div></div>`).join('');
+      }
       if(sAudios.length) sAttHTML+=sAudios.map(a=>`<audio controls src="${a.data}" style="width:100%;height:32px;margin-top:5px"></audio>`).join('');
       if(sFiles.length) sAttHTML+=`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${sFiles.map(f=>`<a href="${f.data}" download="${esc(f.name)}" class="file-action">📎${esc(f.name)}</a>`).join('')}</div>`;
       return sep + noteHTML + entriesHTML + sAttHTML;
@@ -682,6 +700,98 @@ function toggleStickerFiles(id) {
   content.style.display = isOpen ? 'none' : 'block';
   if(peek) peek.style.display = isOpen ? 'block' : 'none';
 }
+
+
+// ── Медиа в записях: мозаика (чат), полоса в лотке, стопка (личные кабинеты) ──
+window._mediaGroups = window._mediaGroups || {};
+function mediaTilesOf(atts) {
+  return (atts||[]).filter(a => a.type && (a.type.startsWith('image/') || a.type.startsWith('video/')))
+    .map(a => ({data: a.data, vid: a.type.startsWith('video/'), name: a.name || ''}));
+}
+function mediaCountLabel(tiles) {
+  const v = tiles.filter(t => t.vid).length, p = tiles.length - v;
+  return [p ? p + ' фото' : '', v ? v + ' видео' : ''].filter(Boolean).join(' · ');
+}
+function mediaTileHTML(t, gid, i, extra, more) {
+  const click = more ? `openMediaGroup('${gid}')` : `mediaOpen('${gid}',${i})`;
+  const inner = t.vid
+    ? `<video src="${t.data}" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover;display:block;pointer-events:none"></video><span style="position:absolute;left:5px;bottom:4px;font-size:10px;color:#fff;background:rgba(0,0,0,.55);border-radius:9px;padding:0 5px">▶</span>`
+    : `<img src="${t.data}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">`;
+  return `<div onclick="event.stopPropagation();${click}" style="position:relative;border-radius:7px;overflow:hidden;cursor:pointer;background:#333;min-height:0;${extra||''}">${inner}${more ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:#fff">+${more}</div>` : ''}</div>`;
+}
+// Мозаика А: 1, 2, 3, 4 или 4 окна + «+N»
+function mediaMosaicHTML(tiles, gid) {
+  window._mediaGroups[gid] = tiles;
+  const n = tiles.length, T = (i, ex, more) => mediaTileHTML(tiles[i], gid, i, ex, more);
+  if(n === 1) return `<div style="display:grid;grid-template-columns:1fr;height:min(260px,62vw);gap:3px">${T(0)}</div>`;
+  if(n === 2) return `<div style="display:grid;grid-template-columns:1fr 1fr;height:min(160px,40vw);gap:3px">${T(0)}${T(1)}</div>`;
+  if(n === 3) return `<div style="display:grid;grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr;height:min(180px,46vw);gap:3px">${T(0,'grid-row:span 2')}${T(1)}${T(2)}</div>`;
+  if(n === 4) return `<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;height:min(200px,52vw);gap:3px">${T(0)}${T(1)}${T(2)}${T(3)}</div>`;
+  return `<div style="display:grid;grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr 1fr;height:min(200px,52vw);gap:3px">${T(0,'grid-row:span 3')}${T(1)}${T(2)}${T(3,'',n-3)}</div>`;
+}
+// Полоса В: до 4 плиток в ряд
+function mediaStripHTML(tiles, gid) {
+  window._mediaGroups[gid] = tiles;
+  const n = tiles.length, show = Math.min(n, 4);
+  return `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px">${tiles.slice(0, show).map((t, i) => mediaTileHTML(t, gid, i, 'aspect-ratio:1', (n > 4 && i === 3) ? n - 3 : 0)).join('')}</div>`;
+}
+// Стопка Г (личные кабинеты)
+function mediaStackHTML(tiles, gid) {
+  window._mediaGroups[gid] = tiles;
+  const n = tiles.length, t0 = tiles[0], t1 = tiles[1];
+  const face = t => t.vid
+    ? `<video src="${t.data}" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover;display:block;pointer-events:none"></video>`
+    : `<img src="${t.data}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">`;
+  return `<div onclick="openMediaGroup('${gid}')" style="margin-top:8px;cursor:pointer">
+    <div style="display:flex;gap:8px;align-items:center">
+      <div style="width:60%;height:100px;border-radius:8px;overflow:hidden">${face(t0)}</div>
+      <div style="position:relative;flex:1;height:100px">
+        <div style="position:absolute;left:12px;top:0;right:0;bottom:12px;border-radius:8px;background:rgba(255,255,255,.10)"></div>
+        <div style="position:absolute;left:6px;top:6px;right:6px;bottom:6px;border-radius:8px;background:rgba(255,255,255,.18)"></div>
+        <div style="position:absolute;left:0;top:12px;right:12px;bottom:0;border-radius:8px;overflow:hidden">${face(t1)}<div style="position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px"><span style="background:rgba(0,0,0,.65);color:#fff;border-radius:10px;padding:1px 8px;font-size:12px">+${n - 1}</span></div></div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--t3);margin-top:4px">${mediaCountLabel(tiles)}</div>
+  </div>`;
+}
+function mediaOpen(gid, i) {
+  const t = (window._mediaGroups[gid] || [])[i]; if(!t) return;
+  document.getElementById('media-group-ov')?.remove();
+  if(t.vid) openVideoViewer(t.data); else openImgDirect(t.data);
+}
+function openMediaGroup(gid) {
+  const tiles = window._mediaGroups[gid] || []; if(!tiles.length) return;
+  document.getElementById('media-group-ov')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'media-group-ov';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:1600;background:rgba(0,0,0,.95);display:flex;flex-direction:column';
+  ov.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;color:var(--t1)"><span style="font-size:14px;font-weight:700">${mediaCountLabel(tiles)}</span><button onclick="document.getElementById('media-group-ov').remove()" style="background:none;border:none;color:var(--t1);font-size:22px;cursor:pointer">✕</button></div>
+    <div style="flex:1;overflow-y:auto;padding:0 10px 16px"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:4px">${tiles.map((t, i) => mediaTileHTML(t, gid, i, 'aspect-ratio:1', 0)).join('')}</div></div>`;
+  document.body.appendChild(ov);
+}
+// Лоток под стикером: полоса ⇄ мозаика (кнопка или слайд пальцем вниз/вверх)
+function toggleTrayMosaic(stkId, force) {
+  const st = document.getElementById(stkId + '_strip'), mo = document.getElementById(stkId + '_mos'), hd = document.getElementById(stkId + '_hd');
+  if(!st || !mo) return;
+  const open = force !== undefined ? force : mo.style.display === 'none';
+  st.style.display = open ? 'none' : '';
+  mo.style.display = open ? '' : 'none';
+  if(hd) hd.textContent = open ? '▴ свернуть' : (hd.dataset.lbl || '▾ показать все');
+}
+(function(){
+  if(window._trayTouchInit) return; window._trayTouchInit = true;
+  let tId = null, tY = 0;
+  document.addEventListener('touchstart', e => {
+    const t = e.target.closest && e.target.closest('[data-tray]');
+    if(t) { tId = t.dataset.tray; tY = e.touches[0].clientY; } else tId = null;
+  }, {passive: true});
+  document.addEventListener('touchend', e => {
+    if(!tId) return;
+    const dy = e.changedTouches[0].clientY - tY;
+    if(dy > 40) toggleTrayMosaic(tId, true); else if(dy < -40) toggleTrayMosaic(tId, false);
+    tId = null;
+  }, {passive: true});
+})();
 
 // ─── ENTRY SWIPE ─────────────────────────────
 function setupEntrySwipe() {
