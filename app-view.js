@@ -393,7 +393,7 @@ async function viewToggleEntry(cardId, entryId) {
   }
   e.done=!e.done;
   const activeDls = (card.entries||[]).filter(x=>!x.done&&x.deadline).map(x=>x.deadline).sort();
-  if(activeDls.length) card.deadline = activeDls[0];
+  card.deadline = activeDls[0] || null; // не осталось записей со сроком — срок с обложки убираем
   if(!card.pinned && (card.entries||[]).length>0&&(card.entries||[]).every(x=>x.done)){
     card.status='done';
     card.history=[...(card.history||[]),{date:nowStr(),text:'Все записи выполнены → Готово',type:'status'}];

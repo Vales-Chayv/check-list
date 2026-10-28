@@ -610,6 +610,7 @@ async function toggleEntry(cardId,entryId) {
   const card=cards.find(c=>c.id===cardId); if(!card)return;
   const e=(card.entries||[]).find(x=>x.id===entryId); if(!e)return;
  e.done=!e.done;
+  card.deadline = ([...(card.entries||[])].filter(x=>!x.done&&x.deadline).map(x=>x.deadline).sort()[0]) || null; // срок обложки = ближайший у невыполненных
   if(!card.pinned && (card.entries||[]).length>0&&(card.entries||[]).every(x=>x.done)){
     card.status='done';
     card.history=[...(card.history||[]),{date:nowStr(),text:'Все записи выполнены → Готово',type:'status'}];
