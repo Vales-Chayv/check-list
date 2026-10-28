@@ -127,7 +127,7 @@ async function srchRun() {
   try {
     if(!navigator.onLine) throw new Error('offline');
     const [r1, r2] = await Promise.all([
-      useFlagRpc ? sb.from('cards').select('*').in('space_id', ids).contains('entries', [{ flag: true }]).limit(100) : sb.rpc('search_cards', { q: like, space_ids: ids, lim: 60 }),
+      useFlagRpc ? sb.rpc('search_flagged', { space_ids: ids, lim: 100 }) : sb.rpc('search_cards', { q: like, space_ids: ids, lim: 60 }),
       (_srch.types.events && !_srch.flagOnly) ? sb.from('events').select('*').in('space_id', ids).or(`title.ilike."%${like.replace(/"/g, '')}%",note.ilike."%${like.replace(/"/g, '')}%"`).limit(30) : Promise.resolve({ data: [] })
     ]);
     if(r1.error) throw r1.error;

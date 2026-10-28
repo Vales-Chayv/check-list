@@ -112,7 +112,8 @@ async function _processSyncQueueInner() {
         const {error} = await sb.from('cards').delete().eq('id', op.data.id);
         if (error) throw error;
       } else if (op.type === 'insert_cat') {
-        const {error} = await sb.from('categories').insert(op.data);
+        const {catKey: _ck, ...catSrv} = op.data; // catKey — только локальный ключ, на сервере такого столбца нет
+        const {error} = await sb.from('categories').insert(catSrv);
         if (error && error.code !== '23505') throw error;
       } else if (op.type === 'insert_event') {
         const {error} = await sb.from('events').insert(op.data);
@@ -357,7 +358,8 @@ async function dbAddCat(cat) {
   catWithSpace.catKey = catKey(catWithSpace.space_id, catWithSpace.name);
   await local.put('categories', catWithSpace);
   if (navigator.onLine) {
-    const {error}=await sb.from('categories').insert(catWithSpace);
+    const {catKey: _ck, ...catSrv} = catWithSpace; // catKey — только локальный ключ, на сервере такого столбца нет
+    const {error}=await sb.from('categories').insert(catSrv);
     if(error) {
       console.log('dbAddCat error:', error.code, error.message, catWithSpace);
       toast('Рубрика «' + cat.name + '» не сохранилась на сервере: ' + (error.message || error.code), true);
