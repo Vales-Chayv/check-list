@@ -403,3 +403,13 @@ async function saveEntryPushHour() {
 document.addEventListener('click', function(e){
   if(e.target.closest && e.target.closest('[onclick^="openSettings"]')) setTimeout(loadEntryPushHour, 80);
 });
+
+// ПК: рубрики прокручиваются колёсиком мыши
+(function(){
+  const bar = document.getElementById('cats');
+  if(!bar) return;
+  bar.addEventListener('wheel', function(e){
+    if(bar.scrollWidth <= bar.clientWidth) return;
+    if(Math.abs(e.deltaY) > Math.abs(e.deltaX)) { bar.scrollLeft += e.deltaY; e.preventDefault(); }
+  }, { passive: false });
+})();

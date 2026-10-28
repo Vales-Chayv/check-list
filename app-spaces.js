@@ -199,7 +199,16 @@ spaces = Array.isArray(saved) ? saved : [];
   showSpaceSelector();
 }
 // ─── SELECTOR ───────────────────────────────
+// Круглая кнопка календаря в лобби: показывает месяц и сегодняшнее число
+function updateLobbyCalIcon() {
+  const b = document.getElementById('lobby-cal-btn'); if(!b) return;
+  const d = new Date();
+  const mo = ['ЯНВ','ФЕВ','МАР','АПР','МАЙ','ИЮН','ИЮЛ','АВГ','СЕН','ОКТ','НОЯ','ДЕК'][d.getMonth()];
+  b.style.overflow = 'hidden';
+  b.innerHTML = `<svg width="38" height="38" viewBox="0 0 40 40" aria-hidden="true"><defs><clipPath id="lcc"><circle cx="20" cy="20" r="19"/></clipPath></defs><g clip-path="url(#lcc)"><rect width="40" height="40" fill="#f2f2f2"/><rect width="40" height="15" fill="#e86060"/><text x="20" y="11.2" text-anchor="middle" font-size="8" font-weight="700" fill="#fff" font-family="sans-serif">${mo}</text><text x="20" y="32" text-anchor="middle" font-size="17" font-weight="700" fill="#222" font-family="sans-serif">${d.getDate()}</text></g></svg>`;
+}
 function showSpaceSelector() {
+  updateLobbyCalIcon();
   renderSpacesList();
   const cb = document.getElementById('lobby-cal-btn');
   if(cb) cb.style.display = currentUser ? 'flex' : 'none';
