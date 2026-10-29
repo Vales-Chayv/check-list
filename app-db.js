@@ -429,9 +429,33 @@ function handleRealtimeSpace(payload) {
   const idx = spaces.findIndex(s => s.id === n.id);
   if(idx === -1) return; // кабинет не в моём списке — не моё дело
   const wasClosed = spaces[idx].status === 'closed';
+  const prevReqs = spaces[idx].joinRequests || [];
+  const wasMemberMe = (spaces[idx].members_auth||[]).some(m => m.user_id === myId);
   const previousMembers = spaces[idx].members; // кэш клиента ДО обновления — payload.old от Supabase может не содержать старых значений
   spaces[idx] = { ...spaces[idx], ...n };
   localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+  // Запросы на вход по ссылке
+  {
+    const nReqs = n.joinRequests || [];
+    const lobbyOpen = typeof renderSpacesList === 'function' && document.getElementById('space-selector')?.style.display !== 'none';
+    if(n.owner_id === myId && nReqs.length > prevReqs.length) {
+      const nr = nReqs.find(r => !prevReqs.some(p => p.user_id === r.user_id));
+      if(typeof showChatNotice === 'function') showChatNotice('🔔 Запрос на вход', `${nr?.name||'Кто-то'} просит войти в «${n.name}»`, null);
+      if(lobbyOpen) renderSpacesList();
+      if(document.getElementById('manage-members-ov')?.classList.contains('on') && typeof renderManageMembersList === 'function') renderManageMembersList();
+    }
+    const isMemberMe = (n.members_auth||[]).some(m => m.user_id === myId);
+    if(!wasMemberMe && isMemberMe && n.owner_id !== myId && prevReqs.some(r => r.user_id === myId)) {
+      if(typeof showChatNotice === 'function') showChatNotice('✅ Тебя приняли', `Теперь ты в «${n.name}»`, null);
+      if(lobbyOpen) renderSpacesList();
+    } else if(prevReqs.some(r => r.user_id === myId) && !nReqs.some(r => r.user_id === myId) && !isMemberMe && n.owner_id !== myId) {
+      spaces = spaces.filter(s => s.id !== n.id);
+      localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+      if(typeof showChatNotice === 'function') showChatNotice('Запрос на вход', `Владелец не принял запрос в «${n.name}»`, null);
+      if(lobbyOpen) renderSpacesList();
+      return;
+    }
+  }
   if(n.status === 'closed' && !wasClosed) {
     if(currentSpaceId === n.id) { currentSpace = spaces[idx]; render(); }
     if(typeof renderSpacesList === 'function' && document.getElementById('space-selector')?.style.display !== 'none') renderSpacesList();

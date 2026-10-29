@@ -103,7 +103,9 @@ async function saveMemberAlias(spaceId, userId, alias) {
 }
 // ─── INIT ───────────────────────────────────
 async function initSpaces() {
-  const urlToken = new URLSearchParams(window.location.search).get('space');
+  const _pend = (typeof getPendingSpace === 'function') ? getPendingSpace() : null;
+  const urlToken = new URLSearchParams(window.location.search).get('space') || (_pend && _pend.token) || null;
+  const urlAs = new URLSearchParams(window.location.search).get('as') || (_pend && _pend.as) || '';
   if(!navigator.onLine) {
     const saved = JSON.parse(localStorage.getItem('mc_spaces')||'[]');
     spaces = Array.isArray(saved) ? saved : [{id:'personal',name:'Личный',type:'personal',members:[]}];
@@ -116,13 +118,18 @@ async function initSpaces() {
   }
   try {
        const joinedIds = JSON.parse(localStorage.getItem('mc_joined_spaces')||'[]');
-    let query = sb.from('spaces').select('*').order('created_at');
-    if(currentUser) {
-      const memberFilter = `members_auth.cs.[{"user_id":"${currentUser.id}"}]`;
-      const inviteFilter = `pendingInvites.cs.[{"user_id":"${currentUser.id}"}]`;
-      query = query.or(`owner_id.eq.${currentUser.id}${joinedIds.length?',id.in.('+joinedIds.join(',')+')'  :''},${memberFilter},${inviteFilter}`);
-    }
-    const {data, error} = await query;
+    const mkQuery = withReq => {
+      let q = sb.from('spaces').select('*').order('created_at');
+      if(currentUser) {
+        const memberFilter = `members_auth.cs.[{"user_id":"${currentUser.id}"}]`;
+        const inviteFilter = `pendingInvites.cs.[{"user_id":"${currentUser.id}"}]`;
+        const reqFilter = withReq ? `,joinRequests.cs.[{"user_id":"${currentUser.id}"}]` : '';
+        q = q.or(`owner_id.eq.${currentUser.id}${joinedIds.length?',id.in.('+joinedIds.join(',')+')'  :''},${memberFilter},${inviteFilter}${reqFilter}`);
+      }
+      return q;
+    };
+    let {data, error} = await mkQuery(true);
+    if(error) { ({data, error} = await mkQuery(false)); } // колонки joinRequests ещё нет — работаем по-старому
     if(error) throw error;
     spaces = data || [];
  } catch(e) {
@@ -135,16 +142,21 @@ spaces = Array.isArray(saved) ? saved : [];
    localStorage.setItem('mc_spaces', JSON.stringify(spaces));
   if(typeof subscribeRealtimeSpaces === 'function') subscribeRealtimeSpaces();
   if(typeof loadMemberAliases === 'function') loadMemberAliases();
-   // Handle invite link — теперь тоже через приглашение с подтверждением, не тихое вступление
+   // Ссылка-приглашение: человек сам не входит — запрос уходит владельцу и ждёт подтверждения
   if(urlToken) {
     try {
-      const {data} = await sb.from('spaces').select('*').eq('share_token', urlToken).single();
-      if(data) {
+      const {data} = await sb.from('spaces').select('*').eq('share_token', urlToken).maybeSingle();
+      if(!data || data.status === 'closed') {
+        clearPendingSpace();
+        history.replaceState({}, '', window.location.pathname);
+        toast('Ссылка недействительна, или кабинет закрыт', true);
+      } else {
         if(!spaces.find(s=>s.id===data.id)) spaces.push(data);
         const isMember = (data.members_auth||[]).some(m=>m.user_id===currentUser?.id);
         const hasInvite = (data.pendingInvites||[]).some(p=>p.user_id===currentUser?.id);
 
         if(data.password && !isMember) {
+          clearPendingSpace();
           pendingSpaceId = data.id;
           document.getElementById('space-pwd-name').textContent = data.name;
           document.getElementById('space-pwd-inp').value = '';
@@ -153,19 +165,18 @@ spaces = Array.isArray(saved) ? saved : [];
           setTimeout(()=>document.getElementById('space-pwd-inp').focus(), 300);
           return;
         }
-        if(isMember) { setCurrentSpace(data.id, true); return; }
-        if(!hasInvite && currentUser) {
-          let inviterName = 'Кто-то';
-          try {
-            const {data:ownerProf} = await sb.from('profiles').select('display_name').eq('id', data.owner_id).single();
-            inviterName = ownerProf?.display_name || 'Кто-то';
-          } catch(e) {}
-          const asName = new URLSearchParams(window.location.search).get('as');
-          data.pendingInvites = [...(data.pendingInvites||[]), {user_id: currentUser.id, name: asName || currentUser.display_name||'', invitedBy: inviterName, invitedAt: new Date().toISOString()}];
-          try { await sb.from('spaces').update({pendingInvites: data.pendingInvites}).eq('id', data.id); } catch(e) {}
-        }
+        if(isMember || data.owner_id === currentUser?.id) { clearPendingSpace(); setCurrentSpace(data.id, true); return; }
+        if(hasInvite) clearPendingSpace();                     // владелец сам приглашал — карточка с «Принять» уже в лобби
+        else if(currentUser) await sendJoinRequest(data, urlAs); // иначе — запрос владельцу
       }
-    } catch(e) {}
+    } catch(e) { console.log('invite link error:', e); }
+  }
+  if(new URLSearchParams(window.location.search).get('showReq')) {
+    const _rid = new URLSearchParams(window.location.search).get('showReq');
+    history.replaceState({}, '', window.location.pathname);
+    showSpaceSelector();
+    setTimeout(()=>{ if(spaces.find(s=>s.id===_rid) && typeof openManageMembers === 'function') openManageMembers(_rid); }, 500);
+    return;
   }
   // Открытие конкретного чата по ссылке из push-уведомления
   const openSpaceId = new URLSearchParams(window.location.search).get('openSpace');
@@ -464,6 +475,19 @@ function spaceRowHTML(s) {
       </div>
     </div>`;
   }
+  const myReq = (s.joinRequests||[]).find(r=>r.user_id===currentUser?.id);
+  if(myReq && !isOwner && !(s.members_auth||[]).some(m=>m.user_id===currentUser?.id)) {
+    return `<div style="background:var(--s2);border:1px dashed var(--accent);border-radius:var(--r);padding:16px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div style="font-size:28px">⏳</div>
+        <div style="flex:1;min-width:0">
+          <div dir="auto" style="font-size:17px;font-weight:700;overflow-wrap:anywhere">${esc(s.name)}</div>
+          <div style="font-size:13px;color:var(--t2);margin-top:2px">Запрос отправлен владельцу. Кабинет откроется, когда он подтвердит</div>
+        </div>
+      </div>
+      <button onclick="cancelJoinRequest('${s.id}')" style="margin-top:10px;background:var(--s1);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:8px 14px;font-size:13px;cursor:pointer;font-family:inherit">Отменить запрос</button>
+    </div>`;
+  }
   const isGroup = s.type==='family';
   const amMember = isGroup && !isOwner && (s.members||[]).some(m=>m.user_id===currentUser?.id);
   const bb = 'border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer;font-family:inherit;';
@@ -499,6 +523,7 @@ function spaceRowHTML(s) {
       ${!isClosed ? `<button class="sp-star${getSpacePins().has(s.id)?' on':''}" onclick="toggleSpacePin('${s.id}')" aria-label="Закрепить" title="Закрепить вверху">${getSpacePins().has(s.id)?'★':'☆'}</button>` : ''}
       ${acts.length ? `<button class="sp-chev${open?' on':''}" onclick="toggleSpaceActs('${s.id}')" aria-label="Действия" title="Действия">▾</button>` : ''}
     </div>
+    ${(isOwner && !isClosed && (s.joinRequests||[]).length) ? `<div onclick="openManageMembers('${s.id}')" style="margin-top:10px;background:rgba(232,197,106,.15);border:1px solid rgba(232,197,106,.4);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--accent);cursor:pointer">🔔 Запросов на вход: ${(s.joinRequests||[]).length} — посмотреть</div>` : ''}
     ${open ? `<div class="sp-acts">${acts.join('')}</div>` : ''}
   </div>`;
 }
@@ -528,7 +553,8 @@ function renderSpacesList() {
   if(lobbyType === null) lobbyType = localStorage.getItem(lk('lobby_type')) || 'all';
   if(lobbySort === null) lobbySort = localStorage.getItem(lk('lobby_sort')) || 'recent';
   const list = document.getElementById('spaces-list');
-  const hasInvite = s => (s.pendingInvites||[]).some(p=>p.user_id===currentUser?.id);
+  const hasInvite = s => (s.pendingInvites||[]).some(p=>p.user_id===currentUser?.id)
+    || ((s.joinRequests||[]).some(r=>r.user_id===currentUser?.id) && s.owner_id!==currentUser?.id && !(s.members_auth||[]).some(m=>m.user_id===currentUser?.id));
   const activeAll = spaces.filter(s=>s.status!=='closed');
   const invites = activeAll.filter(hasInvite);
   const regular = activeAll.filter(s=>!hasInvite(s));
@@ -916,8 +942,16 @@ function renderManageMembersList() {
   const space = spaces.find(s=>s.id===managingSpaceId); if(!space) return;
   const el = document.getElementById('manage-members-list');
   const members = space.members||[];
-  if(!members.length) { el.innerHTML = '<div style="font-size:14px;color:var(--t3)">Нет участников</div>'; return; }
-  el.innerHTML = members.map(m => {
+  const reqs = space.joinRequests||[];
+  const reqHTML = reqs.length ? `<div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:6px">🔔 Запросы на вход</div>`
+    + reqs.map(r => `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(232,197,106,.1);border:1px solid rgba(232,197,106,.4);border-radius:var(--rsm);padding:10px 12px;margin-bottom:6px">
+        <span dir="auto" style="font-size:15px;overflow-wrap:anywhere">${esc(r.name)}</span>
+        <span style="display:flex;gap:6px;flex-shrink:0">
+          <button onclick="approveJoinRequest('${space.id}','${r.user_id}')" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:700;cursor:pointer">✓ Принять</button>
+          <button onclick="declineJoinRequest('${space.id}','${r.user_id}')" style="background:var(--s1);border:1px solid var(--b1);color:var(--t2);border-radius:8px;padding:7px 10px;font-size:13px;cursor:pointer">✕</button>
+        </span></div>`).join('') + '<div style="height:10px"></div>' : '';
+  if(!members.length) { el.innerHTML = reqHTML + '<div style="font-size:14px;color:var(--t3)">Нет участников</div>'; return; }
+  el.innerHTML = reqHTML + members.map(m => {
        const shown = m.user_id ? getDisplayName(managingSpaceId, m.user_id, m.name) : m.name;
     const hasAlias = m.user_id && memberAliases[m.user_id];
     return `<div style="display:flex;align-items:center;justify-content:space-between;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:11px 14px">
@@ -1016,6 +1050,76 @@ async function addMemberToSpace(query, overrideName) {
     const body = `${invitedBy} зовёт тебя в «${space.name}»`;
     if(typeof notifyUsers === 'function') await notifyUsers([found.id], title, body);
     toast('✓ Приглашение отправлено ' + inviteName);
+  } catch(e) { toast('Ошибка: '+e.message, true); }
+}
+
+// ── Запрос на вход по ссылке: владелец подтверждает ──
+const _SITE_URL = 'https://vales-chayv.github.io/check-list/';
+async function sendJoinRequest(space, asName) {
+  if(!currentUser) return false;
+  if(!currentUser.phone) { openPhoneRequiredModal(() => sendJoinRequest(space, asName)); return false; }
+  const reqs = space.joinRequests || [];
+  const already = reqs.some(r => r.user_id === currentUser.id);
+  const name = asName || currentUser.display_name || '';
+  if(!already) {
+    space.joinRequests = [...reqs, {user_id: currentUser.id, name, requestedAt: new Date().toISOString()}];
+    const { error } = await sb.from('spaces').update({joinRequests: space.joinRequests}).eq('id', space.id);
+    if(error) {
+      space.joinRequests = reqs;
+      toast('Не удалось отправить запрос: ' + (error.message || error.code), true);
+      return false;
+    }
+    if(typeof notifyUsers === 'function') await notifyUsers([space.owner_id], '🔔 Запрос на вход', `${name} просит войти в «${space.name}»`, currentUser.id, name, `${_SITE_URL}?showReq=${space.id}`);
+  }
+  clearPendingSpace();
+  localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+  if(!spaces.find(s=>s.id===space.id)) spaces.push(space);
+  toast(already ? 'Запрос уже отправлен владельцу' : '✓ Запрос отправлен владельцу кабинета «' + space.name + '»');
+  if(typeof renderSpacesList === 'function' && document.getElementById('space-selector')?.style.display !== 'none') renderSpacesList();
+  return true;
+}
+async function cancelJoinRequest(spaceId) {
+  const space = spaces.find(s=>s.id===spaceId); if(!space) return;
+  space.joinRequests = (space.joinRequests||[]).filter(r=>r.user_id!==currentUser?.id);
+  try {
+    await sb.from('spaces').update({joinRequests: space.joinRequests}).eq('id', spaceId);
+    spaces = spaces.filter(s=>s.id!==spaceId);
+    localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+    renderSpacesList();
+    toast('Запрос отменён');
+  } catch(e) { toast('Ошибка: '+e.message, true); }
+}
+async function approveJoinRequest(spaceId, userId) {
+  const space = spaces.find(s=>s.id===spaceId); if(!space) return;
+  const req = (space.joinRequests||[]).find(r=>r.user_id===userId); if(!req) return;
+  const memberColors = ['#e8a83a','#5b9ee8','#a07de8','#5bb87a','#e85bb0','#5bc8e8','#e86060','#c8e85b'];
+  const usedColors = (space.members||[]).map(m=>m.color);
+  const freeColors = memberColors.filter(c=>!usedColors.includes(c));
+  const color = freeColors.length ? freeColors[0] : memberColors[Math.floor(Math.random()*memberColors.length)];
+  space.members = [...(space.members||[]), {name: req.name, color, user_id: userId}];
+  space.members_auth = [...(space.members_auth||[]).filter(m=>m.user_id!==userId), {user_id: userId, name: req.name}];
+  space.joinRequests = (space.joinRequests||[]).filter(r=>r.user_id!==userId);
+  try {
+    const { error } = await sb.from('spaces').update({members: space.members, members_auth: space.members_auth, joinRequests: space.joinRequests}).eq('id', spaceId);
+    if(error) throw error;
+    localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+    renderManageMembersList(); renderSpacesList();
+    if(typeof notifyUsers === 'function') await notifyUsers([userId], '✅ Тебя приняли', `Теперь ты в «${space.name}»`, currentUser?.id, null, _SITE_URL);
+    if(typeof logEvent === 'function') logEvent(spaceId, space.name, 'member_joined', 'присоединился(лась) к группе', null, req.name);
+    toast('✓ ' + req.name + ' в группе');
+  } catch(e) { toast('Ошибка: '+e.message, true); }
+}
+async function declineJoinRequest(spaceId, userId) {
+  const space = spaces.find(s=>s.id===spaceId); if(!space) return;
+  const req = (space.joinRequests||[]).find(r=>r.user_id===userId); if(!req) return;
+  if(!confirm('Отклонить запрос «' + req.name + '»?')) return;
+  space.joinRequests = (space.joinRequests||[]).filter(r=>r.user_id!==userId);
+  try {
+    await sb.from('spaces').update({joinRequests: space.joinRequests}).eq('id', spaceId);
+    localStorage.setItem('mc_spaces', JSON.stringify(spaces));
+    renderManageMembersList(); renderSpacesList();
+    if(typeof notifyUsers === 'function') await notifyUsers([userId], 'Запрос на вход', `Владелец не принял запрос в «${space.name}»`, currentUser?.id, null, _SITE_URL);
+    toast('Запрос отклонён');
   } catch(e) { toast('Ошибка: '+e.message, true); }
 }
 

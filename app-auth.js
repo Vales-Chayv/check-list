@@ -13,7 +13,47 @@ function normalizePhone(raw) {
   return p;
 }
 
+// ── Ссылка-приглашение: код запоминаем сразу, чтобы он пережил регистрацию, вход и перезагрузку ──
+function capturePendingSpace() {
+  try {
+    const p = new URLSearchParams(window.location.search);
+    const tok = p.get('space');
+    if(!tok) return;
+    localStorage.setItem('mc_pending_space', JSON.stringify({token: tok, as: p.get('as') || '', ts: Date.now()}));
+    p.delete('space'); p.delete('as');
+    const q = p.toString();
+    history.replaceState({}, '', window.location.pathname + (q ? '?' + q : ''));
+  } catch(e) {}
+}
+function getPendingSpace() {
+  try {
+    const v = JSON.parse(localStorage.getItem('mc_pending_space') || 'null');
+    if(v && v.token && Date.now() - (v.ts||0) < 30*24*3600*1000) return v;
+  } catch(e) {}
+  return null;
+}
+function clearPendingSpace() { try { localStorage.removeItem('mc_pending_space'); } catch(e) {} }
+// Плашка на экране входа/регистрации: человек понимает, зачем создавать аккаунт
+async function showAuthInviteNote() {
+  const pend = getPendingSpace();
+  const box = document.querySelector('#auth-screen > div');
+  if(!box) return;
+  let note = document.getElementById('auth-invite-note');
+  if(!pend) { note?.remove(); return; }
+  if(!note) {
+    note = document.createElement('div');
+    note.id = 'auth-invite-note';
+    note.style.cssText = 'background:rgba(232,197,106,.14);border:1px solid rgba(232,197,106,.4);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.5;color:var(--t1)';
+    box.insertBefore(note, box.firstChild);
+  }
+  note.textContent = '🔗 Тебя пригласили в кабинет. Создай аккаунт или войди — и запрос на вход уйдёт владельцу.';
+  try {
+    const { data } = await sb.rpc('space_name_by_token', { t: pend.token });
+    if(data) note.textContent = '🔗 Тебя пригласили в кабинет «' + data + '». Создай аккаунт или войди — и запрос на вход уйдёт владельцу.';
+  } catch(e) {}
+}
 async function initAuth() {
+  capturePendingSpace();
   // Офлайн режим — используем сохранённые данные
   if(!navigator.onLine) {
     const savedLogin = localStorage.getItem('mc_login');
@@ -47,6 +87,7 @@ async function initAuth() {
   }
 
   // No session — show auth screen
+  showAuthInviteNote();
   const savedLogin = localStorage.getItem('mc_login');
   if(savedLogin) {
     showLoginScreen(savedLogin);
