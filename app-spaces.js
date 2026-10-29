@@ -765,7 +765,7 @@ async function createSpace() {
     if(error) throw error;
        // Стартовые рубрики — только для личного кабинета; у группового/семейного рубрики появляются только вручную при создании чатов
     const defaultCats = type === 'personal'
-      ? [{name:'Работа',color:'#e8c56a'},{name:'Личное',color:'#5b9ee8'},{name:'Проекты',color:'#5bb87a'}]
+      ? [{name:'Личное',color:'#5b9ee8'}]
       : [];
     if(defaultCats.length) await sb.from('categories').insert(defaultCats.map(c => ({...c, space_id: id})));
       spaces.push(space);

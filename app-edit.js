@@ -159,7 +159,9 @@ function setSaveBtns(en) { ['save-btn','save-btn2','save-btn3'].forEach(id=>{con
 // Cat select
 function populateCatSel(sel) {
   const s=document.getElementById('e-cat');
-  s.innerHTML=cats.map(c=>`<option value="${c.name}"${c.name===sel?' selected':''}>${esc(c.name)}</option>`).join('')+'<option value="__new">+ Новая рубрика</option>';
+  // Личный кабинет: подсказки готовых рубрик (создаются только если выбрать и сохранить)
+  const sug = (currentSpace?.type==='personal' ? ['Работа','Семья','Дом','Проекты'] : []).filter(n=>!cats.some(c=>c.name===n));
+  s.innerHTML=cats.map(c=>`<option value="${c.name}"${c.name===sel?' selected':''}>${esc(c.name)}</option>`).join('')+sug.map(n=>`<option value="__sug:${n}">${n} (новая)</option>`).join('')+'<option value="__new">+ Новая рубрика</option>';
 }
 function onCatChange() { if(document.getElementById('e-cat').value==='__new'){document.getElementById('new-cat-box').style.display='flex';initPalette(); setTimeout(()=>{ const i=document.getElementById('e-new-cat'); if(i){ i.scrollIntoView({block:'center',behavior:'smooth'}); i.focus(); } }, 80);} }
 function initPalette() {
@@ -503,10 +505,17 @@ function confirmRubricThen(name, onYes) {
 // Save
 async function saveCard() {
   const title=document.getElementById('e-title').value.trim(); if(!title)return;
-  const catVal=document.getElementById('e-cat').value==='__new'?(cats[0]?.name||''):document.getElementById('e-cat').value;
+  const _rawCat=document.getElementById('e-cat').value;
+  const catVal=_rawCat==='__new'?(cats[0]?.name||''):_rawCat.startsWith('__sug:')?_rawCat.slice(6):_rawCat;
   const isFamily = currentSpace?.type === 'family';
   if(!editId && !isFamily && currentSpace?.type !== 'group' && catVal && !window._catOk) { confirmRubricThen(catVal, () => { window._catOk = true; saveCard(); }); return; }
   window._catOk = false;
+  if(_rawCat.startsWith('__sug:') && !cats.some(c=>c.name===catVal)) {
+    const pal = (typeof COLORS !== 'undefined' && COLORS.length) ? COLORS : ['#e8c56a','#e8a63a','#e86060','#e85bb0','#c05be8','#a07de8','#5b9ee8','#5bc8e8','#5be8d0','#5bb87a','#8ee85b','#c8e85b'];
+    const used = new Set(cats.map(c=>c.color));
+    const nc = {name:catVal, color:(pal.find(c=>!used.has(c))||pal[0])};
+    cats.push(nc); await dbAddCat(nc); renderCats();
+  }
   const newStatus = isFamily ? (document.getElementById('e-status')?.value||'new') : document.getElementById('e-status').value;
   const assignedTo = isFamily ? (document.getElementById('e-assigned').value||null) : null;
   const oldCard=editId?cards.find(c=>c.id===editId):null;
