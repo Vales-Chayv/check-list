@@ -572,6 +572,7 @@ async function saveCard() {
     render();
     toast('✓ Сохранено');
     await dbUpdate(card);
+    try { const _na = cardAttsOf(card); storageRemoveAtts(cardAttsOf(oldCard).filter(a => !_na.some(n => n.data === a.data))); } catch(err) {} // убранные из карточки файлы — и из хранилища
   } else {
     const card={id:uid(),created_at:today(),space_id:currentSpaceId||'personal',created_by:localStorage.getItem('mc_current_member')||currentUser?.display_name||'',...data};
     cards.unshift(card);

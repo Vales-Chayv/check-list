@@ -869,6 +869,7 @@ async function toggleEntryFlag(cardId, entryId) {
 async function deleteEntry(cardId, entryId) {
   if(!confirm('Удалить запись?')) return;
   const card = cards.find(c=>c.id===cardId); if(!card) return;
+  const _goneEntry = (card.entries||[]).find(e=>e.id===entryId);
   card.entries = (card.entries||[]).filter(e=>e.id!==entryId);
   markInProgress(card);
   if(!card.entries.length && confirm('Записей в карточке не осталось. Удалить карточку?')) {
@@ -876,6 +877,7 @@ async function deleteEntry(cardId, entryId) {
   }
   render(); openView(cardId);
   try { await dbUpdate(card); } catch(e) { toast('Ошибка синхронизации', true); }
+  if(_goneEntry) storageRemoveAtts([...(_goneEntry.attachments||[]), ...(_goneEntry.sessionAtts||[])]); // файлы удалённой записи — и из хранилища
 }
 
 function editEntry(cardId, entryId) {

@@ -326,24 +326,36 @@ async function dbUpdate(card) {
   } else { await queueOp({type:'update',data:card}); setSyncDot('err'); }
 }
 
-async function dbDelete(id) {
-  // Удаляем файлы из Storage
-  const card = cards.find(c=>c.id===id);
-  if(card && navigator.onLine) {
-    const allAtts = [
-      ...(card.attachments||[]),
-      ...(card.entries||[]).flatMap(e=>[...(e.attachments||[]),...(e.sessionAtts||[])])
-    ].filter(a=>a.data);
-    for(const att of allAtts) {
-      try {
-      if(att.data.includes('supabase')) {
-  const path = att.data.split('/attachments/')[1];
-  if(path) await sb.storage.from('attachments').remove([path]);
+// Все вложения карточки: на карточке и во всех записях
+function cardAttsOf(c) {
+  if(!c) return [];
+  return [...(c.attachments||[]), ...(c.entries||[]).flatMap(e => [...(e.attachments||[]), ...(e.sessionAtts||[])])].filter(a => a && a.data);
 }
-// base64 файлы просто не сохраняем — они исчезнут вместе с карточкой
-      } catch(e) {}
-    }
-  }
+// Удаляет файлы из Storage, если на них больше не ссылается ни одна известная карточка (кроме exceptCardId)
+async function storageRemoveAtts(atts, exceptCardId) {
+  try {
+    if(!navigator.onLine) return;
+    const pathOf = a => {
+      const u = a && a.data ? String(a.data) : '';
+      if(u.startsWith('data:') || !u.includes('/attachments/')) return null;
+      try { return decodeURIComponent(u.split('/attachments/')[1].split('?')[0]); } catch(e) { return null; }
+    };
+    const want = [...new Set((atts||[]).map(pathOf).filter(Boolean))];
+    if(!want.length) return;
+    let all = [];
+    try { all = await local.getAll('cards'); } catch(e) {}
+    const byId = new Map((all||[]).map(c => [c.id, c]));
+    (cards||[]).forEach(c => byId.set(c.id, c));
+    const used = new Set();
+    byId.forEach(c => { if(c.id === exceptCardId) return; cardAttsOf(c).forEach(a => { const p = pathOf(a); if(p) used.add(p); }); });
+    const del = want.filter(p => !used.has(p));
+    if(del.length) await sb.storage.from('attachments').remove(del);
+  } catch(e) { console.log('storageRemoveAtts error:', e); }
+}
+async function dbDelete(id) {
+  // Удаляем файлы из Storage (если на них не ссылаются другие карточки)
+  const card = cards.find(c=>c.id===id);
+  if(card) await storageRemoveAtts(cardAttsOf(card), id);
   await local.delete('cards', id);
   if (navigator.onLine) {
     setSyncDot('sync');
