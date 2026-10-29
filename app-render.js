@@ -233,10 +233,10 @@ async function openPinPopup(){
   deck.innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Загрузка…</div>';
   let pinned = [];
   try {
-    const ids = spaces.map(s=>s.id);
-    const { data } = await sb.from('cards').select('*').in('space_id', ids).eq('pinned', true);
+    const ids = spaces.filter(s=>s.type!=='family'&&s.type!=='group').map(s=>s.id);
+    const { data } = ids.length ? await sb.from('cards').select('*').in('space_id', ids).eq('pinned', true) : {data:[]};
     pinned = data||[];
- } catch(e) { pinned = (cards||[]).filter(c=>c.pinned); }
+ } catch(e) { pinned = (cards||[]).filter(c=>c.pinned && currentSpace?.type!=='family' && currentSpace?.type!=='group'); }
   window._pinnedCache = pinned;
   try {
     const ids = spaces.map(s=>s.id);
