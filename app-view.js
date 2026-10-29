@@ -68,8 +68,10 @@ function openView(id) {
   const col = catColor(card.category);
   const entries = (currentSpace?.type==='family'||currentSpace?.type==='group') ? [...(card.entries||[])] : [...(card.entries||[])].sort((a,b)=>(a.done===b.done)?0:a.done?1:-1);
   const atts = card.attachments||[];
-  const imgs = atts.filter(a=>a.type?.startsWith('image/'));
-  const files = atts.filter(a=>!a.type?.startsWith('image/'));
+  const _mt = mediaTilesOf(atts);
+  const useStack = _mt.length >= 2; // 2+ фото/видео карточки — стопкой, а не сеткой
+  const imgs = useStack ? [] : atts.filter(a=>a.type?.startsWith('image/'));
+  const files = atts.filter(a=>!a.type?.startsWith('image/') && !(useStack && a.type?.startsWith('video/')));
   const allDeadlines = [card.deadline, ...(card.entries||[]).filter(e=>!e.done&&e.deadline).map(e=>e.deadline)].filter(Boolean).sort();
   const dl = allDeadlines.length ? deadlineInfo(allDeadlines[0]) : null;
   const related = card.related_ids||[];
@@ -307,6 +309,7 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
     html+=`<div class="view-sec">${!isFamily?`<div class="view-lbl">Записи (${dc}/${entries.filter(e=>e.text).length})</div>`:''}${sessionsHTML}${(!isFamily&&entryGroups.length)?`<button onclick="addViewGroup('${id}')" style="width:100%;background:var(--s2);color:var(--accent);border:1px dashed rgba(232,197,106,.4);border-radius:var(--rsm);padding:10px;font-size:14px;cursor:pointer">＋ Новая рубрика</button>`:''}</div>`;
   }
 
+  if(useStack) html+=`<div class="view-sec"><div class="view-lbl">Фото и видео</div>${mediaStackHTML(_mt, 'mg_'+id+'_c')}</div>`;
   if(imgs.length) html+=`<div class="view-sec"><div class="view-lbl">Фото (${imgs.length})</div><div style="display:flex;flex-wrap:wrap;gap:7px">${imgs.map((a,i)=>`<img src="${a.data}" style="width:95px;height:95px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid rgba(255,255,255,.1)" onclick="App.viewImg('${id}',${i})">`).join('')}</div></div>`;
 
   if(files.length) html+=`<div class="view-sec"><div class="view-lbl">Файлы</div><div style="display:flex;flex-wrap:wrap;gap:7px">${files.map(f=>{
@@ -756,7 +759,6 @@ function mediaStackHTML(tiles, gid) {
 }
 function mediaOpen(gid, i) {
   const t = (window._mediaGroups[gid] || [])[i]; if(!t) return;
-  document.getElementById('media-group-ov')?.remove();
   if(t.vid) openVideoViewer(t.data); else openImgDirect(t.data);
 }
 function openMediaGroup(gid) {
