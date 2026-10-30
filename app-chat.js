@@ -425,13 +425,15 @@ async function openChatVoice(cardId){
   try {
     const stream = await navigator.mediaDevices.getUserMedia({audio:true});
     chatRecordedChunks = [];
-    chatRecorder = new MediaRecorder(stream);
+    const _mt = ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg'].find(t => window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t));
+    window._chatRecMime = _mt || '';
+    chatRecorder = _mt ? new MediaRecorder(stream, {mimeType:_mt}) : new MediaRecorder(stream);
     chatRecorder.ondataavailable = e => { if(e.data.size>0) chatRecordedChunks.push(e.data); };
     chatRecorder.onstop = () => { stream.getTracks().forEach(t=>t.stop()); chatFinishVoice(); };
     chatRecorder.start();
     showChatVoiceUI();
   } catch(e) {
-    toast('Нет доступа к микрофону', true);
+    toast('Микрофон: ' + (e && e.name ? e.name : 'ошибка') + (e && e.message ? ' — ' + e.message : ''), true);
   }
 }
 function showChatVoiceUI(){
@@ -573,8 +575,10 @@ async function rejectCloseChat(cardId) {
 
 async function chatFinishVoice(){
   if(!chatRecordedChunks.length) return;
-  const blob = new Blob(chatRecordedChunks, {type:'audio/webm'});
-  const file = new File([blob], 'voice_'+Date.now()+'.webm', {type:'audio/webm'});
+  const _rm = (window._chatRecMime || 'audio/webm').split(';')[0];
+  const _ext = _rm.includes('mp4') ? 'm4a' : _rm.includes('ogg') ? 'ogg' : 'webm';
+  const blob = new Blob(chatRecordedChunks, {type:_rm});
+  const file = new File([blob], 'voice_'+Date.now()+'.'+_ext, {type:_rm});
   const card = cards.find(c=>c.id===chatRecordingCardId); if(!card) return;
   toast('Загрузка голосового…');
   try {

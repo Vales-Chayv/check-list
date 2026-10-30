@@ -134,7 +134,13 @@ function openView(id) {
     const sessionMap = new Map();
     entries.forEach(e => {
       const sid = e.sessionId || e.id;
-      if(!sessionMap.has(sid)) sessionMap.set(sid, {sid, note:e.sessionNote||null, atts:e.sessionAtts||[], entries:[], creator:e.sessionCreator||'', date:e.date||''});
+      if(!sessionMap.has(sid)) sessionMap.set(sid, {sid, note:e.sessionNote||null, atts:[...(e.sessionAtts||[])], entries:[], creator:e.sessionCreator||'', date:e.date||''});
+      else {
+        // «＋ Добавить» кладёт новые вложения в новую запись того же стикера — копим вложения всех записей, а не только самой свежей
+        const _s = sessionMap.get(sid);
+        if(!_s.note && e.sessionNote) _s.note = e.sessionNote;
+        (e.sessionAtts||[]).forEach(a => { if(a && !_s.atts.some(x => x === a || (x.data && x.data === a.data))) _s.atts.push(a); });
+      }
       sessionMap.get(sid).entries.push(e);
     });
     const sessions = [...sessionMap.values()];
