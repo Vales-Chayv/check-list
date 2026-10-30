@@ -347,14 +347,16 @@ async function storageRemoveAtts(atts, exceptCardId) {
     const byId = new Map((all||[]).map(c => [c.id, c]));
     (cards||[]).forEach(c => byId.set(c.id, c));
     const used = new Set();
-    byId.forEach(c => { if(c.id === exceptCardId) return; cardAttsOf(c).forEach(a => { const p = pathOf(a); if(p) used.add(p); }); });
+    const _ex = new Set([].concat(exceptCardId || []));
+    byId.forEach(c => { if(_ex.has(c.id)) return; cardAttsOf(c).forEach(a => { const p = pathOf(a); if(p) used.add(p); }); });
     const del = want.filter(p => !used.has(p));
     if(del.length) await sb.storage.from('attachments').remove(del);
   } catch(e) { console.log('storageRemoveAtts error:', e); }
 }
-async function dbDelete(id) {
-  // Удаляем файлы из Storage (если на них не ссылаются другие карточки)
-  const card = cards.find(c=>c.id===id);
+async function dbDelete(id, cardArg) {
+  // Удаляем файлы из Storage (если на них не ссылаются другие карточки).
+  // Вызывающий код уже убрал карточку из cards, поэтому он передаёт её вторым аргументом
+  const card = cardArg || cards.find(c=>c.id===id);
   if(card) await storageRemoveAtts(cardAttsOf(card), id);
   await local.delete('cards', id);
   if (navigator.onLine) {

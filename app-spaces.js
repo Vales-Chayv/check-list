@@ -860,8 +860,11 @@ async function deleteSpace(id) {
   const space = spaces.find(s=>s.id===id); if(!space) return;
   if(!confirm('Удалить кабинет «'+space.name+'»? Все карточки будут удалены.')) return;
   try {
+    let _spCards = [];
+    try { const { data: _d } = await sb.from('cards').select('id,attachments,entries').eq('space_id', id); _spCards = _d || []; } catch(e) {}
     await sb.from('cards').delete().eq('space_id', id);
     await sb.from('spaces').delete().eq('id', id);
+    try { await storageRemoveAtts(_spCards.flatMap(c => cardAttsOf(c)), _spCards.map(c => c.id)); } catch(e) {}
     spaces = spaces.filter(s=>s.id!==id);
     localStorage.setItem('mc_spaces', JSON.stringify(spaces));
 document.getElementById('edit-space-dialog')?.remove();

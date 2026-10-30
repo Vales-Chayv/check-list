@@ -699,9 +699,10 @@ completions: completions,
 }
 
 async function deleteCardById(id) {
+  const _gone = cards.find(c => c.id === id);
   cards = cards.filter(c => c.id !== id);
   render(); toast('Карточка удалена');
-  await dbDelete(id);
+  await dbDelete(id, _gone);
 }
 
 // Ball segment in ae panel

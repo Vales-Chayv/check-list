@@ -278,9 +278,10 @@ async function handleFiles(inp) {
 }
  
 async function deleteCardById(id) {
+  const _gone=cards.find(c=>c.id===id);
   cards=cards.filter(c=>c.id!==id);
   render(); toast('Карточка удалена');
-  await dbDelete(id);
+  await dbDelete(id, _gone);
 }
 
 function renderAttPrev() {
@@ -602,11 +603,12 @@ if(!localStorage.getItem('mc_push_asked')) {
 async function deleteCard() {
   if(!confirm('Удалить карточку?'))return;
   const id = editId;
+  const _gone=cards.find(c=>c.id===id);
   cards=cards.filter(c=>c.id!==id);
   originalState=null;
   document.getElementById('edit-ov').classList.remove('on');
   render(); toast('Карточка удалена');
-  await dbDelete(id);
+  await dbDelete(id, _gone);
 }
 
 async function toggleDone(id) {
