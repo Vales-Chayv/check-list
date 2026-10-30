@@ -245,6 +245,15 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
         <div style="position:absolute;bottom:2px;right:2px;width:0;height:0;border-style:solid;border-width:24px 24px 0 0;border-color:transparent ${bottomColor} transparent transparent"></div>
       </div>` : '';
 
+     if(s.entries.some(e => e.plainMsg)) {
+        return `<div style="display:flex;justify-content:${align};margin:12px 0 6px"><div style="width:min(80%,330px)">
+          <div style="font-size:10px;color:var(--t3);margin:0 2px 3px;text-align:${isMe?'left':'right'}">${creator?esc(aliasedName(creator)):'?'} · ${s.date}</div>
+          ${tiles.length ? mediaMosaicHTML(tiles, gid) : ''}
+          ${attStripHTML(sFiles, 'file', gid)}
+          ${attStripHTML(sAudios, 'audio', gid)}
+          ${s.note ? `<div style="font-size:14px;color:var(--t1);margin-top:6px;line-height:1.45;word-break:break-word;white-space:pre-wrap" dir="auto">${esc(s.note)}</div>` : ''}
+        </div></div>`;
+      }
      if(mediaOnly) {
         const _chips = sFiles.length ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${sFiles.map(f=>`<a href="${f.data}" download="${esc(f.name)}" class="file-action">📎${esc(f.name)}</a>`).join('')}</div>` : '';
         return `<div style="display:flex;justify-content:${align};margin:12px 0 6px"><div style="width:min(80%,330px)">
@@ -713,6 +722,26 @@ function toggleStickerFiles(id) {
 
 // ── Медиа в записях: мозаика (чат), полоса в лотке, стопка (личные кабинеты) ──
 window._mediaGroups = window._mediaGroups || {};
+function attStackToggle(id) {
+  const l = document.getElementById(id + '_l'), c = document.getElementById(id + '_c');
+  if(!l) return;
+  const open = l.style.display === 'none';
+  l.style.display = open ? 'block' : 'none';
+  if(c) c.textContent = open ? '⌃' : '⌄';
+}
+// Полоска файлов/записей под медиа: до двух — строками, три и больше — стопкой
+function attStripHTML(items, kind, gid) {
+  if(!items.length) return '';
+  const rowHTML = a => kind === 'audio'
+    ? `<div style="margin-top:5px"><audio controls src="${a.data}" style="width:100%;height:34px"></audio></div>`
+    : `<div style="margin-top:5px"><a href="${a.data}" download="${esc(a.name)}" class="file-action" style="margin:0;max-width:100%;box-sizing:border-box"><span>📎</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.name)}</span></a></div>`;
+  if(items.length <= 2) return items.map(rowHTML).join('');
+  const n = items.length, w = kind === 'audio'
+    ? ((n%10===1&&n%100!==11) ? 'запись' : (n%10>=2&&n%10<=4&&(n%100<10||n%100>=20)) ? 'записи' : 'записей')
+    : ((n%10===1&&n%100!==11) ? 'файл' : (n%10>=2&&n%10<=4&&(n%100<10||n%100>=20)) ? 'файла' : 'файлов');
+  const sid = 'as_' + gid + '_' + kind;
+  return `<div style="margin-top:6px"><div onclick="attStackToggle('${sid}')" style="position:relative;cursor:pointer"><div style="position:absolute;inset:0;background:var(--s2);border:1px solid var(--b1);border-radius:8px;transform:rotate(-2deg)"></div><div style="position:relative;background:var(--s2);border:1px solid var(--b1);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--t1)">${kind==='audio'?'🎤':'📄'} ${n} ${w} <span id="${sid}_c">⌄</span></div></div><div id="${sid}_l" style="display:none">${items.map(rowHTML).join('')}</div></div>`;
+}
 function mediaTilesOf(atts) {
   return (atts||[]).filter(a => a.type && (a.type.startsWith('image/') || a.type.startsWith('video/')))
     .map(a => ({data: a.data, vid: a.type.startsWith('video/'), name: a.name || ''}));

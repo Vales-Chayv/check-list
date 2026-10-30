@@ -375,10 +375,10 @@ function pickChatAttachment(cardId, kind){
   if(kind === 'task') { openChatCompose(cardId); return; }
   const inp = document.createElement('input');
   inp.type = 'file';
-  if(kind === 'photo' || kind === 'video') inp.multiple = true;
+  inp.multiple = true;
   if(kind === 'photo') inp.accept = 'image/*,video/*';
   if(kind === 'video') inp.accept = 'video/*';
-  inp.onchange = () => { if(inp.files && inp.files.length) sendQuickAttachment(cardId, [...inp.files]); };
+  inp.onchange = () => { if(inp.files && inp.files.length) openChatSend(cardId, [...inp.files]); };
   inp.click();
 }
 
@@ -587,7 +587,7 @@ async function chatFinishVoice(){
   const entry = {
       id: uid(), text: '', date: nowStr(), done: false,
       attachments: [], sessionId: uid(),
-      sessionNote: null, sessionAtts: [att], sessionCreator: localStorage.getItem('mc_current_member')||currentUser?.display_name||'',
+      sessionNote: null, sessionAtts: [att], plainMsg: true, sessionCreator: localStorage.getItem('mc_current_member')||currentUser?.display_name||'',
       assigned_to: null, completions: null, deadline: null
     };
     card.entries = [entry, ...(card.entries||[])];
@@ -601,6 +601,121 @@ async function chatFinishVoice(){
       if(recipientIds.length) await notifyUsers(recipientIds, '💬 ' + card.title, `{{name}}: 🎙️ Голосовое сообщение`, currentUser?.id, entry.sessionCreator, `https://vales-chayv.github.io/check-list/?openSpace=${currentSpaceId}&openCard=${card.id}`);
     }
   } catch(e) {
+    toast('Ошибка загрузки', true);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  ОКНО ОТПРАВКИ ВЛОЖЕНИЙ ИЗ 📎 (как в мессенджере): превью, подпись, одно сообщение без стикера
+// ═══════════════════════════════════════════
+let _cs = null;
+function _csKind(f){ const t = f.type||''; return (t.startsWith('image/')||t.startsWith('video/')) ? 'media' : t.startsWith('audio/') ? 'audio' : 'file'; }
+function _csUrl(f){ if(!_cs.urls.has(f)) _cs.urls.set(f, URL.createObjectURL(f)); return _cs.urls.get(f); }
+function _csSize(f){ const k = f.size/1024; return k < 1024 ? Math.max(1,Math.round(k)) + ' КБ' : (k/1024).toFixed(1) + ' МБ'; }
+function openChatSend(cardId, files){
+  document.getElementById('chat-send-ov')?.remove();
+  _cs = { cardId, files:[...files], urls:new Map(), open:{}, busy:false };
+  const ov = document.createElement('div');
+  ov.id = 'chat-send-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2100;display:flex;align-items:flex-end;justify-content:center';
+  ov.innerHTML = `<div style="background:var(--s1);border-radius:16px 16px 0 0;width:100%;max-width:560px;max-height:92vh;display:flex;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--b1)">
+      <b style="font-size:15px">Отправить в чат</b>
+      <button onclick="chatSendClose()" style="background:var(--s2);border:none;color:var(--t2);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px">✕</button>
+    </div>
+    <div id="cs-prev" style="padding:12px 16px;overflow:auto;flex:1"></div>
+    <div style="padding:10px 14px;border-top:1px solid var(--b1);display:flex;gap:8px;align-items:flex-end">
+      <button onclick="chatSendMore()" title="Добавить ещё" style="background:var(--s2);color:var(--t1);border:1px solid var(--b1);border-radius:50%;width:40px;height:40px;font-size:18px;cursor:pointer;flex-shrink:0">＋</button>
+      <textarea id="cs-cap" rows="1" dir="auto" placeholder="Подпись…" style="flex:1;min-width:0;background:var(--s2);border:1px solid var(--b1);border-radius:20px;padding:10px 14px;font-size:14px;color:var(--t1);font-family:inherit;resize:none;max-height:90px"></textarea>
+      <button id="cs-send" onclick="chatSendGo()" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:50%;width:40px;height:40px;font-size:16px;cursor:pointer;flex-shrink:0">➤</button>
+    </div></div>`;
+  document.body.appendChild(ov);
+  chatSendRender();
+}
+function chatSendClose(){
+  if(_cs) { _cs.urls.forEach(u => { try { URL.revokeObjectURL(u); } catch(e) {} }); }
+  _cs = null;
+  document.getElementById('chat-send-ov')?.remove();
+}
+function chatSendMore(){
+  if(!_cs) return;
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.multiple = true;
+  inp.onchange = () => { if(_cs && inp.files && inp.files.length) { _cs.files.push(...inp.files); chatSendRender(); } };
+  inp.click();
+}
+function chatSendRemove(i){
+  if(!_cs) return;
+  _cs.files.splice(i, 1);
+  if(!_cs.files.length) { chatSendClose(); return; }
+  chatSendRender();
+}
+function chatSendToggle(k){ if(!_cs) return; _cs.open[k] = !_cs.open[k]; chatSendRender(); }
+function chatSendRender(){
+  const box = document.getElementById('cs-prev'); if(!box || !_cs) return;
+  const idx = f => _cs.files.indexOf(f);
+  const rm = f => `<button onclick="event.stopPropagation();chatSendRemove(${idx(f)})" style="background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:11px;cursor:pointer;flex-shrink:0">✕</button>`;
+  const media = _cs.files.filter(f => _csKind(f)==='media');
+  const audio = _cs.files.filter(f => _csKind(f)==='audio');
+  const other = _cs.files.filter(f => _csKind(f)==='file');
+  const thumb = (f, w, h) => (f.type||'').startsWith('video/')
+    ? `<video src="${_csUrl(f)}#t=0.1" preload="metadata" muted playsinline style="width:${w};height:${h};object-fit:cover;border-radius:8px;display:block"></video><span style="position:absolute;left:6px;bottom:5px;font-size:11px;color:#fff;background:rgba(0,0,0,.55);border-radius:9px;padding:0 6px">▶</span>`
+    : `<img src="${_csUrl(f)}" style="width:${w};height:${h};object-fit:cover;border-radius:8px;display:block">`;
+  let h = '';
+  if(media.length) {
+    h += `<div style="display:flex;gap:8px;align-items:stretch">
+      <div style="position:relative;flex:1;min-width:0">${thumb(media[0], '100%', '150px')}<div style="position:absolute;top:6px;right:6px">${rm(media[0])}</div></div>`;
+    if(media.length > 1) h += `<div onclick="chatSendToggle('media')" style="position:relative;width:34%;cursor:pointer;flex-shrink:0">
+        <div style="position:absolute;inset:0;background:var(--s3,#444);border-radius:8px;transform:rotate(-6deg)"></div>
+        <div style="position:absolute;inset:0;border-radius:8px;overflow:hidden">${thumb(media[1], '100%', '100%')}<div style="position:absolute;inset:0;background:rgba(0,0,0,.45);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700">+${media.length-1}</div></div></div>`;
+    h += `</div>`;
+    if(_cs.open.media && media.length > 1) h += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${media.slice(1).map(f => `<div style="position:relative;width:72px;height:72px">${thumb(f,'72px','72px')}<div style="position:absolute;top:3px;right:3px">${rm(f)}</div></div>`).join('')}</div>`;
+  }
+  const rows = (arr, ico) => arr.map(f => `<div style="display:flex;gap:8px;align-items:center;background:var(--s2);border:1px solid var(--b1);border-radius:8px;padding:7px 10px;margin-top:6px;font-size:13px"><span>${ico}</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span><span style="color:var(--t3);font-size:11px">${_csSize(f)}</span>${rm(f)}</div>`).join('');
+  const group = (arr, key, ico, one, few, many) => {
+    if(!arr.length) return '';
+    if(arr.length <= 2) return rows(arr, ico);
+    const n = arr.length, w = (n%10===1&&n%100!==11) ? one : (n%10>=2&&n%10<=4&&(n%100<10||n%100>=20)) ? few : many;
+    return `<div onclick="chatSendToggle('${key}')" style="position:relative;margin-top:10px;cursor:pointer"><div style="position:absolute;inset:0;background:var(--s2);border:1px solid var(--b1);border-radius:8px;transform:rotate(-2deg)"></div><div style="position:relative;background:var(--s2);border:1px solid var(--b2,var(--b1));border-radius:8px;padding:9px 12px;font-size:13px">${ico} ${n} ${w} ${_cs.open[key]?'⌃':'⌄'}</div></div>` + (_cs.open[key] ? rows(arr, ico) : '');
+  };
+  h += group(other, 'file', '📄', 'файл', 'файла', 'файлов');
+  h += group(audio, 'audio', '🎤', 'запись', 'записи', 'записей');
+  box.innerHTML = h;
+}
+async function chatSendGo(){
+  const s = _cs; if(!s || s.busy || !s.files.length) return;
+  const card = cards.find(c => c.id === s.cardId); if(!card) return;
+  const caption = (document.getElementById('cs-cap')?.value || '').trim();
+  s.busy = true;
+  const btn = document.getElementById('cs-send'); if(btn) btn.disabled = true;
+  const files = [...s.files];
+  toast(files.length > 1 ? `Загрузка… (${files.length})` : 'Загрузка…');
+  try {
+    const atts = [];
+    for(const f of files) atts.push(await uploadToStorage(f, card.id, null));
+    const myName = localStorage.getItem('mc_current_member') || currentUser?.display_name || '';
+    const entry = {
+      id: uid(), text: '', date: nowStr(), done: false,
+      attachments: [], sessionId: uid(), sessionNote: caption || null, sessionAtts: atts,
+      sessionCreator: myName, plainMsg: true,
+      assigned_to: null, completions: null, deadline: null
+    };
+    card.entries = [entry, ...(card.entries||[])];
+    chatSendClose();
+    await dbUpdate(card);
+    render();
+    openView(card.id);
+    setTimeout(() => { const sheet = document.querySelector('#view-ov .sheet'); if(sheet) sheet.scrollTop = 0; }, 50);
+    toast('✓ Отправлено');
+    if(Array.isArray(card.chatParticipants) && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof notifyUsers === 'function') {
+      const recipientIds = chatRecipientIds(card);
+      const nImg = files.filter(f=>(f.type||'').startsWith('image/')).length, nVid = files.filter(f=>(f.type||'').startsWith('video/')).length;
+      const label = (nImg && nVid ? '📷 Фото и видео' : nVid ? '🎥 Видео' : nImg ? '📷 Фото' : (files.every(f=>(f.type||'').startsWith('audio/')) ? '🎤 Запись' : '📎 Файл')) + (files.length>1 ? ' ×'+files.length : '');
+      if(recipientIds.length) await notifyUsers(recipientIds, '💬 ' + card.title, `{{name}}: ${caption ? caption.slice(0,60) : label}`, currentUser?.id, myName, `https://vales-chayv.github.io/check-list/?openSpace=${currentSpaceId}&openCard=${card.id}`);
+    }
+  } catch(e) {
+    s.busy = false;
+    const b = document.getElementById('cs-send'); if(b) b.disabled = false;
     toast('Ошибка загрузки', true);
   }
 }
