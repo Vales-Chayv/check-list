@@ -375,28 +375,32 @@ function pickChatAttachment(cardId, kind){
   if(kind === 'task') { openChatCompose(cardId); return; }
   const inp = document.createElement('input');
   inp.type = 'file';
+  if(kind === 'photo' || kind === 'video') inp.multiple = true;
   if(kind === 'photo') inp.accept = 'image/*';
   if(kind === 'video') inp.accept = 'video/*';
-  inp.onchange = () => { if(inp.files[0]) sendQuickAttachment(cardId, inp.files[0]); };
+  inp.onchange = () => { if(inp.files && inp.files.length) sendQuickAttachment(cardId, [...inp.files]); };
   inp.click();
 }
 
-async function sendQuickAttachment(cardId, file){
+async function sendQuickAttachment(cardId, fileOrFiles){
   const card = cards.find(c=>c.id===cardId); if(!card) return;
-  toast('Загрузка…');
+  const files = Array.isArray(fileOrFiles) ? fileOrFiles : [fileOrFiles];
+  const file = files[0];
+  toast(files.length>1 ? `Загрузка… (${files.length})` : 'Загрузка…');
   try {
-    const att = await uploadToStorage(file, card.id, null);
-    const kindLabel = file.type.startsWith('image/') ? '📷 Фото' : file.type.startsWith('video/') ? '🎥 Видео' : '📎 Файл';
+    const newAtts = [];
+    for(const f of files) newAtts.push(await uploadToStorage(f, card.id, null));
+    const kindLabel = (file.type.startsWith('image/') ? '📷 Фото' : file.type.startsWith('video/') ? '🎥 Видео' : '📎 Файл') + (files.length>1 ? ' ×'+files.length : '');
     const myName = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
 
     // Если есть активный "черновой" стикер этого же чата и он мой — крепим вложение в него, как в Telegram
     const draft = card.entries.find(e=>e.id===_activeAttachEntryId && e.sessionCreator===myName);
     if(draft) {
-      draft.sessionAtts = [...(draft.sessionAtts||[]), att];
+      draft.sessionAtts = [...(draft.sessionAtts||[]), ...newAtts];
     } else {
       const entry = {
         id: uid(), text: '', date: nowStr(), done: false,
-        attachments: [], sessionId: uid(), sessionNote: null, sessionAtts: [att],
+        attachments: [], sessionId: uid(), sessionNote: null, sessionAtts: newAtts,
         sessionCreator: myName,
         assigned_to: null, completions: null, deadline: null
       };
