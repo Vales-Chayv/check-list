@@ -376,7 +376,7 @@ function pickChatAttachment(cardId, kind){
   const inp = document.createElement('input');
   inp.type = 'file';
   if(kind === 'photo' || kind === 'video') inp.multiple = true;
-  if(kind === 'photo') inp.accept = 'image/*';
+  if(kind === 'photo') inp.accept = 'image/*,video/*';
   if(kind === 'video') inp.accept = 'video/*';
   inp.onchange = () => { if(inp.files && inp.files.length) sendQuickAttachment(cardId, [...inp.files]); };
   inp.click();
@@ -390,7 +390,8 @@ async function sendQuickAttachment(cardId, fileOrFiles){
   try {
     const newAtts = [];
     for(const f of files) newAtts.push(await uploadToStorage(f, card.id, null));
-    const kindLabel = (file.type.startsWith('image/') ? '📷 Фото' : file.type.startsWith('video/') ? '🎥 Видео' : '📎 Файл') + (files.length>1 ? ' ×'+files.length : '');
+    const _nImg = files.filter(f=>f.type.startsWith('image/')).length, _nVid = files.filter(f=>f.type.startsWith('video/')).length;
+    const kindLabel = (_nImg && _nVid ? '📷 Фото и видео' : _nVid ? '🎥 Видео' : _nImg ? '📷 Фото' : '📎 Файл') + (files.length>1 ? ' ×'+files.length : '');
     const myName = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
 
     // Если есть активный "черновой" стикер этого же чата и он мой — крепим вложение в него, как в Telegram
