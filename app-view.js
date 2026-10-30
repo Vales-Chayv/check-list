@@ -240,7 +240,7 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
       if(sFiles.length) filesHTML+=`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${sFiles.map(f=>`<a href="${f.data}" download="${esc(f.name)}" style="font-size:12px;color:rgba(0,0,0,.7);background:rgba(0,0,0,.1);padding:3px 8px;border-radius:10px;text-decoration:none">📎${esc(f.name)}</a>`).join('')}</div>`;
 
       // Folded corner SVG
-      const cornerHTML = hasFiles ? `<div onclick="toggleStickerFiles('${stkId}')" style="position:absolute;bottom:0;right:0;width:28px;height:28px;cursor:pointer;overflow:hidden;border-radius:0 0 10px 0">
+      const cornerHTML = hasFiles ? `<div data-stk-corner="${stkId}" style="position:absolute;bottom:0;right:0;width:40px;height:40px;cursor:grab;overflow:hidden;border-radius:0 0 10px 0;touch-action:none">
         <div style="position:absolute;bottom:0;right:0;width:0;height:0;border-style:solid;border-width:28px 28px 0 0;border-color:transparent rgba(0,0,0,.25) transparent transparent"></div>
         <div style="position:absolute;bottom:2px;right:2px;width:0;height:0;border-style:solid;border-width:24px 24px 0 0;border-color:transparent ${bottomColor} transparent transparent"></div>
       </div>` : '';
@@ -277,7 +277,7 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
             ${showAddBtn?`<button onclick="openAddEntry('${id}','${s.sid}',true)" style="margin-top:8px;background:rgba(0,0,0,.1);border:none;border-radius:20px;padding:4px 12px;font-size:12px;color:rgba(0,0,0,.6);cursor:pointer;font-family:inherit">＋ Добавить</button>`:''}
             ${cornerHTML}
           </div>
-          ${hasFiles?`<div id="${stkId}" style="display:none;position:relative;z-index:1;background:${bottomColor};border-radius:0 0 10px 10px;padding:12px 14px;margin:0 -4px">${filesHTML}</div>`:''}
+          ${hasFiles?`<div id="${stkId}" style="display:none;height:0;overflow:hidden;position:relative;z-index:1;background:${bottomColor};border-radius:0 0 10px 10px;margin:0 -4px"><div style="padding:12px 14px">${filesHTML}</div></div>`:''}
         </div>
       </div>`;
     }
@@ -710,14 +710,85 @@ document.getElementById('ae-seg-ball').addEventListener('click', e => {
   document.querySelectorAll('#ae-seg-ball .seg-btn').forEach(b=>b.classList.remove('on'));
   btn.classList.add('on');
 });
-function toggleStickerFiles(id) {
-  const content = document.getElementById(id);
-  const peek = document.getElementById(id + '_peek');
-  if(!content) return;
-  const isOpen = content.style.display !== 'none';
-  content.style.display = isOpen ? 'none' : 'block';
-  if(peek) peek.style.display = isOpen ? 'block' : 'none';
+// Лист-лоток под стикером: тянем за загнутый угол вниз — лоток растёт за пальцем; тянем дальше — поднимается над стикером на треть
+function stkMeasure(tray) {
+  tray.style.display = 'block';
+  const prevH = tray.style.height, prevT = tray.style.transition;
+  tray.style.transition = 'none'; tray.style.height = 'auto';
+  const nat = tray.offsetHeight;
+  tray.style.height = prevH; void tray.offsetHeight; tray.style.transition = prevT;
+  const front = tray.previousElementSibling;
+  return { nat, rm: Math.round(((front && front.offsetHeight) || 120) / 3) };
 }
+function stkLayout(tray, total, nat) {
+  const h = Math.min(total, nat), rise = Math.max(0, total - nat);
+  tray.style.height = h + 'px';
+  tray.style.marginTop = (-rise) + 'px';
+  tray.style.zIndex = rise > 0 ? '3' : '1';
+  tray.style.borderRadius = rise > 0 ? '10px' : '0 0 10px 10px';
+  return rise;
+}
+function stkSetState(id, state, anim) {
+  const tray = document.getElementById(id); if(!tray) return;
+  const peek = document.getElementById(id + '_peek');
+  const s0 = tray.dataset.state || 'closed';
+  const m = stkMeasure(tray);
+  if(!tray.style.height || tray.style.height === 'auto') {
+    tray.style.transition = 'none';
+    tray.style.height = (s0 === 'closed' ? 0 : m.nat) + 'px';
+    void tray.offsetHeight;
+  }
+  tray.dataset.state = state;
+  tray.style.transition = anim ? 'height .22s ease, margin-top .22s ease' : 'none';
+  stkLayout(tray, state === 'closed' ? 0 : state === 'open' ? m.nat : m.nat + m.rm, m.nat);
+  if(peek) peek.style.display = state === 'closed' ? 'block' : 'none';
+  clearTimeout(tray._stkT);
+  tray._stkT = setTimeout(() => {
+    if(tray.dataset.state === 'closed') tray.style.display = 'none';
+    else { tray.style.transition = 'none'; tray.style.height = 'auto'; }
+  }, anim ? 250 : 0);
+}
+function toggleStickerFiles(id) {
+  const tray = document.getElementById(id); if(!tray) return;
+  stkSetState(id, (tray.dataset.state || 'closed') === 'closed' ? 'open' : 'closed', true);
+}
+(function(){
+  if(window._stkDragInit) return; window._stkDragInit = true;
+  let d = null;
+  document.addEventListener('pointerdown', e => {
+    const c = e.target.closest && e.target.closest('[data-stk-corner]'); if(!c) return;
+    const id = c.dataset.stkCorner, tray = document.getElementById(id); if(!tray) return;
+    const s0 = tray.dataset.state || 'closed';
+    const m = stkMeasure(tray);
+    if(s0 === 'closed') tray.style.display = 'none';
+    d = { id, tray, c, y0: e.clientY, s0, nat: m.nat, rm: m.rm, base: s0 === 'closed' ? 0 : s0 === 'open' ? m.nat : m.nat + m.rm, moved: 0, total: 0, pid: e.pointerId };
+    d.total = d.base;
+    try { c.setPointerCapture(e.pointerId); } catch(_) {}
+  });
+  document.addEventListener('pointermove', e => {
+    if(!d || e.pointerId !== d.pid) return;
+    const dy = e.clientY - d.y0;
+    d.moved = Math.max(d.moved, Math.abs(dy));
+    if(d.moved < 6) return;
+    clearTimeout(d.tray._stkT);
+    d.tray.style.display = 'block';
+    d.tray.style.transition = 'none';
+    if(!d.tray.style.height || d.tray.style.height === 'auto') d.tray.style.height = (d.s0 === 'closed' ? 0 : d.nat) + 'px';
+    d.total = Math.max(0, Math.min(d.base + dy, d.nat + d.rm));
+    stkLayout(d.tray, d.total, d.nat);
+    const peek = document.getElementById(d.id + '_peek'); if(peek) peek.style.display = d.total > 0 ? 'none' : 'block';
+  });
+  const end = e => {
+    if(!d || e.pointerId !== d.pid) return;
+    const x = d; d = null;
+    if(x.moved < 6) { stkSetState(x.id, x.s0 === 'closed' ? 'open' : 'closed', true); return; }
+    const t = x.total < x.nat * 0.4 ? 'closed' : x.total < x.nat + x.rm / 2 ? 'open' : 'raised';
+    x.tray.dataset.state = x.s0;
+    stkSetState(x.id, t, true);
+  };
+  document.addEventListener('pointerup', end);
+  document.addEventListener('pointercancel', end);
+})();
 
 
 // ── Медиа в записях: мозаика (чат), полоса в лотке, стопка (личные кабинеты) ──
@@ -780,10 +851,10 @@ function mediaStackHTML(tiles, gid) {
   const face = t => t.vid
     ? `<video src="${t.data}#t=0.1" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover;display:block;pointer-events:none"></video>`
     : `<img src="${t.data}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">`;
-  return `<div onclick="openMediaGroup('${gid}')" style="margin-top:8px;cursor:pointer">
-    <div style="display:flex;gap:8px;align-items:center">
-      <div style="width:60%;height:100px;border-radius:8px;overflow:hidden">${face(t0)}</div>
-      <div style="position:relative;flex:1;height:100px">
+  return `<div style="margin-top:8px">
+    <div style="display:flex;gap:8px;align-items:flex-start">
+      <div data-reveal="${gid}" style="width:60%;height:100px;border-radius:8px;overflow:hidden;cursor:pointer;touch-action:pan-x">${face(t0)}</div>
+      <div onclick="openMediaGroup('${gid}')" style="position:relative;flex:1;height:100px;cursor:pointer">
         <div style="position:absolute;left:12px;top:0;right:0;bottom:12px;border-radius:8px;background:rgba(255,255,255,.10)"></div>
         <div style="position:absolute;left:6px;top:6px;right:6px;bottom:6px;border-radius:8px;background:rgba(255,255,255,.18)"></div>
         <div style="position:absolute;left:0;top:12px;right:12px;bottom:0;border-radius:8px;overflow:hidden">${face(t1)}<div style="position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px"><span style="background:rgba(0,0,0,.65);color:#fff;border-radius:10px;padding:1px 8px;font-size:12px">+${n - 1}</span></div></div>
@@ -792,6 +863,38 @@ function mediaStackHTML(tiles, gid) {
     <div style="font-size:11px;color:var(--t3);margin-top:4px">${mediaCountLabel(tiles)}</div>
   </div>`;
 }
+// Первое фото стопки: потянуть вниз — показывается целиком; нажатие открывает только его
+(function(){
+  if(window._revealInit) return; window._revealInit = true;
+  let r = null;
+  document.addEventListener('pointerdown', e => {
+    const el = e.target.closest && e.target.closest('[data-reveal]'); if(!el) return;
+    const img = el.querySelector('img');
+    let target = 0;
+    if(img && img.naturalWidth) target = Math.min(Math.round(el.offsetWidth * img.naturalHeight / img.naturalWidth), Math.round(window.innerHeight * 0.6));
+    r = { el, gid: el.dataset.reveal, y0: e.clientY, h0: el.offsetHeight, min: 100, target, moved: 0, h: el.offsetHeight, pid: e.pointerId };
+    try { el.setPointerCapture(e.pointerId); } catch(_) {}
+  });
+  document.addEventListener('pointermove', e => {
+    if(!r || e.pointerId !== r.pid) return;
+    const dy = e.clientY - r.y0;
+    r.moved = Math.max(r.moved, Math.abs(dy));
+    if(r.moved < 6 || r.target <= r.min + 4) return;
+    r.el.style.transition = 'none';
+    r.h = Math.max(r.min, Math.min(r.h0 + dy, r.target));
+    r.el.style.height = r.h + 'px';
+  });
+  const end = e => {
+    if(!r || e.pointerId !== r.pid) return;
+    const x = r; r = null;
+    if(x.moved < 6) { mediaOpen(x.gid, 0); return; }
+    if(x.target <= x.min + 4) return;
+    x.el.style.transition = 'height .2s ease';
+    x.el.style.height = (x.h > x.min + (x.target - x.min) * 0.35 ? x.target : x.min) + 'px';
+  };
+  document.addEventListener('pointerup', end);
+  document.addEventListener('pointercancel', end);
+})();
 function mediaOpen(gid, i) {
   const t = (window._mediaGroups[gid] || [])[i]; if(!t) return;
   if(t.vid) openVideoViewer(t.data); else openImgDirect(t.data);
