@@ -168,6 +168,21 @@ function calcBuildPdf(pgs){
   put('trailer\n<< /Size ' + total + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF');
   return new Blob(chunks, {type: 'application/pdf'});
 }
+// Android-приложение (Capacitor): записываем файл во временную папку и открываем системное «Поделиться»
+async function mcNativeShareFile(blob, fileName, title){
+  const P = window.Capacitor && window.Capacitor.Plugins;
+  if(!(typeof window.isNativeApp === 'function' && window.isNativeApp()) || !P || !P.Filesystem || !P.Share) return false;
+  try {
+    const b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(blob); });
+    const w = await P.Filesystem.writeFile({ path: fileName, data: b64, directory: 'CACHE' });
+    await P.Share.share({ title: title || fileName, url: w.uri, dialogTitle: 'Поделиться' });
+    return true;
+  } catch(err) {
+    if(err && /cancel/i.test(String(err.message || err))) return true;
+    console.log('mcNativeShareFile error:', err);
+    return false;
+  }
+}
 async function calcExportPdf(){
   const rows = calcTapeRows();
   if(!rows.length){ toast('Лента пуста — нечего сохранять'); return; }
@@ -178,6 +193,7 @@ async function calcExportPdf(){
     const blob = calcBuildPdf(calcPdfPages(rows, dd));
     const name = 'Расчёт ' + dd + '.pdf';
     const file = new File([blob], name, {type: 'application/pdf'});
+    if(await mcNativeShareFile(blob, 'Raschet_' + dd.replace(/[^\d.]/g, '') + '.pdf', name)) return;
     if(navigator.canShare && navigator.canShare({files: [file]})){
       try { await navigator.share({files: [file], title: name}); return; }
       catch(err){ if(err && err.name === 'AbortError') return; }
