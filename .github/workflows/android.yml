@@ -42,6 +42,12 @@ jobs:
           grep -q SCHEDULE_EXACT_ALARM $M || sed -i 's#<application#<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />\n    <application#' $M
           grep -q RECEIVE_BOOT_COMPLETED $M || sed -i 's#<application#<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />\n    <application#' $M
 
+      - name: Add microphone permissions
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          grep -q RECORD_AUDIO $M || sed -i 's#<application#<uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <application#' $M
+          grep -q MODIFY_AUDIO_SETTINGS $M || sed -i 's#<application#<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <application#' $M
+
       - name: Point Gradle at the permanent test key
         run: |
           cat > "$GITHUB_WORKSPACE/sign.gradle" <<'EOF'
