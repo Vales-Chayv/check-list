@@ -149,14 +149,14 @@ function openView(id) {
     const isFamily = currentSpace?.type==='family' || currentSpace?.type==='group';
     const myName = localStorage.getItem('mc_current_member')||'';
 
-    function entryRowHTML(e, textColor) {
+    function entryRowHTML(e, textColor, bdrOverride, doneOverride) {
       const eDl = e.deadline ? deadlineInfo(e.deadline) : null;
       if(!e.text) return '';
       const col = textColor||'var(--t1)';
 	  const _lt = textColor === '#fff';
-	  const borderCol = textColor ? (_lt ? '#111' : 'rgba(0,0,0,.55)') : 'var(--t2)';
+	  const borderCol = textColor ? (bdrOverride || (_lt ? '#111' : 'rgba(0,0,0,.55)')) : 'var(--t2)';
 
-const doneCol = textColor ? '#5bb87a' : 'var(--green)';
+const doneCol = textColor ? (doneOverride || '#5bb87a') : 'var(--green)';
 const dateCol = textColor ? (_lt ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)') : 'var(--t3)';
       const myName = (localStorage.getItem('mc_current_member')||'').toLowerCase();
       const isAll = e.assigned_to==='all' && e.completions?.length;
@@ -259,12 +259,25 @@ const dateCol = textColor ? (_lt ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)') 
           ${showAddBtn?`<button onclick="openAddEntry('${id}','${s.sid}',true)" style="margin-top:6px;background:var(--s2);border:1px solid var(--b1);border-radius:20px;padding:4px 12px;font-size:12px;color:var(--t2);cursor:pointer;font-family:inherit">＋ Добавить</button>`:''}
         </div></div>`;
       }
-     const _rgb = stkRgb(memberColor), _deep = _rgb.map(v => Math.round(v*0.78));
-     const _lum = 0.299*_deep[0] + 0.587*_deep[1] + 0.114*_deep[2];
-     const _lightTxt = _lum <= 150;
+     // тона: каждый лист считает контраст отдельно, чёрный и белый слегка сдвигаются, чтобы были видны края и тени
+     const _lumOf = c => 0.299*c[0] + 0.587*c[1] + 0.114*c[2];
+     const _soft = c => { const l = _lumOf(c); return l < 40 ? c.map(v => Math.round(v*0.5 + 20)) : l > 225 ? c.map(v => Math.round(v*0.9)) : c; };
+     const _deep = _soft(stkRgb(memberColor).map(v => Math.round(v*0.78)));
+     const _backRgb = _soft(stkRgb(bottomColor).map(v => Math.round(v*0.82)));
+     const _lum = _lumOf(_deep), _bLum = _lumOf(_backRgb);
+     const _lightTxt = _lum <= 150, _bLight = _bLum <= 150;
      const _tx = _lightTxt ? '#fff' : 'rgba(0,0,0,.82)', _tx2 = _lightTxt ? 'rgba(255,255,255,.7)' : 'rgba(0,0,0,.55)';
+     const _btx = _bLight ? '#fff' : 'rgba(0,0,0,.82)';
      const _frontBg = `rgb(${_deep.join(',')})`;
-     const _backBg = `rgb(${stkRgb(bottomColor).map(v => Math.round(v*0.82)).join(',')})`;
+     const _backBg = `rgb(${_backRgb.join(',')})`;
+     const _bdr = _lightTxt ? (_lum < 70 ? 'rgba(255,255,255,.85)' : '#111') : 'rgba(0,0,0,.55)';
+     const _gDist = Math.hypot(_deep[0]-71, _deep[1]-143, _deep[2]-95);
+     const _doneC = _gDist < 70 ? (_lightTxt ? '#111' : '#fff') : '#5bb87a';
+     const _clip = [clipColor, ...clipColors, '#f2f2f2', '#333'].map(h => ({ h, l: _lumOf(stkRgb(h)) })).find(o => Math.abs(o.l - _lum) >= 60 && Math.abs(o.l - _bLum) >= 45) || { h: _lightTxt ? '#f2f2f2' : '#333' };
+     const _clipC = _clip.h;
+     const _flapBg = _lightTxt ? 'rgba(255,255,255,.3)' : 'rgba(0,0,0,.18)';
+     const _grBg = _bLight ? 'rgba(255,255,255,.55)' : 'rgba(0,0,0,.35)';
+     const _chipBg = _bLight ? 'rgba(255,255,255,.22)' : 'rgba(0,0,0,.12)';
      const _ft = n => n + ' ' + stkPlural(n, 'файл', 'файла', 'файлов');
      let _trayHTML = '';
      if(hasFiles) {
@@ -277,15 +290,15 @@ const dateCol = textColor ? (_lt ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)') 
          return `<div id="${stkId}_t${i}" style="position:absolute;left:0;top:0;width:34px;height:34px;overflow:hidden;border-radius:5px;opacity:0;pointer-events:none">${h}${mo}</div>`;
        }).join('');
        const _rowTxt = [trayTiles.length ? mediaCountLabel(trayTiles) : '', sFiles.length ? '📄 ' + _ft(sFiles.length) : ''].filter(Boolean).join(' · ');
-       const _bigFiles = sFiles.length ? sFiles.map(f => `<a href="${f.data}" download="${esc(f.name)}" class="file-action" style="margin:0;max-width:100%;box-sizing:border-box;background:rgba(255,255,255,.22);border:none;color:${_tx}"><span>📎</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span></a>`).join('') : '';
+       const _bigFiles = sFiles.length ? sFiles.map(f => `<a href="${f.data}" download="${esc(f.name)}" class="file-action" style="margin:0;max-width:100%;box-sizing:border-box;background:${_chipBg};border:none;color:${_btx}"><span>📎</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span></a>`).join('') : '';
        _trayHTML = `
-         <div id="${stkId}_b" data-n="${trayTiles.length}" style="position:absolute;left:0;right:8px;top:10px;z-index:1;background:${_backBg};transform-origin:left bottom;border-radius:0 0 4px 4px;color:${_tx}">
+         <div id="${stkId}_b" data-n="${trayTiles.length}" style="position:absolute;left:0;right:8px;top:10px;z-index:1;background:${_backBg};transform-origin:left bottom;border-radius:0 0 4px 4px;color:${_btx}">
            ${_tileW}
            <div id="${stkId}_lbl" style="position:absolute;right:24px;height:34px;display:flex;align-items:center;font-size:12px;line-height:1.4;pointer-events:none;opacity:0">${_rowTxt}</div>
            <div id="${stkId}_fi" style="position:absolute;left:30px;right:28px;display:flex;flex-wrap:wrap;gap:4px;opacity:0;pointer-events:none">${_bigFiles}</div>
-           <div id="${stkId}_gr" style="position:absolute;left:50%;top:8px;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:rgba(255,255,255,.55);pointer-events:none;opacity:0"></div>
+           <div id="${stkId}_gr" style="position:absolute;left:50%;top:8px;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:${_grBg};pointer-events:none;opacity:0"></div>
          </div>
-         <div id="${stkId}_fl" style="position:absolute;left:12px;z-index:5;clip-path:polygon(0 0,100% 0,100% 100%);pointer-events:none;background:rgba(255,255,255,.3)"></div>
+         <div id="${stkId}_fl" style="position:absolute;left:12px;z-index:5;clip-path:polygon(0 0,100% 0,100% 100%);pointer-events:none;background:${_flapBg}"></div>
          <div id="${stkId}_ch" style="position:absolute;left:19px;z-index:5;font-size:15px;color:${_tx2};pointer-events:none;opacity:0">⌃</div>
          <div id="${stkId}_th" data-stk-th="${stkId}" style="position:absolute;left:0;right:8px;z-index:7;cursor:grab;touch-action:none;display:none"></div>
          <div id="${stkId}_hit" data-stk-hit="${stkId}" style="position:absolute;left:12px;width:52px;height:52px;z-index:8;cursor:grab;touch-action:none"></div>`;
@@ -300,12 +313,12 @@ const dateCol = textColor ? (_lt ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)') 
             ${s.note?`<div style="font-size:14px;color:${_tx};margin-bottom:8px;font-style:italic;line-height:1.5;word-break:break-word;white-space:pre-wrap" dir="auto">${esc(s.note)}</div>`:''}
             ${audioHTML}
             ${inlineTiles.length?`<div style="margin:6px 0 8px">${mediaMosaicHTML(inlineTiles, gid)}</div>`:''}
-            ${s.entries.filter(e=>e.text).map(e=>entryRowHTML(e, _lightTxt ? '#fff' : 'rgba(0,0,0,.82)')).join('')}
+            ${s.entries.filter(e=>e.text).map(e=>entryRowHTML(e, _lightTxt ? '#fff' : 'rgba(0,0,0,.82)', _bdr, _doneC)).join('')}
             ${showAddBtn?`<div style="text-align:right;margin-top:8px"><button onclick="openAddEntry('${id}','${s.sid}',true)" style="background:rgba(${_lightTxt?'255,255,255':'0,0,0'},.2);border:none;border-radius:20px;padding:4px 12px;font-size:12px;color:${_tx};cursor:pointer;font-family:inherit">＋ Добавить</button></div>`:''}
             ${hasFiles ? '<div style="height:10px"></div>' : ''}
            </div>
           </div>
-          <svg width="27" height="46" viewBox="-4 -6 52 88" style="position:absolute;left:26px;top:-8px;z-index:9;pointer-events:none;overflow:visible;transform:rotate(2deg);transform-origin:50% 20%"><path d="M30 10 C30 -3 13 -3 13 10 L6 60 C5 73 26 73 28 60 L36 17" fill="none" stroke="${clipColor}" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <svg width="27" height="46" viewBox="-4 -6 52 88" style="position:absolute;left:26px;top:-8px;z-index:9;pointer-events:none;overflow:visible;transform:rotate(2deg);transform-origin:50% 20%"><path d="M30 10 C30 -3 13 -3 13 10 L6 60 C5 73 26 73 28 60 L36 17" fill="none" stroke="${_clipC}" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
       </div>`;
     }
