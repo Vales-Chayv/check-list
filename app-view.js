@@ -153,10 +153,11 @@ function openView(id) {
       const eDl = e.deadline ? deadlineInfo(e.deadline) : null;
       if(!e.text) return '';
       const col = textColor||'var(--t1)';
-	  const borderCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t2)';
+	  const _lt = textColor === '#fff';
+	  const borderCol = textColor ? (_lt ? '#111' : 'rgba(0,0,0,.55)') : 'var(--t2)';
 
-const doneCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--green)';
-const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
+const doneCol = textColor ? '#5bb87a' : 'var(--green)';
+const dateCol = textColor ? (_lt ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)') : 'var(--t3)';
       const myName = (localStorage.getItem('mc_current_member')||'').toLowerCase();
       const isAll = e.assigned_to==='all' && e.completions?.length;
       const myComp = isAll ? e.completions.find(c=>c.name.toLowerCase()===myName) : null;
@@ -184,7 +185,7 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
           <button onclick="deleteEntry('${id}','${e.id}')" style="background:rgba(232,96,96,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">🗑️</button>
           <button onclick="editEntry('${id}','${e.id}')" style="background:rgba(91,158,232,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">📝</button>
           <button onclick="moveEntry('${id}','${e.id}')" style="background:rgba(91,184,122,.85);border:none;border-radius:8px;width:36px;height:36px;font-size:18px;cursor:pointer">📤</button>`;
-      return `<div class="swipe-entry-wrap" style="position:relative;overflow:hidden;border-bottom:1px solid ${borderCol}22">
+      return `<div class="swipe-entry-wrap" style="position:relative;overflow:hidden;${textColor ? 'border-bottom:2px solid ' + (_lt ? 'rgba(255,255,255,.28)' : 'rgba(0,0,0,.18)') : 'border-bottom:1px solid ' + borderCol + '22'}">
         <div class="swipe-actions" style="position:absolute;left:0;top:0;bottom:0;display:flex;align-items:center;gap:4px;padding:0 8px;opacity:0;transition:opacity .2s">
           ${swipeButtonsHTML}
         </div>
@@ -192,7 +193,7 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
           ${(!isGroupSpace && e.flag) ? '<span title="Отмечено" style="font-size:13px;flex-shrink:0;margin-top:1px">🚩</span>' : ''}
           ${checkboxHTML}
           <div style="flex:1">
-            <div style="font-size:13px;color:${col};${e.done?'text-decoration:line-through;opacity:.5':''};word-break:break-word;overflow-wrap:break-word" dir="auto">${sanitizeRich(e.text)}</div>
+            <div style="font-size:${textColor?'15px':'13px'};color:${col};${e.done?'text-decoration:line-through;opacity:.5':''};word-break:break-word;overflow-wrap:break-word" dir="auto">${sanitizeRich(e.text)}</div>
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
               <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                 <div style="font-size:10px;color:${dateCol};margin-top:1px">${e.date}</div>
@@ -239,11 +240,6 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
       if(trayTiles.length) filesHTML += `<div id="${stkId}_strip" data-tray="${stkId}">${mediaStripHTML(trayTiles, gid)}</div><div id="${stkId}_mos" data-tray="${stkId}" style="display:none">${mediaMosaicHTML(trayTiles, gid)}</div><div id="${stkId}_hd" data-tray="${stkId}" data-lbl="▾ показать все (${trayTiles.length})" onclick="toggleTrayMosaic('${stkId}')" style="text-align:center;font-size:12px;color:rgba(255,255,255,.92);padding:7px 0 2px;cursor:pointer;user-select:none">▾ показать все (${trayTiles.length})</div>`;
       if(sFiles.length) filesHTML+=`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${sFiles.map(f=>`<a href="${f.data}" download="${esc(f.name)}" style="font-size:12px;color:rgba(0,0,0,.7);background:rgba(0,0,0,.1);padding:3px 8px;border-radius:10px;text-decoration:none">📎${esc(f.name)}</a>`).join('')}</div>`;
 
-      // Folded corner SVG
-      const cornerHTML = hasFiles ? `<div data-stk-corner="${stkId}" style="position:absolute;bottom:0;right:0;width:40px;height:40px;cursor:grab;overflow:hidden;border-radius:0 0 10px 0;touch-action:none">
-        <div style="position:absolute;bottom:0;right:0;width:0;height:0;border-style:solid;border-width:28px 28px 0 0;border-color:transparent rgba(0,0,0,.25) transparent transparent"></div>
-        <div style="position:absolute;bottom:2px;right:2px;width:0;height:0;border-style:solid;border-width:24px 24px 0 0;border-color:transparent ${bottomColor} transparent transparent"></div>
-      </div>` : '';
 
      if(s.entries.some(e => e.plainMsg)) {
         return `<div style="display:flex;justify-content:${align};margin:12px 0 6px"><div style="width:min(80%,330px)">
@@ -263,21 +259,49 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
           ${showAddBtn?`<button onclick="openAddEntry('${id}','${s.sid}',true)" style="margin-top:6px;background:var(--s2);border:1px solid var(--b1);border-radius:20px;padding:4px 12px;font-size:12px;color:var(--t2);cursor:pointer;font-family:inherit">＋ Добавить</button>`:''}
         </div></div>`;
       }
-     return `<div style="display:flex;justify-content:${align};margin:16px 0 4px">
-        <div style="max-width:88%;min-width:55%;position:relative;${hasFiles?'padding-bottom:14px':''}">
-           ${hasFiles?`<div id="${stkId}_peek" style="position:absolute;bottom:-5px;left:-5px;right:8px;height:90%;background:${bottomColor};border-radius:10px;transform:rotate(1.2deg);z-index:0"></div>`:''}
-          <div style="position:relative;z-index:1;background:linear-gradient(${hex2rgba(memberColor,.7)},${hex2rgba(memberColor,.7)}),#eaeaea;border-radius:10px;padding:14px 14px 16px;box-shadow:2px 3px 10px rgba(0,0,0,.3)">
-            <div style="position:absolute;top:-16px;${isMe?'left:14px':'right:14px'};transform:rotate(${isMe?'-12':'12'}deg);filter:drop-shadow(1px 1px 3px rgba(0,0,0,.4))"><svg width="20" height="32" viewBox="0 0 20 32" fill="none"><path d="M10 1C6.1 1 3 4.1 3 8v14c0 3.9 3.1 7 7 7s7-3.1 7-7V6h-2.5v16c0 2.5-2 4.5-4.5 4.5S5.5 24.5 5.5 22V8c0-1.9 1.6-3.5 3.5-3.5S12.5 6.1 12.5 8v14h2.5V8c0-3.9-3.1-7-7-7z" fill="${clipColor}"/></svg></div>
-            <div style="font-size:12px;font-weight:700;color:rgba(0,0,0,.7);margin-bottom:6px;margin-top:8px">${creator?esc(aliasedName(creator)):'?'}</div>
-<div style="font-size:10px;color:rgba(0,0,0,.45);margin-bottom:4px">${s.date}</div>
-                     ${s.note?`<div style="font-size:13px;color:rgba(0,0,0,.75);margin-bottom:8px;font-style:italic;line-height:1.5;word-break:break-word;white-space:pre-wrap" dir="auto">${esc(s.note)}</div>`:''}
+     const _rgb = stkRgb(memberColor), _deep = _rgb.map(v => Math.round(v*0.78));
+     const _lum = 0.299*_deep[0] + 0.587*_deep[1] + 0.114*_deep[2];
+     const _lightTxt = _lum <= 150;
+     const _tx = _lightTxt ? '#fff' : 'rgba(0,0,0,.82)', _tx2 = _lightTxt ? 'rgba(255,255,255,.7)' : 'rgba(0,0,0,.55)';
+     const _frontBg = `rgb(${_deep.join(',')})`;
+     const _backBg = `rgb(${stkRgb(bottomColor).map(v => Math.round(v*0.82)).join(',')})`;
+     const _ft = n => n + ' ' + stkPlural(n, 'файл', 'файла', 'файлов');
+     let _trayHTML = '';
+     if(hasFiles) {
+       window._mediaGroups[gid] = trayTiles;
+       const _th = t => t.vid
+         ? `<video src="${t.data}#t=0.1" preload="metadata" muted playsinline style="width:34px;height:34px;object-fit:cover;border-radius:5px;display:block;flex-shrink:0"></video>`
+         : `<img src="${t.data}" loading="lazy" style="width:34px;height:34px;object-fit:cover;border-radius:5px;display:block;flex-shrink:0">`;
+       const _rowTxt = [trayTiles.length ? mediaCountLabel(trayTiles) : '', sFiles.length ? '📄 ' + _ft(sFiles.length) : ''].filter(Boolean).join(' · ');
+       const _bigTiles = trayTiles.slice(0, 4).map((t, i) => mediaTileHTML(t, gid, i, 'height:112px', (trayTiles.length > 4 && i === 3) ? trayTiles.length - 3 : 0)).join('');
+       const _bigFiles = sFiles.length ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:${trayTiles.length?8:0}px">${sFiles.map(f => `<a href="${f.data}" download="${esc(f.name)}" class="file-action" style="margin:0;max-width:100%;box-sizing:border-box;background:rgba(255,255,255,.22);border:none;color:${_tx}"><span>📎</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span></a>`).join('')}</div>` : '';
+       _trayHTML = `
+         <div id="${stkId}_b" style="position:absolute;left:0;right:8px;top:40px;z-index:1;background:${_backBg};transform-origin:left bottom;border-radius:0 0 4px 4px"></div>
+         <div id="${stkId}_c" style="position:absolute;left:0;right:8px;z-index:4;background:${_backBg};transform-origin:left bottom;border-radius:5px 5px 4px 4px;box-shadow:0 -3px 8px rgba(0,0,0,.28);opacity:0"></div>
+         <div id="${stkId}_fl" style="position:absolute;left:12px;z-index:5;clip-path:polygon(0 0,100% 0,100% 100%);pointer-events:none;background:rgba(255,255,255,.3)"></div>
+         <div id="${stkId}_ch" style="position:absolute;left:19px;z-index:5;font-size:15px;color:${_tx2};pointer-events:none;opacity:0">⌃</div>
+         <div id="${stkId}_row" style="position:absolute;left:34px;right:24px;z-index:5;pointer-events:none;color:${_tx};font-size:12px;display:flex;gap:5px;align-items:center;overflow:hidden">${trayTiles.slice(0,3).map(_th).join('')}${trayTiles.length > 3 ? `<div style="width:34px;height:34px;border-radius:5px;background:rgba(0,0,0,.35);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0">+${trayTiles.length-3}</div>` : ''}<div style="margin-left:6px;line-height:1.4">${_rowTxt}</div></div>
+         <div id="${stkId}_big" style="position:absolute;left:30px;right:28px;z-index:5;opacity:0;pointer-events:none;color:${_tx}">${trayTiles.length ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">${_bigTiles}</div>` : ''}${_bigFiles}</div>
+         <div id="${stkId}_gr" style="position:absolute;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:rgba(255,255,255,.55);z-index:6;pointer-events:none;opacity:0"></div>
+         <div id="${stkId}_th" data-stk-th="${stkId}" style="position:absolute;left:0;right:8px;z-index:7;cursor:grab;touch-action:none;display:none"></div>
+         <div id="${stkId}_hit" data-stk-hit="${stkId}" style="position:absolute;left:12px;width:52px;height:52px;z-index:8;cursor:grab;touch-action:none"></div>`;
+     }
+     return `<div style="display:flex;justify-content:${align};margin:18px 0 4px">
+        <div id="${stkId}" style="position:relative;max-width:88%;min-width:55%;${hasFiles?'padding-bottom:14px':''}">
+          ${_trayHTML}
+          <div id="${stkId}_fw" style="position:relative;z-index:2;margin-left:12px;filter:drop-shadow(2px 3px 5px rgba(0,0,0,.35))">
+           <div id="${stkId}_f" style="background:${_frontBg};color:${_tx};border-radius:3px;padding:12px 18px 16px 18px;position:relative">
+            <div style="font-size:12px;font-weight:700;color:${_tx};margin:0 0 1px;${isMe?'margin-left:50px':'margin-right:50px;text-align:right'}">${creator?esc(aliasedName(creator)):'?'}</div>
+            <div style="font-size:10px;color:${_tx2};margin:0 0 8px;${isMe?'margin-left:50px':'margin-right:50px;text-align:right'}">${s.date}</div>
+            ${s.note?`<div style="font-size:14px;color:${_tx};margin-bottom:8px;font-style:italic;line-height:1.5;word-break:break-word;white-space:pre-wrap" dir="auto">${esc(s.note)}</div>`:''}
             ${audioHTML}
             ${inlineTiles.length?`<div style="margin:6px 0 8px">${mediaMosaicHTML(inlineTiles, gid)}</div>`:''}
-            ${s.entries.filter(e=>e.text).map(e=>entryRowHTML(e,'rgba(0,0,0,0.75)')).join('')}
-            ${showAddBtn?`<button onclick="openAddEntry('${id}','${s.sid}',true)" style="margin-top:8px;background:rgba(0,0,0,.1);border:none;border-radius:20px;padding:4px 12px;font-size:12px;color:rgba(0,0,0,.6);cursor:pointer;font-family:inherit">＋ Добавить</button>`:''}
-            ${cornerHTML}
+            ${s.entries.filter(e=>e.text).map(e=>entryRowHTML(e, _lightTxt ? '#fff' : 'rgba(0,0,0,.82)')).join('')}
+            ${showAddBtn?`<div style="text-align:right;margin-top:8px"><button onclick="openAddEntry('${id}','${s.sid}',true)" style="background:rgba(${_lightTxt?'255,255,255':'0,0,0'},.2);border:none;border-radius:20px;padding:4px 12px;font-size:12px;color:${_tx};cursor:pointer;font-family:inherit">＋ Добавить</button></div>`:''}
+            ${hasFiles ? '<div style="height:10px"></div>' : ''}
+           </div>
           </div>
-          ${hasFiles?`<div id="${stkId}" style="display:none;height:0;overflow:hidden;position:relative;z-index:1;background:${bottomColor};border-radius:0 0 10px 10px;margin:0 -4px"><div style="padding:12px 14px">${filesHTML}</div></div>`:''}
+          <svg width="44" height="76" viewBox="0 0 44 76" style="position:absolute;${isMe?'left:30px':'right:22px'};top:-20px;z-index:9;pointer-events:none"><path d="M30 10 C30 -3 13 -3 13 10 L6 60 C5 73 26 73 28 60 L36 17" fill="none" stroke="${clipColor}" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
       </div>`;
     }
@@ -353,7 +377,9 @@ const dateCol = textColor ? 'rgba(0,0,0,.4)' : 'var(--t3)';
     if(_sheet) _sheet.addEventListener('scroll', _setFadeH, { passive: true });
   }
   document.getElementById('view-ov').classList.add('on');
-  setTimeout(()=>setupEntrySwipe(), 100);
+  stkInitAll();
+  setTimeout(()=>{ setupEntrySwipe(); stkInitAll(); }, 100);
+  setTimeout(stkInitAll, 600);
 }
 
 function closeView() {
@@ -711,81 +737,84 @@ document.getElementById('ae-seg-ball').addEventListener('click', e => {
   document.querySelectorAll('#ae-seg-ball .seg-btn').forEach(b=>b.classList.remove('on'));
   btn.classList.add('on');
 });
-// Лист-лоток под стикером: тянем за загнутый угол вниз — лоток растёт за пальцем; тянем дальше — поднимается над стикером на треть
-function stkMeasure(tray) {
-  tray.style.display = 'block';
-  const prevH = tray.style.height, prevT = tray.style.transition;
-  tray.style.transition = 'none'; tray.style.height = 'auto';
-  const nat = tray.offsetHeight;
-  tray.style.height = prevH; void tray.offsetHeight; tray.style.transition = prevT;
-  const front = tray.previousElementSibling;
-  return { nat, rm: Math.round(((front && front.offsetHeight) || 120) / 3) };
+// ── Стикер: загнутый угол, нижний лист с вложениями, раскрытие ──
+function stkRgb(hex) { const n = parseInt(String(hex).replace('#',''), 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function stkPlural(n, one, few, many) { return (n%10===1 && n%100!==11) ? one : (n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20)) ? few : many; }
+function stkApply(id, p, q, anim) {
+  const g = s => document.getElementById(id + s);
+  const w = g(''), f = g('_f'); if(!w || !f) return;
+  const b = g('_b'), c = g('_c'), fl = g('_fl'), ch = g('_ch'), row = g('_row'), big = g('_big'), gr = g('_gr'), th = g('_th'), hit = g('_hit');
+  p = Math.max(0, Math.min(1, p)); q = p < 1 ? 0 : Math.max(0, Math.min(1, q));
+  w.dataset.p = p; w.dataset.q = q;
+  const F = f.offsetHeight, CUT = 46, SL = 66, RMAX = 70, EMAX = 170;
+  const cut = Math.round(CUT * (1 - p)), r = RMAX * q, e = EMAX * q, Bb = F + 10 + SL * p + e;
+  const tr = anim ? 'all .24s ease' : 'none';
+  [f, b, c, fl, row, big, gr, th].forEach(x => { if(x) x.style.transition = tr; });
+  w.style.transition = anim ? 'padding-bottom .24s ease' : 'none';
+  f.style.clipPath = `polygon(0 0,100% 0,100% 100%,${cut}px 100%,0 calc(100% - ${cut}px))`;
+  fl.style.width = cut + 'px'; fl.style.height = cut + 'px'; fl.style.top = (F - cut) + 'px'; fl.style.opacity = cut < 4 ? 0 : 1;
+  ch.style.top = (F - 26) + 'px'; ch.style.opacity = (p > 0.6 && q < 0.05) ? 1 : 0;
+  hit.style.top = (F - 52) + 'px'; hit.style.display = q < 0.05 ? 'block' : 'none';
+  const rot = (-2.2 * (1 - 0.65 * p) * (1 - q)).toFixed(2);
+  const bt = Math.min(40, F - 20);
+  b.style.top = bt + 'px'; b.style.height = (Bb - bt) + 'px'; b.style.transform = `rotate(${rot}deg)`;
+  c.style.top = (F - r) + 'px'; c.style.height = (Bb - (F - r)) + 'px'; c.style.transform = `rotate(${rot}deg)`; c.style.opacity = q > 0.01 ? 1 : 0;
+  row.style.top = (Bb - 14 - 34) + 'px'; row.style.opacity = Math.max(0, Math.min(1, (p - 0.55) / 0.45)) * (1 - Math.min(1, q * 2.2));
+  big.style.top = (F - r + 30) + 'px'; big.style.opacity = Math.max(0, q * 2 - 1);
+  big.style.pointerEvents = q > 0.9 ? 'auto' : 'none';
+  gr.style.top = (F - r + 8) + 'px'; gr.style.opacity = p > 0.9 ? 1 : 0;
+  th.style.top = (F - r) + 'px'; th.style.height = (Bb - (F - r)) + 'px'; th.style.display = p > 0.9 ? 'block' : 'none';
+  w.style.paddingBottom = (Bb - F + 8) + 'px';
 }
-function stkLayout(tray, total, nat) {
-  const h = Math.min(total, nat), rise = Math.max(0, total - nat);
-  tray.style.height = h + 'px';
-  tray.style.marginTop = (-rise) + 'px';
-  tray.style.zIndex = rise > 0 ? '3' : '1';
-  tray.style.borderRadius = rise > 0 ? '10px' : '0 0 10px 10px';
-  return rise;
+// ставим стикеры в исходное положение (угол загнут) и пересчитываем размеры, когда лист уже показан
+function stkInitAll() {
+  document.querySelectorAll('[data-stk-hit]').forEach(h => {
+    const id = h.dataset.stkHit, w = document.getElementById(id);
+    if(!w) return;
+    stkApply(id, parseFloat(w.dataset.p || 0), parseFloat(w.dataset.q || 0), false);
+  });
 }
-function stkSetState(id, state, anim) {
-  const tray = document.getElementById(id); if(!tray) return;
-  const peek = document.getElementById(id + '_peek');
-  const s0 = tray.dataset.state || 'closed';
-  const m = stkMeasure(tray);
-  if(!tray.style.height || tray.style.height === 'auto') {
-    tray.style.transition = 'none';
-    tray.style.height = (s0 === 'closed' ? 0 : m.nat) + 'px';
-    void tray.offsetHeight;
-  }
-  tray.dataset.state = state;
-  tray.style.transition = anim ? 'height .22s ease, margin-top .22s ease' : 'none';
-  stkLayout(tray, state === 'closed' ? 0 : state === 'open' ? m.nat : m.nat + m.rm, m.nat);
-  if(peek) peek.style.display = state === 'closed' ? 'block' : 'none';
-  clearTimeout(tray._stkT);
-  tray._stkT = setTimeout(() => {
-    if(tray.dataset.state === 'closed') tray.style.display = 'none';
-    else { tray.style.transition = 'none'; tray.style.height = 'auto'; }
-  }, anim ? 250 : 0);
-}
-function toggleStickerFiles(id) {
-  const tray = document.getElementById(id); if(!tray) return;
-  stkSetState(id, (tray.dataset.state || 'closed') === 'closed' ? 'open' : 'closed', true);
-}
+window.addEventListener('resize', () => { try { stkInitAll(); } catch(e) {} });
 (function(){
-  if(window._stkDragInit) return; window._stkDragInit = true;
+  if(window._stkDragInit2) return; window._stkDragInit2 = true;
   let d = null;
+  const geo = id => { const w = document.getElementById(id); return { w, p: parseFloat(w?.dataset.p || 0), q: parseFloat(w?.dataset.q || 0) }; };
   document.addEventListener('pointerdown', e => {
-    const c = e.target.closest && e.target.closest('[data-stk-corner]'); if(!c) return;
-    const id = c.dataset.stkCorner, tray = document.getElementById(id); if(!tray) return;
-    const s0 = tray.dataset.state || 'closed';
-    const m = stkMeasure(tray);
-    if(s0 === 'closed') tray.style.display = 'none';
-    d = { id, tray, c, y0: e.clientY, s0, nat: m.nat, rm: m.rm, base: s0 === 'closed' ? 0 : s0 === 'open' ? m.nat : m.nat + m.rm, moved: 0, total: 0, pid: e.pointerId };
-    d.total = d.base;
-    try { c.setPointerCapture(e.pointerId); } catch(_) {}
+    const hit = e.target.closest && e.target.closest('[data-stk-hit]');
+    const th = !hit && e.target.closest && e.target.closest('[data-stk-th]');
+    const el = hit || th; if(!el) return;
+    const id = hit ? hit.dataset.stkHit : th.dataset.stkTh;
+    const G = geo(id); if(!G.w) return;
+    d = { id, kind: hit ? 'corner' : 'tray', y0: e.clientY, x0: e.clientX, p0: G.p, q0: G.q, m: 0, pid: e.pointerId, el };
+    try { el.setPointerCapture(e.pointerId); } catch(_) {}
   });
   document.addEventListener('pointermove', e => {
     if(!d || e.pointerId !== d.pid) return;
     const dy = e.clientY - d.y0;
-    d.moved = Math.max(d.moved, Math.abs(dy));
-    if(d.moved < 6) return;
-    clearTimeout(d.tray._stkT);
-    d.tray.style.display = 'block';
-    d.tray.style.transition = 'none';
-    if(!d.tray.style.height || d.tray.style.height === 'auto') d.tray.style.height = (d.s0 === 'closed' ? 0 : d.nat) + 'px';
-    d.total = Math.max(0, Math.min(d.base + dy, d.nat + d.rm));
-    stkLayout(d.tray, d.total, d.nat);
-    const peek = document.getElementById(d.id + '_peek'); if(peek) peek.style.display = d.total > 0 ? 'none' : 'block';
+    d.m = Math.max(d.m, Math.abs(dy));
+    if(d.m < 6) return;
+    if(d.kind === 'corner') stkApply(d.id, d.p0 + dy / 66, 0, false);
+    else stkApply(d.id, 1, d.q0 + dy / 170, false);
   });
   const end = e => {
     if(!d || e.pointerId !== d.pid) return;
     const x = d; d = null;
-    if(x.moved < 6) { stkSetState(x.id, x.s0 === 'closed' ? 'open' : 'closed', true); return; }
-    const t = x.total < x.nat * 0.4 ? 'closed' : x.total < x.nat + x.rm / 2 ? 'open' : 'raised';
-    x.tray.dataset.state = x.s0;
-    stkSetState(x.id, t, true);
+    const G = geo(x.id);
+    if(x.kind === 'corner') {
+      if(x.m < 6) stkApply(x.id, G.p > 0.5 ? 0 : 1, 0, true);
+      else stkApply(x.id, G.p > 0.4 ? 1 : 0, 0, true);
+    } else {
+      if(x.m < 6) {
+        if(G.q > 0.5) {
+          // нажатие по раскрытому листу: передаём его плитке или файлу под пальцем, иначе сворачиваем
+          x.el.style.display = 'none';
+          const t = document.elementFromPoint(e.clientX, e.clientY);
+          x.el.style.display = 'block';
+          const hitEl = t && t.closest && t.closest('[onclick], a');
+          if(hitEl && G.w.contains(hitEl)) hitEl.click(); else stkApply(x.id, 1, 0, true);
+        } else stkApply(x.id, 1, 1, true);
+      } else stkApply(x.id, 1, G.q > 0.35 ? 1 : 0, true);
+    }
   };
   document.addEventListener('pointerup', end);
   document.addEventListener('pointercancel', end);
