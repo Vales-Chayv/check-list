@@ -50,3 +50,43 @@ uploadToStorage = async function(file, cardId, entryId) {
   file = await mcPrepareFile(file);
   return mcOrigUpload(file, cardId, entryId);
 };
+
+// ═══════════════════════════════════════════
+//  ЛОКАЛЬНАЯ КОПИЯ ВЛОЖЕНИЙ (работает вместе с sw-media.js в service worker)
+//  Фоновая «прогревка»: фото из карточек и чатов скачиваются на устройство один раз.
+// ═══════════════════════════════════════════
+const MC_ATT_RE = /\/storage\/v1\/object\/(public|sign)\/attachments\//;
+const _mcWarmed = new Set();
+function mcMediaDb() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('mc-media', 1);
+    r.onupgradeneeded = () => { const d = r.result; d.createObjectStore('files', { keyPath: 'url' }); d.createObjectStore('idx', { keyPath: 'url' }); };
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+// сколько места занимают сохранённые на устройстве вложения (байты)
+async function mcMediaUsage() {
+  try {
+    const db = await mcMediaDb();
+    const all = await new Promise((res, rej) => { const q = db.transaction('idx').objectStore('idx').getAll(); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+    return { files: all.length, bytes: all.reduce((s, x) => s + x.size, 0) };
+  } catch(e) { return { files: 0, bytes: 0 }; }
+}
+async function mcWarmMedia() {
+  try {
+    if(!navigator.onLine || document.hidden || !navigator.serviceWorker || !navigator.serviceWorker.controller) return;
+    if(typeof cards === 'undefined' || typeof cardAttsOf !== 'function') return;
+    const urls = [];
+    (cards || []).forEach(c => cardAttsOf(c).forEach(a => {
+      const u = String(a.data || '');
+      if(!MC_ATT_RE.test(u) || _mcWarmed.has(u) || (a.type || '').startsWith('video/')) return;
+      urls.push(u);
+    }));
+    for(const u of urls.slice(0, 40)) {
+      _mcWarmed.add(u);
+      try { const r = await fetch(u, { mode: 'cors' }); await r.arrayBuffer(); } catch(e) { _mcWarmed.delete(u); }
+    }
+  } catch(e) {}
+}
+setInterval(mcWarmMedia, 25000);
+setTimeout(mcWarmMedia, 6000);
