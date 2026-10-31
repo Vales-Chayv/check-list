@@ -295,8 +295,8 @@ const dateCol = textColor ? (_lt ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)') 
           ${_trayHTML}
           <div id="${stkId}_fw" style="position:relative;z-index:2;margin-left:12px;filter:drop-shadow(2px 3px 5px rgba(0,0,0,.35))">
            <div id="${stkId}_f" style="background:${_frontBg};color:${_tx};border-radius:3px;padding:12px 18px 16px 18px;position:relative">
-            <div style="font-size:12px;font-weight:700;color:${_tx};margin:0 0 1px;${isMe?'margin-left:50px':'margin-right:50px;text-align:right'}">${creator?esc(aliasedName(creator)):'?'}</div>
-            <div style="font-size:10px;color:${_tx2};margin:0 0 8px;${isMe?'margin-left:50px':'margin-right:50px;text-align:right'}">${s.date}</div>
+            <div style="font-size:12px;font-weight:700;color:${_tx};margin:0 0 1px;text-align:right">${creator?esc(aliasedName(creator)):'?'}</div>
+            <div style="font-size:10px;color:${_tx2};margin:0 0 8px;text-align:right">${s.date}</div>
             ${s.note?`<div style="font-size:14px;color:${_tx};margin-bottom:8px;font-style:italic;line-height:1.5;word-break:break-word;white-space:pre-wrap" dir="auto">${esc(s.note)}</div>`:''}
             ${audioHTML}
             ${inlineTiles.length?`<div style="margin:6px 0 8px">${mediaMosaicHTML(inlineTiles, gid)}</div>`:''}
@@ -305,7 +305,7 @@ const dateCol = textColor ? (_lt ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)') 
             ${hasFiles ? '<div style="height:10px"></div>' : ''}
            </div>
           </div>
-          <svg width="44" height="76" viewBox="0 0 44 76" style="position:absolute;${isMe?'left:30px':'right:22px'};top:-20px;z-index:9;pointer-events:none"><path d="M30 10 C30 -3 13 -3 13 10 L6 60 C5 73 26 73 28 60 L36 17" fill="none" stroke="${clipColor}" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <svg width="27" height="46" viewBox="-4 -6 52 88" style="position:absolute;left:26px;top:-8px;z-index:9;pointer-events:none;overflow:visible;transform:rotate(2deg);transform-origin:50% 20%"><path d="M30 10 C30 -3 13 -3 13 10 L6 60 C5 73 26 73 28 60 L36 17" fill="none" stroke="${clipColor}" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
       </div>`;
     }
@@ -1908,9 +1908,11 @@ async function createCardAndMove(fromCardId, spaceId, catName) {
 function openVideoViewer(src) {
   const div = document.createElement('div');
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
-  div.innerHTML = `<video controls autoplay src="${src}" style="max-width:100%;max-height:90vh;border-radius:8px"></video>`;
+  div.innerHTML = `<video controls autoplay playsinline src="${src}" style="max-width:100%;max-height:90vh;border-radius:8px"></video>`;
   div.onclick = e => { if(e.target===div) div.remove(); };
   document.body.appendChild(div);
+  const v = div.querySelector('video');
+  if(v) { const pr = v.play(); if(pr && pr.catch) pr.catch(() => { v.muted = true; v.play().catch(() => {}); }); }
 }
 async function restoreCard(id) {
   const card = cards.find(c=>c.id===id); if(!card) return;
