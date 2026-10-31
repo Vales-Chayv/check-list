@@ -259,14 +259,41 @@ function toggleCalcDesign(){
 }
 
 // ── Арифметика: выражение целиком, со скобками и приоритетом действий ──
-let calcExpr = '0', calcFresh = true;
+let calcExpr = '0', calcFresh = true, calcFracOn = false, calcRaw = null;
 function calcFmt(n){ return Math.round(n*10000)/10000 + ''; }
-function calcPretty(e){ return e.replace(/-/g,'−'); }
+function calcPretty(e){ return e.replace(/-/g,'−').replace(/\^2(?!\d)/g,'²'); }
+// дробь для результата: 0.75 → 3/4, 2.5 → 2 1/2 (целые и «неудобные» числа остаются десятичными)
+function calcToFrac(x){
+  if(!isFinite(x) || Math.abs(x-Math.round(x)) < 1e-9) return null;
+  const sg = x < 0 ? '−' : ''; x = Math.abs(x);
+  let h1 = 1, h0 = 0, k1 = 0, k0 = 1, b = x;
+  for(let i = 0; i < 14; i++){
+    const a = Math.floor(b), h2 = a*h1 + h0, k2 = a*k1 + k0;
+    h0 = h1; h1 = h2; k0 = k1; k1 = k2;
+    if(Math.abs(x - h1/k1) < 1e-9 || k1 > 1000) break;
+    b = 1/(b - a); if(!isFinite(b)) break;
+  }
+  if(k1 > 1000 || Math.abs(x - h1/k1) > 1e-7) return null;
+  const w = Math.floor(h1/k1), r = h1 % k1;
+  return sg + (w ? w + ' ' : '') + r + '/' + k1;
+}
+function calcFmtOut(n){ if(calcFracOn){ const f = calcToFrac(n); if(f) return f; } return calcFmt(n); }
+function calcToggle2nd(){
+  const o = document.getElementById('calc-fn').classList.toggle('open');
+  document.getElementById('calc-2nd-btn').classList.toggle('on', o);
+}
+function calcToggleFrac(){
+  calcFracOn = !calcFracOn;
+  document.getElementById('calc-frac-btn')?.classList.toggle('on', calcFracOn);
+  calcShow();
+}
 function calcShow(){
   const disp = document.getElementById('calc-current');
   if(!disp) return;
-  disp.textContent = calcPretty(calcExpr);
-  const n = calcExpr.length;
+  let txt = calcPretty(calcExpr);
+  if(calcFresh && calcFracOn && calcRaw !== null && calcExpr === calcFmt(calcRaw)){ const f = calcToFrac(calcRaw); if(f) txt = f; }
+  disp.textContent = txt;
+  const n = txt.length;
   disp.classList.toggle('calc-sm', n > 12 && n <= 24);
   disp.classList.toggle('calc-xs', n > 24);
 }
@@ -297,11 +324,39 @@ function calcEval(src){
     }
     return single ? left : {v: left.v};
   }
+  function fn(name, a){
+    const R = x => Math.round(x*1e12)/1e12, k = Math.PI/180;
+    if(name==='sin') return R(Math.sin(a*k));
+    if(name==='cos') return R(Math.cos(a*k));
+    if(name==='tan'){ if(Math.abs(Math.cos(a*k)) < 1e-12) throw new Error('num'); return R(Math.tan(a*k)); }
+    if(a < 0) throw new Error('num');
+    return Math.sqrt(a);
+  }
   function factor(){
     if(peek()==='-'){ p++; const f = factor(); return {v: -f.v, pct: f.pct}; }
     if(peek()==='+'){ p++; return factor(); }
+    return power();
+  }
+  function power(){
+    const b = atom();
+    if(peek()==='^'){
+      p++; let sg = 1;
+      if(peek()==='-'){ p++; sg = -1; } else if(peek()==='+') p++;
+      const e = power(), r = Math.pow(b.v, sg*e.v);
+      if(!isFinite(r)) throw new Error('num');
+      return {v: r};
+    }
+    return b;
+  }
+  function atom(){
     let node;
-    if(peek()==='('){
+    const f = /^(sin|cos|tan|√)\(/.exec(t.slice(p));
+    if(f){
+      p += f[0].length; const a = expr().v;
+      if(peek()===')') p++; else throw new Error('paren');
+      node = {v: fn(f[1], a)};
+    } else if(peek()==='π'){ p++; node = {v: Math.PI};
+    } else if(peek()==='('){
       p++; node = {v: expr().v};
       if(peek()===')') p++; else throw new Error('paren');
     } else {
@@ -323,14 +378,15 @@ function calcInput(v){
   if(v==='C'){ calcExpr='0'; calcFresh=true; calcShow(); return; }
   if(v==='⌫'){
     if(calcFresh) return;
-    calcExpr = calcExpr.length > 1 ? calcExpr.slice(0,-1) : '0';
+    const fm = /(sin\(|cos\(|tan\(|√\()$/.exec(calcExpr);
+    calcExpr = fm ? (calcExpr.slice(0, -fm[0].length) || '0') : (calcExpr.length > 1 ? calcExpr.slice(0,-1) : '0');
     if(calcExpr==='-') calcExpr='0';
     calcShow(); return;
   }
   if(v==='='){
     if(calcFresh) return;
     let e = calcExpr;
-    while(e.length && (isOp(e[e.length-1]) || e[e.length-1]==='(')) e = e.slice(0,-1);
+    for(let ch = true; ch && e.length;){ const bf = e; e = e.replace(/(sin|cos|tan|√)\($/, '').replace(/[+\-×÷^(]$/, ''); ch = e !== bf; }
     if(!e){ return; }
     const open = (e.match(/\(/g)||[]).length - (e.match(/\)/g)||[]).length;
     if(open > 0) e += ')'.repeat(open);
@@ -338,8 +394,8 @@ function calcInput(v){
     let res;
     try { res = calcEval(e); }
     catch(err){ toast(err.message==='div0' ? 'Делить на ноль нельзя' : 'Проверь выражение', true); return; }
-    calcAddHistory(calcPretty(e) + ' =', calcFmt(res));
-    calcExpr = calcFmt(res); calcFresh = true; calcShow();
+    calcAddHistory(calcPretty(e) + ' =', calcFmtOut(res), calcFmt(res));
+    calcRaw = res; calcExpr = calcFmt(res); calcFresh = true; calcShow();
     return;
   }
   if(v==='±'){
@@ -351,6 +407,17 @@ function calcInput(v){
     else if(b==='-') calcExpr = pre.slice(0,-1) + '+' + m[0];
     else if(b==='+') calcExpr = pre.slice(0,-1) + '-' + m[0];
     else calcExpr = pre + '-' + m[0];
+    calcShow(); return;
+  }
+  if(v==='^' || v==='^2'){
+    calcFresh = false;
+    if(/[\d)%π]$/.test(calcExpr)) calcExpr += v;
+    calcShow(); return;
+  }
+  if(v==='π' || v.length > 1){ // π, sin(, cos(, tan(, √(
+    if(calcFresh){ calcExpr = '0'; calcFresh = false; }
+    if(calcExpr==='0') calcExpr = v;
+    else calcExpr += (/[\d.)%π]$/.test(calcExpr) ? '×' : '') + v;
     calcShow(); return;
   }
   if(calcFresh){
@@ -370,13 +437,13 @@ function calcInput(v){
   }
   if(v==='('){
     if(calcExpr==='0') calcExpr = '(';
-    else if(/[\d.)%]/.test(last())) calcExpr += '×(';
+    else if(/[\d.)%π]/.test(last())) calcExpr += '×(';
     else calcExpr += '(';
     calcShow(); return;
   }
   if(v===')'){
     const open = (calcExpr.match(/\(/g)||[]).length - (calcExpr.match(/\)/g)||[]).length;
-    if(open > 0 && /[\d)%]/.test(last())) calcExpr += ')';
+    if(open > 0 && /[\d)%π]/.test(last())) calcExpr += ')';
     calcShow(); return;
   }
   if(v==='%'){
@@ -387,29 +454,30 @@ function calcInput(v){
   const lastNum = /(\d*\.?\d*)$/.exec(calcExpr)[1];
   if(v==='.'){
     if(lastNum.includes('.')) return;
-    if(/[)%]/.test(last())) return;
+    if(/[)%π]/.test(last())) return;
     calcExpr += (lastNum==='' ? '0.' : '.');
   } else {
-    if(/[)%]/.test(last())) calcExpr += '×';
+    if(/[)%π]/.test(last())) calcExpr += '×';
     if(lastNum==='0') calcExpr = calcExpr.slice(0,-1) + v;
     else calcExpr += v;
   }
   calcShow();
 }
-function calcAddHistory(expr, result){
+function calcAddHistory(expr, result, num){
   const hist = document.getElementById('calc-history');
   const row = document.createElement('div');
   row.dataset.expr = expr; row.dataset.res = result;
   const a = document.createElement('span'); a.textContent = expr;
   const b = document.createElement('b'); b.textContent = result;
   row.append(a, b);
-  row.onclick = () => { calcExpr = result; calcFresh = true; calcShow(); };
+  const nm = num !== undefined ? num : result;
+  row.onclick = () => { calcExpr = nm; calcFresh = true; calcRaw = parseFloat(nm); calcShow(); };
   hist.appendChild(row);
   hist.scrollTop = hist.scrollHeight;
 }
 function calcSetResult(expr, result){
-  calcExpr = calcFmt(result); calcFresh = true; calcShow();
-  calcAddHistory(expr, calcFmt(result));
+  calcRaw = result; calcExpr = calcFmt(result); calcFresh = true; calcShow();
+  calcAddHistory(expr, calcFmtOut(result), calcFmt(result));
 }
 
 // ── Дизайн-инструменты ──

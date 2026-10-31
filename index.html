@@ -547,30 +547,46 @@
       </div>
     </div>
   </div>
+  <div id="calc-meta">
+    <button class="calc-tg" id="calc-2nd-btn" onclick="calcToggle2nd()">2nd</button>
+    <button class="calc-tg" id="calc-frac-btn" onclick="calcToggleFrac()">дроби ½ ⇄ 0.5</button>
+    <span class="calc-deg">градусы</span>
+  </div>
+  <div id="calc-fn">
+    <button onclick="calcInput('(')">(</button>
+    <button onclick="calcInput(')')">)</button>
+    <button onclick="calcInput('%')">%</button>
+    <button onclick="calcInput('^')">xʸ</button>
+    <button onclick="calcInput('^2')">x²</button>
+    <button onclick="calcInput('√(')">√</button>
+    <button onclick="calcInput('π')">π</button>
+    <button onclick="calcInput('sin(')">sin</button>
+    <button onclick="calcInput('cos(')">cos</button>
+    <button onclick="calcInput('tan(')">tan</button>
+  </div>
   <div id="calc-pad">
     <button onclick="calcInput('C')" class="calc-op">C</button>
-    <button onclick="calcInput('(')" class="calc-op">(</button>
-    <button onclick="calcInput(')')" class="calc-op">)</button>
     <button onclick="calcInput('⌫')" class="calc-op" aria-label="Стереть">⌫</button>
+    <button onclick="calcInput('÷')" class="calc-op">÷</button>
+    <button onclick="calcInput('×')" class="calc-op">×</button>
     <button onclick="calcInput('7')">7</button>
     <button onclick="calcInput('8')">8</button>
     <button onclick="calcInput('9')">9</button>
-    <button onclick="calcInput('÷')" class="calc-op">÷</button>
+    <button onclick="calcInput('-')" class="calc-op">−</button>
     <button onclick="calcInput('4')">4</button>
     <button onclick="calcInput('5')">5</button>
     <button onclick="calcInput('6')">6</button>
-    <button onclick="calcInput('×')" class="calc-op">×</button>
+    <button onclick="calcInput('+')" class="calc-op">+</button>
     <button onclick="calcInput('1')">1</button>
     <button onclick="calcInput('2')">2</button>
     <button onclick="calcInput('3')">3</button>
-    <button onclick="calcInput('-')" class="calc-op">−</button>
+    <button onclick="calcInput('±')" class="calc-op">±</button>
     <button onclick="calcInput('0')">0</button>
     <button onclick="calcInput('.')">.</button>
-    <button onclick="calcInput('%')" class="calc-op">%</button>
-    <button onclick="calcInput('+')" class="calc-op">+</button>
-    <button onclick="calcInput('±')" class="calc-op">±</button>
+    <button onclick="calcToggleFrac()" class="calc-op" aria-label="Дроби">a/b</button>
     <button onclick="calcExportPdf()" class="calc-pdf" aria-label="Сохранить ленту в PDF">PDF</button>
-  <button onclick="calcInput('=')" class="calc-eq" style="grid-column:span 2">=</button>
+    <button onclick="calcInput('=')" class="calc-eq">=</button>
+  </div>
   </div>
   </div>
   </div>
