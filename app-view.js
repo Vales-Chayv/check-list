@@ -269,25 +269,29 @@ const dateCol = textColor ? (_lt ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)') 
      let _trayHTML = '';
      if(hasFiles) {
        window._mediaGroups[gid] = trayTiles;
-       const _th = t => t.vid
-         ? `<video src="${t.data}#t=0.1" preload="metadata" muted playsinline style="width:34px;height:34px;object-fit:cover;border-radius:5px;display:block;flex-shrink:0"></video>`
-         : `<img src="${t.data}" loading="lazy" style="width:34px;height:34px;object-fit:cover;border-radius:5px;display:block;flex-shrink:0">`;
+       const _more = trayTiles.length - 3;
+       const _tileW = trayTiles.slice(0, 4).map((t, i) => {
+         let h = mediaTileHTML(t, gid, i, 'width:100%;height:100%;border-radius:inherit', (trayTiles.length > 4 && i === 3) ? _more : 0);
+         h = h.replace('font-size:20px', 'font-size:var(--stkf,20px)');
+         const mo = (trayTiles.length === 4 && i === 3) ? `<div id="${stkId}_mo" style="position:absolute;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;font-size:var(--stkf,20px);font-weight:600;color:#fff;pointer-events:none">+${_more}</div>` : '';
+         return `<div id="${stkId}_t${i}" style="position:absolute;left:0;top:0;width:34px;height:34px;overflow:hidden;border-radius:5px;opacity:0;pointer-events:none">${h}${mo}</div>`;
+       }).join('');
        const _rowTxt = [trayTiles.length ? mediaCountLabel(trayTiles) : '', sFiles.length ? '📄 ' + _ft(sFiles.length) : ''].filter(Boolean).join(' · ');
-       const _bigTiles = trayTiles.slice(0, 4).map((t, i) => mediaTileHTML(t, gid, i, 'height:112px', (trayTiles.length > 4 && i === 3) ? trayTiles.length - 3 : 0)).join('');
-       const _bigFiles = sFiles.length ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:${trayTiles.length?8:0}px">${sFiles.map(f => `<a href="${f.data}" download="${esc(f.name)}" class="file-action" style="margin:0;max-width:100%;box-sizing:border-box;background:rgba(255,255,255,.22);border:none;color:${_tx}"><span>📎</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span></a>`).join('')}</div>` : '';
+       const _bigFiles = sFiles.length ? sFiles.map(f => `<a href="${f.data}" download="${esc(f.name)}" class="file-action" style="margin:0;max-width:100%;box-sizing:border-box;background:rgba(255,255,255,.22);border:none;color:${_tx}"><span>📎</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span></a>`).join('') : '';
        _trayHTML = `
-         <div id="${stkId}_b" style="position:absolute;left:0;right:8px;top:40px;z-index:1;background:${_backBg};transform-origin:left bottom;border-radius:0 0 4px 4px"></div>
-         <div id="${stkId}_c" style="position:absolute;left:0;right:8px;z-index:4;background:${_backBg};transform-origin:left bottom;border-radius:5px 5px 4px 4px;box-shadow:0 -3px 8px rgba(0,0,0,.28);opacity:0"></div>
+         <div id="${stkId}_b" data-n="${trayTiles.length}" style="position:absolute;left:0;right:8px;top:10px;z-index:1;background:${_backBg};transform-origin:left bottom;border-radius:0 0 4px 4px;color:${_tx}">
+           ${_tileW}
+           <div id="${stkId}_lbl" style="position:absolute;right:24px;height:34px;display:flex;align-items:center;font-size:12px;line-height:1.4;pointer-events:none;opacity:0">${_rowTxt}</div>
+           <div id="${stkId}_fi" style="position:absolute;left:30px;right:28px;display:flex;flex-wrap:wrap;gap:4px;opacity:0;pointer-events:none">${_bigFiles}</div>
+           <div id="${stkId}_gr" style="position:absolute;left:50%;top:8px;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:rgba(255,255,255,.55);pointer-events:none;opacity:0"></div>
+         </div>
          <div id="${stkId}_fl" style="position:absolute;left:12px;z-index:5;clip-path:polygon(0 0,100% 0,100% 100%);pointer-events:none;background:rgba(255,255,255,.3)"></div>
          <div id="${stkId}_ch" style="position:absolute;left:19px;z-index:5;font-size:15px;color:${_tx2};pointer-events:none;opacity:0">⌃</div>
-         <div id="${stkId}_row" style="position:absolute;left:34px;right:24px;z-index:5;pointer-events:none;color:${_tx};font-size:12px;display:flex;gap:5px;align-items:center;overflow:hidden">${trayTiles.slice(0,3).map(_th).join('')}${trayTiles.length > 3 ? `<div style="width:34px;height:34px;border-radius:5px;background:rgba(0,0,0,.35);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0">+${trayTiles.length-3}</div>` : ''}<div style="margin-left:6px;line-height:1.4">${_rowTxt}</div></div>
-         <div id="${stkId}_big" style="position:absolute;left:30px;right:28px;z-index:5;opacity:0;pointer-events:none;color:${_tx}">${trayTiles.length ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">${_bigTiles}</div>` : ''}${_bigFiles}</div>
-         <div id="${stkId}_gr" style="position:absolute;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:rgba(255,255,255,.55);z-index:6;pointer-events:none;opacity:0"></div>
          <div id="${stkId}_th" data-stk-th="${stkId}" style="position:absolute;left:0;right:8px;z-index:7;cursor:grab;touch-action:none;display:none"></div>
          <div id="${stkId}_hit" data-stk-hit="${stkId}" style="position:absolute;left:12px;width:52px;height:52px;z-index:8;cursor:grab;touch-action:none"></div>`;
      }
      return `<div style="display:flex;justify-content:${align};margin:18px 0 4px">
-        <div id="${stkId}" style="position:relative;max-width:88%;min-width:55%;${hasFiles?'padding-bottom:14px':''}">
+        <div id="${stkId}" style="position:relative;${hasFiles?'width:100%;padding-bottom:14px':'max-width:88%;min-width:55%'}">
           ${_trayHTML}
           <div id="${stkId}_fw" style="position:relative;z-index:2;margin-left:12px;filter:drop-shadow(2px 3px 5px rgba(0,0,0,.35))">
            <div id="${stkId}_f" style="background:${_frontBg};color:${_tx};border-radius:3px;padding:12px 18px 16px 18px;position:relative">
@@ -740,52 +744,90 @@ document.getElementById('ae-seg-ball').addEventListener('click', e => {
 // ── Стикер: загнутый угол, нижний лист с вложениями, раскрытие ──
 function stkRgb(hex) { const n = parseInt(String(hex).replace('#',''), 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
 function stkPlural(n, one, few, many) { return (n%10===1 && n%100!==11) ? one : (n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20)) ? few : many; }
-function stkApply(id, p, q, anim) {
+function stkApply(id, x, anim) {
   const g = s => document.getElementById(id + s);
   const w = g(''), f = g('_f'); if(!w || !f) return;
-  const b = g('_b'), c = g('_c'), fl = g('_fl'), ch = g('_ch'), row = g('_row'), big = g('_big'), gr = g('_gr'), th = g('_th'), hit = g('_hit');
-  p = Math.max(0, Math.min(1, p)); q = p < 1 ? 0 : Math.max(0, Math.min(1, q));
-  w.dataset.p = p; w.dataset.q = q;
-  const F = f.offsetHeight, CUT = 46, SL = 66, RMAX = 70, EMAX = 170;
-  const cut = Math.round(CUT * (1 - p)), r = RMAX * q, e = EMAX * q, Bb = F + 10 + SL * p + e;
+  const F = f.offsetHeight; if(!F) return;
+  const b = g('_b'), fl = g('_fl'), ch = g('_ch'), lbl = g('_lbl'), fi = g('_fi'), gr = g('_gr'), th = g('_th'), hit = g('_hit'), mo = g('_mo');
+  const n = parseInt(b.dataset.n || 0), shown = Math.min(n, 4);
+  const cl = (v, a, c) => Math.max(a, Math.min(c, v));
+  const CUT = 46, X1 = 66, X3 = 70;
+  const W = w.clientWidth - 8;
+  const tw = (W - 56 - 6) / 2, bh = Math.min(112, Math.round(tw * 0.75));
+  const fiH = fi.offsetHeight, gridH = n ? 2 * bh + 6 : 0;
+  const Hs = Math.max(F, 18 + gridH + (fiH ? (n ? 8 : 0) + fiH : 0) + 16);
+  const X2 = Math.max(20, Hs - 76), XM = X1 + X2 + X3;
+  if(x === undefined || x === null || isNaN(x)) x = parseFloat(w.dataset.x || 0);
+  x = cl(x, 0, XM);
+  w.dataset.x = x; w.dataset.x1 = X1; w.dataset.x2 = X2; w.dataset.xm = XM;
+  const p = cl(x / X1, 0, 1), y2 = cl(x - X1, 0, X2), r = cl(x - X1 - X2, 0, X3);
+  const t = y2 / X2, k = t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  const Bo = F + 10 + X1 * p + y2, top = Bo - Hs - r, hh = Hs + r;
+  const all = [b, fl, th, lbl, fi, gr, mo, g('_t0'), g('_t1'), g('_t2'), g('_t3')];
   const tr = anim ? 'all .24s ease' : 'none';
-  [f, b, c, fl, row, big, gr, th].forEach(x => { if(x) x.style.transition = tr; });
+  all.forEach(e => { if(e) e.style.transition = tr; });
   w.style.transition = anim ? 'padding-bottom .24s ease' : 'none';
+  const cut = Math.round(CUT * (1 - p));
   f.style.clipPath = `polygon(0 0,100% 0,100% 100%,${cut}px 100%,0 calc(100% - ${cut}px))`;
   fl.style.width = cut + 'px'; fl.style.height = cut + 'px'; fl.style.top = (F - cut) + 'px'; fl.style.opacity = cut < 4 ? 0 : 1;
-  ch.style.top = (F - 26) + 'px'; ch.style.opacity = (p > 0.6 && q < 0.05) ? 1 : 0;
-  hit.style.top = (F - 52) + 'px'; hit.style.display = q < 0.05 ? 'block' : 'none';
-  const rot = (-2.2 * (1 - 0.65 * p) * (1 - q)).toFixed(2);
-  const bt = Math.min(40, F - 20);
-  b.style.top = bt + 'px'; b.style.height = (Bb - bt) + 'px'; b.style.transform = `rotate(${rot}deg)`;
-  c.style.top = (F - r) + 'px'; c.style.height = (Bb - (F - r)) + 'px'; c.style.transform = `rotate(${rot}deg)`; c.style.opacity = q > 0.01 ? 1 : 0;
-  row.style.top = (Bb - 14 - 34) + 'px'; row.style.opacity = Math.max(0, Math.min(1, (p - 0.55) / 0.45)) * (1 - Math.min(1, q * 2.2));
-  big.style.top = (F - r + 30) + 'px'; big.style.opacity = Math.max(0, q * 2 - 1);
-  big.style.pointerEvents = q > 0.9 ? 'auto' : 'none';
-  gr.style.top = (F - r + 8) + 'px'; gr.style.opacity = p > 0.9 ? 1 : 0;
-  th.style.top = (F - r) + 'px'; th.style.height = (Bb - (F - r)) + 'px'; th.style.display = p > 0.9 ? 'block' : 'none';
-  w.style.paddingBottom = (Bb - F + 8) + 'px';
+  ch.style.top = (F - 26) + 'px'; ch.style.opacity = (p > 0.6 && y2 < 5) ? 1 : 0;
+  hit.style.top = (F - 52) + 'px'; hit.style.display = y2 < 5 ? 'block' : 'none';
+  // нижний лист: тот же размер, что и верхний, едет жёстко; наклон исчезает по мере разгибания уголка
+  b.style.top = top + 'px'; b.style.height = hh + 'px';
+  b.style.transform = `rotate(${(-2.2 * (1 - p)).toFixed(2)}deg)`;
+  b.style.zIndex = r > 0 ? 4 : 1;
+  b.style.boxShadow = r > 0 ? '0 -3px 8px rgba(0,0,0,.28)' : 'none';
+  b.style.borderRadius = r > 0 ? '5px 5px 4px 4px' : '0 0 4px 4px';
+  const clipTop = Math.max(0, 10 - top);
+  b.style.clipPath = clipTop > 0 ? `inset(${clipTop}px 0 0 0)` : 'none';
+  // миниатюры → крупные плитки (морфинг: позиция и размер)
+  const rowOp = cl((p - 0.55) / 0.45, 0, 1), rowY = hh - 14 - 34;
+  const expanded = x >= X1 + X2 - 2;
+  for(let i = 0; i < shown; i++) {
+    const el = g('_t' + i); if(!el) continue;
+    const sx = 34 + i * 39, sy = rowY, sw = 34, sh = 34;
+    const ex = 30 + (i % 2) * (tw + 6), ey = 18 + r / 2 + Math.floor(i / 2) * (bh + 6), ew = tw, eh = bh;
+    el.style.left = (sx + (ex - sx) * k) + 'px'; el.style.top = (sy + (ey - sy) * k) + 'px';
+    el.style.width = (sw + (ew - sw) * k) + 'px'; el.style.height = (sh + (eh - sh) * k) + 'px';
+    el.style.borderRadius = (5 + 3 * k) + 'px';
+    el.style.setProperty('--stkf', (11 + 9 * k) + 'px');
+    el.style.opacity = rowOp; el.style.pointerEvents = expanded ? 'auto' : 'none';
+  }
+  if(mo) mo.style.opacity = 1 - k;
+  lbl.style.left = (34 + shown * 39 + (shown ? 6 : 0)) + 'px'; lbl.style.top = rowY + 'px';
+  lbl.style.opacity = rowOp * (1 - Math.min(1, t * 2.2));
+  fi.style.top = (18 + r / 2 + gridH + (n ? 8 : 0)) + 'px'; fi.style.opacity = cl((k - 0.55) / 0.35, 0, 1);
+  fi.style.pointerEvents = expanded ? 'auto' : 'none';
+  gr.style.opacity = r > 0 ? 1 : 0;
+  const vt = r > 0 ? F - r : Math.max(top, F);
+  th.style.top = vt + 'px'; th.style.height = Math.max(0, Bo - vt) + 'px'; th.style.display = p > 0.9 ? 'block' : 'none';
+  w.style.paddingBottom = (Bo - F + 8) + 'px';
 }
 // ставим стикеры в исходное положение (угол загнут) и пересчитываем размеры, когда лист уже показан
 function stkInitAll() {
   document.querySelectorAll('[data-stk-hit]').forEach(h => {
     const id = h.dataset.stkHit, w = document.getElementById(id);
     if(!w) return;
-    stkApply(id, parseFloat(w.dataset.p || 0), parseFloat(w.dataset.q || 0), false);
+    stkApply(id, parseFloat(w.dataset.x || 0), false);
   });
 }
 window.addEventListener('resize', () => { try { stkInitAll(); } catch(e) {} });
 (function(){
   if(window._stkDragInit2) return; window._stkDragInit2 = true;
   let d = null;
-  const geo = id => { const w = document.getElementById(id); return { w, p: parseFloat(w?.dataset.p || 0), q: parseFloat(w?.dataset.q || 0) }; };
+  const geo = id => { const w = document.getElementById(id); const D = w?.dataset || {}; return { w, x: parseFloat(D.x || 0), X1: parseFloat(D.x1 || 66), X2: parseFloat(D.x2 || 100), XM: parseFloat(D.xm || 236) }; };
+  const snap = (id, G) => {
+    const pts = [0, G.X1, G.X1 + G.X2, G.XM]; let best = pts[0];
+    pts.forEach(v => { if(Math.abs(v - G.x) < Math.abs(best - G.x)) best = v; });
+    stkApply(id, best, true);
+  };
   document.addEventListener('pointerdown', e => {
     const hit = e.target.closest && e.target.closest('[data-stk-hit]');
     const th = !hit && e.target.closest && e.target.closest('[data-stk-th]');
     const el = hit || th; if(!el) return;
     const id = hit ? hit.dataset.stkHit : th.dataset.stkTh;
     const G = geo(id); if(!G.w) return;
-    d = { id, kind: hit ? 'corner' : 'tray', y0: e.clientY, x0: e.clientX, p0: G.p, q0: G.q, m: 0, pid: e.pointerId, el };
+    d = { id, kind: hit ? 'corner' : 'tray', y0: e.clientY, x0: G.x, m: 0, pid: e.pointerId, el };
     try { el.setPointerCapture(e.pointerId); } catch(_) {}
   });
   document.addEventListener('pointermove', e => {
@@ -793,28 +835,22 @@ window.addEventListener('resize', () => { try { stkInitAll(); } catch(e) {} });
     const dy = e.clientY - d.y0;
     d.m = Math.max(d.m, Math.abs(dy));
     if(d.m < 6) return;
-    if(d.kind === 'corner') stkApply(d.id, d.p0 + dy / 66, 0, false);
-    else stkApply(d.id, 1, d.q0 + dy / 170, false);
+    stkApply(d.id, d.x0 + dy, false);
   });
   const end = e => {
     if(!d || e.pointerId !== d.pid) return;
     const x = d; d = null;
     const G = geo(x.id);
-    if(x.kind === 'corner') {
-      if(x.m < 6) stkApply(x.id, G.p > 0.5 ? 0 : 1, 0, true);
-      else stkApply(x.id, G.p > 0.4 ? 1 : 0, 0, true);
-    } else {
-      if(x.m < 6) {
-        if(G.q > 0.5) {
-          // нажатие по раскрытому листу: передаём его плитке или файлу под пальцем, иначе сворачиваем
-          x.el.style.display = 'none';
-          const t = document.elementFromPoint(e.clientX, e.clientY);
-          x.el.style.display = 'block';
-          const hitEl = t && t.closest && t.closest('[onclick], a');
-          if(hitEl && G.w.contains(hitEl)) hitEl.click(); else stkApply(x.id, 1, 0, true);
-        } else stkApply(x.id, 1, 1, true);
-      } else stkApply(x.id, 1, G.q > 0.35 ? 1 : 0, true);
-    }
+    if(x.m >= 6) { snap(x.id, G); return; }
+    if(x.kind === 'corner') { stkApply(x.id, G.x > G.X1 / 2 ? 0 : G.X1, true); return; }
+    if(G.x >= G.X1 + G.X2 * 0.9) {
+      // нажатие по раскрытому листу: передаём его плитке или файлу под пальцем, иначе сворачиваем
+      x.el.style.display = 'none';
+      const t = document.elementFromPoint(e.clientX, e.clientY);
+      x.el.style.display = 'block';
+      const hitEl = t && t.closest && t.closest('[onclick], a');
+      if(hitEl && G.w.contains(hitEl)) hitEl.click(); else stkApply(x.id, G.X1, true);
+    } else stkApply(x.id, G.X1 + G.X2, true);
   };
   document.addEventListener('pointerup', end);
   document.addEventListener('pointercancel', end);
