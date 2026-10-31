@@ -4,7 +4,7 @@
 //  Ролики по умолчанию идут из облака потоком и не сохраняются (чтобы не качать дважды).
 // ═══════════════════════════════════════════
 (function(){
-  const DB = 'mc-media', CAP = 500 * 1024 * 1024;
+  const DB = 'mc-media', DEFAULT_CAP = 500 * 1024 * 1024;
   const RE = /\/storage\/v1\/object\/(public|sign)\/attachments\//;
   const rq = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
   const done = t => new Promise((res, rej) => { t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); });
@@ -19,8 +19,12 @@
     return dbp;
   }
   async function getFile(url) { const db = await open(); return rq(db.transaction('files').objectStore('files').get(url)); }
+  async function getCap(db) {
+    try { const r = await rq(db.transaction('idx').objectStore('idx').get('__cap__')); return (r && r.cap) || DEFAULT_CAP; } catch(e) { return DEFAULT_CAP; }
+  }
   async function trim(db) {
-    const all = await rq(db.transaction('idx').objectStore('idx').getAll());
+    const CAP = await getCap(db);
+    const all = (await rq(db.transaction('idx').objectStore('idx').getAll())).filter(x => x.url !== '__cap__');
     let tot = all.reduce((s, x) => s + x.size, 0);
     if(tot <= CAP) return;
     all.sort((a, b) => a.t - b.t);

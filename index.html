@@ -441,6 +441,7 @@
 <div id="desktop-cal-toolbar">
   <button id="desktop-cal-toggle" onclick="toggleDesktopCalendar()">📅 Календарь</button>
     <button id="desktop-calc-toggle" onclick="toggleDesktopCalc()">🧮 Калькулятор</button>
+  <button id="desktop-gal-toggle" onclick="toggleGallery()">🖼 Галерея</button>
   <button id="desktop-events-toggle" onclick="toggleDesktopEvents()">🗓️ События</button>
 </div>
 <div id="lobby-panels-backdrop" onclick="closeLobbyPanelsSwipe()"></div>
@@ -755,6 +756,7 @@
     <button id="pin-strip-btn" onclick="openPinPopup()" title="Закреплённые">📌</button>
     <button id="pin-strip-btn" onclick="openMyTasksPopup()" title="Мои задачи">📋</button>
     <button id="pin-strip-btn" onclick="openCalcMobile()" title="Калькулятор">🧮</button>
+    <button id="pin-strip-btn" onclick="openGalleryMobile()" title="Галерея">🖼</button>
   </div>
 </div>
 <div id="pin-popup-ov" onclick="if(event.target===this)closePinPopup()">
@@ -824,6 +826,7 @@
 <script src="app-render.js"></script>
 <script src="app-calc.js"></script>
 <script src="app-chat.js"></script>
+<script src="app-gallery.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="app-view.js"></script>
 <script src="app-edit.js"></script>

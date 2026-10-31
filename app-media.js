@@ -48,7 +48,9 @@ async function mcPrepareFile(file) {
 const mcOrigUpload = uploadToStorage;
 uploadToStorage = async function(file, cardId, entryId) {
   file = await mcPrepareFile(file);
-  return mcOrigUpload(file, cardId, entryId);
+  const att = await mcOrigUpload(file, cardId, entryId);
+  if(att && typeof att === 'object' && !att.ts) att.ts = Date.now(); // время загрузки: нужно для галереи
+  return att;
 };
 
 // ═══════════════════════════════════════════
@@ -65,10 +67,22 @@ function mcMediaDb() {
   });
 }
 // сколько места занимают сохранённые на устройстве вложения (байты)
+function mcGalCfg() {
+  const d = { videosWifi: false, photosAuto: true, capMB: 500 };
+  try { return Object.assign(d, JSON.parse(localStorage.getItem('mc_gal_cfg') || '{}')); } catch(e) { return d; }
+}
+// лимит места на устройстве: записываем туда, откуда его читает service worker
+async function mcApplyCap() {
+  try {
+    const db = await mcMediaDb();
+    const t = db.transaction('idx', 'readwrite');
+    t.objectStore('idx').put({ url: '__cap__', size: 0, t: 0, cap: mcGalCfg().capMB * 1024 * 1024 });
+  } catch(e) {}
+}
 async function mcMediaUsage() {
   try {
     const db = await mcMediaDb();
-    const all = await new Promise((res, rej) => { const q = db.transaction('idx').objectStore('idx').getAll(); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+    const all = (await new Promise((res, rej) => { const q = db.transaction('idx').objectStore('idx').getAll(); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); })).filter(x => x.url !== '__cap__');
     return { files: all.length, bytes: all.reduce((s, x) => s + x.size, 0) };
   } catch(e) { return { files: 0, bytes: 0 }; }
 }
@@ -76,10 +90,15 @@ async function mcWarmMedia() {
   try {
     if(!navigator.onLine || document.hidden || !navigator.serviceWorker || !navigator.serviceWorker.controller) return;
     if(typeof cards === 'undefined' || typeof cardAttsOf !== 'function') return;
+    const cfg = mcGalCfg();
+    const conn = navigator.connection;
+    const onWifi = !conn || !conn.type || conn.type === 'wifi' || conn.type === 'ethernet';
     const urls = [];
     (cards || []).forEach(c => cardAttsOf(c).forEach(a => {
       const u = String(a.data || '');
-      if(!MC_ATT_RE.test(u) || _mcWarmed.has(u) || (a.type || '').startsWith('video/')) return;
+      if(!MC_ATT_RE.test(u) || _mcWarmed.has(u)) return;
+      const vid = (a.type || '').startsWith('video/');
+      if(vid ? !(cfg.videosWifi && onWifi) : !cfg.photosAuto) return;
       urls.push(u);
     }));
     for(const u of urls.slice(0, 40)) {
@@ -90,3 +109,4 @@ async function mcWarmMedia() {
 }
 setInterval(mcWarmMedia, 25000);
 setTimeout(mcWarmMedia, 6000);
+setTimeout(mcApplyCap, 1500);
