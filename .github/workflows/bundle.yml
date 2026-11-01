@@ -1,0 +1,46 @@
+name: Publish site bundle
+
+# Когда меняются файлы сайта — собираем архив app.zip и кладём в релиз «bundle».
+# Приложение на телефоне видит новую версию и подтягивает её само.
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - '*.html'
+      - '*.css'
+      - '*.js'
+      - '*.png'
+      - '*.jpg'
+      - '*.svg'
+      - '*.webp'
+      - '*.ico'
+      - 'manifest*.json'
+      - '.github/scripts/site-files.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assemble site files
+        run: |
+          VER=$(bash .github/scripts/site-files.sh bundle-out)
+          echo "VER=$VER" >> "$GITHUB_ENV"
+          echo "Version: $VER"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view bundle >/dev/null 2>&1; then
+            CUR=$(gh release view bundle --json name -q .name)
+            if [ "$CUR" = "$VER" ]; then echo "Same version, nothing to do"; exit 0; fi
+            gh release delete bundle --yes --cleanup-tag
+          fi
+          (cd bundle-out && zip -qr ../app.zip .)
+          gh release create bundle app.zip --title "$VER" --notes "Автоматический пакет сайта для приложения" --target "$GITHUB_SHA" --latest=false
