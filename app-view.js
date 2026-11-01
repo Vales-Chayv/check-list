@@ -1925,6 +1925,18 @@ function openVideoViewer(src) {
   div.onclick = e => { if(e.target===div) div.remove(); };
   document.body.appendChild(div);
   const v = div.querySelector('video');
+  if(v) v.addEventListener('error', () => {
+    // формат не поддерживается (например WMV) или нет связи: вместо чёрного окна показываем подсказку и ссылку
+    const box = document.createElement('div');
+    box.style.cssText = 'max-width:320px;text-align:center;color:#fff;font:15px/1.5 system-ui,sans-serif';
+    box.innerHTML = '<div style="font-size:42px;margin-bottom:8px">🎞</div><div style="font-weight:700;margin-bottom:6px">Не удалось воспроизвести ролик</div><div style="opacity:.75;font-size:13px;margin-bottom:14px">Возможно, формат не поддерживается этим устройством (например WMV) или нет связи.</div>';
+    const link = document.createElement('a');
+    link.href = src; link.target = '_blank'; link.rel = 'noopener'; link.setAttribute('download', '');
+    link.textContent = '⬇ Скачать файл';
+    link.style.cssText = 'display:inline-block;background:#fff;color:#111;padding:10px 18px;border-radius:12px;font-weight:700;text-decoration:none';
+    box.appendChild(link);
+    v.replaceWith(box);
+  }, { once: true });
   if(v) { const pr = v.play(); if(pr && pr.catch) pr.catch(() => { v.muted = true; v.play().catch(() => {}); }); }
 }
 async function restoreCard(id) {

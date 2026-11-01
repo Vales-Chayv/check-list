@@ -102,6 +102,33 @@
     };
   })();
 
+  // ═══ Запись голоса в фоне: пока идёт запись с микрофона, держим службу переднего плана (только APK) ═══
+  (function () {
+    const McR = (cap.Plugins && cap.Plugins.McRec) || (cap.registerPlugin && cap.registerPlugin('McRec'));
+    const md = navigator.mediaDevices;
+    if (!McR || !md || !md.getUserMedia || !window.MediaStreamTrack) return;
+    const live = new Set();
+    const svcStart = async () => { try { await McR.start(); } catch (e) { console.log('[rec] start', e && e.message); } };
+    const svcStop = async () => { try { await McR.stop(); } catch (e) { console.log('[rec] stop', e && e.message); } };
+    const forget = t => { if (live.delete(t) && live.size === 0) svcStop(); };
+    const origGUM = md.getUserMedia.bind(md);
+    md.getUserMedia = async function (c) {
+      const s = await origGUM(c);                       // разрешение на микрофон уже получено
+      try {
+        if (c && c.audio) {
+          const tr = s.getAudioTracks();
+          if (tr.length) {
+            tr.forEach(t => { live.add(t); t.addEventListener('ended', () => forget(t)); });
+            await svcStart();
+          }
+        }
+      } catch (e) {}
+      return s;
+    };
+    const origStop = MediaStreamTrack.prototype.stop;
+    MediaStreamTrack.prototype.stop = function () { origStop.call(this); forget(this); };
+  })();
+
   const PN = cap.Plugins && cap.Plugins.PushNotifications;
   if (!PN) { console.log('[native] плагин PushNotifications не найден'); return; }
 
