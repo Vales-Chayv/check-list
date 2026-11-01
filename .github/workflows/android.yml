@@ -35,6 +35,15 @@ jobs:
           sed -i 's/minSdkVersion = [0-9]*/minSdkVersion = 23/' android/variables.gradle
           grep -n minSdkVersion android/variables.gradle
 
+      - name: Upgrade Android build tools to compileSdk 35 (needed by the updater plugin)
+        run: |
+          sed -i 's#com.android.tools.build:gradle:[0-9.]*#com.android.tools.build:gradle:8.7.3#' android/build.gradle
+          sed -i 's#gradle-[0-9.]*-all.zip#gradle-8.9-all.zip#' android/gradle/wrapper/gradle-wrapper.properties
+          sed -i 's/compileSdkVersion = [0-9]*/compileSdkVersion = 35/' android/variables.gradle
+          grep -n "com.android.tools.build" android/build.gradle
+          grep -n distributionUrl android/gradle/wrapper/gradle-wrapper.properties
+          grep -n "SdkVersion" android/variables.gradle
+
       - name: Add native video compression
         run: |
           D=android/app/src/main/java/app/mycards/mobile
@@ -94,26 +103,11 @@ jobs:
           }
           EOF
 
-      - name: Pin library versions that fit compileSdk 34
-        run: |
-          cat > "$GITHUB_WORKSPACE/deps.gradle" <<'EOF'
-          allprojects {
-            configurations.all {
-              resolutionStrategy {
-                force 'androidx.work:work-runtime:2.9.1'
-                eachDependency { d ->
-                  if (d.requested.group == 'androidx.lifecycle') { d.useVersion '2.8.7' }
-                }
-              }
-            }
-          }
-          EOF
-
       - name: Build APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew -I "$GITHUB_WORKSPACE/sign.gradle" -I "$GITHUB_WORKSPACE/deps.gradle" assembleDebug
+          ./gradlew -I "$GITHUB_WORKSPACE/sign.gradle" assembleDebug
 
       - name: Show signing fingerprint
         run: keytool -printcert -jarfile android/app/build/outputs/apk/debug/app-debug.apk | grep SHA256 || true
