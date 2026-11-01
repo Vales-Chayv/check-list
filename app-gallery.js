@@ -4,6 +4,7 @@
 //  Работает вместе с app-media.js и sw-media.js (локальные копии на устройстве).
 // ═══════════════════════════════════════════
 (function(){
+  const CLOUD = '<svg width="22" height="17" viewBox="0 0 34 26" fill="none" stroke="#e8c56a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 22a6 6 0 0 1-.7-11.95A8 8 0 0 1 23.6 8.2 6.6 6.6 0 0 1 25 22z"/><path d="M17 10v8m-3.5-3.2L17 18.4l3.5-3.6"/></svg>';
   const G = { type: 'all', space: 'all', sel: false, picked: new Set(), items: [], local: new Set(), shown: 90, built: false };
   const $ = id => document.getElementById(id);
   const X = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -28,8 +29,11 @@
   .gal-t{position:relative;aspect-ratio:1;border-radius:5px;overflow:hidden;cursor:pointer;background:#262626;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
   .gal-t img,.gal-t video{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
   .gal-t i{position:absolute;right:4px;bottom:3px;font-style:normal;font-size:10px;color:#fff;background:rgba(0,0,0,.55);border-radius:8px;padding:0 5px}
-  .gal-t u{position:absolute;left:4px;top:3px;text-decoration:none;font-size:12px;color:#fff;text-shadow:0 0 3px #000;z-index:2}
-  .gal-t.cl::after{content:'';position:absolute;inset:0;background:rgba(0,0,0,.28);pointer-events:none}
+  .gal-dl{position:absolute;left:4px;top:4px;width:40px;height:32px;border-radius:16px;border:none;background:transparent;padding:0;cursor:pointer;z-index:4;font-family:inherit;color:var(--accent);font-size:13px;display:flex;align-items:center;justify-content:center}
+  .gal-dl span{width:34px;height:26px;border-radius:13px;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center}
+  .gal-dl.busy{opacity:.6;pointer-events:none}
+  #gal-sheet.selmode .gal-dl{display:none}
+  .gal-t.cl::after{content:'';position:absolute;inset:0;background:rgba(0,0,0,.22);pointer-events:none;z-index:1}
   .gal-t.doc{display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:var(--t2);text-align:center;padding:4px;word-break:break-all}
   .gal-t.doc b{font-size:24px;display:block;margin-bottom:2px}
   .gal-sel{position:absolute;right:4px;top:4px;width:18px;height:18px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,.35);z-index:3;display:none}
@@ -131,7 +135,7 @@
       <div class="gal-fl" id="gal-f1"></div>
       <div class="gal-fl" id="gal-f2"></div>
       <div id="gal-body"></div>
-      <div class="gal-bar"><span id="gal-usage"></span><span>☁ — ещё не на устройстве</span></div>
+      <div class="gal-bar"><span id="gal-usage"></span><span>☁ со стрелкой — файл только в облаке: нажми, чтобы сохранить на устройство</span></div>
       <div class="gal-act"><span id="gal-share">↗ Поделиться</span><span id="gal-save">⬇ Сохранить</span><span id="gal-rm">🗑 С устройства</span><span id="gal-cancel">✕ Отмена</span></div>
       <div id="gal-set">
         <div style="font-weight:700;margin-bottom:2px">Хранение на устройстве</div>
@@ -145,15 +149,25 @@
     $('gal-f1').onclick = e => { const c = e.target.closest('.gal-ch'); if(c) { G.type = c.dataset.t; G.shown = 90; renderAll(); } };
     $('gal-f2').onclick = e => { const c = e.target.closest('.gal-ch'); if(c) { G.space = c.dataset.s; G.shown = 90; renderAll(); } };
     const body = $('gal-body');
-    let timer = null, long = false;
+    let timer = null, long = false, sx = 0, sy = 0;
+    const startSel = t => { long = true; G.sel = true; G.picked.add(+t.dataset.i); if(navigator.vibrate) try { navigator.vibrate(15); } catch(e) {} renderBody(); };
     body.addEventListener('pointerdown', e => {
-      const t = e.target.closest('.gal-t'); if(!t) return;
       long = false;
-      timer = setTimeout(() => { long = true; G.sel = true; G.picked.add(+t.dataset.i); renderBody(); }, 450);
+      const t = e.target.closest('.gal-t'); if(!t || e.target.closest('.gal-dl') || G.sel) return;
+      sx = e.clientX; sy = e.clientY;
+      timer = setTimeout(() => startSel(t), 420);
     });
-    ['pointerup', 'pointerleave', 'pointercancel', 'pointermove'].forEach(n => body.addEventListener(n, () => clearTimeout(timer)));
-    body.addEventListener('contextmenu', e => { if(e.target.closest('.gal-t')) e.preventDefault(); });
-    body.addEventListener('click', e => {
+    body.addEventListener('pointermove', e => { if(timer && Math.hypot(e.clientX - sx, e.clientY - sy) > 12) { clearTimeout(timer); timer = null; } });
+    ['pointerup', 'pointercancel'].forEach(n => body.addEventListener(n, () => { clearTimeout(timer); timer = null; }));
+    // на телефоне долгое нажатие приходит ещё и как «контекстное меню»: превращаем его в выбор
+    body.addEventListener('contextmenu', e => {
+      const t = e.target.closest('.gal-t'); if(!t) return;
+      e.preventDefault();
+      if(!G.sel && !long) startSel(t);
+    });
+    body.addEventListener('click', async e => {
+      const dl = e.target.closest('.gal-dl');
+      if(dl) { e.stopPropagation(); downloadOne(dl); return; }
       if(e.target.closest('.gal-more')) { G.shown += 90; renderBody(); return; }
       const t = e.target.closest('.gal-t'); if(!t) return;
       if(long) { long = false; return; }
@@ -215,7 +229,7 @@
       if(it.kind === 'img') inner = `<img src="${X(it.url)}" loading="lazy" alt="">`;
       else if(it.kind === 'vid') inner = `<video src="${X(it.url)}#t=0.1" preload="metadata" muted playsinline></video><i>▶</i>`;
       else inner = `<b>${it.kind === 'aud' ? '🎤' : '📄'}</b>${X(it.name || (it.kind === 'aud' ? 'запись' : 'файл'))}`;
-      h += `<div class="${cls}" data-i="${o.i}">${inner}${cl ? '<u>☁</u>' : ''}<span class="gal-sel"></span></div>`;
+      h += `<div class="${cls}" data-i="${o.i}">${inner}${cl ? '<button class="gal-dl" data-dl="' + o.i + '" aria-label="Скачать на устройство"><span>' + CLOUD + '</span></button>' : ''}<span class="gal-sel"></span></div>`;
     });
     if(cur !== null) h += '</div>';
     if(L.length > G.shown) h += `<button class="gal-more">Показать ещё (${L.length - G.shown})</button>`;
@@ -266,6 +280,12 @@
       } else await saveBlob(blob, it);
       loadLocal().then(renderBody);
     } catch(e) { toast('Не удалось открыть файл', true); }
+  }
+  async function downloadOne(btn) {
+    const it = G.items[+btn.dataset.dl]; if(!it) return;
+    btn.classList.add('busy'); btn.firstElementChild.textContent = '…';
+    try { await fetchBlob(it.url); await loadLocal(); renderBody(); toast('Сохранено на устройстве'); }
+    catch(e) { btn.classList.remove('busy'); btn.firstElementChild.innerHTML = CLOUD; toast('Не удалось скачать', true); }
   }
   async function doShare(saveOnly) {
     const list = [...G.picked].map(i => G.items[i]).filter(Boolean);
