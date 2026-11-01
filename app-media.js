@@ -33,6 +33,7 @@ async function mcCompressImage(file) {
 async function mcPrepareFile(file) {
   const t = file.type || '';
   if(t.startsWith('image/')) file = await mcCompressImage(file);
+  if(t.startsWith('video/') && typeof window.mcCompressVideo === 'function') { try { file = await window.mcCompressVideo(file); } catch(e) {} } // сжатие видео работает только в APK
   const kind = t.startsWith('video/') ? 'video' : t.startsWith('audio/') ? 'audio' : t.startsWith('image/') ? 'image' : 'other';
   const lim = MC_LIMITS[kind];
   if(file.size > lim) {

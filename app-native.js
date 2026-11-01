@@ -50,6 +50,58 @@
     document.addEventListener('visibilitychange', () => { if (!document.hidden) check(false); });
   })();
 
+  // ═══ Сжатие видео перед отправкой (нативный плагин McVideo, только APK) ═══
+  (function () {
+    const McV = (cap.Plugins && cap.Plugins.McVideo) || (cap.registerPlugin && cap.registerPlugin('McVideo'));
+    const FS = cap.Plugins && cap.Plugins.Filesystem;
+    if (!McV || !FS) return;
+    const MIN = 6 * 1024 * 1024, MAX = 400 * 1024 * 1024, CH = 3 * 1024 * 1024;
+    let ui = null;
+    const show = t => {
+      if (!ui) {
+        ui = document.createElement('div');
+        ui.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:rgba(20,20,20,.92);color:#fff;padding:10px 16px;border-radius:14px;font:600 14px system-ui,sans-serif;z-index:99999;box-shadow:0 4px 18px rgba(0,0,0,.4)';
+        document.body.appendChild(ui);
+      }
+      ui.textContent = t;
+    };
+    const hide = () => { if (ui) { ui.remove(); ui = null; } };
+    const b64 = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = () => rej(r.error); r.readAsDataURL(blob); });
+
+    // вернёт сжатый File, а при любой неудаче — исходный файл
+    window.mcCompressVideo = async function (file) {
+      if (file.size < MIN || file.size > MAX) return file;
+      const inName = 'mcv_' + Date.now() + '.mp4';
+      const outName = inName + '.out.mp4';
+      let h = null;
+      try {
+        show('🎞 Готовлю видео…');
+        for (let off = 0, i = 0; off < file.size; off += CH, i++) {
+          const data = await b64(file.slice(off, off + CH));
+          if (i === 0) await FS.writeFile({ path: inName, directory: 'CACHE', data });
+          else await FS.appendFile({ path: inName, directory: 'CACHE', data });
+          show('🎞 Готовлю видео… ' + Math.min(99, Math.round((off + CH) / file.size * 100)) + '%');
+        }
+        show('🎞 Сжимаю видео…');
+        h = await McV.addListener('progress', p => show('🎞 Сжимаю видео… ' + Math.round(p.percent || 0) + '%'));
+        await McV.compress({ name: inName, maxShort: 720, bitrate: 2500000 });
+        const { uri } = await FS.getUri({ path: outName, directory: 'CACHE' });
+        let blob;
+        try { const rr = await fetch(cap.convertFileSrc(uri)); if (!rr.ok) throw new Error('http'); blob = await rr.blob(); }
+        catch (e) { const rd = await FS.readFile({ path: outName, directory: 'CACHE' }); blob = await (await fetch('data:video/mp4;base64,' + rd.data)).blob(); }
+        if (!blob || !blob.size || blob.size >= file.size * 0.95) return file; // не стало меньше — оставляем исходный
+        return new File([blob], (file.name || 'video').replace(/\.[^.]+$/, '') + '.mp4', { type: 'video/mp4', lastModified: Date.now() });
+      } catch (e) {
+        console.log('[video]', e && e.message);
+        return file;
+      } finally {
+        hide();
+        try { if (h) h.remove(); } catch (e) {}
+        for (const n of [inName, outName]) { try { await FS.deleteFile({ path: n, directory: 'CACHE' }); } catch (e) {} }
+      }
+    };
+  })();
+
   const PN = cap.Plugins && cap.Plugins.PushNotifications;
   if (!PN) { console.log('[native] плагин PushNotifications не найден'); return; }
 
