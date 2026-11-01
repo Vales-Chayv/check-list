@@ -15,12 +15,54 @@
   window.isNativeApp = () => native;
   if (!native) return;
 
+  // ═══ Встроенная копия сайта: сама подтягивает свежую версию, без пересборки APK ═══
+  (function () {
+    const CU = cap.Plugins && cap.Plugins.CapacitorUpdater;
+    if (!CU) return;
+    const REL = 'https://api.github.com/repos/vales-chayv/check-list/releases/tags/bundle';
+    try { CU.notifyAppReady(); } catch (e) {} // «страница запустилась нормально» — иначе плагин откатит версию
+    let lastCheck = 0, busy = false;
+    async function check(force) {
+      if (busy || (!force && Date.now() - lastCheck < 20 * 60000)) return;
+      busy = true; lastCheck = Date.now();
+      try {
+        const r = await fetch(REL, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' });
+        if (!r.ok) return;
+        const rel = await r.json();
+        const ver = String(rel.name || '').trim();
+        const asset = (rel.assets || []).find(a => a.name === 'app.zip');
+        if (!ver || !asset) return;
+        let have = '';
+        try { have = (await (await fetch('mc-bundle.json', { cache: 'no-store' })).json()).version; } catch (e) {}
+        if (have === ver) return;
+        const list = ((await CU.list()).bundles) || [];
+        let b = list.find(x => x.version === ver);
+        if (!b) b = await CU.download({ url: asset.browser_download_url, version: ver });
+        await CU.next({ id: b.id }); // включится при следующем запуске приложения
+        // убираем старые скачанные версии
+        const cur = (await CU.current()).bundle || {};
+        for (const x of list) { if (x.id !== b.id && x.id !== cur.id && x.id !== 'builtin') { try { await CU.delete({ id: x.id }); } catch (e) {} } }
+        console.log('[updater] скачана версия', ver);
+      } catch (e) { console.log('[updater]', e && e.message); }
+      finally { busy = false; }
+    }
+    setTimeout(() => check(true), 6000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) check(false); });
+  })();
+
   const PN = cap.Plugins && cap.Plugins.PushNotifications;
   if (!PN) { console.log('[native] плагин PushNotifications не найден'); return; }
 
   const TOKEN_KEY = 'mc_fcm_token';
   const ON_KEY = 'mc_native_push'; // '1' — включены, '0' — выключены вручную, пусто — ещё не выбирали
   const SITE_PREFIX = 'https://vales-chayv.github.io/check-list/';
+  // ссылка из уведомления: берём из неё только параметры и открываем их на нашей (встроенной) странице
+  function openSiteUrl(url) {
+    if (!url || url.indexOf(SITE_PREFIX) !== 0) return;
+    const q = url.slice(SITE_PREFIX.length).replace(/^\/?/, '');
+    const target = location.pathname + (q ? (q.charAt(0) === '?' ? q : '?' + q) : '');
+    if (target !== location.pathname + location.search) location.href = target;
+  }
   const post = body => fetch(FUNC_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'apikey': SB_ANON, 'Authorization': 'Bearer ' + SB_ANON },
@@ -68,7 +110,7 @@
   // тап по уведомлению — открываем нужный чат/карточку
   PN.addListener('pushNotificationActionPerformed', a => {
     const url = a && a.notification && a.notification.data && a.notification.data.url;
-    if (url && url.indexOf(SITE_PREFIX) === 0 && url !== location.href) location.href = url;
+    openSiteUrl(url);
   });
 
   // ── подмена функций из app-init.js / app-settings.js ──
@@ -238,7 +280,7 @@
   if (LN) {
     LN.addListener('localNotificationActionPerformed', a => {
       const url = a && a.notification && a.notification.extra && a.notification.extra.url;
-      if (url && url.indexOf(SITE_PREFIX) === 0 && url !== location.href) location.href = url;
+      openSiteUrl(url);
     });
     setInterval(alarmsSync, 60000);
     setTimeout(alarmsSync, 8000);
