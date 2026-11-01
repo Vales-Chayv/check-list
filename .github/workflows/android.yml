@@ -85,11 +85,24 @@ jobs:
           }
           EOF
 
+      - name: Pin library versions that fit compileSdk 34
+        run: |
+          cat > "$GITHUB_WORKSPACE/deps.gradle" <<'EOF'
+          allprojects {
+            configurations.all {
+              resolutionStrategy {
+                force 'androidx.work:work-runtime:2.9.1'
+                force 'androidx.lifecycle:lifecycle-process:2.8.7'
+              }
+            }
+          }
+          EOF
+
       - name: Build APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew -I "$GITHUB_WORKSPACE/sign.gradle" assembleDebug
+          ./gradlew -I "$GITHUB_WORKSPACE/sign.gradle" -I "$GITHUB_WORKSPACE/deps.gradle" assembleDebug
 
       - name: Show signing fingerprint
         run: keytool -printcert -jarfile android/app/build/outputs/apk/debug/app-debug.apk | grep SHA256 || true
