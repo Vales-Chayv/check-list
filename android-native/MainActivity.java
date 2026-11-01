@@ -7,6 +7,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(McVideoPlugin.class);
+        registerPlugin(McRecPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
