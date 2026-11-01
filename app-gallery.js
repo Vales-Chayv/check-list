@@ -85,9 +85,9 @@
     const sp = (typeof spaces !== 'undefined' ? spaces : []).find(s => s.id === id);
     return sp ? (sp.name || 'Кабинет') : (!id || id === 'personal' ? 'Личный' : 'Кабинет');
   }
-  function collect() {
+  function collect(list) {
     const out = [], seen = new Set();
-    (typeof cards !== 'undefined' ? cards : []).forEach(c => {
+    (list || []).forEach(c => {
       const base = Date.parse(c.created_at || '') || 0;
       const push = (a, ds) => {
         if(!a || !a.data || seen.has(a.data)) return;
@@ -101,6 +101,29 @@
     });
     out.sort((a, b) => b.ts - a.ts);
     return out;
+  }
+  // Карточки всех кабинетов, которые есть на устройстве (кэш), плюс текущий кабинет из памяти
+  async function allCards() {
+    const map = new Map();
+    try { (await local.getAll('cards')).forEach(c => map.set(c.id, c)); } catch(e) {}
+    (typeof cards !== 'undefined' ? cards : []).forEach(c => map.set(c.id, c));
+    return [...map.values()];
+  }
+  const syncedIds = () => { try { return new Set(JSON.parse(localStorage.getItem('mc_gal_synced') || '[]')); } catch(e) { return new Set(); } };
+  // Загружает с сервера карточки кабинетов, которых ещё нет на устройстве (один раз для каждого кабинета); force — все кабинеты заново
+  async function pullSpaces(force) {
+    if(!navigator.onLine || typeof sb === 'undefined' || typeof spaces === 'undefined') return false;
+    const have = new Set((await allCards()).map(c => c.space_id));
+    const done = syncedIds();
+    const ids = spaces.map(s => s.id).filter(id => force || (!have.has(id) && !done.has(id)));
+    if(!ids.length) return false;
+    try {
+      const { data, error } = await sb.from('cards').select('*').in('space_id', ids);
+      if(error) throw error;
+      if(data && data.length) await local.putAll('cards', data);
+      try { localStorage.setItem('mc_gal_synced', JSON.stringify([...new Set([...done, ...ids])])); } catch(e) {}
+      return true;
+    } catch(e) { console.log('gallery pull error:', e.message || e); return false; }
   }
   async function loadLocal() {
     G.local = new Set();
@@ -131,7 +154,7 @@
     ov.onclick = e => { if(e.target === ov) closeGallery(); };
     ov.innerHTML = `<div class="sheet" id="gal-sheet">
       <div class="sheet-handle"></div>
-      <div class="gal-top"><span>🖼 Галерея</span><span class="sp"></span><span class="cnt" id="gal-cnt"></span><button class="gal-ib" id="gal-gear" aria-label="Настройки">⚙</button><button class="gal-ib" style="color:var(--t2)" onclick="closeGallery()" aria-label="Закрыть">✕</button></div>
+      <div class="gal-top"><span>🖼 Галерея</span><span class="sp"></span><span class="cnt" id="gal-cnt"></span><button class="gal-ib" id="gal-sync" aria-label="Обновить из облака" title="Обновить из облака">⟳</button><button class="gal-ib" id="gal-gear" aria-label="Настройки">⚙</button><button class="gal-ib" style="color:var(--t2)" onclick="closeGallery()" aria-label="Закрыть">✕</button></div>
       <div class="gal-fl" id="gal-f1"></div>
       <div class="gal-fl" id="gal-f2"></div>
       <div id="gal-body"></div>
@@ -179,6 +202,7 @@
     $('gal-share').onclick = () => doShare(false);
     $('gal-save').onclick = () => doShare(true);
     $('gal-rm').onclick = removeLocal;
+    $('gal-sync').onclick = () => { toast('Обновляю…'); refresh(true); };
     $('gal-gear').onclick = () => { fillSettings(); $('gal-set').classList.add('show'); };
     $('gal-setx').onclick = () => $('gal-set').classList.remove('show');
     $('gal-s1').onclick = e => { const c = cfg(); c.videosWifi = !c.videosWifi; saveCfg(c); fillSettings(); };
@@ -318,14 +342,20 @@
   }
 
   // ── открытие и закрытие ──
-  async function refresh() {
+  async function refresh(force) {
     build();
-    G.items = collect();
     G.sel = false; G.picked.clear(); G.shown = 90;
+    G.items = collect(await allCards());
     if(G.space !== 'all' && !G.items.some(it => it.space === G.space)) G.space = 'all';
     renderAll();
     await loadLocal();
     renderBody();
+    // кабинеты, которые на этом устройстве ещё не открывали: один раз подгружаем их файлы, дальше они лежат в кэше
+    if(await pullSpaces(force === true)) {
+      G.items = collect(await allCards());
+      renderAll(); renderBody();
+      if(force === true) toast('Галерея обновлена');
+    }
   }
   window.openGalleryMobile = function() { build(); document.getElementById('gal-ov').classList.add('on'); refresh(); };
   window.closeGallery = function() {
