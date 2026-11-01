@@ -21,10 +21,9 @@ jobs:
       - name: Install Capacitor
         run: npm install
 
-      - name: Prepare placeholder web folder
+      - name: Put the site inside the app
         run: |
-          mkdir -p www
-          echo '<!doctype html><title>Мои карточки</title>' > www/index.html
+          bash .github/scripts/site-files.sh www
 
       - name: Create Android project
         run: |
