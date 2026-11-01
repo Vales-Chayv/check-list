@@ -28,10 +28,10 @@ async function checkForUpdate(manual) {
     else if(manual) toast('Обновлений нет');
   } catch(e) {}
 }
-// В APK сайт лежит внутри приложения и обновляется отдельно, сервис-воркер там не нужен
+// В APK сайт лежит внутри приложения и обновляется отдельно: там работает только облегчённый воркер для вложений (sw-native.js), без кэша файлов сайта
 const _mcNativeApp = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
-if('serviceWorker' in navigator && !_mcNativeApp) {
-  navigator.serviceWorker.register(new URL('sw.js', location.href).pathname).then(reg => {
+if('serviceWorker' in navigator) {
+  navigator.serviceWorker.register(new URL(_mcNativeApp ? 'sw-native.js' : 'sw.js', location.href).pathname).then(reg => {
     _swReg = reg;
     if(reg.waiting && navigator.serviceWorker.controller) showUpdateBar();
     reg.addEventListener('updatefound', () => {
