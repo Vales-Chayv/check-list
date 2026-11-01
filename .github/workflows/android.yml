@@ -101,7 +101,9 @@ jobs:
             configurations.all {
               resolutionStrategy {
                 force 'androidx.work:work-runtime:2.9.1'
-                force 'androidx.lifecycle:lifecycle-process:2.8.7'
+                eachDependency { d ->
+                  if (d.requested.group == 'androidx.lifecycle') { d.useVersion '2.8.7' }
+                }
               }
             }
           }
