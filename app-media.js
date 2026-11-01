@@ -50,6 +50,10 @@ uploadToStorage = async function(file, cardId, entryId) {
   file = await mcPrepareFile(file);
   const att = await mcOrigUpload(file, cardId, entryId);
   if(att && typeof att === 'object' && !att.ts) att.ts = Date.now(); // время загрузки: нужно для галереи
+  try { // у отправителя файл уже есть: отмечаем получение сразу
+    const p = att && mcPathOf(att.data);
+    if(p && typeof currentUser !== 'undefined' && currentUser && currentUser.id) sb.from('attachment_receipts').upsert([{ path: p, user_id: currentUser.id }], { onConflict: 'path,user_id', ignoreDuplicates: true }).then(() => {}, () => {});
+  } catch(e) {}
   return att;
 };
 
@@ -110,3 +114,41 @@ async function mcWarmMedia() {
 setInterval(mcWarmMedia, 25000);
 setTimeout(mcWarmMedia, 6000);
 setTimeout(mcApplyCap, 1500);
+
+// ═══════════════════════════════════════════
+//  ОТМЕТКИ «ФАЙЛ ПОЛУЧЕН НА УСТРОЙСТВО»
+//  Когда файл сохранился на устройстве, в таблицу attachment_receipts пишется «этот пользователь его получил».
+//  Ночная очистка стирает файл из облака, когда его получили все участники (см. функцию cleanup-attachments).
+// ═══════════════════════════════════════════
+function mcPathOf(url) {
+  const u = String(url || '');
+  if(!MC_ATT_RE.test(u)) return null;
+  try { return decodeURIComponent(u.split('/attachments/')[1].split('?')[0]); } catch(e) { return null; }
+}
+async function mcReportReceipts() {
+  try {
+    if(!navigator.onLine || typeof sb === 'undefined' || typeof currentUser === 'undefined' || !currentUser || !currentUser.id) return;
+    const db = await mcMediaDb();
+    const all = await new Promise((res, rej) => { const q = db.transaction('idx').objectStore('idx').getAll(); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+    const fresh = all.filter(x => x.url !== '__cap__' && !x.rep && mcPathOf(x.url)).slice(0, 200);
+    if(!fresh.length) return;
+    const rows = fresh.map(x => ({ path: mcPathOf(x.url), user_id: currentUser.id }));
+    const { error } = await sb.from('attachment_receipts').upsert(rows, { onConflict: 'path,user_id', ignoreDuplicates: true });
+    if(error) { console.log('receipts error:', error.message); return; }
+    const t = db.transaction('idx', 'readwrite');
+    fresh.forEach(x => t.objectStore('idx').put({ ...x, rep: true }));
+  } catch(e) {}
+}
+setInterval(mcReportReceipts, 60000);
+setTimeout(mcReportReceipts, 12000);
+
+// файл удалён из облака (срок вышел) и на этом устройстве его нет: вместо «битой» картинки показываем заглушку
+const MC_GONE_IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240"><rect width="240" height="240" fill="#2a2a2a"/><g fill="none" stroke="#8a8a8a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M70 150a26 26 0 0 1-3-51.8A34 34 0 0 1 132 90a28 28 0 0 1 6 60z"/><path d="M100 112l40 40M140 112l-40 40" stroke="#c85a5a"/></g><text x="120" y="196" font-size="15" fill="#aaa" text-anchor="middle" font-family="sans-serif">Файл удалён из облака</text></svg>');
+document.addEventListener('error', e => {
+  const el = e.target;
+  if(!el || el.tagName !== 'IMG' || el.dataset.gone) return;
+  if(!MC_ATT_RE.test(el.currentSrc || el.src || '')) return;
+  el.dataset.gone = '1';
+  el.src = MC_GONE_IMG;
+  el.title = 'Файл удалён из облака и не был сохранён на этом устройстве';
+}, true);

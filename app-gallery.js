@@ -242,6 +242,7 @@
   async function fetchBlob(url) {
     if(url.startsWith('data:')) return await (await fetch(url)).blob();
     const r = await fetch(url, { mode: 'cors' });
+    if(r.status === 404 || r.status === 400) throw new Error('gone');
     if(!r.ok) throw new Error('http ' + r.status);
     return await r.blob();
   }
@@ -279,13 +280,13 @@
         document.body.appendChild(d);
       } else await saveBlob(blob, it);
       loadLocal().then(renderBody);
-    } catch(e) { toast('Не удалось открыть файл', true); }
+    } catch(e) { toast(e.message === 'gone' ? 'Файл удалён из облака: на устройстве его нет' : 'Не удалось открыть файл', true); }
   }
   async function downloadOne(btn) {
     const it = G.items[+btn.dataset.dl]; if(!it) return;
     btn.classList.add('busy'); btn.firstElementChild.textContent = '…';
     try { await fetchBlob(it.url); await loadLocal(); renderBody(); toast('Сохранено на устройстве'); }
-    catch(e) { btn.classList.remove('busy'); btn.firstElementChild.innerHTML = CLOUD; toast('Не удалось скачать', true); }
+    catch(e) { btn.classList.remove('busy'); btn.firstElementChild.innerHTML = CLOUD; toast(e.message === 'gone' ? 'Файл удалён из облака: на устройстве его нет' : 'Не удалось скачать', true); }
   }
   async function doShare(saveOnly) {
     const list = [...G.picked].map(i => G.items[i]).filter(Boolean);
