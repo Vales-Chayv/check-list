@@ -30,6 +30,11 @@ jobs:
           npx cap add android
           npx cap sync android
 
+      - name: Raise minSdk to 23 (needed by the updater plugin)
+        run: |
+          sed -i 's/minSdkVersion = [0-9]*/minSdkVersion = 23/' android/variables.gradle
+          grep -n minSdkVersion android/variables.gradle
+
       - name: Add native video compression
         run: |
           D=android/app/src/main/java/app/mycards/mobile
