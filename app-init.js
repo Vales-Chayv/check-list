@@ -29,7 +29,7 @@ async function checkForUpdate(manual) {
   } catch(e) {}
 }
 if('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/check-list/sw.js').then(reg => {
+  navigator.serviceWorker.register(new URL('sw.js', location.href).pathname).then(reg => {
     _swReg = reg;
     if(reg.waiting && navigator.serviceWorker.controller) showUpdateBar();
     reg.addEventListener('updatefound', () => {

@@ -796,7 +796,7 @@ async function createSpace() {
   } catch(e) { toast('Ошибка: '+e.message, true); }
 }
 function showShareLink(space) {
-  const link = `${location.origin}${location.pathname}?space=${space.share_token}`;
+  const link = `${_SITE_URL}?space=${space.share_token}`;
   const div = document.createElement('div');
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1001;display:flex;align-items:center;justify-content:center;padding:20px';
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:24px;max-width:380px;width:100%">
@@ -1010,7 +1010,7 @@ async function savePhoneAndContinue() {
 }
 
 function offerInvite(query, space, contactName) {
-  const link = `${location.origin}${location.pathname}?space=${space.share_token}${contactName ? '&as=' + encodeURIComponent(contactName) : ''}`;
+  const link = `${_SITE_URL}?space=${space.share_token}${contactName ? '&as=' + encodeURIComponent(contactName) : ''}`;
   const text = encodeURIComponent(`Присоединяйся к группе «${space.name}» в Моих карточках: ${link}`);
   const isPhone = /^\+?\d[\d\s\-()]{6,}$/.test(query);
   const div = document.createElement('div');
