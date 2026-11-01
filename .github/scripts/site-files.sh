@@ -7,7 +7,7 @@ OUT="$1"
 rm -rf "$OUT"; mkdir -p "$OUT"
 shopt -s nullglob
 for f in *.html *.css *.js *.png *.jpg *.jpeg *.svg *.webp *.ico *.webmanifest manifest*.json; do
-  case "$f" in sw.js|sw-*.js) continue;; esac
+  case "$f" in sw.js) continue;; esac
   cp "$f" "$OUT/"
 done
 VER=$(cd "$OUT" && find . -type f | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-12)
