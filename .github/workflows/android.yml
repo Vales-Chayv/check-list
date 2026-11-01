@@ -42,6 +42,8 @@ jobs:
           cp android-native/McVideoPlugin.java $D/McVideoPlugin.java
           cp android-native/McRecService.java $D/McRecService.java
           cp android-native/McRecPlugin.java $D/McRecPlugin.java
+          cp android-native/McApp.java $D/McApp.java
+          cp android-native/McCrashActivity.java $D/McCrashActivity.java
           cp android-native/MainActivity.java $D/MainActivity.java
           G=android/app/build.gradle
           grep -q media3-transformer $G || sed -i 's#^dependencies {#dependencies {\n    implementation "androidx.media3:media3-transformer:1.4.1"\n    implementation "androidx.media3:media3-effect:1.4.1"\n    implementation "androidx.media3:media3-common:1.4.1"#' $G
@@ -70,6 +72,8 @@ jobs:
           grep -q 'permission.FOREGROUND_SERVICE"' $M || sed -i 's#<application#<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <application#' $M
           grep -q FOREGROUND_SERVICE_MICROPHONE $M || sed -i 's#<application#<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />\n    <application#' $M
           grep -q McRecService $M || sed -i 's#</application>#    <service android:name=".McRecService" android:exported="false" android:foregroundServiceType="microphone" />\n    </application>#' $M
+          grep -q McCrashActivity $M || sed -i 's#</application>#    <activity android:name=".McCrashActivity" android:exported="false" android:process=":crash" android:theme="@android:style/Theme.Material.Light" />\n    </application>#' $M
+          grep -q 'android:name=".McApp"' $M || sed -i '0,/<application/s#<application#<application android:name=".McApp"#' $M
           grep -n "FOREGROUND_SERVICE\|McRecService" $M
 
       - name: Point Gradle at the permanent test key
