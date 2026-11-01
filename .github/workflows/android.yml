@@ -30,6 +30,16 @@ jobs:
           npx cap add android
           npx cap sync android
 
+      - name: Add native video compression
+        run: |
+          D=android/app/src/main/java/app/mycards/mobile
+          mkdir -p $D
+          cp android-native/McVideoPlugin.java $D/McVideoPlugin.java
+          cp android-native/MainActivity.java $D/MainActivity.java
+          G=android/app/build.gradle
+          grep -q media3-transformer $G || sed -i 's#^dependencies {#dependencies {\n    implementation "androidx.media3:media3-transformer:1.4.1"\n    implementation "androidx.media3:media3-effect:1.4.1"\n    implementation "androidx.media3:media3-common:1.4.1"#' $G
+          grep -n media3 $G
+
       - name: Add Firebase config
         run: |
           cp google-services.json android/app/google-services.json
