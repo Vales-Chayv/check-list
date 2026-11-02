@@ -18,7 +18,20 @@
   // ═══ Встроенная копия сайта: сама подтягивает свежую версию, без пересборки APK ═══
   (function () {
     const CU = cap.Plugins && cap.Plugins.CapacitorUpdater;
-    if (!CU) return;
+    // временная диагностика: короткая строка сверху, исчезает через 7 секунд
+    let dbgEl = null, dbgT = null;
+    const dbg = t => {
+      try {
+        if (!dbgEl) {
+          dbgEl = document.createElement('div');
+          dbgEl.style.cssText = 'position:fixed;left:8px;right:8px;top:8px;background:rgba(0,0,0,.85);color:#9f9;padding:6px 10px;border-radius:8px;font:11px/1.4 monospace;z-index:99999;pointer-events:none;white-space:pre-wrap';
+          document.body.appendChild(dbgEl);
+        }
+        dbgEl.textContent += (dbgEl.textContent ? '\n' : '') + t;
+        clearTimeout(dbgT); dbgT = setTimeout(() => { if (dbgEl) { dbgEl.remove(); dbgEl = null; } }, 7000);
+      } catch (e) {}
+    };
+    if (!CU) { setTimeout(() => dbg('upd: плагин обновления НЕ найден'), 3000); return; }
     const REL = 'https://api.github.com/repos/vales-chayv/check-list/releases/tags/bundle';
     try { CU.notifyAppReady(); } catch (e) {} // «страница запустилась нормально» — иначе плагин откатит версию
     let lastCheck = 0, busy = false;
@@ -26,24 +39,25 @@
       if (busy || (!force && Date.now() - lastCheck < 20 * 60000)) return;
       busy = true; lastCheck = Date.now();
       try {
+        let have = '';
+        try { have = (await (await fetch('mc-bundle.json', { cache: 'no-store' })).json()).version; } catch (e) { dbg('upd: нет mc-bundle.json'); }
+        dbg('upd: у меня ' + have);
         const r = await fetch(REL, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' });
-        if (!r.ok) return;
+        if (!r.ok) { dbg('upd: GitHub ответил ' + r.status); return; }
         const rel = await r.json();
         const ver = String(rel.name || '').trim();
         const asset = (rel.assets || []).find(a => a.name === 'app.zip');
+        dbg('upd: в облаке ' + ver + (asset ? '' : ' (нет app.zip)'));
         if (!ver || !asset) return;
-        let have = '';
-        try { have = (await (await fetch('mc-bundle.json', { cache: 'no-store' })).json()).version; } catch (e) {}
-        if (have === ver) return;
+        if (have === ver) { dbg('upd: версии совпадают'); return; }
         const list = ((await CU.list()).bundles) || [];
         let b = list.find(x => x.version === ver);
-        if (!b) b = await CU.download({ url: asset.browser_download_url, version: ver });
-        await CU.next({ id: b.id }); // включится при следующем запуске приложения
-        // убираем старые скачанные версии
+        if (!b) { dbg('upd: качаю…'); b = await CU.download({ url: asset.browser_download_url, version: ver }); }
+        await CU.next({ id: b.id }); // включится, когда приложение свернут
+        dbg('upd: скачано. Сверни приложение и открой снова');
         const cur = (await CU.current()).bundle || {};
         for (const x of list) { if (x.id !== b.id && x.id !== cur.id && x.id !== 'builtin') { try { await CU.delete({ id: x.id }); } catch (e) {} } }
-        console.log('[updater] скачана версия', ver);
-      } catch (e) { console.log('[updater]', e && e.message); }
+      } catch (e) { dbg('upd: ошибка ' + ((e && e.message) || String(e)).slice(0, 140)); }
       finally { busy = false; }
     }
     setTimeout(() => check(true), 6000);
