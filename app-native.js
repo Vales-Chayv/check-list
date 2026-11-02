@@ -24,13 +24,15 @@
       try {
         if (!dbgEl) {
           dbgEl = document.createElement('div');
-          dbgEl.style.cssText = 'position:fixed;left:8px;right:8px;top:8px;background:rgba(0,0,0,.85);color:#9f9;padding:6px 10px;border-radius:8px;font:11px/1.4 monospace;z-index:99999;pointer-events:none;white-space:pre-wrap';
+          dbgEl.style.cssText = 'position:fixed;left:8px;right:8px;top:70px;background:rgba(0,0,0,.9);color:#9f9;padding:8px 10px;border-radius:8px;font:12px/1.4 monospace;z-index:2147483647;white-space:pre-wrap';
           document.body.appendChild(dbgEl);
         }
         dbgEl.textContent += (dbgEl.textContent ? '\n' : '') + t;
-        clearTimeout(dbgT); dbgT = setTimeout(() => { if (dbgEl) { dbgEl.remove(); dbgEl = null; } }, 7000);
+        clearTimeout(dbgT); dbgT = setTimeout(() => { if (dbgEl) { dbgEl.remove(); dbgEl = null; } }, 30000);
+        dbgEl.onclick = () => { dbgEl.remove(); dbgEl = null; };
       } catch (e) {}
     };
+    setTimeout(() => dbg('upd: блок запущен' + (CU ? '' : ', плагина нет')), 2500);
     if (!CU) { setTimeout(() => dbg('upd: плагин обновления НЕ найден'), 3000); return; }
     const REL = 'https://api.github.com/repos/vales-chayv/check-list/releases/tags/bundle';
     try { CU.notifyAppReady(); } catch (e) {} // «страница запустилась нормально» — иначе плагин откатит версию
