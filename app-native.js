@@ -32,7 +32,7 @@
         dbgEl.onclick = () => { dbgEl.remove(); dbgEl = null; };
       } catch (e) {}
     };
-    setTimeout(() => dbg('upd: блок запущен ТЕСТ2' + (CU ? '' : ', плагина нет')), 2500);
+    setTimeout(() => dbg('upd: блок запущен' + (CU ? '' : ', плагина нет')), 2500);
     if (!CU) { setTimeout(() => dbg('upd: плагин обновления НЕ найден'), 3000); return; }
     const REL = 'https://api.github.com/repos/vales-chayv/check-list/releases/tags/bundle';
     try { CU.notifyAppReady(); } catch (e) {} // «страница запустилась нормально» — иначе плагин откатит версию
@@ -52,9 +52,11 @@
         dbg('upd: в облаке ' + ver + (asset ? '' : ' (нет app.zip)'));
         if (!ver || !asset) return;
         if (have === ver) { dbg('upd: версии совпадают'); return; }
+        const sum = String(rel.body || '').trim().toLowerCase(); // контрольная сумма архива (SHA-256), её кладёт в релиз Publish site bundle
+        if (!/^[0-9a-f]{64}$/.test(sum)) { dbg('upd: у релиза нет контрольной суммы'); return; }
         const list = ((await CU.list()).bundles) || [];
         let b = list.find(x => x.version === ver);
-        if (!b) { dbg('upd: качаю…'); b = await CU.download({ url: asset.browser_download_url, version: ver }); }
+        if (!b) { dbg('upd: качаю…'); b = await CU.download({ url: asset.browser_download_url, version: ver, checksum: sum }); }
         await CU.next({ id: b.id }); // включится, когда приложение свернут
         dbg('upd: скачано. Сверни приложение и открой снова');
         const cur = (await CU.current()).bundle || {};
