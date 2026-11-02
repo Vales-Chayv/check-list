@@ -68,6 +68,10 @@
     const hide = () => { if (ui) { ui.remove(); ui = null; } };
     const b64 = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = () => rej(r.error); r.readAsDataURL(blob); });
 
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const withTimeout = (p, ms, label) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('таймаут: ' + label)), ms))]);
+    const mb = n => (n / 1048576).toFixed(1) + ' МБ';
+
     // вернёт сжатый File, а при любой неудаче — исходный файл
     window.mcCompressVideo = async function (file) {
       if (file.size < MIN || file.size > MAX) return file;
@@ -75,7 +79,7 @@
       const outName = inName + '.out.mp4';
       let h = null;
       try {
-        show('🎞 Готовлю видео…');
+        show('🎞 Готовлю видео (v2)…');
         for (let off = 0, i = 0; off < file.size; off += CH, i++) {
           const data = await b64(file.slice(off, off + CH));
           if (i === 0) await FS.writeFile({ path: inName, directory: 'CACHE', data });
@@ -84,15 +88,28 @@
         }
         show('🎞 Сжимаю видео…');
         h = await McV.addListener('progress', p => show('🎞 Сжимаю видео… ' + Math.round(p.percent || 0) + '%'));
-        await McV.compress({ name: inName, maxShort: 720, bitrate: 2500000 });
+        await withTimeout(McV.compress({ name: inName, maxShort: 720, bitrate: 2500000 }), 15 * 60000, 'сжатие');
+        show('🎞 Читаю результат…');
         const { uri } = await FS.getUri({ path: outName, directory: 'CACHE' });
         let blob;
-        try { const rr = await fetch(cap.convertFileSrc(uri)); if (!rr.ok) throw new Error('http'); blob = await rr.blob(); }
-        catch (e) { const rd = await FS.readFile({ path: outName, directory: 'CACHE' }); blob = await (await fetch('data:video/mp4;base64,' + rd.data)).blob(); }
-        if (!blob || !blob.size || blob.size >= file.size * 0.95) return file; // не стало меньше — оставляем исходный
+        try {
+          const rr = await withTimeout(fetch(cap.convertFileSrc(uri)), 15000, 'чтение файла');
+          if (!rr.ok) throw new Error('http ' + rr.status);
+          blob = await withTimeout(rr.blob(), 90000, 'загрузка в память');
+        } catch (e) {
+          show('🎞 Читаю другим способом…');
+          const rd = await withTimeout(FS.readFile({ path: outName, directory: 'CACHE' }), 180000, 'readFile');
+          blob = await (await fetch('data:video/mp4;base64,' + rd.data)).blob();
+        }
+        if (!blob || !blob.size) throw new Error('пустой результат');
+        show('🎞 Готово: ' + mb(file.size) + ' → ' + mb(blob.size));
+        await sleep(900);
+        if (blob.size >= file.size * 0.95) return file; // не стало меньше — оставляем исходный
         return new File([blob], (file.name || 'video').replace(/\.[^.]+$/, '') + '.mp4', { type: 'video/mp4', lastModified: Date.now() });
       } catch (e) {
         console.log('[video]', e && e.message);
+        show('⚠ Видео: ' + ((e && e.message) || String(e)).slice(0, 120));
+        await sleep(6000);
         return file;
       } finally {
         hide();
