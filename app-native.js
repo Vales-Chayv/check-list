@@ -32,7 +32,7 @@
         dbgEl.onclick = () => { dbgEl.remove(); dbgEl = null; };
       } catch (e) {}
     };
-    setTimeout(() => dbg('upd: блок запущен' + (CU ? '' : ', плагина нет')), 2500);
+    setTimeout(() => dbg('upd: блок запущен ТЕСТ2' + (CU ? '' : ', плагина нет')), 2500);
     if (!CU) { setTimeout(() => dbg('upd: плагин обновления НЕ найден'), 3000); return; }
     const REL = 'https://api.github.com/repos/vales-chayv/check-list/releases/tags/bundle';
     try { CU.notifyAppReady(); } catch (e) {} // «страница запустилась нормально» — иначе плагин откатит версию
