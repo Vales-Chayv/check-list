@@ -39,8 +39,11 @@ jobs:
         run: |
           if gh release view bundle >/dev/null 2>&1; then
             CUR=$(gh release view bundle --json name -q .name)
-            if [ "$CUR" = "$VER" ]; then echo "Same version, nothing to do"; exit 0; fi
+            BODY=$(gh release view bundle --json body -q .body | tr -d '[:space:]')
+            if [ "$CUR" = "$VER" ] && echo "$BODY" | grep -Eq '^[0-9a-f]{64}$'; then echo "Same version, nothing to do"; exit 0; fi
             gh release delete bundle --yes --cleanup-tag
           fi
           (cd bundle-out && zip -qr ../app.zip .)
-          gh release create bundle app.zip --title "$VER" --notes "Автоматический пакет сайта для приложения" --target "$GITHUB_SHA" --latest=false
+          SUM=$(sha256sum app.zip | cut -d' ' -f1)
+          echo "SHA-256: $SUM"
+          gh release create bundle app.zip --title "$VER" --notes "$SUM" --target "$GITHUB_SHA" --latest=false
