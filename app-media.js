@@ -49,7 +49,12 @@ async function mcPrepareFile(file) {
 const mcOrigUpload = uploadToStorage;
 uploadToStorage = async function(file, cardId, entryId) {
   file = await mcPrepareFile(file);
-  const att = await mcOrigUpload(file, cardId, entryId);
+  const _vid = (file.type || '').startsWith('video/') && typeof window.mcNativeStatus === 'function';
+  if(_vid) window.mcNativeStatus('⬆ Отправляю ролик (' + (file.size / MC_MB).toFixed(1) + ' МБ)…');
+  let att;
+  try { att = await mcOrigUpload(file, cardId, entryId); }
+  catch(e) { if(_vid) { window.mcNativeStatus('⚠ Отправка: ' + String((e && e.message) || e).slice(0, 120)); setTimeout(() => window.mcNativeStatus(null), 6000); } throw e; }
+  if(_vid) window.mcNativeStatus(null);
   if(att && typeof att === 'object' && !att.ts) att.ts = Date.now(); // время загрузки: нужно для галереи
   try { // у отправителя файл уже есть: отмечаем получение сразу
     const p = att && mcPathOf(att.data);

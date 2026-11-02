@@ -128,9 +128,11 @@
       } finally {
         hide();
         try { if (h) h.remove(); } catch (e) {}
-        for (const n of [inName, outName]) { try { await FS.deleteFile({ path: n, directory: 'CACHE' }); } catch (e) {} }
+        // временные файлы удаляем в фоне, не дожидаясь: отправка ролика не должна от этого зависеть
+        for (const n of [inName, outName]) { try { FS.deleteFile({ path: n, directory: 'CACHE' }).catch(() => {}); } catch (e) {} }
       }
     };
+    window.mcNativeStatus = t => { if (t) show(t); else hide(); };
   })();
 
   // ═══ Запись голоса в фоне: пока идёт запись с микрофона, держим службу переднего плана (только APK) ═══
