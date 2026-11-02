@@ -50,10 +50,19 @@ const mcOrigUpload = uploadToStorage;
 uploadToStorage = async function(file, cardId, entryId) {
   file = await mcPrepareFile(file);
   const _vid = (file.type || '').startsWith('video/') && typeof window.mcNativeStatus === 'function';
-  if(_vid) window.mcNativeStatus('⬆ Отправляю ролик (' + (file.size / MC_MB).toFixed(1) + ' МБ)…');
+  const _t0 = Date.now();
+  const _say = () => window.mcNativeStatus('⬆ Отправляю ролик (' + (file.size / MC_MB).toFixed(1) + ' МБ)… ' + Math.round((Date.now() - _t0) / 1000) + ' с');
+  let _tm = null;
+  if(_vid) { _say(); _tm = setInterval(_say, 1000); }
   let att;
-  try { att = await mcOrigUpload(file, cardId, entryId); }
-  catch(e) { if(_vid) { window.mcNativeStatus('⚠ Отправка: ' + String((e && e.message) || e).slice(0, 120)); setTimeout(() => window.mcNativeStatus(null), 6000); } throw e; }
+  try {
+    att = await Promise.race([mcOrigUpload(file, cardId, entryId), new Promise((_, rej) => setTimeout(() => rej(new Error('отправка заняла больше 5 минут')), 5 * 60000))]);
+  } catch(e) {
+    if(_tm) clearInterval(_tm);
+    if(_vid) { window.mcNativeStatus('⚠ Отправка: ' + String((e && e.message) || e).slice(0, 120)); setTimeout(() => window.mcNativeStatus(null), 6000); }
+    throw e;
+  }
+  if(_tm) clearInterval(_tm);
   if(_vid) window.mcNativeStatus(null);
   if(att && typeof att === 'object' && !att.ts) att.ts = Date.now(); // время загрузки: нужно для галереи
   try { // у отправителя файл уже есть: отмечаем получение сразу

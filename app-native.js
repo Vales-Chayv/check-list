@@ -116,6 +116,9 @@
           blob = await (await fetch('data:video/mp4;base64,' + rd.data)).blob();
         }
         if (!blob || !blob.size) throw new Error('пустой результат');
+        // переносим данные в обычную память: файл из временного файла Android при отправке может «зависать»
+        show('🎞 Копирую в память…');
+        blob = new Blob([await withTimeout(blob.arrayBuffer(), 90000, 'копирование')], { type: 'video/mp4' });
         show('🎞 Готово: ' + mb(file.size) + ' → ' + mb(blob.size));
         await sleep(900);
         if (blob.size >= file.size * 0.95) return file; // не стало меньше — оставляем исходный
