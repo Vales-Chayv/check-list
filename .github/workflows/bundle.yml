@@ -9,6 +9,7 @@ on:
       - '*.html'
       - '*.css'
       - '*.js'
+      - '!sw.js'
       - '*.png'
       - '*.jpg'
       - '*.svg'
@@ -20,6 +21,10 @@ on:
 
 permissions:
   contents: write
+
+concurrency:
+  group: site-bundle
+  cancel-in-progress: false
 
 jobs:
   bundle:
@@ -41,7 +46,7 @@ jobs:
             CUR=$(gh release view bundle --json name -q .name)
             BODY=$(gh release view bundle --json body -q .body | tr -d '[:space:]')
             if [ "$CUR" = "$VER" ] && echo "$BODY" | grep -Eq '^[0-9a-f]{64}$'; then echo "Same version, nothing to do"; exit 0; fi
-            gh release delete bundle --yes --cleanup-tag
+            gh release delete bundle --yes --cleanup-tag || true
           fi
           (cd bundle-out && zip -qr ../app.zip .)
           SUM=$(sha256sum app.zip | cut -d' ' -f1)
