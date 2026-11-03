@@ -167,3 +167,152 @@ document.addEventListener('error', e => {
   el.src = MC_GONE_IMG;
   el.title = 'Файл удалён из облака и не был сохранён на этом устройстве';
 }, true);
+
+// ===== Камера: снимок и запись ролика =====
+// Телефон: родная камера Android (input capture). ПК: своё окно с веб-камерой.
+// target — id скрытого input (положим файл в него и вызовем его onchange) или функция(file)
+function mcIsMobile() {
+  return !!window._mcNativeApp || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+}
+function mcCamDeliver(target, file) {
+  if (typeof target === 'function') { target(file); return; }
+  const inp = document.getElementById(target);
+  if (!inp) return;
+  try {
+    const dt = new DataTransfer(); dt.items.add(file); inp.files = dt.files;
+    inp.dispatchEvent(new Event('change'));
+  } catch (e) { toast('Не удалось передать файл: ' + e.message, true); }
+}
+function mcCam(kind, target) {
+  const useInput = () => {
+    if (typeof target === 'string') { const i = document.getElementById(target); if (i) i.click(); return; }
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = kind === 'video' ? 'video/*' : 'image/*'; inp.setAttribute('capture', 'environment');
+    inp.onchange = () => { if (inp.files && inp.files[0]) target(inp.files[0]); };
+    inp.click();
+  };
+  if (mcIsMobile() || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { useInput(); return; }
+  mcCamOpen(kind, f => mcCamDeliver(target, f), useInput);
+}
+function mcCamOpen(kind, onFile, onFail) {
+  if (document.getElementById('mc-cam-ov')) return;
+  const isVid = kind === 'video';
+  const ov = document.createElement('div');
+  ov.id = 'mc-cam-ov';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;box-sizing:border-box;font-family:inherit;color:#eee';
+  const btnCss = 'border:1px solid #555;background:#2a2a2a;color:#eee;border-radius:10px;padding:11px 20px;font-size:15px;cursor:pointer;font-family:inherit';
+  ov.innerHTML =
+    '<div id="mc-cam-title" style="font-size:15px;opacity:.85">' + (isVid ? '🎥 Запись видео' : '📷 Фото') + '</div>' +
+    '<video id="mc-cam-live" autoplay playsinline muted style="max-width:min(92vw,900px);max-height:62vh;background:#000;border-radius:12px"></video>' +
+    '<video id="mc-cam-rev" playsinline controls style="display:none;max-width:min(92vw,900px);max-height:62vh;background:#000;border-radius:12px"></video>' +
+    '<img id="mc-cam-img" style="display:none;max-width:min(92vw,900px);max-height:62vh;border-radius:12px">' +
+    '<div id="mc-cam-info" style="font-size:14px;min-height:20px;opacity:.85"></div>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">' +
+      '<select id="mc-cam-dev" style="' + btnCss + ';display:none;max-width:240px"></select>' +
+      '<button id="mc-cam-go" style="' + btnCss + ';background:#B8892B;color:#111;border-color:#B8892B;font-weight:600">' + (isVid ? '⏺ Начать запись' : '📸 Снять') + '</button>' +
+      '<button id="mc-cam-again" style="' + btnCss + ';display:none">↺ Переснять</button>' +
+      '<button id="mc-cam-use" style="' + btnCss + ';display:none;background:#B8892B;color:#111;border-color:#B8892B;font-weight:600">✓ Использовать</button>' +
+      '<button id="mc-cam-x" style="' + btnCss + '">Отмена</button>' +
+    '</div>';
+  document.body.appendChild(ov);
+  const $ = id => ov.querySelector('#' + id);
+  const live = $('mc-cam-live'), rev = $('mc-cam-rev'), img = $('mc-cam-img'), info = $('mc-cam-info');
+  const go = $('mc-cam-go'), again = $('mc-cam-again'), use = $('mc-cam-use'), dev = $('mc-cam-dev');
+  let stream = null, rec = null, chunks = [], result = null, timer = null, t0 = 0, closed = false, url = null;
+  const MAX_SEC = 300;
+  const stamp = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '_' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()); };
+  function stopStream() { if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; } }
+  function close() {
+    if (closed) return; closed = true;
+    clearInterval(timer);
+    try { if (rec && rec.state !== 'inactive') { rec.onstop = null; rec.stop(); } } catch (e) {}
+    stopStream();
+    if (url) URL.revokeObjectURL(url);
+    document.removeEventListener('keydown', onKey, true);
+    ov.remove();
+  }
+  function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); close(); } }
+  document.addEventListener('keydown', onKey, true);
+  async function start(deviceId) {
+    stopStream();
+    try {
+      const v = deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'user' };
+      stream = await navigator.mediaDevices.getUserMedia({ video: v, audio: isVid });
+    } catch (e) {
+      close();
+      const denied = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
+      toast(denied ? 'Нет доступа к камере. Разреши её значком 🔒 или 📷 в адресной строке браузера.' : 'Камера недоступна: ' + (e && e.message || e), true);
+      if (!denied && onFail) onFail();
+      return;
+    }
+    if (closed) { stopStream(); return; }
+    live.srcObject = stream;
+    try {
+      const all = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+      if (all.length > 1) {
+        const cur = stream.getVideoTracks()[0].getSettings().deviceId;
+        dev.innerHTML = all.map((d, i) => '<option value="' + d.deviceId + '"' + (d.deviceId === cur ? ' selected' : '') + '>' + (d.label || 'Камера ' + (i + 1)) + '</option>').join('');
+        dev.style.display = '';
+      }
+    } catch (e) {}
+  }
+  dev.onchange = () => start(dev.value);
+  function showResult(isVideoResult) {
+    live.style.display = 'none'; go.style.display = 'none'; dev.style.display = 'none';
+    again.style.display = ''; use.style.display = '';
+    if (isVideoResult) { rev.style.display = ''; } else { img.style.display = ''; }
+  }
+  function retake() {
+    result = null; info.textContent = '';
+    if (url) { URL.revokeObjectURL(url); url = null; }
+    rev.style.display = 'none'; img.style.display = 'none'; rev.removeAttribute('src');
+    live.style.display = ''; go.style.display = ''; again.style.display = 'none'; use.style.display = 'none';
+    go.textContent = isVid ? '⏺ Начать запись' : '📸 Снять'; go.dataset.rec = '';
+    start(dev.value || '');
+  }
+  function stopRec() { clearInterval(timer); try { if (rec && rec.state === 'recording') rec.stop(); } catch (e) {} }
+  go.onclick = () => {
+    if (!stream) return;
+    if (!isVid) {
+      const c = document.createElement('canvas');
+      c.width = live.videoWidth || 1280; c.height = live.videoHeight || 720;
+      c.getContext('2d').drawImage(live, 0, 0, c.width, c.height);
+      c.toBlob(b => {
+        if (!b) { toast('Не удалось сделать снимок', true); return; }
+        result = new File([b], 'photo_' + stamp() + '.jpg', { type: 'image/jpeg' });
+        url = URL.createObjectURL(b); img.src = url;
+        stopStream(); showResult(false);
+      }, 'image/jpeg', 0.92);
+      return;
+    }
+    if (go.dataset.rec === '1') { stopRec(); return; }
+    const types = ['video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+    const mt = types.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t));
+    try { rec = mt ? new MediaRecorder(stream, { mimeType: mt }) : new MediaRecorder(stream); }
+    catch (e) { toast('Запись видео не поддерживается этим браузером', true); return; }
+    chunks = [];
+    rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    rec.onstop = () => {
+      const type = (rec.mimeType || mt || 'video/webm').split(';')[0];
+      const ext = type.indexOf('mp4') >= 0 ? 'mp4' : 'webm';
+      const b = new Blob(chunks, { type });
+      if (!b.size) { toast('Запись пустая, попробуй ещё раз', true); retake(); return; }
+      result = new File([b], 'video_' + stamp() + '.' + ext, { type });
+      url = URL.createObjectURL(b); rev.src = url;
+      stopStream(); info.textContent = '≈ ' + (b.size / 1048576).toFixed(1) + ' МБ';
+      showResult(true);
+    };
+    rec.start(1000);
+    go.dataset.rec = '1'; go.textContent = '⏹ Остановить'; dev.style.display = 'none';
+    t0 = Date.now();
+    timer = setInterval(() => {
+      const s = Math.floor((Date.now() - t0) / 1000);
+      info.textContent = '🔴 ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + ' (максимум 5 минут)';
+      if (s >= MAX_SEC) stopRec();
+    }, 500);
+  };
+  again.onclick = retake;
+  use.onclick = () => { const f = result; close(); if (f) onFile(f); };
+  $('mc-cam-x').onclick = close;
+  start('');
+}

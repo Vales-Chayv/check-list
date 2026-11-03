@@ -201,6 +201,7 @@ function renderChatQuickBar(cardId, card){
       <button id="chat-attach-btn" onclick="event.stopPropagation();handleAttachClick('${cardId}')" onpointerdown="startAttachPress('${cardId}')" onpointerup="cancelAttachPress()" onpointerleave="cancelAttachPress()" onpointercancel="cancelAttachPress()" oncontextmenu="return false" style="user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:manipulation">📎</button>
       <input id="chat-quick-input" type="text" placeholder="Сообщение…" dir="auto" style="background:var(--s2);border:1px solid var(--b1);border-radius:20px;padding:10px 16px;font-size:14px;color:var(--t1);font-family:inherit">
       <button class="chat-fan-petal" data-kind="photo" onclick="event.stopPropagation();pickChatAttachment('${cardId}','photo')" style="left:6px;top:50%;margin-top:-20px">🖼️</button>
+      <button class="chat-fan-petal" data-kind="shot" onclick="event.stopPropagation();pickChatAttachment('${cardId}','shot')" style="left:6px;top:50%;margin-top:-20px">📷</button>
       <button class="chat-fan-petal" data-kind="video" onclick="event.stopPropagation();pickChatAttachment('${cardId}','video')" style="left:6px;top:50%;margin-top:-20px">🎥</button>
       <button class="chat-fan-petal" data-kind="file" onclick="event.stopPropagation();pickChatAttachment('${cardId}','file')" style="left:6px;top:50%;margin-top:-20px">📄</button>
       <button class="chat-fan-petal" data-kind="task" onclick="event.stopPropagation();pickChatAttachment('${cardId}','task')" style="left:6px;top:50%;margin-top:-20px">✅</button>
@@ -349,7 +350,7 @@ function toggleChatFan(cardId){
   btn.classList.add('open');
   btn.textContent = '📦';
   // Веер: первый лепесток прямо над кнопкой, дальше по кругу вправо-вниз, с небольшим шагом между кнопками
-  const radius = 66, step = 38;
+  const radius = 66, step = 34;
   petals.forEach((p, i) => {
     const a = (i*step) * Math.PI/180;
     const x = Math.sin(a)*radius;
@@ -373,11 +374,11 @@ let _activeAttachEntryId = null; // "черновой" стикер, в кото
 function pickChatAttachment(cardId, kind){
   closeChatFanOnOutsideClick();
   if(kind === 'task') { openChatCompose(cardId); return; }
+  if(kind === 'shot' || kind === 'video') { mcCam(kind === 'video' ? 'video' : 'photo', f => openChatSend(cardId, [f])); return; }
   const inp = document.createElement('input');
   inp.type = 'file';
   inp.multiple = true;
   if(kind === 'photo') inp.accept = 'image/*,video/*';
-  if(kind === 'video') inp.accept = 'video/*';
   inp.onchange = () => { if(inp.files && inp.files.length) openChatSend(cardId, [...inp.files]); };
   inp.click();
 }
