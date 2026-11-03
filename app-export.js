@@ -33,17 +33,18 @@ function mcRichToParts(html) {
 
 function mcDocRun(text, o) {
   o = o || {};
-  const rpr = (o.b ? '<w:b/><w:bCs/>' : '') + (o.i ? '<w:i/><w:iCs/>' : '') + (o.u ? '<w:u w:val="single"/>' : '') + (o.s ? '<w:strike/>' : '') +
-    (o.color ? '<w:color w:val="' + o.color + '"/>' : '') + (o.size ? '<w:sz w:val="' + o.size + '"/><w:szCs w:val="' + o.size + '"/>' : '') + (o.rtl ? '<w:rtl/>' : '');
+  const rpr = (o.b ? '<w:b/><w:bCs/>' : '') + (o.i ? '<w:i/><w:iCs/>' : '') + (o.s ? '<w:strike/>' : '') + (o.vanish ? '<w:vanish/>' : '') +
+    (o.color ? '<w:color w:val="' + o.color + '"/>' : '') + (o.size ? '<w:sz w:val="' + o.size + '"/><w:szCs w:val="' + o.size + '"/>' : '') +
+    (o.u ? '<w:u w:val="single"/>' : '') + (o.rtl ? '<w:rtl/>' : '');
   return '<w:r>' + (rpr ? '<w:rPr>' + rpr + '</w:rPr>' : '') + '<w:t xml:space="preserve">' + _XE(text) + '</w:t></w:r>';
 }
 function mcDocPara(inner, o) {
   o = o || {};
   return '<w:p><w:pPr>' + (o.keep ? '<w:keepNext/>' : '') +
-    (o.bar ? '<w:pBdr><w:left w:val="single" w:sz="24" w:space="8" w:color="B8892B"/></w:pBdr>' : '') +
+    (o.divider ? '<w:pBdr><w:bottom w:val="single" w:sz="8" w:space="1" w:color="' + o.divider + '"/></w:pBdr>' : '') +
     (o.bidi ? '<w:bidi/>' : '') +
     '<w:spacing w:before="' + (o.before || 0) + '" w:after="' + (o.after == null ? 60 : o.after) + '"' + (o.line ? ' w:line="' + o.line + '" w:lineRule="exact"' : '') + '/>' +
-    (o.bar ? '<w:ind w:left="200"/>' : '') + (o.jc ? '<w:jc w:val="' + o.jc + '"/>' : '') + '</w:pPr>' + inner + '</w:p>';
+    (o.jc ? '<w:jc w:val="' + o.jc + '"/>' : '') + (o.vanish ? '<w:rPr><w:vanish/></w:rPr>' : '') + '</w:pPr>' + inner + '</w:p>';
 }
 
 async function mcFetchBlob(url) {
@@ -79,7 +80,10 @@ function mcExportEntries(card) {
 function mcExpPrefsLoad() {
   let p = {};
   try { p = JSON.parse(localStorage.getItem('mc_exp_prefs') || '{}') || {}; } catch (e) {}
-  return Object.assign({ logo: '', studio: '', slogan: '', site: '', author: '', showNames: true, checks: true, signs: false }, p);
+  const r = Object.assign({ logo: '', studio: '', slogan: '', site: '', author: '', names: 'show', dates: 'show', divider: true, divColor: '#B8892B', checks: true, signs: false }, p);
+  if (p.showNames === false && !p.names) r.names = 'none'; // старое сохранённое значение
+  delete r.showNames;
+  return r;
 }
 function mcExpPrefsSave(p) { try { localStorage.setItem('mc_exp_prefs', JSON.stringify(p)); } catch (e) { toast('Не удалось сохранить оформление (логотип слишком большой?)', true); } }
 // логотип → маленький PNG (с прозрачностью) в виде data URL
@@ -130,7 +134,9 @@ function mcExportCardWord(cardId) {
       lab('Название документа') + '<input id="mc-exp-title" style="' + is + '" value="' + _XE(card.title || '') + '">' +
       lab('Объект (необязательно)') + '<input id="mc-exp-object" style="' + is + '">' +
       lab('Составил(а)') + '<input id="mc-exp-author" style="' + is + '" value="' + _XE(P.author) + '">' +
-      '<div style="margin-top:8px">' + chk('mc-exp-names', 'Показывать названия файлов (без них документ компактнее)', P.showNames) +
+      '<div style="margin-top:8px">' + lab('Названия файлов под фото') + '<select id="mc-exp-names" style="' + is + '"><option value="show"' + (P.names === 'show' ? ' selected' : '') + '>Показывать</option><option value="none"' + (P.names === 'none' ? ' selected' : '') + '>Не показывать (компактно)</option><option value="hidden"' + (P.names === 'hidden' ? ' selected' : '') + '>Скрытый текст: показывать в Word кнопкой ¶</option></select><div style="height:6px"></div>' +
+      lab('Дата и время над фото') + '<select id="mc-exp-dates" style="' + is + '"><option value="show"' + (P.dates === 'show' ? ' selected' : '') + '>Показывать</option><option value="none"' + (P.dates === 'none' ? ' selected' : '') + '>Не показывать</option><option value="hidden"' + (P.dates === 'hidden' ? ' selected' : '') + '>Скрытый текст (кнопка ¶ в Word)</option></select><div style="height:6px"></div>' +
+      '<div style="display:flex;gap:10px;align-items:center;padding:4px 0"><label style="display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer"><input type="checkbox" id="mc-exp-div"' + (P.divider ? ' checked' : '') + '> Разделитель между записями, цвет:</label><input type="color" id="mc-exp-divc" value="' + _XE(P.divColor || '#B8892B') + '" style="width:44px;height:30px;border:1px solid var(--b1);border-radius:6px;background:var(--s2);padding:2px;cursor:pointer"></div>' +
       chk('mc-exp-checks', 'Галочка «выполнено» возле каждой записи', P.checks) +
       chk('mc-exp-signs', 'Строки для подписей в конце', P.signs) + '</div></details>' +
     '</div>' +
@@ -178,7 +184,7 @@ function mcExportCardWord(cardId) {
     if (!checked.size && !wc) { toast('Выбери хотя бы одну запись', true); return; }
     const v = id => $(id).value.trim();
     Object.assign(P, { studio: v('mc-exp-studio'), slogan: v('mc-exp-slogan'), site: v('mc-exp-site'), author: v('mc-exp-author'),
-      showNames: $('mc-exp-names').checked, checks: $('mc-exp-checks').checked, signs: $('mc-exp-signs').checked });
+      names: $('mc-exp-names').value, dates: $('mc-exp-dates').value, divider: $('mc-exp-div').checked, divColor: $('mc-exp-divc').value, checks: $('mc-exp-checks').checked, signs: $('mc-exp-signs').checked });
     mcExpPrefsSave(P);
     const ids = new Set(checked); const docTitle = v('mc-exp-title') || card.title || 'Карточка', object = v('mc-exp-object');
     close();
@@ -270,17 +276,20 @@ async function mcExportCardWordRun(card, opt) {
     };
     const sizeTxt = b => b == null ? '' : (b > 1048576 ? (b / 1048576).toFixed(1) + ' МБ' : Math.max(1, Math.round(b / 1024)) + ' КБ');
     const icon = o => o.isImg ? '📷 ' : o.isVid ? '🎥 ' : o.isAud ? '🎙 ' : '📎 ';
-    const attXml = (list, bar) => {
+    const attXml = list => {
       let x = '';
       const imgs = list.filter(o => o.thumb);
-      for (let i = 0; i < imgs.length; i += 3) x += mcDocPara(imgs.slice(i, i + 3).map(imgXml).join(''), { keep: true, after: 60, bar });
-      if (P.showNames) {
+      for (let i = 0; i < imgs.length; i += 3) x += mcDocPara(imgs.slice(i, i + 3).map(imgXml).join(''), { keep: true, after: 60 });
+      const nameLines = vanish => {
+        let y = '';
         list.forEach(o => {
-          if (o.err) { x += mcDocPara(mcDocRun(icon(o), { size: 19 }) + mcDocRun((o.a.name || 'файл') + ' — файл недоступен (удалён из облака или нет сети)', { size: 19, color: 'C0392B' }), { after: 30, bar }); return; }
-          x += mcDocPara(mcDocRun(icon(o), { size: 19 }) + '<w:hyperlink r:id="' + extRel(o.name) + '" w:history="1">' + mcDocRun(o.name, { size: 19, color: '1F5FA8', u: true }) + '</w:hyperlink>' + mcDocRun('  (' + sizeTxt(o.size) + ')', { size: 17, color: '8A8A8A' }), { after: 30, bar });
+          if (o.err) { y += mcDocPara(mcDocRun(icon(o), { size: 19, vanish }) + mcDocRun((o.a.name || 'файл') + ' — файл недоступен (удалён из облака или нет сети)', { size: 19, color: 'C0392B', vanish }), { after: 30, vanish }); return; }
+          y += mcDocPara(mcDocRun(icon(o), { size: 19, vanish }) + '<w:hyperlink r:id="' + extRel(o.name) + '" w:history="1">' + mcDocRun(o.name, { size: 19, color: '1F5FA8', u: true, vanish }) + '</w:hyperlink>' + mcDocRun('  (' + sizeTxt(o.size) + ')', { size: 17, color: '8A8A8A', vanish }), { after: 30, vanish });
         });
-      } else {
-        // компактно: фото без подписей, остальное — одна строка коротких ссылок
+        return y;
+      };
+      const compact = () => {
+        // фото без подписей, остальное — одна строка коротких ссылок
         const cnt = { v: 0, a: 0, f: 0, p: 0 }; let line = '';
         list.forEach(o => {
           if (o.thumb && !o.err) return;
@@ -288,8 +297,11 @@ async function mcExportCardWordRun(card, opt) {
           const lbl = o.isVid ? 'Видео ' + (++cnt.v) : o.isAud ? 'Голосовое ' + (++cnt.a) : o.isImg ? 'Фото ' + (++cnt.p) : 'Файл ' + (++cnt.f);
           line += mcDocRun(icon(o), { size: 18 }) + '<w:hyperlink r:id="' + extRel(o.name) + '" w:history="1">' + mcDocRun(lbl, { size: 18, color: '1F5FA8', u: true }) + '</w:hyperlink>' + mcDocRun('    ', { size: 18 });
         });
-        if (line) x += mcDocPara(line, { after: 30, bar });
-      }
+        return line ? mcDocPara(line, { after: 30 }) : '';
+      };
+      if (P.names === 'show') x += nameLines(false);
+      else if (P.names === 'hidden') x += compact() + nameLines(true);
+      else x += compact();
       return x;
     };
     // галочка «выполнено» (в Word нажимается мышью)
@@ -343,18 +355,23 @@ async function mcExportCardWordRun(card, opt) {
       body += mcDocPara(parts.map(x => x.br ? '<w:r><w:br/></w:r>' : mcDocRun(x.t, { ...x, rtl })).join(''), { bidi: rtl, after: 120 });
     }
     if (cardAttObjs.length) {
-      body += mcDocPara(mcDocRun('Вложения карточки', { b: true, size: 26 }), { before: 160, keep: true, bar: true });
-      body += attXml(cardAttObjs, true);
+      body += mcDocPara(mcDocRun('Вложения карточки', { b: true, size: 26 }), { before: 160, keep: true });
+      body += attXml(cardAttObjs);
     }
     blocks.forEach(b => {
       const e = b.e;
       const parts = mcRichToParts(e.text || e.sessionNote || '');
       const rtl = _isRTL(parts.map(x => x.t || '').join(''));
       const textXml = parts.map(x => x.br ? '<w:r><w:br/></w:r>' : mcDocRun(x.t, { ...x, rtl, size: 24 })).join('');
-      body += mcDocPara('', { after: 0, line: 200 }); // разделитель между записями (чтобы полосы не сливались)
-      body += mcDocPara(mcDocRun(b.n + '.  ', { b: true, color: GOLD, size: 26, rtl }) + (P.checks ? checkbox(!!e.done) : (e.done ? mcDocRun('☑ ', { size: 24, rtl }) : '')) + textXml, { before: 100, after: 60, keep: true, bidi: rtl, bar: true });
-      if (e.date || b.grp) body += mcDocPara(mcDocRun(String(e.date || '') + (b.grp ? (e.date ? '  ·  ' : '') + '▸ ' + b.grp : ''), { size: 18, color: '8A8A8A', rtl: _isRTL(b.grp) && !e.date }), { keep: true, after: 80, bar: true });
-      if (b.atts.length) body += attXml(b.atts, true);
+      if (P.divider && b !== blocks[0]) body += mcDocPara('', { before: 160, after: 120, line: 120, divider: (P.divColor || '#B8892B').replace('#', '') });
+      else body += mcDocPara('', { after: 0, line: 120 });
+      body += mcDocPara(mcDocRun(b.n + '.  ', { b: true, color: GOLD, size: 26, rtl }) + (P.checks ? checkbox(!!e.done) : (e.done ? mcDocRun('☑ ', { size: 24, rtl }) : '')) + textXml, { before: 60, after: 60, keep: true, bidi: rtl });
+      const dTxt = String(e.date || '');
+      if (P.dates === 'show' && (dTxt || b.grp)) body += mcDocPara(mcDocRun(dTxt + (b.grp ? (dTxt ? '  ·  ' : '') + '▸ ' + b.grp : ''), { size: 18, color: '8A8A8A', rtl: _isRTL(b.grp) && !dTxt }), { keep: true, after: 80 });
+      else if (P.dates === 'hidden' && dTxt && !b.grp) body += mcDocPara(mcDocRun(dTxt, { size: 18, color: '8A8A8A', vanish: true }), { keep: true, after: 80, vanish: true });
+      else if (P.dates === 'hidden' && b.grp) body += mcDocPara(mcDocRun(dTxt + '  ·  ', { size: 18, color: '8A8A8A', vanish: true }) + mcDocRun('▸ ' + b.grp, { size: 18, color: '8A8A8A' }), { keep: true, after: 80 });
+      else if (b.grp) body += mcDocPara(mcDocRun('▸ ' + b.grp, { size: 18, color: '8A8A8A', rtl: _isRTL(b.grp) }), { keep: true, after: 80 });
+      if (b.atts.length) body += attXml(b.atts);
     });
     if (P.signs) {
       const top = '<w:tcBorders><w:top w:val="single" w:sz="6" w:space="0" w:color="999999"/></w:tcBorders>';
@@ -367,7 +384,7 @@ async function mcExportCardWordRun(card, opt) {
       '<w:sectPr><w:footerReference w:type="default" r:id="rId2"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1000" w:right="1000" w:bottom="1000" w:left="1000" w:header="500" w:footer="500" w:gutter="0"/></w:sectPr></w:body></w:document>';
     const footTxt = [P.studio, P.site].filter(Boolean).join('  ·  ');
     const footXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:pBdr><w:top w:val="single" w:sz="4" w:space="6" w:color="DDDDDD"/></w:pBdr><w:tabs><w:tab w:val="right" w:pos="' + TW + '"/></w:tabs></w:pPr>' +
-      '<w:r><w:rPr><w:color w:val="888888"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">' + _XE(footTxt) + '</w:t></w:r><w:r><w:rPr><w:color w:val="888888"/><w:sz w:val="16"/></w:rPr><w:tab/><w:t xml:space="preserve">Стр. </w:t></w:r>' +
+      '<w:r><w:rPr><w:color w:val="888888"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">' + _XE(footTxt) + '</w:t></w:r><w:r><w:rPr><w:color w:val="888888"/><w:sz w:val="16"/></w:rPr><w:tab/></w:r>' +
       '<w:r><w:rPr><w:color w:val="888888"/><w:sz w:val="16"/></w:rPr><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:rPr><w:color w:val="888888"/><w:sz w:val="16"/></w:rPr><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:rPr><w:color w:val="888888"/><w:sz w:val="16"/></w:rPr><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:rPr><w:color w:val="888888"/><w:sz w:val="16"/></w:rPr><w:t>1</w:t></w:r><w:r><w:rPr><w:color w:val="888888"/><w:sz w:val="16"/></w:rPr><w:fldChar w:fldCharType="end"/></w:r></w:p></w:ftr>';
     const stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial" w:eastAsia="Arial"/><w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="ru-RU" w:bidi="he-IL"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>';
     const docRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>' + rels.join('') + '</Relationships>';
