@@ -143,17 +143,22 @@ async function mcExportCardWordRun(card, opt) {
     const groups = card.entryGroups || [];
     const blocks = mcExportEntries(card).filter(x => opt.ids.has(x.e.id))
       .sort((a, b) => (opt.order === 'asc' ? 1 : -1) * ((a.ts - b.ts) || (a.i - b.i)))
-      .map(x => ({ e: x.e, grp: ((groups.find(g => g.id === x.e.groupId) || {}).name) || '' }));
+      .map(x => ({ ts: x.ts, i: x.i, e: x.e, grp: ((groups.find(g => g.id === x.e.groupId) || {}).name) || '' }));
     const cardAtts = opt.withCard ? (card.attachments || []).filter(a => a && a.data) : [];
     const allAtts = [];
     const reg = (a, tag) => { const o = { a, tag }; allAtts.push(o); return o; };
     let n = 0;
+    // фото/файлы самой карточки в приложении стоят под первой (самой ранней) записью — в документе кладём их туда же;
+    // если записей нет, они идут отдельным блоком
+    const first = blocks.length ? blocks.reduce((m, b) => ((b.ts - m.ts) || (b.i - m.i)) < 0 ? b : m) : null;
     blocks.forEach(b => {
       if (!b.e) return;
       b.n = ++n;
-      b.atts = [...(b.e.sessionAtts || []), ...(b.e.attachments || [])].filter(a => a && a.data).map(a => reg(a, String(b.n).padStart(2, '0')));
+      const tag = String(b.n).padStart(2, '0');
+      const own = [...(b.e.sessionAtts || []), ...(b.e.attachments || [])].filter(a => a && a.data);
+      b.atts = [...own, ...(b === first ? cardAtts : [])].map(a => reg(a, tag));
     });
-    const cardAttObjs = cardAtts.map(a => reg(a, '00'));
+    const cardAttObjs = first ? [] : cardAtts.map(a => reg(a, '00'));
     if (!n && !cardAttObjs.length) { toast('В карточке нет записей и вложений', true); return; }
 
     // 2. Скачиваем вложения (по 3 одновременно)
