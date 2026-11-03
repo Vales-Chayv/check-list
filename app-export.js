@@ -52,7 +52,7 @@ async function mcFetchBlob(url) {
 async function mcThumb(blob) {
   let bmp;
   try { bmp = await createImageBitmap(blob); } catch (e) { return null; }
-  const H = 420, k = Math.min(1, H / bmp.height, 900 / bmp.width);
+  const k = Math.min(1, 640 / bmp.width, 840 / bmp.height);
   const w = Math.max(1, Math.round(bmp.width * k)), h = Math.max(1, Math.round(bmp.height * k));
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(bmp, 0, 0, w, h);
@@ -61,24 +61,90 @@ async function mcThumb(blob) {
   return b ? { buf: await b.arrayBuffer(), w, h } : null;
 }
 
-async function mcExportCardWord(cardId) {
+function mcEntryTs(e) {
+  // время создания записи зашито в начале её id (uid = Date.now() в base36)
+  const m = /^[0-9a-z]{8}/.exec(String((e && e.id) || ''));
+  if (m) { const t = parseInt(m[0], 36); if (t > 1.5e12 && t < 4.1e12) return t; }
+  return null;
+}
+function mcExportEntries(card) {
+  const list = (card.entries || []).filter(e => e && (e.text || e.sessionNote || (e.attachments || []).length || (e.sessionAtts || []).length)).map((e, i) => ({ e, i, ts: mcEntryTs(e) }));
+  let last = 0; list.forEach(x => { if (x.ts == null) x.ts = last; else last = x.ts; });
+  return list;
+}
+function mcExportCardWord(cardId) {
   const card = (typeof cards !== 'undefined') && cards.find(c => c.id === cardId);
   if (!card) return;
   if (typeof JSZip === 'undefined') { toast('Модуль архивов не загрузился. Проверь интернет и обнови страницу', true); return; }
+  if (window._mcExporting || document.getElementById('mc-exp-ov')) return;
+  const list = mcExportEntries(card);
+  const cardAttCount = (card.attachments || []).filter(a => a && a.data).length;
+  if (!list.length && !cardAttCount) { toast('В карточке нет записей и вложений', true); return; }
+  const checked = new Set(list.map(x => x.e.id));
+  let withCard = cardAttCount > 0, order = 'asc';
+  const ov = document.createElement('div');
+  ov.id = 'mc-exp-ov';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:14px;box-sizing:border-box;font-family:inherit';
+  const bs = 'background:var(--s2);color:var(--t1);border:1px solid var(--b1);border-radius:8px;padding:7px 11px;font-size:13px;cursor:pointer;font-family:inherit';
+  ov.innerHTML = '<div style="background:var(--s1);color:var(--t1);border:1px solid var(--b1);border-radius:14px;width:min(560px,100%);max-height:92vh;display:flex;flex-direction:column;box-sizing:border-box">' +
+    '<div style="padding:16px 18px 8px;font-size:17px;font-weight:700">📄 Выгрузка в Word</div>' +
+    '<div style="padding:0 18px 8px;font-size:13px;color:var(--t3)">Выбери записи. Вместе с документом скачается папка files с фото, роликами и голосовыми.</div>' +
+    '<div style="padding:4px 18px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
+      '<button data-q="all" style="' + bs + '">Все</button><button data-q="none" style="' + bs + '">Ничего</button>' +
+      '<button data-q="done" style="' + bs + '">Только ☑ отмеченные</button><button data-q="open" style="' + bs + '">Только без отметки</button>' +
+      '<select id="mc-exp-ord" style="' + bs + '"><option value="asc">Сначала старые</option><option value="desc">Сначала новые</option></select></div>' +
+    '<div id="mc-exp-list" style="padding:6px 12px;overflow:auto;flex:1;min-height:80px"></div>' +
+    (cardAttCount ? '<label style="padding:6px 18px;font-size:14px;display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="mc-exp-card" checked> Вложения самой карточки (' + cardAttCount + ')</label>' : '') +
+    '<div style="padding:12px 18px 16px;display:flex;gap:8px;justify-content:flex-end;align-items:center"><span id="mc-exp-cnt" style="margin-right:auto;font-size:13px;color:var(--t3)"></span>' +
+      '<button id="mc-exp-x" style="' + bs + ';padding:10px 16px;font-size:14px">Отмена</button>' +
+      '<button id="mc-exp-go" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Выгрузить</button></div></div>';
+  document.body.appendChild(ov);
+  const $ = id => ov.querySelector('#' + id);
+  const sorted = () => list.slice().sort((a, b) => (order === 'asc' ? 1 : -1) * ((a.ts - b.ts) || (a.i - b.i)));
+  const plain = e => { const t = mcRichToParts(e.text || e.sessionNote || '').map(x => x.br ? ' ' : (x.t || '')).join('').trim(); return t.length > 70 ? t.slice(0, 68) + '…' : (t || '(без текста)'); };
+  function render() {
+    const box = $('mc-exp-list');
+    box.innerHTML = sorted().map((x, k) => {
+      const na = (x.e.sessionAtts || []).length + (x.e.attachments || []).length;
+      return '<label style="display:flex;gap:9px;align-items:flex-start;padding:7px 6px;border-bottom:1px solid var(--b1);cursor:pointer;font-size:14px">' +
+        '<input type="checkbox" data-id="' + _XE(x.e.id) + '"' + (checked.has(x.e.id) ? ' checked' : '') + ' style="margin-top:3px">' +
+        '<span style="flex:1;min-width:0;word-break:break-word" dir="auto">' + (x.e.done ? '☑ ' : '') + _XE(plain(x.e)) + '</span>' +
+        '<span style="font-size:12px;color:var(--t3);white-space:nowrap">' + _XE(x.e.date || '') + (na ? ' · 📎' + na : '') + '</span></label>';
+    }).join('') || '<div style="padding:10px;color:var(--t3);font-size:13px">Записей нет</div>';
+    box.querySelectorAll('input[data-id]').forEach(i => i.onchange = () => { i.checked ? checked.add(i.dataset.id) : checked.delete(i.dataset.id); count(); });
+    count();
+  }
+  function count() { $('mc-exp-cnt').textContent = 'Выбрано записей: ' + checked.size + ' из ' + list.length; }
+  ov.querySelectorAll('[data-q]').forEach(b => b.onclick = () => {
+    const q = b.dataset.q; checked.clear();
+    list.forEach(x => { if (q === 'all' || (q === 'done' && x.e.done) || (q === 'open' && !x.e.done)) checked.add(x.e.id); });
+    render();
+  });
+  $('mc-exp-ord').onchange = e => { order = e.target.value; render(); };
+  const close = () => { document.removeEventListener('keydown', onKey, true); ov.remove(); };
+  const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+  document.addEventListener('keydown', onKey, true);
+  $('mc-exp-x').onclick = close;
+  ov.addEventListener('mousedown', e => { if (e.target === ov) close(); });
+  $('mc-exp-go').onclick = () => {
+    const wc = $('mc-exp-card') ? $('mc-exp-card').checked : false;
+    if (!checked.size && !wc) { toast('Выбери хотя бы одну запись', true); return; }
+    const ids = new Set(checked); close();
+    mcExportCardWordRun(card, { ids, order, withCard: wc });
+  };
+  render();
+}
+
+async function mcExportCardWordRun(card, opt) {
   if (window._mcExporting) return;
   window._mcExporting = true;
   try {
-    // 1. Собираем структуру: вложения карточки, записи без рубрики, затем рубрики
-    const entries = (card.entries || []).filter(e => e && (e.text || e.sessionNote || (e.attachments || []).length || (e.sessionAtts || []).length));
+    // 1. Собираем структуру: выбранные записи по дате (рубрика — пометкой), вложения карточки
     const groups = card.entryGroups || [];
-    const blocks = [];
-    const cardAtts = (card.attachments || []).filter(a => a && a.data);
-    const loose = entries.filter(e => !e.groupId || !groups.some(g => g.id === e.groupId));
-    loose.forEach(e => blocks.push({ e }));
-    groups.forEach(g => {
-      const ge = entries.filter(e => e.groupId === g.id);
-      if (ge.length) { blocks.push({ head: g.name || 'Рубрика' }); ge.forEach(e => blocks.push({ e })); }
-    });
+    const blocks = mcExportEntries(card).filter(x => opt.ids.has(x.e.id))
+      .sort((a, b) => (opt.order === 'asc' ? 1 : -1) * ((a.ts - b.ts) || (a.i - b.i)))
+      .map(x => ({ e: x.e, grp: ((groups.find(g => g.id === x.e.groupId) || {}).name) || '' }));
+    const cardAtts = opt.withCard ? (card.attachments || []).filter(a => a && a.data) : [];
     const allAtts = [];
     const reg = (a, tag) => { const o = { a, tag }; allAtts.push(o); return o; };
     let n = 0;
@@ -133,7 +199,8 @@ async function mcExportCardWord(cardId) {
     let docPrId = 1;
     const relId = () => 'rId' + (rels.length + 10);
     const imgXml = o => {
-      const cy = Math.round(o.thumb.h / 420 * 1512000), cx = Math.round(o.thumb.w / o.thumb.h * cy);
+      let cx = 1980000, cy = Math.round(cx * o.thumb.h / o.thumb.w);
+      if (cy > 2520000) { cy = 2520000; cx = Math.round(cy * o.thumb.w / o.thumb.h); }
       const id = relId(), fn = 'img' + (media.length + 1) + '.jpg';
       media.push({ name: fn, buf: o.thumb.buf });
       rels.push('<Relationship Id="' + id + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/' + fn + '"/>');
@@ -142,13 +209,13 @@ async function mcExportCardWord(cardId) {
         '<wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
         '<pic:pic><pic:nvPicPr><pic:cNvPr id="' + did + '" name="' + nm + '"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="' + id + '"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>' +
         '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + cx + '" cy="' + cy + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>' +
-        mcDocRun('  ');
+        mcDocRun(' ', { size: 8 });
     };
     const sizeTxt = b => b == null ? '' : (b > 1048576 ? (b / 1048576).toFixed(1) + ' МБ' : Math.max(1, Math.round(b / 1024)) + ' КБ');
     const attXml = list => {
       let x = '';
       const imgs = list.filter(o => o.thumb);
-      if (imgs.length) x += mcDocPara(imgs.map(imgXml).join(''), { keep: true, after: 60 });
+      for (let i = 0; i < imgs.length; i += 3) x += mcDocPara(imgs.slice(i, i + 3).map(imgXml).join(''), { keep: true, after: 60 });
       list.forEach(o => {
         const icon = o.isImg ? '📷 ' : o.isVid ? '🎥 ' : o.isAud ? '🎙 ' : '📎 ';
         if (o.err) { x += mcDocPara(mcDocRun(icon, { size: 19 }) + mcDocRun((o.a.name || 'файл') + ' — файл недоступен (удалён из облака или нет сети)', { size: 19, color: 'C0392B' }), { after: 30 }); return; }
@@ -177,7 +244,7 @@ async function mcExportCardWord(cardId) {
       const rtl = _isRTL(parts.map(x => x.t || '').join(''));
       const textXml = parts.map(x => x.br ? '<w:r><w:br/></w:r>' : mcDocRun(x.t, { ...x, rtl, size: 24 })).join('');
       body += mcDocPara(mcDocRun(b.n + '.  ', { b: true, color: 'B8892B', size: 26, rtl }) + (e.done ? mcDocRun('☑ ', { size: 24, rtl }) : '') + textXml, { before: 260, after: 60, keep: true, bidi: rtl });
-      if (e.date) body += mcDocPara(mcDocRun(String(e.date), { size: 18, color: '8A8A8A' }), { keep: true, after: 80 });
+      if (e.date || b.grp) body += mcDocPara(mcDocRun(String(e.date || '') + (b.grp ? (e.date ? '  ·  ' : '') + '▸ ' + b.grp : ''), { size: 18, color: '8A8A8A', rtl: _isRTL(b.grp) && !e.date }), { keep: true, after: 80 });
       if (b.atts.length) body += attXml(b.atts);
     });
     const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
