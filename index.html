@@ -156,10 +156,14 @@
       <div class="fld">
         <label>Фото и файлы</label>
         <input type="file" id="f-cam" multiple accept="image/*,video/*,.pdf,.doc,.docx" style="display:none" onchange="handleFiles(this)">
+        <input type="file" id="f-shot" accept="image/*" capture="environment" style="display:none" onchange="handleFiles(this)">
+        <input type="file" id="f-rec" accept="video/*" capture="environment" style="display:none" onchange="handleFiles(this)">
         <input type="file" id="f-file" multiple accept="*/*" style="display:none" onchange="handleFiles(this)">
         <div id="att-prev" class="att-prev" style="margin-bottom:5px"></div>
         <div style="display:flex;gap:7px">
-          <button onclick="document.getElementById('f-cam').click()" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px;font-size:13px;color:var(--t2);cursor:pointer">📷 Камера/Фото</button>
+          <button onclick="document.getElementById('f-shot').click()" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px 4px;font-size:13px;color:var(--t2);cursor:pointer">📷 Фото</button>
+          <button onclick="document.getElementById('f-rec').click()" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px 4px;font-size:13px;color:var(--t2);cursor:pointer">🎥 Видео</button>
+          <button onclick="document.getElementById('f-cam').click()" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px 4px;font-size:13px;color:var(--t2);cursor:pointer">🖼 Галерея</button>
           <button onclick="document.getElementById('f-file').click()" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px;font-size:13px;color:var(--t2);cursor:pointer">📎 Файл</button>
           <button id="voice-btn" onclick="toggleVoice()" class="voice-btn">🎙</button>
         </div>
@@ -261,10 +265,14 @@
 <button onclick="aeAddEntryRow()" style="width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:11px;font-size:15px;color:var(--accent);cursor:pointer;font-family:inherit;text-align:left;margin-top:4px">＋ Добавить запись</button>
 <div id="ae-entries-list" style="display:flex;flex-direction:column;gap:0"></div>
       <input type="file" id="ae-cam" multiple accept="image/*,video/*,.pdf,.doc,.docx" style="display:none" onchange="handleAEFiles(this)">
+      <input type="file" id="ae-shot" accept="image/*" capture="environment" style="display:none" onchange="handleAEFiles(this)">
+      <input type="file" id="ae-rec" accept="video/*" capture="environment" style="display:none" onchange="handleAEFiles(this)">
       <input type="file" id="ae-file" multiple accept="*/*" style="display:none" onchange="handleAEFiles(this)">
       <div id="ae-att-prev" class="att-prev"></div>
       <div style="display:flex;gap:7px">
-        <button onclick="document.getElementById('ae-cam').click()" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px;font-size:13px;color:var(--t2);cursor:pointer">📷 Фото</button>
+        <button onclick="document.getElementById('ae-shot').click()" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px 4px;font-size:13px;color:var(--t2);cursor:pointer">📷 Фото</button>
+        <button onclick="document.getElementById('ae-rec').click()" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px 4px;font-size:13px;color:var(--t2);cursor:pointer">🎥 Видео</button>
+        <button onclick="document.getElementById('ae-cam').click()" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px 4px;font-size:13px;color:var(--t2);cursor:pointer">🖼 Галерея</button>
         <button onclick="document.getElementById('ae-file').click()" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px;font-size:13px;color:var(--t2);cursor:pointer">📎 Файл</button>
         <button id="ae-voice-btn" onclick="toggleAEVoice()" class="voice-btn">🎙</button>
       </div>
