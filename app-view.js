@@ -1,4 +1,3 @@
-
 // Личное имя участника (alias), если задано — иначе официальное «Имя Фамилия»
 function aliasedName(name) {
   if(!name || typeof getDisplayName !== 'function' || !currentSpace) return name;
@@ -1098,9 +1097,39 @@ async function deleteEntry(cardId, entryId) {
   if(_goneEntry) storageRemoveAtts([...(_goneEntry.attachments||[]), ...(_goneEntry.sessionAtts||[])]); // файлы удалённой записи — и из хранилища
 }
 
+let _eeAtts = []; // файлы, добавленные в окне редактирования записи (ещё не сохранённые)
+async function handleEEFiles(inp) {
+  const files = Array.from(inp.files);
+  inp.value = '';
+  for(const f of files) {
+    try {
+      toast('⏳ Загрузка ' + f.name + '...');
+      const att = await uploadToStorage(f);
+      _eeAtts.push(att);
+      renderEEPrev();
+    } catch(e) {
+      toast('Ошибка загрузки: ' + e.message, true);
+    }
+  }
+}
+function renderEEPrev() {
+  const el = document.getElementById('ee-att-prev'); if(!el) return;
+  el.innerHTML = _eeAtts.map(a => {
+    const del = `<button class="att-del" onclick="_eeAtts=_eeAtts.filter(x=>x.id!=='${a.id}');renderEEPrev()">✕</button>`;
+    if (a.type?.startsWith('image/')) return `<div class="att-img"><img src="${a.data}" style="width:68px;height:68px;object-fit:cover;border-radius:7px">${del}</div>`;
+    if (a.type?.startsWith('audio/')) return `<div class="att-file"><span style="color:var(--green)">🎙 ${esc(a.name)}</span>${del}</div>`;
+    return `<div class="att-file">${a.type?.startsWith('video/')?'🎥':'📎'}${esc(a.name.length>18?a.name.slice(0,16)+'…':a.name)}${del}</div>`;
+  }).join('');
+}
+function closeEditEntry(discard) {
+  if(discard && _eeAtts.length) { const gone = _eeAtts; _eeAtts = []; try { storageRemoveAtts(gone); } catch(e) {} }
+  _eeAtts = [];
+  document.getElementById('edit-entry-dialog')?.remove();
+}
 function editEntry(cardId, entryId) {
   const card = cards.find(c=>c.id===cardId); if(!card) return;
   const entry = (card.entries||[]).find(e=>e.id===entryId); if(!entry) return;
+  _eeAtts = [];
   const div = document.createElement('div');
   div.id = 'edit-entry-dialog';
 div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
@@ -1122,9 +1151,23 @@ div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2
       <label style="font-size:12px;color:var(--t2)">Срок выполнения</label>
       <input type="date" id="edit-entry-dl" value="${entry.deadline||''}" style="width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:8px;font-size:14px;color:var(--t1);font-family:inherit;margin-top:4px">
     </div>
+    <div style="margin-top:10px">
+      <label style="font-size:12px;color:var(--t2)">Добавить файлы${((entry.attachments||[]).length+(entry.sessionAtts||[]).length)?' (уже прикреплено: '+((entry.attachments||[]).length+(entry.sessionAtts||[]).length)+')':''}</label>
+      <input type="file" id="ee-cam" multiple accept="image/*,video/*" style="display:none" onchange="handleEEFiles(this)">
+      <input type="file" id="ee-file" multiple accept="*/*" style="display:none" onchange="handleEEFiles(this)">
+      <input type="file" id="ee-shot" accept="image/*" capture="environment" style="display:none" onchange="handleEEFiles(this)">
+      <input type="file" id="ee-rec" accept="video/*" capture="environment" style="display:none" onchange="handleEEFiles(this)">
+      <div id="ee-att-prev" class="att-prev" style="margin-top:4px"></div>
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <button type="button" onclick="mcCam('photo','ee-shot')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px 4px;font-size:13px;color:var(--t2);cursor:pointer;flex:1;font-family:inherit">📷 Фото</button>
+        <button type="button" onclick="mcCam('video','ee-rec')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px 4px;font-size:13px;color:var(--t2);cursor:pointer;flex:1;font-family:inherit">🎥 Видео</button>
+        <button type="button" onclick="document.getElementById('ee-cam').click()" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px 4px;font-size:13px;color:var(--t2);cursor:pointer;flex:1;font-family:inherit">🖼 Галерея</button>
+        <button type="button" onclick="document.getElementById('ee-file').click()" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:9px 4px;font-size:13px;color:var(--t2);cursor:pointer;flex:1;font-family:inherit">📎 Файл</button>
+      </div>
+    </div>
     <div style="display:flex;gap:8px;margin-top:12px">
       <button onclick="saveEntryEdit('${cardId}','${entryId}')" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:11px;font-size:14px;font-weight:700;cursor:pointer">Сохранить</button>
-      <button onclick="this.closest('[style*=fixed]').remove()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px 16px;cursor:pointer">Отмена</button>
+      <button onclick="closeEditEntry(true)" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px 16px;cursor:pointer">Отмена</button>
     </div>
   </div>`;
   document.body.appendChild(div);
@@ -1136,8 +1179,10 @@ async function saveEntryEdit(cardId, entryId) {
   const entry = (card.entries||[]).find(e=>e.id===entryId); if(!entry) return;
   const el = document.getElementById('edit-entry-txt');
   const txt = sanitizeRich(el?.innerHTML || '');
-  if(!stripTags(txt).trim()) return;
+  const hadAtts = (entry.attachments||[]).length + (entry.sessionAtts||[]).length + _eeAtts.length;
+  if(!stripTags(txt).trim() && !hadAtts) return;
   entry.text = txt;
+  if(_eeAtts.length) { entry.attachments = [...(entry.attachments||[]), ..._eeAtts]; _eeAtts = []; }
   const dl = document.getElementById('edit-entry-dl')?.value;
 if(dl && !entry.deadline && !(currentSpace?.type==='family' || currentSpace?.type==='group')) entry.inTasks = true;
 entry.deadline = dl || null;
