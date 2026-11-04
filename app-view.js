@@ -1182,7 +1182,8 @@ async function saveEntryEdit(cardId, entryId) {
   const hadAtts = (entry.attachments||[]).length + (entry.sessionAtts||[]).length + _eeAtts.length;
   if(!stripTags(txt).trim() && !hadAtts) return;
   entry.text = txt;
-  if(_eeAtts.length) { entry.attachments = [...(entry.attachments||[]), ..._eeAtts]; _eeAtts = []; }
+  // в карточке файлы показываются из sessionAtts (вложения «стикера»), поэтому новые кладём туда же
+  if(_eeAtts.length) { entry.sessionAtts = [...(entry.sessionAtts||[]), ..._eeAtts]; _eeAtts = []; }
   const dl = document.getElementById('edit-entry-dl')?.value;
 if(dl && !entry.deadline && !(currentSpace?.type==='family' || currentSpace?.type==='group')) entry.inTasks = true;
 entry.deadline = dl || null;
