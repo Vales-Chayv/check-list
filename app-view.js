@@ -2061,7 +2061,7 @@ async function startCardInterval(id, mins) {
 }
 async function stopCardInterval(id) {
   const card = cards.find(c=>c.id===id); if(!card) return;
-  try { window.mcAlarmsCancel?.(id); } catch(e) {}
+  try { await window.mcAlarmsCancel?.(id); } catch(e) {}
   card.reminder = { ...(card.reminder||{}), intervalRun: null };
   render(); openView(id);
   toast('Интервальные напоминания выключены');

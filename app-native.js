@@ -330,6 +330,19 @@
     } catch (e) { console.log('[native] alarms cancel', e && e.message); }
     delete map[cardId];
     alarmsSave(map);
+    await alarmsCancelPending(c => c === cardId); // страховка: снимаем всё, что реально стоит для этой карточки
+  }
+  const urlCardId = u => { const m = /[?&]openCard=([^&]+)/.exec(String(u || '')); return m ? decodeURIComponent(m[1]) : null; };
+  async function alarmsCancelPending(pred) {
+    try {
+      const pend = await LN.getPending();
+      const list = ((pend && pend.notifications) || []).filter(x => {
+        const c = urlCardId(x.extra && x.extra.url);
+        return c && pred(c);
+      }).map(x => ({ id: x.id }));
+      if (list.length) await LN.cancel({ notifications: list });
+      return list.length;
+    } catch (e) { console.log('[native] cancel pending', e && e.message); return 0; }
   }
 
   async function alarmsFill(card, run) {
@@ -370,14 +383,39 @@
     return items.length;
   }
 
+  // будильники карточек, которых нет в открытом кабинете (выключены с ПК, удалены, перенесены): сверяем с базой
+  async function alarmsSweepForeign(token) {
+    try {
+      if (typeof sb === 'undefined' || !navigator.onLine) return;
+      const pend = await LN.getPending();
+      const mine = new Set(((typeof cards !== 'undefined' && Array.isArray(cards)) ? cards : []).map(c => c.id));
+      const ids = [...new Set(((pend && pend.notifications) || []).map(x => urlCardId(x.extra && x.extra.url)).filter(c => c && !mine.has(c)))];
+      if (!ids.length) return;
+      const r = await sb.from('cards').select('id,status,reminder').in('id', ids);
+      if (r.error) return; // не уверены — ничего не снимаем
+      const found = new Map((r.data || []).map(c => [c.id, c]));
+      const dead = new Set();
+      ids.forEach(id => {
+        const c = found.get(id);
+        const run = c && c.reminder && c.reminder.intervalRun;
+        if (!c || c.status === 'done' || !run || !run.everyMin || !token || run.localToken !== token) dead.add(id);
+      });
+      if (dead.size) {
+        await alarmsCancelPending(c => dead.has(c));
+        const map = alarmsLoad(); dead.forEach(id => delete map[id]); alarmsSave(map);
+      }
+    } catch (e) { console.log('[native] sweep', e && e.message); }
+  }
+
   // проверка: что стоит — актуально ли, при необходимости снять или дозавести
   async function alarmsSync() {
     if (!LN || typeof cards === 'undefined' || !Array.isArray(cards)) return;
     const token = localStorage.getItem(TOKEN_KEY);
+    await alarmsSweepForeign(token);
     const map = alarmsLoad();
     for (const cardId of Object.keys(map)) {
       const card = cards.find(c => c.id === cardId);
-      if (!card) continue; // карточка из другого кабинета — не трогаем
+      if (!card) continue; // карточка из другого кабинета — ею занимается alarmsSweepForeign
       const run = (typeof intervalRunActive === 'function') ? intervalRunActive(card) : null;
       if (!run || card.status === 'done' || !token || run.localToken !== token) { await alarmsCancel(cardId); continue; }
       try { await alarmsFill(card, run); } catch (e) {}
