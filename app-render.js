@@ -206,40 +206,69 @@ function renderImportant(){
     const gName = e => (groups.find(g=>g.id===e.groupId)?.name)||'';
     const _all = (c.entries||[]).filter(e=>e.inTasks && !e.done && e.text);
     const _exp = window._impExp.has(c.id);
-    const _vis = _exp ? _all : _all.slice(0,2);
-    const rows = _vis.map(e => `<div onclick="impOpenCard('${c.id}')" style="display:flex;gap:8px;align-items:flex-start;padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.08);cursor:pointer;font-size:14px"><span style="font-size:13px;margin-top:1px">⭐</span><div style="flex:1" dir="auto">${esc(stripTags(e.text))}${groups.length && gName(e) ? ` <span style="font-size:10px;color:var(--accent);background:rgba(232,197,106,.15);border-radius:8px;padding:1px 7px;white-space:nowrap">${esc(gName(e))}</span>` : ''}</div></div>`).join('');
+    const rows = _all.map(e => `<div onclick="impOpenCard('${c.id}')" style="display:flex;gap:8px;align-items:flex-start;padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.08);cursor:pointer;font-size:14px"><span style="font-size:13px;margin-top:1px">⭐</span><div style="flex:1" dir="auto">${esc(stripTags(e.text))}${groups.length && gName(e) ? ` <span style="font-size:10px;color:var(--accent);background:rgba(232,197,106,.15);border-radius:8px;padding:1px 7px;white-space:nowrap">${esc(gName(e))}</span>` : ''}</div></div>`).join('');
     const _foc = window._impFocus === c.id;
     return `<div data-cid="${c.id}" style="border:${_foc?'2px':'1px'} solid var(--accent);border-radius:12px;background:rgba(232,197,106,${_foc?'.16':'.07'});margin-bottom:12px;overflow:hidden;${_foc?'box-shadow:0 0 16px rgba(232,197,106,.55)':''}">${_foc?'<div style="font-size:11px;font-weight:700;color:#0f0f0f;background:var(--accent);padding:3px 12px">🔔 Напоминание из уведомления</div>':''}
       <div onclick="impOpenCard('${c.id}')" style="padding:9px 12px;background:rgba(232,197,106,.16);display:flex;justify-content:space-between;align-items:flex-start;gap:8px;cursor:pointer">
         <div style="min-width:0"><div style="font-size:14px;font-weight:700;color:var(--t1)" dir="auto">${esc(c.title||'Без названия')}</div><div style="font-size:11px;color:var(--t2);margin-top:2px">🗂️ ${esc(spName(c.space_id))}${groups.length?' · мультикарточка':''}</div></div>
         <span style="font-size:11px;color:var(--accent);white-space:nowrap">⏱ ${every(c)}</span>
       </div>
-      <div style="padding:2px 10px 2px">${rows}</div>
+      <div style="padding:2px 10px 2px"><div class="imp-rows" data-cid="${c.id}" data-n="${_all.length}" style="overflow:hidden">${rows}</div></div>
       ${_all.length>2 ? `<div class="imp-more" data-cid="${c.id}" style="touch-action:none;text-align:center;font-size:12px;color:var(--accent);padding:7px 0 5px;cursor:pointer;user-select:none;border-top:1px dashed rgba(232,197,106,.3)">${_exp ? '⌃ свернуть' : `⌄ ещё ${_all.length-2} · потяни вниз`}</div>` : ''}
       <div onclick="impOpenCard('${c.id}')" style="font-size:11px;color:var(--t2);padding:6px 12px 9px;text-align:right;cursor:pointer">Открыть карточку ›</div>
     </div>`;
   }).join('');
+  list.querySelectorAll('.imp-rows').forEach(el => {
+    if(+el.dataset.n <= 2) return;
+    const kids = el.children; let ch = 0; for(let i=0;i<2;i++) ch += kids[i].offsetHeight;
+    el.dataset.ch = ch; el.dataset.fh = el.scrollHeight;
+    if(!window._impExp.has(el.dataset.cid)) el.style.maxHeight = ch + 'px';
+  });
   if(window._impFocus) setTimeout(()=>{ const el = list.querySelector('[data-cid="'+window._impFocus+'"]'); if(el) el.scrollIntoView({block:'center', behavior:'smooth'}); }, 80);
 }
-// в «Сейчас важно» показываем по 2 записи; остальные раскрываются тапом или протягиванием пальца вниз по полоске «ещё N»
+// в «Сейчас важно» показываем по 2 записи; остальные раскручиваются вслед за пальцем (потяни полоску «ещё N» вниз) или тапом
 (function(){
-  let y0 = null, cid = null;
-  const toggle = (id, open) => { if(open) window._impExp.add(id); else window._impExp.delete(id); const l = document.getElementById('imp-list'); const st = l ? l.scrollTop : 0; renderImportant(); if(l) l.scrollTop = st; };
-  document.addEventListener('touchstart', e => { const m = e.target.closest && e.target.closest('.imp-more'); if(m){ y0 = e.touches[0].clientY; cid = m.dataset.cid; } else { y0 = null; } }, {passive:true});
+  let g = null;
+  const label = (id, open) => { const m = document.querySelector('.imp-more[data-cid="'+id+'"]'); const el = document.querySelector('.imp-rows[data-cid="'+id+'"]'); if(!m||!el) return; m.textContent = open ? '⌃ свернуть' : '⌄ ещё ' + (+el.dataset.n - 2) + ' · потяни вниз'; };
+  const settle = (id, open) => {
+    const el = document.querySelector('.imp-rows[data-cid="'+id+'"]'); if(!el) return;
+    el.style.transition = 'max-height .22s ease';
+    el.style.maxHeight = (open ? el.dataset.fh : el.dataset.ch) + 'px';
+    if(open) window._impExp.add(id); else window._impExp.delete(id);
+    label(id, open);
+  };
+  document.addEventListener('touchstart', e => {
+    const m = e.target.closest && e.target.closest('.imp-more');
+    if(!m){ g = null; return; }
+    const el = document.querySelector('.imp-rows[data-cid="'+m.dataset.cid+'"]'); if(!el) { g = null; return; }
+    g = { id: m.dataset.cid, el, y0: e.touches[0].clientY, ch: +el.dataset.ch, fh: +el.dataset.fh, open: window._impExp.has(m.dataset.cid), moved: false };
+    g.h0 = g.open ? g.fh : g.ch;
+  }, {passive:true});
+  document.addEventListener('touchmove', e => {
+    if(!g) return;
+    const dy = e.touches[0].clientY - g.y0;
+    if(Math.abs(dy) > 6) g.moved = true;
+    if(!g.moved) return;
+    e.preventDefault();
+    const h = Math.max(g.ch, Math.min(g.fh, g.h0 + dy));
+    g.el.style.transition = 'none';
+    g.el.style.maxHeight = h + 'px';
+    g.h = h;
+  }, {passive:false});
   document.addEventListener('touchend', e => {
-    if(y0 === null) return;
-    const dy = e.changedTouches[0].clientY - y0, id = cid; y0 = null;
-    if(dy > 25) toggle(id, true);
-    else if(dy < -25) toggle(id, false);
-    else toggle(id, !window._impExp.has(id)); // обычный тап
+    if(!g) return;
+    const x = g; g = null;
+    window._impTouchedAt = Date.now();
+    if(!x.moved) { settle(x.id, !x.open); e.preventDefault(); return; }
+    const span = Math.max(1, x.fh - x.ch), frac = ((x.h == null ? x.h0 : x.h) - x.ch) / span;
+    settle(x.id, x.open ? frac > 0.7 : frac > 0.3); // отпустил — доезжает до открытого/закрытого
     e.preventDefault();
   }, {passive:false});
   document.addEventListener('click', e => { // мышь на ПК
-    const m = e.target.closest && e.target.closest('.imp-more'); if(!m || e.pointerType==='touch') return;
-    if(window._impTouchedAt && Date.now()-window._impTouchedAt < 500) return;
-    toggle(m.dataset.cid, !window._impExp.has(m.dataset.cid));
+    const m = e.target.closest && e.target.closest('.imp-more'); if(!m) return;
+    if(window._impTouchedAt && Date.now()-window._impTouchedAt < 600) return;
+    settle(m.dataset.cid, !window._impExp.has(m.dataset.cid));
   });
-  document.addEventListener('touchend', () => { window._impTouchedAt = Date.now(); }, {passive:true});
 })();
 function impOpenCard(id){
   closeImportant();
