@@ -35,6 +35,9 @@ async function deleteViewGroup(cardId, groupId) {
   card.entries = (card.entries||[]).filter(e => e.groupId !== groupId);
   card.entryGroups = (card.entryGroups||[]).filter(x => x.id !== groupId);
   card.deadline = ([...(card.entries||[])].filter(e => !e.done && e.deadline).map(e => e.deadline).sort()[0]) || null;
+  if(!(card.entryGroups||[]).length && !(card.entries||[]).length && confirm('Списков в карточке не осталось. Удалить карточку?')) {
+    closeView(); deleteCardById(cardId); return;
+  }
   try { await dbUpdate(card); } catch(err) { toast('Ошибка синхронизации', true); }
   render(); openView(cardId);
   setTimeout(() => { const s = document.querySelector('#view-ov .sheet'); if(s) s.scrollTop = _st; }, 60);
@@ -130,7 +133,9 @@ function openView(id) {
 
 
   if(entries.length) {
-    const dc = entries.filter(e=>e.done).length;
+    // запись без текста, но с вложением (например, только голос): показываем её строкой с галочкой, иначе карточку нельзя завершить
+    const _vOk = e => !e.text && ((e.sessionAtts&&e.sessionAtts.length)||(e.attachments&&e.attachments.length));
+    const dc = entries.filter(e=>e.done && (e.text||_vOk(e))).length;
     const sessionMap = new Map();
     entries.forEach(e => {
       const sid = e.sessionId || e.id;
@@ -326,7 +331,11 @@ const dateCol = textColor ? (_lt ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)') 
     function plainSessionHTML(s, si) {
       const sep = si > 0 ? '<div style="height:1px;background:var(--b1);margin:8px 0"></div>' : '';
       const noteHTML = s.note ? `<div style="font-size:13px;color:var(--t1);padding:5px 0 4px;font-style:italic">${esc(s.note)}</div>` : '';
-      const entriesHTML = s.entries.map(e=>entryRowHTML(e,null)).join('');
+      const _voiceRow = e => {
+        const _isAud = [...(e.sessionAtts||[]), ...(e.attachments||[])].some(x => x.type?.startsWith('audio/'));
+        return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(128,128,128,.15)"><div style="width:16px;height:16px;border-radius:3px;border:2px solid var(--t2);flex-shrink:0;background:${e.done?'var(--green)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="viewToggleEntry('${id}','${e.id}')">${e.done?'<svg width="10" height="8" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>':''}</div><div style="flex:1;font-size:13px;${e.done?'text-decoration:line-through;opacity:.5':''}">${_isAud?'🎙 Голосовая запись':'📎 Вложение'}</div><div style="font-size:10px;color:var(--t3)">${e.date||''}</div></div>`;
+      };
+      const entriesHTML = s.entries.map(e=>e.text ? entryRowHTML(e,null) : (_vOk(e) ? _voiceRow(e) : '')).join('');
       const sAtts = s.atts||[];
       const sImgs = sAtts.filter(a=>a.type?.startsWith('image/'));
       const sAudios = sAtts.filter(a=>a.type?.startsWith('audio/'));
@@ -362,7 +371,7 @@ const dateCol = textColor ? (_lt ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)') 
     } else {
       sessionsHTML = sessions.map((s,si) => isFamily ? stickerHTML(s,si) : plainSessionHTML(s,si)).join('');
     }
-    html+=`<div class="view-sec">${!isFamily?`<div class="view-lbl">Записи (${dc}/${entries.filter(e=>e.text).length})</div>`:''}${sessionsHTML}${(!isFamily&&entryGroups.length)?`<button onclick="addViewGroup('${id}')" style="width:100%;background:var(--s2);color:var(--accent);border:1px dashed rgba(232,197,106,.4);border-radius:var(--rsm);padding:10px;font-size:14px;cursor:pointer">＋ Новая рубрика</button>`:''}</div>`;
+    html+=`<div class="view-sec">${!isFamily?`<div class="view-lbl">Записи (${dc}/${entries.filter(e=>e.text||_vOk(e)).length})</div>`:''}${sessionsHTML}${(!isFamily&&entryGroups.length)?`<button onclick="addViewGroup('${id}')" style="width:100%;background:var(--s2);color:var(--accent);border:1px dashed rgba(232,197,106,.4);border-radius:var(--rsm);padding:10px;font-size:14px;cursor:pointer">＋ Новая рубрика</button>`:''}</div>`;
   }
 
   if(useStack) html+=`<div class="view-sec"><div class="view-lbl">Фото и видео</div>${mediaStackHTML(_mt, 'mg_'+id+'_c')}</div>`;
