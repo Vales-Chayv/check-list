@@ -165,6 +165,7 @@ function closeLobbyReminders(){ document.getElementById('rem-ov').classList.remo
 
 // ⭐ «Сейчас важно»: карточки из всех кабинетов, где включён интервал и есть записи со звёздочкой
 let _impFilter = 'all';
+window._impExp = window._impExp || new Set(); // карточки, где раскрыты все ⭐-записи
 async function openImportant(focusId){
   window._impFocus = focusId || null;
   document.getElementById('imp-ov').classList.add('on');
@@ -203,7 +204,10 @@ function renderImportant(){
   list.innerHTML = shown.map(c => {
     const groups = c.entryGroups||[];
     const gName = e => (groups.find(g=>g.id===e.groupId)?.name)||'';
-    const rows = (c.entries||[]).filter(e=>e.inTasks && !e.done && e.text).map(e => `<div onclick="impOpenCard('${c.id}')" style="display:flex;gap:8px;align-items:flex-start;padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.08);cursor:pointer;font-size:14px"><span style="font-size:13px;margin-top:1px">⭐</span><div style="flex:1" dir="auto">${esc(stripTags(e.text))}${groups.length && gName(e) ? ` <span style="font-size:10px;color:var(--accent);background:rgba(232,197,106,.15);border-radius:8px;padding:1px 7px;white-space:nowrap">${esc(gName(e))}</span>` : ''}</div></div>`).join('');
+    const _all = (c.entries||[]).filter(e=>e.inTasks && !e.done && e.text);
+    const _exp = window._impExp.has(c.id);
+    const _vis = _exp ? _all : _all.slice(0,2);
+    const rows = _vis.map(e => `<div onclick="impOpenCard('${c.id}')" style="display:flex;gap:8px;align-items:flex-start;padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.08);cursor:pointer;font-size:14px"><span style="font-size:13px;margin-top:1px">⭐</span><div style="flex:1" dir="auto">${esc(stripTags(e.text))}${groups.length && gName(e) ? ` <span style="font-size:10px;color:var(--accent);background:rgba(232,197,106,.15);border-radius:8px;padding:1px 7px;white-space:nowrap">${esc(gName(e))}</span>` : ''}</div></div>`).join('');
     const _foc = window._impFocus === c.id;
     return `<div data-cid="${c.id}" style="border:${_foc?'2px':'1px'} solid var(--accent);border-radius:12px;background:rgba(232,197,106,${_foc?'.16':'.07'});margin-bottom:12px;overflow:hidden;${_foc?'box-shadow:0 0 16px rgba(232,197,106,.55)':''}">${_foc?'<div style="font-size:11px;font-weight:700;color:#0f0f0f;background:var(--accent);padding:3px 12px">🔔 Напоминание из уведомления</div>':''}
       <div onclick="impOpenCard('${c.id}')" style="padding:9px 12px;background:rgba(232,197,106,.16);display:flex;justify-content:space-between;align-items:flex-start;gap:8px;cursor:pointer">
@@ -211,11 +215,32 @@ function renderImportant(){
         <span style="font-size:11px;color:var(--accent);white-space:nowrap">⏱ ${every(c)}</span>
       </div>
       <div style="padding:2px 10px 2px">${rows}</div>
+      ${_all.length>2 ? `<div class="imp-more" data-cid="${c.id}" style="touch-action:none;text-align:center;font-size:12px;color:var(--accent);padding:7px 0 5px;cursor:pointer;user-select:none;border-top:1px dashed rgba(232,197,106,.3)">${_exp ? '⌃ свернуть' : `⌄ ещё ${_all.length-2} · потяни вниз`}</div>` : ''}
       <div onclick="impOpenCard('${c.id}')" style="font-size:11px;color:var(--t2);padding:6px 12px 9px;text-align:right;cursor:pointer">Открыть карточку ›</div>
     </div>`;
   }).join('');
   if(window._impFocus) setTimeout(()=>{ const el = list.querySelector('[data-cid="'+window._impFocus+'"]'); if(el) el.scrollIntoView({block:'center', behavior:'smooth'}); }, 80);
 }
+// в «Сейчас важно» показываем по 2 записи; остальные раскрываются тапом или протягиванием пальца вниз по полоске «ещё N»
+(function(){
+  let y0 = null, cid = null;
+  const toggle = (id, open) => { if(open) window._impExp.add(id); else window._impExp.delete(id); const l = document.getElementById('imp-list'); const st = l ? l.scrollTop : 0; renderImportant(); if(l) l.scrollTop = st; };
+  document.addEventListener('touchstart', e => { const m = e.target.closest && e.target.closest('.imp-more'); if(m){ y0 = e.touches[0].clientY; cid = m.dataset.cid; } else { y0 = null; } }, {passive:true});
+  document.addEventListener('touchend', e => {
+    if(y0 === null) return;
+    const dy = e.changedTouches[0].clientY - y0, id = cid; y0 = null;
+    if(dy > 25) toggle(id, true);
+    else if(dy < -25) toggle(id, false);
+    else toggle(id, !window._impExp.has(id)); // обычный тап
+    e.preventDefault();
+  }, {passive:false});
+  document.addEventListener('click', e => { // мышь на ПК
+    const m = e.target.closest && e.target.closest('.imp-more'); if(!m || e.pointerType==='touch') return;
+    if(window._impTouchedAt && Date.now()-window._impTouchedAt < 500) return;
+    toggle(m.dataset.cid, !window._impExp.has(m.dataset.cid));
+  });
+  document.addEventListener('touchend', () => { window._impTouchedAt = Date.now(); }, {passive:true});
+})();
 function impOpenCard(id){
   closeImportant();
   window._impBack = true; // из карточки вернёмся в это окно
