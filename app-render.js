@@ -298,7 +298,7 @@ const col = (window._pinCatColors && window._pinCatColors[c.space_id + '||' + (c
     return `<div class="pin-tile" style="${pos};background:linear-gradient(${bg},${bg}),var(--bg);border-color:${border}" onclick="openPinnedCard('${c.id}')">
       <button onclick="unpinFromPopup('${c.id}',event)" title="Открепить" style="position:absolute;top:8px;right:10px;background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:0;line-height:1">✕</button>
       <div style="font-size:14px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:22px">📌 ${esc(c.title)}</div>
-      <div style="font-size:12px;color:var(--t3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🗂️ ${esc(spaceName(c.space_id))}${ents.length?` · записи ${doneN}/${ents.length}`:''}</div>
+      <div style="font-size:12px;color:var(--t3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🗂️ ${esc(spaceName(c.space_id))}${c.category?` · <span style="color:${col}">● ${esc(c.category)}</span>`:''}${ents.length?` · записи ${doneN}/${ents.length}`:''}</div>
     </div>`;
   }).join('');
 }
