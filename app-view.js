@@ -1448,13 +1448,15 @@ function openBulkTransferPicker(cardId) {
       <input type="checkbox" class="bt-entry-cb" data-entryid="${e.id}" style="margin-top:2px">
       <div style="font-size:13px" dir="auto">${esc(stripTags(e.text))}</div>
     </label>`).join('');
-  div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto">
-    <div style="font-size:16px;font-weight:700;margin-bottom:4px">Что перенести?</div>
-    <div style="font-size:12px;color:var(--t3);margin-bottom:12px">Отметьте «весь раздел» целиком или только нужные записи внутри</div>
+  div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px 20px 16px;width:100%;max-width:420px;max-height:80vh;display:flex;flex-direction:column;box-sizing:border-box">
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px;flex-shrink:0">Что перенести?</div>
+    <div style="font-size:12px;color:var(--t3);margin-bottom:12px;flex-shrink:0">Отметьте «весь раздел» целиком или только нужные записи внутри</div>
+    <div style="flex:1;min-height:0;overflow-y:auto">
     ${groupBlocks}
     ${entryBlocks}
     ${!groups.length && !ungrouped.length ? '<div style="color:var(--t3);font-size:13px">Нет записей</div>' : ''}
-    <div style="display:flex;gap:8px;margin-top:14px">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-shrink:0">
       <button onclick="document.getElementById('bulk-transfer-ov')?.remove()" style="flex:1;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;cursor:pointer">Отмена</button>
       <button onclick="confirmBulkSelection('${cardId}')" style="flex:1;background:var(--accent);border:none;color:#0f0f0f;font-weight:700;border-radius:var(--rsm);padding:11px;cursor:pointer">Далее →</button>
     </div>
@@ -1827,6 +1829,7 @@ async function collectMoveEntries(fromCard, targetSpaceId) {
   const movedGroups = [];
   const groupIdMap = {}; // старый groupId (в источнике) -> новый groupId (в цели)
   const sharedSessionId = uid();
+  const sessMap = {}; // старый sessionId -> новый (для переноса в личный кабинет)
   const sessionCreator = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
   let isFirst = true;
 
@@ -1842,13 +1845,24 @@ async function collectMoveEntries(fromCard, targetSpaceId) {
   for(const e of (fromCard.entries||[])) {
     const fromSelectedGroup = e.groupId && moveSelection.groupIds.includes(e.groupId);
     if(moveSelection.entryIds.includes(e.id) || fromSelectedGroup) {
-      const copy = {
+      // в личный кабинет записи переносятся теми же «стикерами», что и были (с разделительной полосой между ними);
+      // в чат всё уходит одним сообщением
+      const _ssid = e.sessionId || e.id;
+      if(!_toChat && !(_ssid in sessMap)) sessMap[_ssid] = uid();
+      const copy = _toChat ? {
         ...e, id: uid(),
         groupId: fromSelectedGroup ? groupIdMap[e.groupId] : undefined,
         sessionId: sharedSessionId,
         sessionCreator,
         sessionNote: isFirst ? (moveSessionNote.trim() || autoNote || e.sessionNote || null) : null,
         sessionAtts: isFirst ? (e.sessionAtts||e.attachments||[]) : []
+      } : {
+        ...e, id: uid(),
+        groupId: fromSelectedGroup ? groupIdMap[e.groupId] : undefined,
+        sessionId: sessMap[_ssid],
+        sessionCreator: e.sessionCreator || sessionCreator,
+        sessionNote: isFirst ? (moveSessionNote.trim() || autoNote || e.sessionNote || null) : (e.sessionNote || null),
+        sessionAtts: (e.sessionAtts && e.sessionAtts.length) ? e.sessionAtts : (isFirst ? (e.attachments||[]) : [])
       };
       isFirst = false;
       if(_toChat) delete copy.flag; // в чате отметок нет
