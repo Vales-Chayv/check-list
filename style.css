@@ -450,3 +450,7 @@ body.in-lobby.cal-on #cal-ov, body.in-cabinet.cal-on #cal-ov { bottom: auto; hei
   #pin-tab-pc{display:inline-block}
   #lobby-pin-btn{display:flex}
 }
+
+/* быстрые кнопки лобби: общий чек-лист и «Готово» */
+.lobby-pill{flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:14px;color:var(--t1);font-size:14px;font-weight:600;padding:11px 8px;cursor:pointer;font-family:inherit}
+.lobby-pill:active{background:var(--s1);border-color:var(--accent)}

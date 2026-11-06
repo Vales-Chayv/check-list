@@ -409,7 +409,7 @@ const dateCol = textColor ? (_lt ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)') 
 }
 
 function closeView() {
-  if(window._impBack){ window._impBack = false; setTimeout(()=>{ try{ openImportant(); }catch(_){} }, 60); } // вернулись из карточки в окно «Сейчас важно»
+  if(window._backTo){ const _f = window._backTo; window._backTo = null; setTimeout(()=>{ try{ window[_f](); }catch(_){} }, 60); } // вернулись из карточки в окно, откуда её открыли
   document.getElementById('view-ov').classList.remove('on');
   window._openViewId = null;
   if((currentSpace?.type==='family'||currentSpace?.type==='group') && typeof updateMyPresenceCard==='function') updateMyPresenceCard(null, null);

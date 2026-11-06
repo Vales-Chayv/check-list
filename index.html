@@ -42,7 +42,6 @@
   <button class="tab-bell" id="bell-tab" onclick="toggleBellFilter()" title="Только карточки с напоминанием">🔔</button>
   <button class="tab-bell" id="pin-tab-pc" onclick="openPinPopup()" title="Закреплённые">📌</button>
   <button class="tab-bell" id="gal-tab" onclick="toggleGallery()" title="Галерея вложений">🖼</button>
-  <button class="tab" data-view="checklist">Чек-лист</button>
   <button class="tab" data-view="done">✅ Выполненные</button>
 </div>
 
@@ -54,7 +53,6 @@
 <div class="bnav" id="bnav">
   <button class="nav-btn on" data-view="cards"><span class="nav-ico">🗂️</span><span class="nav-lbl">Карточки</span></button>
   <button class="nav-btn" data-view="today"><span class="nav-ico">⭐</span><span class="nav-lbl">Сегодня</span></button>
-  <button class="nav-btn" data-view="checklist"><span class="nav-ico">✅</span><span class="nav-lbl">Чек-лист</span></button>
   <button class="nav-btn" data-view="done"><span class="nav-ico">🏁</span><span class="nav-lbl">Готово</span></button>
 </div>
 
@@ -447,6 +445,10 @@
         <button class="lobby-ib" onclick="openSettings()" title="Настройки">⚙️</button>
       </div>
     </div>
+    <div id="lobby-quick" style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="lobby-pill" onclick="openLobbyChecklist()">✅ Чек-лист</button>
+      <button class="lobby-pill" onclick="openLobbyDone()">🏁 Готово</button>
+    </div>
  <div id="lobby-filters"></div>
  <div id="spaces-list" style="flex:1;min-height:0;overflow-y:auto;padding-bottom:calc(16px + var(--safe))"></div>
   </div>
@@ -638,6 +640,23 @@
     <div class="sheet-head"><span class="sheet-title">⭐ Сейчас важно</span><button class="close-btn" onclick="closeImportant()">✕</button></div>
     <div id="imp-chips" style="display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 4px"></div>
     <div id="imp-list" style="padding:12px 16px;max-height:70vh;overflow-y:auto"></div>
+  </div>
+</div>
+
+<div class="overlay" id="chk-ov" onclick="if(event.target===this)closeLobbyChecklist()">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><span class="sheet-title">✅ Чек-лист всех кабинетов</span><button class="close-btn" onclick="closeLobbyChecklist()">✕</button></div>
+    <div id="chk-chips" style="display:flex;gap:6px;overflow-x:auto;padding:0 16px 6px"></div>
+    <div id="chk-list" style="padding:8px 16px 16px;max-height:70vh;overflow-y:auto"></div>
+  </div>
+</div>
+<div class="overlay" id="dn-ov" onclick="if(event.target===this)closeLobbyDone()">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><span class="sheet-title">🏁 Готово во всех кабинетах</span><button class="close-btn" onclick="closeLobbyDone()">✕</button></div>
+    <div id="dn-chips" style="display:flex;gap:6px;overflow-x:auto;padding:0 16px 6px"></div>
+    <div id="dn-list" style="padding:8px 16px 16px;max-height:70vh;overflow-y:auto"></div>
   </div>
 </div>
 

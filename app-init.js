@@ -54,10 +54,12 @@ function checkURLParams() {
 }
 
 function switchToChecklist() {
-  view = 'checklist';
-  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.view === 'checklist'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('on', b.dataset.view === 'checklist'));
-  render();
+  // «Чек-лист» теперь живёт в лобби: открываем общее окно по всем кабинетам, когда кабинеты загрузились
+  let tries = 0;
+  (function w(){
+    if(typeof spaces !== 'undefined' && spaces.length && typeof openLobbyChecklist === 'function') { openLobbyChecklist(); return; }
+    if(++tries < 40) setTimeout(w, 250);
+  })();
 }
 
 // ═══════════════════════════════════════════
@@ -81,6 +83,8 @@ window.mcBackStep = function () {
   if (on('gal-ov')) { closeGallery(); return true; }
   if (on('rem-ov')) { closeLobbyReminders(); return true; }
   if (on('imp-ov')) { closeImportant(); return true; }
+  if (on('chk-ov')) { closeLobbyChecklist(); return true; }
+  if (on('dn-ov')) { closeLobbyDone(); return true; }
   if (on('event-ov')) { closeEventModal(); return true; }
   if (on('pin-popup-ov')) { closePinPopup(); return true; }
   if (on('pin-strip-ov')) { closePinStrip(); return true; }

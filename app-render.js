@@ -155,7 +155,7 @@ async function openLobbyReminders(){
   list.innerHTML = Object.keys(bySpace).map(sid => {
     const name = (spaces.find(s=>s.id===sid)?.name)||'Кабинет';
     return `<div style="font-size:12px;color:var(--t3);margin:10px 2px 6px">🗂️ ${esc(name)}</div>` + bySpace[sid].map(c => `
-      <div onclick="closeLobbyReminders();clOpenCard('${c.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:11px 14px;margin-bottom:7px;cursor:pointer">
+      <div onclick="closeLobbyReminders();window._backTo='openLobbyReminders';clOpenCard('${c.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:11px 14px;margin-bottom:7px;cursor:pointer">
         <div style="font-size:14px;color:var(--t1)">🔔 ${esc(c.title||'Без названия')}</div>
         ${c.category?`<div style="font-size:12px;color:var(--t3);margin-top:3px">${esc(c.category)}</div>`:''}
       </div>`).join('');
@@ -270,9 +270,109 @@ function renderImportant(){
     settle(m.dataset.cid, !window._impExp.has(m.dataset.cid));
   });
 })();
+// ✅ Чек-лист и 🏁 Готово в лобби: общие окна по всем личным кабинетам
+let _chkSel = new Set(), _dnSel = new Set(), _dnOpen = new Set();
+async function _lobbyLoad(extra){ // карточки всех личных кабинетов + цвета рубрик
+  const ids = (spaces||[]).filter(s=>s.type!=='family'&&s.type!=='group'&&s.status!=='closed').map(s=>s.id);
+  let data = [];
+  try {
+    if(!ids.length || !navigator.onLine) throw 0;
+    let q = sb.from('cards').select('*').in('space_id', ids);
+    if(extra) q = extra(q);
+    const r = await q; if(r.error) throw r.error; data = r.data||[];
+  } catch(e) { try { data = (await local.getAll('cards')).filter(c=>ids.includes(c.space_id)); } catch(_) { data = []; } }
+  const mem = new Map((cards||[]).map(c=>[c.id,c]));
+  data = data.map(c => mem.get(c.id) || c);
+  try {
+    const { data: cd } = await sb.from('categories').select('name,color,space_id').in('space_id', ids);
+    window._clCatColors = {}; (cd||[]).forEach(c => { window._clCatColors[c.space_id+'||'+(c.name||'')] = c.color; });
+  } catch(e) {}
+  return data;
+}
+const _spName = id => (spaces.find(s=>s.id===id)?.name)||'Кабинет';
+const _chipH = (label, on, fn) => `<button onclick="${fn}" style="flex-shrink:0;background:${on?'rgba(232,197,106,.15)':'var(--s2)'};border:1px solid ${on?'var(--accent)':'var(--b1)'};border-radius:14px;padding:4px 12px;font-size:12px;color:${on?'var(--accent)':'var(--t2)'};cursor:pointer;font-family:inherit;white-space:nowrap">${label}</button>`;
+const _colOf = c => (window._clCatColors && window._clCatColors[c.space_id+'||'+(c.category||'')]) || '#666666';
+
+async function openLobbyChecklist(){
+  document.getElementById('chk-ov').classList.add('on');
+  document.getElementById('chk-list').innerHTML = '<div style="text-align:center;color:var(--t3);padding:24px">Загрузка…</div>';
+  const data = await _lobbyLoad();
+  window._chkCards = data.filter(c => c.reminder?.enabled && c.status!=='done');
+  window._clCache = data;
+  renderLobbyChecklist();
+}
+function closeLobbyChecklist(){ document.getElementById('chk-ov').classList.remove('on'); }
+function chkToggleCab(id){ if(id==='all') _chkSel.clear(); else if(_chkSel.has(id)) _chkSel.delete(id); else _chkSel.add(id); renderLobbyChecklist(); }
+function renderLobbyChecklist(){
+  const all = window._chkCards||[];
+  const ids = [...new Set(all.map(c=>c.space_id))];
+  _chkSel = new Set([..._chkSel].filter(id=>ids.includes(id)));
+  document.getElementById('chk-chips').innerHTML = ids.length>1 ? _chipH('🗂️ Все кабинеты', !_chkSel.size, "chkToggleCab('all')") + ids.map(id=>_chipH(esc(_spName(id))+' · '+all.filter(c=>c.space_id===id).length, _chkSel.has(id), `chkToggleCab('${id}')`)).join('') : '';
+  const rem = all.filter(c => !_chkSel.size || _chkSel.has(c.space_id));
+  const el = document.getElementById('chk-list');
+  if(!rem.length){ el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Чек-лист пуст: нет карточек с напоминанием</div>'; return; }
+  const PO = {urgent:0, high:1, normal:2};
+  rem.sort((a,b) => { const pa = PO[a.priority||'normal'], pb = PO[b.priority||'normal']; if(pa!==pb) return pa-pb; return (a.deadline||'9999').localeCompare(b.deadline||'9999'); });
+  const item = card => {
+    const col = _colOf(card), dl = deadlineInfo(card.deadline);
+    const pB = card.priority==='urgent'?';border-left:4px solid var(--red)':card.priority==='high'?';border-left:4px solid var(--accent)':'';
+    return `<div class="cl-item" style="background:${hex2rgba(col,.12)};border-color:${hex2rgba(col,.3)}${pB}" onclick="chkOpenCard('${card.id}')">
+      <div class="cl-cb" onclick="event.stopPropagation();chkDone('${card.id}')"></div>
+      <div style="flex:1;min-width:0">
+        <div class="cl-title" dir="auto" style="color:${col}">${card.priority==='urgent'?'🔥 ':card.priority==='high'?'⚡ ':''}${esc(card.title)}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:3px">
+          <span style="font-size:11px;opacity:.75;color:${col}">🗂️ ${esc(_spName(card.space_id))}</span>
+          ${card.category?`<span style="font-size:11px;opacity:.6">${esc(card.category)}</span>`:''}
+          ${dl?`<span class="dl-badge ${dl.cls}${dl.days<=3?' dl-pulse':''}" style="font-size:11px">${dl.text}</span>`:''}
+        </div>
+      </div>
+      <span class="badge" style="color:${col}">${ST_LABELS[card.status]||''}</span>
+    </div>`;
+  };
+  const pr = rem.filter(c=>c.priority==='urgent'||c.priority==='high'), nm = rem.filter(c=>!(c.priority==='urgent'||c.priority==='high'));
+  el.innerHTML = (pr.length ? `<div class="date-lbl" style="color:var(--red)">🔥 Срочные и важные</div>${pr.map(item).join('')}${nm.length?'<div style="height:1px;background:var(--b1);margin:4px 0 8px"></div>':''}` : '') + nm.map(item).join('');
+}
+async function chkDone(id){
+  const card = (window._chkCards||[]).find(c=>c.id===id); if(!card) return;
+  const old = card.status; card.status = 'done';
+  card.history = [...(card.history||[]), {date:nowStr(), text:`Статус: ${ST_LABELS[old]} → ${ST_LABELS.done}`, type:'status'}];
+  window._chkCards = window._chkCards.filter(c=>c.id!==id);
+  const inMem = (cards||[]).find(c=>c.id===id); if(inMem){ inMem.status='done'; inMem.history=card.history; }
+  renderLobbyChecklist();
+  try { await dbUpdate(card); } catch(e) { toast('Ошибка', true); }
+}
+function chkOpenCard(id){ closeLobbyChecklist(); window._backTo = 'openLobbyChecklist'; clOpenCard(id); }
+
+async function openLobbyDone(){
+  document.getElementById('dn-ov').classList.add('on');
+  document.getElementById('dn-list').innerHTML = '<div style="text-align:center;color:var(--t3);padding:24px">Загрузка…</div>';
+  const data = await _lobbyLoad(q => q.eq('status','done'));
+  window._dnCards = data.filter(c => c.status==='done');
+  window._clCache = window._dnCards;
+  renderLobbyDone();
+}
+function closeLobbyDone(){ document.getElementById('dn-ov').classList.remove('on'); }
+function dnToggleCab(id){ if(id==='all') _dnSel.clear(); else if(_dnSel.has(id)) _dnSel.delete(id); else _dnSel.add(id); renderLobbyDone(); }
+function dnToggleMore(id){ if(_dnOpen.has(id)) _dnOpen.delete(id); else _dnOpen.add(id); renderLobbyDone(); }
+function renderLobbyDone(){
+  const all = window._dnCards||[];
+  const ids = [...new Set(all.map(c=>c.space_id))];
+  _dnSel = new Set([..._dnSel].filter(id=>ids.includes(id)));
+  document.getElementById('dn-chips').innerHTML = ids.length>1 ? _chipH('🗂️ Все кабинеты', !_dnSel.size, "dnToggleCab('all')") + ids.map(id=>_chipH(esc(_spName(id))+' · '+all.filter(c=>c.space_id===id).length, _dnSel.has(id), `dnToggleCab('${id}')`)).join('') : '';
+  const el = document.getElementById('dn-list');
+  const shownIds = ids.filter(id => !_dnSel.size || _dnSel.has(id));
+  if(!shownIds.length){ el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Пока нет выполненных карточек</div>'; return; }
+  const total = shownIds.reduce((n,id)=>n+all.filter(c=>c.space_id===id).length, 0);
+  el.innerHTML = `<div style="font-size:12px;color:var(--t3);margin:0 2px 10px">Всего выполнено: ${total} · кабинетов: ${shownIds.length}</div>` + shownIds.map(id => {
+    const list = all.filter(c=>c.space_id===id).sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
+    const open = _dnOpen.has(id), part = open ? list : list.slice(0,5);
+    return `<div style="font-size:12px;font-weight:700;color:var(--accent);margin:12px 2px 6px">🗂️ ${esc(_spName(id))} <span style="color:var(--t3);font-weight:400">· ${list.length}</span></div>` + part.map(c => { const col = _colOf(c); return `<div onclick="dnOpenCard('${c.id}')" style="background:${hex2rgba(col,.09)};border:1px solid ${hex2rgba(col,.2)};border-radius:var(--rsm);padding:9px 12px;margin-bottom:6px;cursor:pointer;opacity:.85"><div dir="auto" style="font-size:14px;color:${col}">✓ ${esc(c.title||'Без названия')}</div><div style="font-size:11px;color:var(--t3);margin-top:2px">${c.category?esc(c.category)+' · ':''}${esc(String(c.created_at||'').slice(0,10))}</div></div>`; }).join('') + (list.length>5 ? `<div onclick="dnToggleMore('${id}')" style="font-size:12px;color:var(--t2);text-align:center;padding:6px;cursor:pointer">${open?'Свернуть ▴':'Показать все ('+list.length+') ▾'}</div>` : '');
+  }).join('');
+}
+function dnOpenCard(id){ closeLobbyDone(); window._backTo = 'openLobbyDone'; clOpenCard(id); }
 function impOpenCard(id){
   closeImportant();
-  window._impBack = true; // из карточки вернёмся в это окно
+  window._backTo = 'openImportant'; // из карточки вернёмся в это окно
   clOpenCard(id);
 }
 async function goToMyTask(cardId, entryId, spaceId){
