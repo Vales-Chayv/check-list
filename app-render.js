@@ -864,16 +864,20 @@ function cardHTML(card, isDone=false) {
         </div>
       </div>` : '')
     : (entries.length?`<div class="entries-mini"><div style="font-size:11px;opacity:.55;margin-bottom:2px">Записи: ${doneEntries}/${entries.length}</div>${entries.slice(0,3).map(e=>`<div class="em-row"><div class="em-cb${e.done?' on':''}" onclick="event.stopPropagation();App.toggleEntry('${card.id}','${e.id}')">${e.done?checkSVG():''}</div><span class="em-text${e.done?' done':''}">${esc((t=>t.length>40?t.slice(0,38)+'…':t)(stripTags(e.text)))}</span></div>`).join('')}${entries.length>3?`<div style="font-size:11px;opacity:.4;padding-left:20px">...+${entries.length-3}</div>`:''}</div>`:'');
-  // обложка мультикарточки: заголовок + до двух невыполненных заданий; нажатие на заголовок раскрывает/сворачивает весь список невыполненных
+  // обложка мультикарточки: каждый заголовок (раздел) с двумя невыполненными заданиями; нажатие на заголовок раскрывает/сворачивает его список
   const _isMulti = !_isChatSp && (card.entryGroups||[]).length > 0;
-  const _undoneList = _isMulti ? entries.filter(e => !e.done && e.text) : [];
-  const _multiExp = _isMulti && window._multiExp.has(card.id);
   let _entriesHTML = entriesHTML;
   if(_isMulti) {
-    const shown = _multiExp ? _undoneList : _undoneList.slice(0,2);
-    _entriesHTML = _undoneList.length
-      ? `<div class="entries-mini">${shown.map(e=>`<div class="em-row"><div class="em-cb" onclick="event.stopPropagation();App.toggleEntry('${card.id}','${e.id}')"></div><span class="em-text">${esc((t=>t.length>40?t.slice(0,38)+'…':t)(stripTags(e.text)))}</span></div>`).join('')}${(_undoneList.length>2 && !_multiExp)?`<div style="font-size:11px;opacity:.5;padding-left:20px">ещё ${_undoneList.length-2} · нажми на заголовок</div>`:''}</div>`
-      : (entries.length ? `<div class="entries-mini"><div style="font-size:11px;opacity:.55">✓ Все записи выполнены</div></div>` : '');
+    const _rowH = e => `<div class="em-row"><div class="em-cb" onclick="event.stopPropagation();App.toggleEntry('${card.id}','${e.id}')"></div><span class="em-text">${esc((t=>t.length>40?t.slice(0,38)+'…':t)(stripTags(e.text)))}</span></div>`;
+    const secs = card.entryGroups.map(g => {
+      const und = entries.filter(e => e.groupId===g.id && !e.done && e.text);
+      if(!und.length) return '';
+      const exp = window._multiExp.has(g.id);
+      const shown = exp ? und : und.slice(0,2);
+      const lab = und.length>2 ? `<span style="font-size:11px;font-weight:400;opacity:.6;white-space:nowrap">${exp?'свернуть ▴':`ещё (${und.length-2}) · нажми заголовок ▾`}</span>` : '';
+      return `<div style="margin-bottom:6px"><div onclick="event.stopPropagation();App.toggleMultiGroup('${g.id}')" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 8px;background:${exp?'rgba(232,197,106,.18)':'rgba(255,255,255,.07)'};border-radius:7px;font-size:12px;font-weight:700;color:var(--accent);cursor:pointer"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(g.name||'Без названия')}</span>${lab}</div>${shown.map(_rowH).join('')}</div>`;
+    }).join('');
+    _entriesHTML = secs ? `<div class="entries-mini">${secs}</div>` : (entries.length ? `<div class="entries-mini"><div style="font-size:11px;opacity:.55">✓ Все записи выполнены</div></div>` : '');
   }
   const hist=card.history||[];
   const lastChg=hist.length?`<span style="font-size:10px;opacity:.45;margin-left:auto">${hist[hist.length-1].date}</span>`:'';
@@ -882,7 +886,7 @@ function cardHTML(card, isDone=false) {
 <div style="display:flex;justify-content:space-between;gap:7px;align-items:flex-start">
       ${(currentSpace?.type==='family'||currentSpace?.type==='group')?'':`<button onclick="event.stopPropagation();App.togglePin('${card.id}')" title="${card.pinned?'Открепить':'Закрепить'}" style="background:none;border:none;cursor:pointer;font-size:16px;padding:0;line-height:1;flex-shrink:0;margin-top:1px;${card.pinned?'':'opacity:.28;filter:grayscale(1)'}">📌</button>`}
       <div style="flex:1;min-width:0">
-        <div class="card-title"${_isMulti?` onclick="event.stopPropagation();App.toggleMultiExp('${card.id}')"`:''} style="color:${col};${_isMulti?'cursor:pointer;':''}${isDone?'text-decoration:line-through;opacity:.7':''}">${card.reminder?.enabled?`<span onclick="event.stopPropagation();openRemPopup('${card.id}')" style="cursor:pointer;font-size:11px;font-weight:600;color:var(--accent);margin-right:5px">🔔 ${remBadge(card.reminder)}</span>`:''}${pBadge}${esc(card.title)}${(_isMulti && _undoneList.length>2)?`<span style="font-size:11px;opacity:.6;margin-left:6px">${_multiExp?'▴':'▾'}</span>`:''}</div>
+        <div class="card-title" style="color:${col};${isDone?'text-decoration:line-through;opacity:.7':''}">${card.reminder?.enabled?`<span onclick="event.stopPropagation();openRemPopup('${card.id}')" style="cursor:pointer;font-size:11px;font-weight:600;color:var(--accent);margin-right:5px">🔔 ${remBadge(card.reminder)}</span>`:''}${pBadge}${esc(card.title)}</div>
         ${bodyHTML}${_entriesHTML}${imgsHTML}${filesHTML}
         <div class="card-meta">
           ${card.category?`<span class="cat-tag">${esc(card.category)}</span>`:''}
@@ -905,9 +909,9 @@ function cardHTML(card, isDone=false) {
 // ═══════════════════════════════════════════
 //  APP ACTIONS (called from inline HTML via App.*)
 // ═══════════════════════════════════════════
-window._multiExp = window._multiExp || new Set(); // мультикарточки с раскрытым списком на обложке
+window._multiExp = window._multiExp || new Set(); // разделы мультикарточек с раскрытым списком на обложке
 const App = {
-  toggleMultiExp(id) { if(window._multiExp.has(id)) window._multiExp.delete(id); else window._multiExp.add(id); render(); },
+  toggleMultiGroup(gid) { if(window._multiExp.has(gid)) window._multiExp.delete(gid); else window._multiExp.add(gid); render(); },
   setCat(idx) { filterCats = []; filterCat = idx===-1 ? 'all' : cats[idx].name; render(); },
   _catHoldTimer: null,
   _dragIdx: null,
