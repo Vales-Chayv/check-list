@@ -40,6 +40,7 @@
   <button class="tab" data-view="today">⭐ Задачи на сегодня</button>
     <button class="tab on" data-view="cards">Все карточки</button>
   <button class="tab-bell" id="bell-tab" onclick="toggleBellFilter()" title="Только карточки с напоминанием">🔔</button>
+  <button class="tab-bell" id="pin-tab-pc" onclick="openPinPopup()" title="Закреплённые">📌</button>
   <button class="tab-bell" id="gal-tab" onclick="toggleGallery()" title="Галерея вложений">🖼</button>
   <button class="tab" data-view="checklist">Чек-лист</button>
   <button class="tab" data-view="done">✅ Выполненные</button>
@@ -438,6 +439,7 @@
       <div style="display:flex;gap:8px;flex-shrink:0">
         <button class="lobby-ib" onclick="openCreateSpace()" title="Создать кабинет" style="background:var(--accent);border-color:var(--accent);color:#0f0f0f;font-size:20px;font-weight:700">＋</button>
         <button class="lobby-ib" onclick="openLobbyReminders()" title="Напоминания всех кабинетов">🔔</button>
+        <button class="lobby-ib" id="lobby-pin-btn" onclick="openPinPopup()" title="Закреплённые">📌</button>
         <button class="lobby-ib" id="lobby-gal-btn" onclick="toggleGallery()" title="Галерея вложений">🖼</button>
         <button class="lobby-ib" onclick="openSearch()" title="Поиск">🔍</button>
         <button id="lobby-cal-btn" class="lobby-ib" onclick="openCalendarFromLobby()" title="Календарь">📅</button>

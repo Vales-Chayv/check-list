@@ -443,3 +443,10 @@ body.in-lobby.cal-on #cal-ov, body.in-cabinet.cal-on #cal-ov { bottom: auto; hei
 @media (min-width:900px){
   #gal-tab,#lobby-gal-btn{display:none!important}
 }
+
+/* кнопка «Закреплённые» рядом с колокольчиком — только на ПК (на телефоне закреплённые — через боковой язычок) */
+#pin-tab-pc,#lobby-pin-btn{display:none}
+@media (min-width:900px){
+  #pin-tab-pc{display:inline-block}
+  #lobby-pin-btn{display:flex}
+}
