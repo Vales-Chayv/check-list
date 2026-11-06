@@ -9,6 +9,16 @@ function aliasedName(name) {
 // ═══════════════════════════════════════════
 let viewGroupState = new Map(); // groupId -> развёрнут(true)/свёрнут(false), по умолчанию развёрнут
 
+// «Сейчас важно»: пока включён интервал, записи со ⭐ выносятся наверх, остальное свёрнуто
+window._impRestOpen = window._impRestOpen || {};
+window._impGroupsOpen = window._impGroupsOpen || new Set();
+function _impScrollKeep(fn) {
+  const _st = document.querySelector('#view-ov .sheet')?.scrollTop || 0;
+  fn();
+  setTimeout(() => { const sh = document.querySelector('#view-ov .sheet'); if(sh) sh.scrollTop = _st; }, 60);
+}
+function impToggleRest(cardId) { _impScrollKeep(() => { window._impRestOpen[cardId] = !window._impRestOpen[cardId]; openView(cardId); }); }
+function impToggleGroup(cardId, groupId) { _impScrollKeep(() => { if(window._impGroupsOpen.has(groupId)) window._impGroupsOpen.delete(groupId); else window._impGroupsOpen.add(groupId); openView(cardId); }); }
 function viewToggleGroup(cardId, groupId) {
   const cur = viewGroupState.get(groupId);
   viewGroupState.set(groupId, cur === false ? true : false);
@@ -149,6 +159,10 @@ function openView(id) {
       sessionMap.get(sid).entries.push(e);
     });
     const sessions = [...sessionMap.values()];
+    const _famNow = currentSpace?.type==='family' || currentSpace?.type==='group';
+    const _impList = (!_famNow && intervalRunActive(card)) ? entries.filter(e => e.inTasks && !e.done && e.text) : [];
+    const _impMode = _impList.length > 0;
+    const _impIds = new Set(_impList.map(e => e.id));
     if(card.body && sessions.length) sessions[sessions.length-1].note = sessions[sessions.length-1].note || card.body;
 
     const isFamily = currentSpace?.type==='family' || currentSpace?.type==='group';
@@ -335,7 +349,7 @@ const dateCol = textColor ? (_lt ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)') 
         const _isAud = [...(e.sessionAtts||[]), ...(e.attachments||[])].some(x => x.type?.startsWith('audio/'));
         return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(128,128,128,.15)"><div style="width:16px;height:16px;border-radius:3px;border:2px solid var(--t2);flex-shrink:0;background:${e.done?'var(--green)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="viewToggleEntry('${id}','${e.id}')">${e.done?'<svg width="10" height="8" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>':''}</div><div style="flex:1;font-size:13px;${e.done?'text-decoration:line-through;opacity:.5':''}">${_isAud?'🎙 Голосовая запись':'📎 Вложение'}</div><div style="font-size:10px;color:var(--t3)">${e.date||''}</div></div>`;
       };
-      const entriesHTML = s.entries.map(e=>e.text ? entryRowHTML(e,null) : (_vOk(e) ? _voiceRow(e) : '')).join('');
+      const entriesHTML = s.entries.filter(e=>!(_impMode && _impIds.has(e.id))).map(e=>e.text ? entryRowHTML(e,null) : (_vOk(e) ? _voiceRow(e) : '')).join('');
       const sAtts = s.atts||[];
       const sImgs = sAtts.filter(a=>a.type?.startsWith('image/'));
       const sAudios = sAtts.filter(a=>a.type?.startsWith('audio/'));
@@ -357,12 +371,13 @@ const dateCol = textColor ? (_lt ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)') 
     let sessionsHTML;
     if(!isFamily && entryGroups.length) {
       sessionsHTML = entryGroups.map(g => {
-        const gEntries = entries.filter(e => e.groupId === g.id && e.text);
-        const expanded = viewGroupState.get(g.id) !== false;
+        const gAll = entries.filter(e => e.groupId === g.id && e.text);
+        const gEntries = _impMode ? gAll.filter(e => !_impIds.has(e.id)) : gAll;
+        const expanded = _impMode ? window._impGroupsOpen.has(g.id) : viewGroupState.get(g.id) !== false;
         const gDone = gEntries.length > 0 && gEntries.every(e => e.done);
         return `<div style="border:1px solid ${gDone?'rgba(91,184,122,.55)':'var(--b1)'};border-radius:var(--rsm);margin-bottom:8px;overflow:hidden">
-          <div onclick="viewToggleGroup('${id}','${g.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:${gDone?'rgba(91,184,122,.2)':'var(--s2)'};cursor:pointer">
-            <span style="font-size:13px;font-weight:700;color:${gDone?'var(--green)':'var(--accent)'}">${gDone?'✓ ':''}${esc(g.name)||'Без названия'}</span>
+          <div onclick="${_impMode ? `impToggleGroup('${id}','${g.id}')` : `viewToggleGroup('${id}','${g.id}')`}" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:${gDone?'rgba(91,184,122,.2)':'var(--s2)'};cursor:pointer">
+            <span style="font-size:13px;font-weight:700;color:${gDone?'var(--green)':'var(--accent)'}">${gDone?'✓ ':''}${esc(g.name)||'Без названия'}</span>${_impMode ? `<span style="font-size:11px;color:var(--t3);flex:1;text-align:right;padding-right:8px">${gEntries.length ? (gEntries.length===gAll.length ? gAll.length+' '+stkPlural(gAll.length,'запись','записи','записей') : gEntries.length+' из '+gAll.length+' ещё не важны') : 'все важные — выше'} ${expanded?'▲':'▼'}</span>` : ''}
             <span style="display:flex;align-items:center;gap:8px"><button onclick="event.stopPropagation();renameViewGroup('${id}','${g.id}')" title="Переименовать" style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;padding:2px 4px">✎</button><button onclick="event.stopPropagation();deleteViewGroup('${id}','${g.id}')" title="Удалить рубрику" style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;padding:2px 4px">🗑</button><button onclick="event.stopPropagation();openAddEntry('${id}',null,false,'${g.id}')" style="background:rgba(232,197,106,.15);color:var(--accent);border:1px solid rgba(232,197,106,.3);border-radius:6px;padding:2px 10px;font-size:15px;line-height:1.3;cursor:pointer">＋</button><span style="font-size:11px;color:var(--t3)">${gEntries.length} ${expanded?'▲':'▼'}</span></span>
           </div>
           ${expanded ? `<div style="padding:0 12px">${gEntries.map(e=>entryRowHTML(e,null)).join('')}</div>` : ''}
@@ -370,6 +385,21 @@ const dateCol = textColor ? (_lt ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)') 
       }).join('');
     } else {
       sessionsHTML = sessions.map((s,si) => isFamily ? stickerHTML(s,si) : plainSessionHTML(s,si)).join('');
+    }
+    if(_impMode) {
+      const _gName = e => (entryGroups.find(g=>g.id===e.groupId)?.name) || '';
+      const _tag = e => (entryGroups.length && _gName(e)) ? `<div style="margin-top:6px"><span style="font-size:10px;color:var(--accent);background:rgba(232,197,106,.15);border-radius:8px;padding:1px 7px">${esc(_gName(e))}</span></div>` : '';
+      const _blk = `<div style="border:1px solid var(--accent);border-radius:12px;padding:4px 10px 6px;background:rgba(232,197,106,.08);margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--accent);padding:6px 0 2px">⭐ СЕЙЧАС ВАЖНО (${_impList.length})</div>
+        ${_impList.map(e => _tag(e) + entryRowHTML(e,null)).join('')}
+      </div>`;
+      if(entryGroups.length) {
+        sessionsHTML = _blk + sessionsHTML;
+      } else {
+        const _restN = entries.filter(e => (e.text||_vOk(e)) && !_impIds.has(e.id)).length;
+        const _open = !!window._impRestOpen[id];
+        sessionsHTML = _blk + (_restN ? `<div onclick="impToggleRest('${id}')" style="font-size:12px;color:var(--t2);padding:9px;text-align:center;border:1px dashed var(--b1);border-radius:8px;margin-bottom:8px;cursor:pointer">${_open?'Скрыть':'Показать'} остальные записи (${_restN}) ${_open?'▴':'▾'}</div>${_open ? sessionsHTML : ''}` : '');
+      }
     }
     html+=`<div class="view-sec">${!isFamily?`<div class="view-lbl">Записи (${dc}/${entries.filter(e=>e.text||_vOk(e)).length})</div>`:''}${sessionsHTML}${(!isFamily&&entryGroups.length)?`<button onclick="addViewGroup('${id}')" style="width:100%;background:var(--s2);color:var(--accent);border:1px dashed rgba(232,197,106,.4);border-radius:var(--rsm);padding:10px;font-size:14px;cursor:pointer">＋ Новая рубрика</button>`:''}</div>`;
   }
