@@ -126,6 +126,42 @@ function renderMyTasks(){
   }).join('');
 }
 function closeMyTasksPopup(){ document.getElementById('my-tasks-ov').classList.remove('on'); }
+// 🔔 в лобби (ПК): карточки с напоминанием из всех личных кабинетов
+async function openLobbyReminders(){
+  document.getElementById('rem-ov').classList.add('on');
+  const list = document.getElementById('rem-list');
+  list.innerHTML = '<div style="text-align:center;color:var(--t3);padding:24px">Загрузка…</div>';
+  const ids = (spaces||[]).filter(s=>s.type!=='family'&&s.type!=='group'&&s.status!=='closed').map(s=>s.id);
+  let data = [];
+  try {
+    if(!ids.length) throw 0;
+    if(!navigator.onLine) throw 0;
+    const r = await sb.from('cards').select('*').in('space_id', ids);
+    if(r.error) throw r.error;
+    data = r.data||[];
+  } catch(e) {
+    try { data = (await local.getAll('cards')).filter(c=>ids.includes(c.space_id)); } catch(_) { data = []; }
+  }
+  try {
+    const { data: catData } = await sb.from('categories').select('name,color,space_id').in('space_id', ids);
+    window._clCatColors = {};
+    (catData||[]).forEach(c => { window._clCatColors[c.space_id + '||' + (c.name||'')] = c.color; });
+  } catch(e) {}
+  data = data.filter(c=>c.reminder?.enabled && c.status!=='done');
+  window._clCache = data;
+  if(!data.length){ list.innerHTML = '<div style="text-align:center;color:var(--t3);padding:24px">Нет карточек с напоминанием</div>'; return; }
+  const bySpace = {};
+  data.forEach(c => { (bySpace[c.space_id] = bySpace[c.space_id]||[]).push(c); });
+  list.innerHTML = Object.keys(bySpace).map(sid => {
+    const name = (spaces.find(s=>s.id===sid)?.name)||'Кабинет';
+    return `<div style="font-size:12px;color:var(--t3);margin:10px 2px 6px">🗂️ ${esc(name)}</div>` + bySpace[sid].map(c => `
+      <div onclick="closeLobbyReminders();clOpenCard('${c.id}')" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:11px 14px;margin-bottom:7px;cursor:pointer">
+        <div style="font-size:14px;color:var(--t1)">🔔 ${esc(c.title||'Без названия')}</div>
+        ${c.category?`<div style="font-size:12px;color:var(--t3);margin-top:3px">${esc(c.category)}</div>`:''}
+      </div>`).join('');
+  }).join('');
+}
+function closeLobbyReminders(){ document.getElementById('rem-ov').classList.remove('on'); }
 async function goToMyTask(cardId, entryId, spaceId){
   closeMyTasksPopup();
   if(spaceId !== currentSpaceId){

@@ -40,6 +40,7 @@
   <button class="tab" data-view="today">⭐ Задачи на сегодня</button>
     <button class="tab on" data-view="cards">Все карточки</button>
   <button class="tab-bell" id="bell-tab" onclick="toggleBellFilter()" title="Только карточки с напоминанием">🔔</button>
+  <button class="tab-bell" id="gal-tab" onclick="toggleGallery()" title="Галерея вложений">🖼</button>
   <button class="tab" data-view="checklist">Чек-лист</button>
   <button class="tab" data-view="done">✅ Выполненные</button>
 </div>
@@ -436,6 +437,8 @@
       </div>
       <div style="display:flex;gap:8px;flex-shrink:0">
         <button class="lobby-ib" onclick="openCreateSpace()" title="Создать кабинет" style="background:var(--accent);border-color:var(--accent);color:#0f0f0f;font-size:20px;font-weight:700">＋</button>
+        <button class="lobby-ib lobby-pc" onclick="openLobbyReminders()" title="Напоминания всех кабинетов">🔔</button>
+        <button class="lobby-ib lobby-pc" id="lobby-gal-btn" onclick="toggleGallery()" title="Галерея вложений">🖼</button>
         <button class="lobby-ib" onclick="openSearch()" title="Поиск">🔍</button>
         <button id="lobby-cal-btn" class="lobby-ib" onclick="openCalendarFromLobby()" title="Календарь">📅</button>
         <button class="lobby-ib" onclick="openSettings()" title="Настройки">⚙️</button>
@@ -615,6 +618,14 @@
       <select id="mt-member-filter" onchange="renderMyTasks()" style="display:none;width:100%;margin-top:8px;background:var(--s2);border:1px solid var(--b1);border-radius:8px;padding:8px;color:var(--t1);font-size:13px;font-family:inherit"></select>
     </div>
     <div id="my-tasks-list" style="padding:16px;max-height:70vh;overflow-y:auto"></div>
+  </div>
+</div>
+
+<div class="overlay" id="rem-ov" onclick="if(event.target===this)closeLobbyReminders()">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><span class="sheet-title">🔔 Напоминания всех кабинетов</span><button class="close-btn" onclick="closeLobbyReminders()">✕</button></div>
+    <div id="rem-list" style="padding:16px;max-height:70vh;overflow-y:auto"></div>
   </div>
 </div>
 

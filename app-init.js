@@ -79,6 +79,7 @@ window.mcBackStep = function () {
   if ($('gal-set') && $('gal-set').classList.contains('show')) { $('gal-set').classList.remove('show'); return true; }
   if ($('gal-sheet') && $('gal-sheet').classList.contains('selmode') && on('gal-ov')) { $('gal-cancel').click(); return true; }
   if (on('gal-ov')) { closeGallery(); return true; }
+  if (on('rem-ov')) { closeLobbyReminders(); return true; }
   if (on('event-ov')) { closeEventModal(); return true; }
   if (on('pin-popup-ov')) { closePinPopup(); return true; }
   if (on('pin-strip-ov')) { closePinStrip(); return true; }

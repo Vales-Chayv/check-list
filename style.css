@@ -438,3 +438,12 @@ body.in-lobby.cal-on #cal-ov, body.in-cabinet.cal-on #cal-ov { bottom: auto; hei
 .sp-card.dragging{position:relative;z-index:20;box-shadow:0 8px 24px rgba(0,0,0,.6);transition:none}
 .sp-card.drop-before{box-shadow:0 -6px 0 0 var(--accent)}
 .sp-card.drop-after{box-shadow:0 6px 0 0 var(--accent)}
+
+/* кнопка галереи рядом с колокольчиком и кнопки в лобби — только на ПК */
+#gal-tab{display:none}
+.lobby-pc{display:none!important}
+@media (min-width:900px){
+  #gal-tab{display:inline-block}
+  .lobby-pc{display:flex!important}
+  body.gal-on #gal-tab,body.gal-on #lobby-gal-btn{background:var(--accent);color:#0f0f0f;border-color:var(--accent)}
+}
