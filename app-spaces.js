@@ -204,7 +204,7 @@ spaces = Array.isArray(saved) ? saved : [];
         if(!c && ++tries < 14) { setTimeout(w, 150); return; }
         const famLike = currentSpace?.type==='family' || currentSpace?.type==='group';
         const star = c && (c.entries||[]).some(e=>e.inTasks && !e.done && e.text);
-        if(c && !famLike && star && typeof intervalRunActive==='function' && intervalRunActive(c) && typeof openImportant==='function') openImportant();
+        if(c && !famLike && star && typeof intervalRunActive==='function' && intervalRunActive(c) && typeof openImportant==='function') openImportant(openCardId);
         else openView(openCardId);
       })(); })();
       if(openEntryId) setTimeout(()=>{

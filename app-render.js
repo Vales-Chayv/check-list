@@ -165,7 +165,8 @@ function closeLobbyReminders(){ document.getElementById('rem-ov').classList.remo
 
 // ⭐ «Сейчас важно»: карточки из всех кабинетов, где включён интервал и есть записи со звёздочкой
 let _impFilter = 'all';
-async function openImportant(){
+async function openImportant(focusId){
+  window._impFocus = focusId || null;
   document.getElementById('imp-ov').classList.add('on');
   const list = document.getElementById('imp-list');
   list.innerHTML = '<div style="text-align:center;color:var(--t3);padding:24px">Загрузка…</div>';
@@ -203,7 +204,8 @@ function renderImportant(){
     const groups = c.entryGroups||[];
     const gName = e => (groups.find(g=>g.id===e.groupId)?.name)||'';
     const rows = (c.entries||[]).filter(e=>e.inTasks && !e.done && e.text).map(e => `<div onclick="impOpenCard('${c.id}')" style="display:flex;gap:8px;align-items:flex-start;padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.08);cursor:pointer;font-size:14px"><span style="font-size:13px;margin-top:1px">⭐</span><div style="flex:1" dir="auto">${esc(stripTags(e.text))}${groups.length && gName(e) ? ` <span style="font-size:10px;color:var(--accent);background:rgba(232,197,106,.15);border-radius:8px;padding:1px 7px;white-space:nowrap">${esc(gName(e))}</span>` : ''}</div></div>`).join('');
-    return `<div style="border:1px solid var(--accent);border-radius:12px;background:rgba(232,197,106,.07);margin-bottom:12px;overflow:hidden">
+    const _foc = window._impFocus === c.id;
+    return `<div data-cid="${c.id}" style="border:${_foc?'2px':'1px'} solid var(--accent);border-radius:12px;background:rgba(232,197,106,${_foc?'.16':'.07'});margin-bottom:12px;overflow:hidden;${_foc?'box-shadow:0 0 16px rgba(232,197,106,.55)':''}">${_foc?'<div style="font-size:11px;font-weight:700;color:#0f0f0f;background:var(--accent);padding:3px 12px">🔔 Напоминание из уведомления</div>':''}
       <div onclick="impOpenCard('${c.id}')" style="padding:9px 12px;background:rgba(232,197,106,.16);display:flex;justify-content:space-between;align-items:flex-start;gap:8px;cursor:pointer">
         <div style="min-width:0"><div style="font-size:14px;font-weight:700;color:var(--t1)" dir="auto">${esc(c.title||'Без названия')}</div><div style="font-size:11px;color:var(--t2);margin-top:2px">🗂️ ${esc(spName(c.space_id))}${groups.length?' · мультикарточка':''}</div></div>
         <span style="font-size:11px;color:var(--accent);white-space:nowrap">⏱ ${every(c)}</span>
@@ -212,6 +214,7 @@ function renderImportant(){
       <div onclick="impOpenCard('${c.id}')" style="font-size:11px;color:var(--t2);padding:6px 12px 9px;text-align:right;cursor:pointer">Открыть карточку ›</div>
     </div>`;
   }).join('');
+  if(window._impFocus) setTimeout(()=>{ const el = list.querySelector('[data-cid="'+window._impFocus+'"]'); if(el) el.scrollIntoView({block:'center', behavior:'smooth'}); }, 80);
 }
 function impOpenCard(id){
   closeImportant();

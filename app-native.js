@@ -293,7 +293,8 @@
   // ── локальные будильники для интервальных напоминаний ──
   const LN = cap.Plugins && cap.Plugins.LocalNotifications;
   const ALARMS_KEY = 'mc_alarms';   // {cardId: номер последнего поставленного будильника}
-  const ALARMS_AHEAD = 100;         // сколько будильников ставим вперёд
+  const ALARMS_AHEAD = 40;          // сколько будильников ставим вперёд одной карточке
+  const ALARMS_TOTAL = 400;         // всего на приложение (лимит Android — 500, при превышении приложение падает)
   const alarmsLoad = () => { try { return JSON.parse(localStorage.getItem(ALARMS_KEY) || '{}'); } catch (e) { return {}; } };
   const alarmsSave = m => { try { localStorage.setItem(ALARMS_KEY, JSON.stringify(m)); } catch (e) {} };
   function alarmBase(cardId) {
@@ -340,12 +341,15 @@
     const kNow = Math.floor((now - start) / step);
     const map = alarmsLoad();
     const lastK = map[card.id] || 0;
-    if (lastK - kNow >= 50) return 0; // запас ещё большой
+    if (lastK - kNow >= 20) return 0; // запас ещё большой
+    let room = ALARMS_AHEAD;
+    try { const pend = await LN.getPending(); room = Math.min(ALARMS_AHEAD, ALARMS_TOTAL - ((pend && pend.notifications) || []).length); } catch (e) {}
+    if (room <= 0) return -1; // общий лимит будильников исчерпан
     const end = new Date(); end.setHours(24, 0, 0, 0);
     const url = SITE_PREFIX + '?openSpace=' + encodeURIComponent(card.space_id) + '&openCard=' + encodeURIComponent(card.id);
     const items = [];
     let lastUsed = lastK;
-    for (let k = Math.max(lastK + 1, kNow + 1); items.length < ALARMS_AHEAD; k++) {
+    for (let k = Math.max(lastK + 1, kNow + 1); items.length < room; k++) {
       const t = start + k * step;
       if (t >= end.getTime()) break;
       if (t <= now + 3000) continue;
@@ -386,6 +390,7 @@
       if (!(await alarmsPerm(true))) return null;
       await alarmsCancel(card.id);
       const n = await alarmsFill(card, run);
+      if (n < 0) toast('Слишком много активных интервалов: выключи ненужные, иначе напоминания не встанут', true);
       return n > 0 ? localStorage.getItem(TOKEN_KEY) : null;
     } catch (e) { console.log('[native] alarms start', e && e.message); return null; }
   };
