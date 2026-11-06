@@ -454,3 +454,10 @@ body.in-lobby.cal-on #cal-ov, body.in-cabinet.cal-on #cal-ov { bottom: auto; hei
 /* быстрые кнопки лобби: общий чек-лист и «Готово» */
 .lobby-pill{flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:14px;color:var(--t1);font-size:14px;font-weight:600;padding:11px 8px;cursor:pointer;font-family:inherit}
 .lobby-pill:active{background:var(--s1);border-color:var(--accent)}
+
+/* ПК: «Чек-лист» и «Готово» открываются в колонке карточек (слева), а не на весь экран */
+@media (min-width:900px){
+  #chk-ov, #dn-ov { inset: 0 auto 0 0; width: var(--split-left); min-width: 320px; background: var(--s1); border-right: 1px solid var(--b1); align-items: stretch; }
+  #chk-ov .sheet, #dn-ov .sheet { transform: none; max-height: none; height: 100%; width: 100%; border-radius: 0; overflow-y: auto; }
+  #chk-list, #dn-list { max-height: none !important; }
+}
