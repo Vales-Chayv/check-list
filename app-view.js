@@ -1196,6 +1196,7 @@ async function saveEntryEdit(cardId, entryId) {
   const dl = document.getElementById('edit-entry-dl')?.value;
 if(dl && !entry.deadline && !(currentSpace?.type==='family' || currentSpace?.type==='group')) entry.inTasks = true;
 entry.deadline = dl || null;
+  card.deadline = ([...(card.entries||[])].filter(x=>!x.done&&x.deadline).map(x=>x.deadline).sort()[0]) || null; // срок обложки (его берёт календарь) = ближайший срок записей
   markInProgress(card);
   document.getElementById('edit-entry-dialog')?.remove();
   render(); openView(cardId);
@@ -1907,13 +1908,15 @@ async function confirmMove(fromCardId) {
       if(!toCard) { toast('Карточка не найдена', true); return; }
       toCard.entries = [...movedEntries, ...(toCard.entries||[])];
       toCard.entryGroups = [...(toCard.entryGroups||[]), ...movedGroups];
+      toCard.deadline = ([...toCard.entries].filter(x=>!x.done&&x.deadline).map(x=>x.deadline).sort()[0]) || toCard.deadline || null;
       await dbUpdate(toCard);
     } else {
       const {data:toCardData} = await sb.from('cards').select('*').eq('id', moveTargetCard.id).single();
       if(!toCardData) { toast('Карточка не найдена', true); return; }
       const updatedEntries = [...movedEntries, ...(toCardData.entries||[])];
       const updatedGroups = [...(toCardData.entryGroups||[]), ...movedGroups];
-      await sb.from('cards').update({entries: updatedEntries, entryGroups: updatedGroups}).eq('id', moveTargetCard.id);
+      const _newDl = ([...updatedEntries].filter(x=>!x.done&&x.deadline).map(x=>x.deadline).sort()[0]) || toCardData.deadline || null;
+      await sb.from('cards').update({entries: updatedEntries, entryGroups: updatedGroups, deadline: _newDl}).eq('id', moveTargetCard.id);
     }
     if(moveDeleteSource && (fromCard.entries||[]).length === 0 && confirm('Карточка «' + fromCard.title + '» пуста. Удалить её?')) {
       deleteCardById(fromCard.id);
