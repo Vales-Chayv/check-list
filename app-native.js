@@ -401,6 +401,16 @@
     setTimeout(alarmsSync, 8000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) alarmsSync(); });
   }
+  // ── кнопка «Назад» на телефоне: шаг назад, в лобби — свернуть приложение ──
+  (function () {
+    const AP = cap.Plugins && cap.Plugins.App;
+    if (!AP || !AP.addListener) return;
+    AP.addListener('backButton', () => {
+      let handled = false;
+      try { handled = window.innerWidth < 900 && typeof window.mcBackStep === 'function' && window.mcBackStep(); } catch (e) {}
+      if (!handled) { try { AP.minimizeApp(); } catch (e) {} }
+    });
+  })();
   // ── старт: при каждом запуске обновляем токен, при первом запуске сами просим разрешение ──
   window.subscribeToPush();
 })();

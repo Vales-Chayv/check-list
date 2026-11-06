@@ -63,10 +63,71 @@ function switchToChecklist() {
 // ═══════════════════════════════════════════
 //  ANDROID BACK BUTTON
 // ═══════════════════════════════════════════
+// Телефон: «Назад» = шаг назад (закрыть верхний слой → вкладка → «Все карточки» → лобби → свернуть).
+// ПК (ширина ≥900): всё как раньше, ничего не меняется.
+window.mcBackStep = function () {
+  const $ = id => document.getElementById(id);
+  const on = id => !!$(id) && $(id).classList.contains('on');
+  // 1. диалоги и просмотрщики поверх всего
+  if ($('edit-entry-dialog')) { closeEditEntry(true); return true; }
+  const iv = $('img-viewer');
+  if (iv && iv.style.display === 'flex') { closeImgViewer(); return true; }
+  const dyn = document.querySelector('body > div[style*="z-index:2000"]');
+  if (dyn) { dyn.remove(); return true; }
+  // галерея: аудио-плеер → настройки хранения → режим выбора → само окно
+  const gAud = $('gal-audio-ov'); if (gAud) { gAud.remove(); return true; }
+  if ($('gal-set') && $('gal-set').classList.contains('show')) { $('gal-set').classList.remove('show'); return true; }
+  if ($('gal-sheet') && $('gal-sheet').classList.contains('selmode') && on('gal-ov')) { $('gal-cancel').click(); return true; }
+  if (on('gal-ov')) { closeGallery(); return true; }
+  if (on('event-ov')) { closeEventModal(); return true; }
+  if (on('pin-popup-ov')) { closePinPopup(); return true; }
+  if (on('pin-strip-ov')) { closePinStrip(); return true; }
+  if (on('ae-ov')) { closeAddEntry(); return true; }
+  // 2. карточка / чат, редактирование
+  if (on('view-ov')) { closeView(); return true; }
+  if (on('edit-ov')) { tryClose(); return true; }
+  // 3. экраны поверх кабинета
+  if (on('cal-ov')) { closeCalendar(); return true; }
+  if (on('calc-ov')) { closeCalcMobile(); return true; }
+  if (on('my-tasks-ov')) { closeMyTasksPopup(); return true; }
+  if (on('arch-ov')) { closeArchive(); return true; }
+  if (on('set-ov')) { closeSettings(); return true; }
+  if (on('create-space-ov')) { closeCreateSpace(); return true; }
+  if (on('manage-members-ov')) { $('manage-members-ov').classList.remove('on'); return true; }
+  if (on('space-member-ov')) { $('space-member-ov').classList.remove('on'); return true; }
+  if (on('space-pwd-ov')) { $('space-pwd-ov').classList.remove('on'); return true; }
+  // любое другое окно (поиск, галерея и т.п.): нажимаем его кнопку закрытия
+  const other = Array.from(document.querySelectorAll('.overlay.on')).pop();
+  if (other) {
+    const x = Array.from(other.querySelectorAll('button')).find(b => /close|закры|cancel/i.test((b.getAttribute('onclick') || '') + ' ' + (b.title || '')) || /^[✕×]$/.test((b.textContent || '').trim()));
+    if (x) x.click(); else other.classList.remove('on');
+    return true;
+  }
+  // 4. панели А/Б в лобби и кабинете
+  if (document.body.classList.contains('lobby-panels-open')) { closeLobbyPanelsSwipe(); return true; }
+  // 5. кабинет: вкладка → «Все карточки» → лобби
+  if (typeof currentSpaceId !== 'undefined' && currentSpaceId) {
+    if (view !== 'cards') {
+      view = 'cards';
+      document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.view === 'cards'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('on', b.dataset.view === 'cards'));
+      render();
+      return true;
+    }
+    switchSpace();
+    return true;
+  }
+  return false; // мы в лобби — дальше выход
+};
 // Push a history state so back button can be intercepted
 history.pushState({app:true}, '');
 window.addEventListener('popstate', e => {
-  // Close whichever modal is open, in priority order
+  if (window.innerWidth < 900) {
+    // телефон в браузере/PWA: один шаг назад; в лобби — выходим как обычно
+    if (window.mcBackStep()) history.pushState({app:true}, '');
+    return;
+  }
+  // ПК: прежнее поведение
   if(document.getElementById('ae-ov').classList.contains('on')) { closeAddEntry(); history.pushState({app:true},''); return; }
   if(document.getElementById('view-ov').classList.contains('on')) { closeView(); history.pushState({app:true},''); return; }
   if(document.getElementById('edit-ov').classList.contains('on')) { tryClose(); history.pushState({app:true},''); return; }
