@@ -198,7 +198,15 @@ spaces = Array.isArray(saved) ? saved : [];
     history.replaceState({}, '', window.location.pathname); // убираем параметры из адреса, чтобы не сработало повторно при обновлении
     if(spaces.find(s=>s.id===openSpaceId)) {
       await setCurrentSpace(openSpaceId, true);
-      setTimeout(()=>openView(openCardId), 300);
+      // из уведомления: если в карточке включён интервал и есть записи со ⭐ — открываем окно «Сейчас важно», иначе саму карточку
+      (function(){ let tries = 0; (function w(){
+        const c = (cards||[]).find(x=>x.id===openCardId);
+        if(!c && ++tries < 14) { setTimeout(w, 150); return; }
+        const famLike = currentSpace?.type==='family' || currentSpace?.type==='group';
+        const star = c && (c.entries||[]).some(e=>e.inTasks && !e.done && e.text);
+        if(c && !famLike && star && typeof intervalRunActive==='function' && intervalRunActive(c) && typeof openImportant==='function') openImportant();
+        else openView(openCardId);
+      })(); })();
       if(openEntryId) setTimeout(()=>{
         const el = document.querySelector('#view-ov .swipe-content[data-entryid="' + String(openEntryId).replace(/"/g,'') + '"]');
         if(el) { el.scrollIntoView({block:'center'}); el.style.background = 'rgba(232,197,106,.28)'; el.style.borderRadius = '6px'; setTimeout(()=>{ el.style.background = 'transparent'; }, 3000); }

@@ -80,6 +80,7 @@ window.mcBackStep = function () {
   if ($('gal-sheet') && $('gal-sheet').classList.contains('selmode') && on('gal-ov')) { $('gal-cancel').click(); return true; }
   if (on('gal-ov')) { closeGallery(); return true; }
   if (on('rem-ov')) { closeLobbyReminders(); return true; }
+  if (on('imp-ov')) { closeImportant(); return true; }
   if (on('event-ov')) { closeEventModal(); return true; }
   if (on('pin-popup-ov')) { closePinPopup(); return true; }
   if (on('pin-strip-ov')) { closePinStrip(); return true; }

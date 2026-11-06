@@ -162,6 +162,62 @@ async function openLobbyReminders(){
   }).join('');
 }
 function closeLobbyReminders(){ document.getElementById('rem-ov').classList.remove('on'); }
+
+// ⭐ «Сейчас важно»: карточки из всех кабинетов, где включён интервал и есть записи со звёздочкой
+let _impFilter = 'all';
+async function openImportant(){
+  document.getElementById('imp-ov').classList.add('on');
+  const list = document.getElementById('imp-list');
+  list.innerHTML = '<div style="text-align:center;color:var(--t3);padding:24px">Загрузка…</div>';
+  const ids = (spaces||[]).filter(s=>s.type!=='family'&&s.type!=='group'&&s.status!=='closed').map(s=>s.id);
+  let data = [];
+  try {
+    if(!ids.length || !navigator.onLine) throw 0;
+    const r = await sb.from('cards').select('*').in('space_id', ids);
+    if(r.error) throw r.error;
+    data = r.data||[];
+  } catch(e) {
+    try { data = (await local.getAll('cards')).filter(c=>ids.includes(c.space_id)); } catch(_) { data = []; }
+  }
+  // карточки текущего кабинета берём из памяти: там самое свежее
+  const mem = new Map((cards||[]).map(c=>[c.id,c]));
+  data = data.map(c => mem.get(c.id) || c);
+  const hasStar = c => (c.entries||[]).some(e=>e.inTasks && !e.done && e.text);
+  window._impCards = data.filter(c => c.status!=='done' && typeof intervalRunActive==='function' && intervalRunActive(c) && hasStar(c));
+  window._clCache = window._impCards;
+  if(_impFilter!=='all' && !window._impCards.some(c=>c.space_id===_impFilter)) _impFilter = 'all';
+  renderImportant();
+}
+function closeImportant(){ document.getElementById('imp-ov').classList.remove('on'); }
+function setImpFilter(id){ _impFilter = id; renderImportant(); }
+function renderImportant(){
+  const list = document.getElementById('imp-list'), chipsEl = document.getElementById('imp-chips');
+  const all = window._impCards||[];
+  const spName = id => (spaces.find(s=>s.id===id)?.name)||'Кабинет';
+  const spIds = [...new Set(all.map(c=>c.space_id))];
+  chipsEl.innerHTML = spIds.length > 1 ? `<span onclick="setImpFilter('all')" style="cursor:pointer;font-size:12px;padding:3px 11px;border-radius:14px;border:1px solid ${_impFilter==='all'?'var(--accent)':'var(--b1)'};background:${_impFilter==='all'?'var(--accent)':'transparent'};color:${_impFilter==='all'?'#0f0f0f':'var(--t2)'}">Все кабинеты</span>` + spIds.map(id=>`<span onclick="setImpFilter('${id}')" style="cursor:pointer;font-size:12px;padding:3px 11px;border-radius:14px;border:1px solid ${_impFilter===id?'var(--accent)':'var(--b1)'};background:${_impFilter===id?'var(--accent)':'transparent'};color:${_impFilter===id?'#0f0f0f':'var(--t2)'}">${esc(spName(id))}</span>`).join('') : '';
+  const shown = all.filter(c => _impFilter==='all' || c.space_id===_impFilter);
+  if(!shown.length){ list.innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Сейчас ничего важного: нет карточек с включённым интервалом и записями со ⭐</div>'; return; }
+  const every = c => { const m = c.reminder?.intervalRun?.everyMin; return m===60 ? 'каждый час' : m ? 'каждые '+m+' мин' : ''; };
+  list.innerHTML = shown.map(c => {
+    const groups = c.entryGroups||[];
+    const gName = e => (groups.find(g=>g.id===e.groupId)?.name)||'';
+    const rows = (c.entries||[]).filter(e=>e.inTasks && !e.done && e.text).map(e => `<div onclick="impOpenCard('${c.id}')" style="display:flex;gap:8px;align-items:flex-start;padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.08);cursor:pointer;font-size:14px"><span style="font-size:13px;margin-top:1px">⭐</span><div style="flex:1" dir="auto">${esc(stripTags(e.text))}${groups.length && gName(e) ? ` <span style="font-size:10px;color:var(--accent);background:rgba(232,197,106,.15);border-radius:8px;padding:1px 7px;white-space:nowrap">${esc(gName(e))}</span>` : ''}</div></div>`).join('');
+    return `<div style="border:1px solid var(--accent);border-radius:12px;background:rgba(232,197,106,.07);margin-bottom:12px;overflow:hidden">
+      <div onclick="impOpenCard('${c.id}')" style="padding:9px 12px;background:rgba(232,197,106,.16);display:flex;justify-content:space-between;align-items:flex-start;gap:8px;cursor:pointer">
+        <div style="min-width:0"><div style="font-size:14px;font-weight:700;color:var(--t1)" dir="auto">${esc(c.title||'Без названия')}</div><div style="font-size:11px;color:var(--t2);margin-top:2px">🗂️ ${esc(spName(c.space_id))}${groups.length?' · мультикарточка':''}</div></div>
+        <span style="font-size:11px;color:var(--accent);white-space:nowrap">⏱ ${every(c)}</span>
+      </div>
+      <div style="padding:2px 10px 2px">${rows}</div>
+      <div onclick="impOpenCard('${c.id}')" style="font-size:11px;color:var(--t2);padding:6px 12px 9px;text-align:right;cursor:pointer">Открыть карточку ›</div>
+    </div>`;
+  }).join('');
+}
+function impOpenCard(id){
+  closeImportant();
+  window._impBack = true; // из карточки вернёмся в это окно
+  clOpenCard(id);
+}
 async function goToMyTask(cardId, entryId, spaceId){
   closeMyTasksPopup();
   if(spaceId !== currentSpaceId){

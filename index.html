@@ -439,6 +439,7 @@
       <div style="display:flex;gap:8px;flex-shrink:0">
         <button class="lobby-ib" onclick="openCreateSpace()" title="Создать кабинет" style="background:var(--accent);border-color:var(--accent);color:#0f0f0f;font-size:20px;font-weight:700">＋</button>
         <button class="lobby-ib" onclick="openLobbyReminders()" title="Напоминания всех кабинетов">🔔</button>
+        <button class="lobby-ib" onclick="openImportant()" title="Сейчас важно (интервал и ⭐)">⭐</button>
         <button class="lobby-ib" id="lobby-pin-btn" onclick="openPinPopup()" title="Закреплённые">📌</button>
         <button class="lobby-ib" id="lobby-gal-btn" onclick="toggleGallery()" title="Галерея вложений">🖼</button>
         <button class="lobby-ib" onclick="openSearch()" title="Поиск">🔍</button>
@@ -628,6 +629,15 @@
     <div class="sheet-handle"></div>
     <div class="sheet-head"><span class="sheet-title">🔔 Напоминания всех кабинетов</span><button class="close-btn" onclick="closeLobbyReminders()">✕</button></div>
     <div id="rem-list" style="padding:16px;max-height:70vh;overflow-y:auto"></div>
+  </div>
+</div>
+
+<div class="overlay" id="imp-ov" onclick="if(event.target===this)closeImportant()">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><span class="sheet-title">⭐ Сейчас важно</span><button class="close-btn" onclick="closeImportant()">✕</button></div>
+    <div id="imp-chips" style="display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 4px"></div>
+    <div id="imp-list" style="padding:12px 16px;max-height:70vh;overflow-y:auto"></div>
   </div>
 </div>
 
