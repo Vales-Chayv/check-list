@@ -2652,11 +2652,29 @@ function aeToggleAssign(btn, val, event) {
     if(el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.style.background = 'rgba(232,197,106,.28)'; el.style.borderRadius = '6px'; setTimeout(() => { el.style.background = 'transparent'; }, 3000); }
   }
 
+  let _offToastAt = 0;
+  const offlineToast = () => { const n = Date.now(); if(n - _offToastAt > 4000) { _offToastAt = n; try { toast('📴 Нет сети: файл сохранён на устройстве и загрузится сам, когда появится интернет'); } catch(_) {} } };
+  const isNetErr = e => !!e && (e instanceof TypeError || /failed to fetch|networkerror|load failed|network request failed|timeout|timed out/i.test(String(e.message || e)));
+  async function saveOffline(file, cardId, entryId) { // сеть пропала посреди загрузки: кладём файл в очередь, как при обычном офлайне
+    const tempId = uid();
+    const base64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = ev => res(ev.target.result); r.onerror = rej; r.readAsDataURL(file); });
+    await saveOfflineFile(tempId, cardId || null, entryId || null, file, base64);
+    return { id: tempId, name: file.name, type: file.type, data: base64, offline: true };
+  }
   window.uploadToStorage = async function(file, cardId, entryId) {
-    if(!navigator.onLine || window._upQuiet) return orig.apply(this, arguments);
+    if(window._upQuiet) return orig.apply(this, arguments);
+    if(!navigator.onLine) {
+      if(file && file.size > 60 * 1024 * 1024) throw new Error('Файл больше 60 МБ: без интернета его не сохранить, дождись сети');
+      const r = await orig.apply(this, arguments); offlineToast(); return r;
+    }
     const j = { id: ++seq, name: (file && file.name) || 'файл', ctx: curCtx(cardId), url: null };
     begin(j);
     try { const att = await orig.apply(this, arguments); j.url = att && att.data; finish(j, true); return att; }
-    catch(e) { finish(j, false); throw e; }
+    catch(e) {
+      if(isNetErr(e) && typeof saveOfflineFile === 'function' && !(file && file.size > 60 * 1024 * 1024)) {
+        try { const r = await saveOffline(file, cardId, entryId); finish(j, true); offlineToast(); return r; } catch(e2) {}
+      }
+      finish(j, false); throw e;
+    }
   };
 })();

@@ -112,8 +112,7 @@ async function _processSyncQueueInner() {
         const {error} = await sb.from('cards').delete().eq('id', op.data.id);
         if (error) throw error;
       } else if (op.type === 'insert_cat') {
-        const {catKey: _ck, ...catSrv} = op.data; // catKey — только локальный ключ, на сервере такого столбца нет
-        const {error} = await sb.from('categories').insert(catSrv);
+        const {error} = await sb.from('categories').insert(op.data);
         if (error && error.code !== '23505') throw error;
       } else if (op.type === 'insert_event') {
         const {error} = await sb.from('events').insert(op.data);
@@ -326,38 +325,24 @@ async function dbUpdate(card) {
   } else { await queueOp({type:'update',data:card}); setSyncDot('err'); }
 }
 
-// Все вложения карточки: на карточке и во всех записях
-function cardAttsOf(c) {
-  if(!c) return [];
-  return [...(c.attachments||[]), ...(c.entries||[]).flatMap(e => [...(e.attachments||[]), ...(e.sessionAtts||[])])].filter(a => a && a.data);
+async function dbDelete(id) {
+  // Удаляем файлы из Storage
+  const card = cards.find(c=>c.id===id);
+  if(card && navigator.onLine) {
+    const allAtts = [
+      ...(card.attachments||[]),
+      ...(card.entries||[]).flatMap(e=>[...(e.attachments||[]),...(e.sessionAtts||[])])
+    ].filter(a=>a.data);
+    for(const att of allAtts) {
+      try {
+      if(att.data.includes('supabase')) {
+  const path = att.data.split('/attachments/')[1];
+  if(path) await sb.storage.from('attachments').remove([path]);
 }
-// Удаляет файлы из Storage, если на них больше не ссылается ни одна известная карточка (кроме exceptCardId)
-async function storageRemoveAtts(atts, exceptCardId) {
-  try {
-    if(!navigator.onLine) return;
-    const pathOf = a => {
-      const u = a && a.data ? String(a.data) : '';
-      if(u.startsWith('data:') || !u.includes('/attachments/')) return null;
-      try { return decodeURIComponent(u.split('/attachments/')[1].split('?')[0]); } catch(e) { return null; }
-    };
-    const want = [...new Set((atts||[]).map(pathOf).filter(Boolean))];
-    if(!want.length) return;
-    let all = [];
-    try { all = await local.getAll('cards'); } catch(e) {}
-    const byId = new Map((all||[]).map(c => [c.id, c]));
-    (cards||[]).forEach(c => byId.set(c.id, c));
-    const used = new Set();
-    const _ex = new Set([].concat(exceptCardId || []));
-    byId.forEach(c => { if(_ex.has(c.id)) return; cardAttsOf(c).forEach(a => { const p = pathOf(a); if(p) used.add(p); }); });
-    const del = want.filter(p => !used.has(p));
-    if(del.length) await sb.storage.from('attachments').remove(del);
-  } catch(e) { console.log('storageRemoveAtts error:', e); }
-}
-async function dbDelete(id, cardArg) {
-  // Удаляем файлы из Storage (если на них не ссылаются другие карточки).
-  // Вызывающий код уже убрал карточку из cards, поэтому он передаёт её вторым аргументом
-  const card = cardArg || cards.find(c=>c.id===id);
-  if(card) await storageRemoveAtts(cardAttsOf(card), id);
+// base64 файлы просто не сохраняем — они исчезнут вместе с карточкой
+      } catch(e) {}
+    }
+  }
   await local.delete('cards', id);
   if (navigator.onLine) {
     setSyncDot('sync');
@@ -372,12 +357,7 @@ async function dbAddCat(cat) {
   catWithSpace.catKey = catKey(catWithSpace.space_id, catWithSpace.name);
   await local.put('categories', catWithSpace);
   if (navigator.onLine) {
-    const {catKey: _ck, ...catSrv} = catWithSpace; // catKey — только локальный ключ, на сервере такого столбца нет
-    const {error}=await sb.from('categories').insert(catSrv);
-    if(error) {
-      console.log('dbAddCat error:', error.code, error.message, catWithSpace);
-      toast('Рубрика «' + cat.name + '» не сохранилась на сервере: ' + (error.message || error.code), true);
-    }
+    const {error}=await sb.from('categories').insert(catWithSpace);
     if(error && error.code!=='23505') await queueOp({type:'insert_cat',data:catWithSpace});
   } else { await queueOp({type:'insert_cat',data:catWithSpace}); }
 }
@@ -431,33 +411,9 @@ function handleRealtimeSpace(payload) {
   const idx = spaces.findIndex(s => s.id === n.id);
   if(idx === -1) return; // кабинет не в моём списке — не моё дело
   const wasClosed = spaces[idx].status === 'closed';
-  const prevReqs = spaces[idx].joinRequests || [];
-  const wasMemberMe = (spaces[idx].members_auth||[]).some(m => m.user_id === myId);
   const previousMembers = spaces[idx].members; // кэш клиента ДО обновления — payload.old от Supabase может не содержать старых значений
   spaces[idx] = { ...spaces[idx], ...n };
   localStorage.setItem('mc_spaces', JSON.stringify(spaces));
-  // Запросы на вход по ссылке
-  {
-    const nReqs = n.joinRequests || [];
-    const lobbyOpen = typeof renderSpacesList === 'function' && document.getElementById('space-selector')?.style.display !== 'none';
-    if(n.owner_id === myId && nReqs.length > prevReqs.length) {
-      const nr = nReqs.find(r => !prevReqs.some(p => p.user_id === r.user_id));
-      if(typeof showChatNotice === 'function') showChatNotice('🔔 Запрос на вход', `${nr?.name||'Кто-то'} просит войти в «${n.name}»`, null);
-      if(lobbyOpen) renderSpacesList();
-      if(document.getElementById('manage-members-ov')?.classList.contains('on') && typeof renderManageMembersList === 'function') renderManageMembersList();
-    }
-    const isMemberMe = (n.members_auth||[]).some(m => m.user_id === myId);
-    if(!wasMemberMe && isMemberMe && n.owner_id !== myId && prevReqs.some(r => r.user_id === myId)) {
-      if(typeof showChatNotice === 'function') showChatNotice('✅ Тебя приняли', `Теперь ты в «${n.name}»`, null);
-      if(lobbyOpen) renderSpacesList();
-    } else if(prevReqs.some(r => r.user_id === myId) && !nReqs.some(r => r.user_id === myId) && !isMemberMe && n.owner_id !== myId) {
-      spaces = spaces.filter(s => s.id !== n.id);
-      localStorage.setItem('mc_spaces', JSON.stringify(spaces));
-      if(typeof showChatNotice === 'function') showChatNotice('Запрос на вход', `Владелец не принял запрос в «${n.name}»`, null);
-      if(lobbyOpen) renderSpacesList();
-      return;
-    }
-  }
   if(n.status === 'closed' && !wasClosed) {
     if(currentSpaceId === n.id) { currentSpace = spaces[idx]; render(); }
     if(typeof renderSpacesList === 'function' && document.getElementById('space-selector')?.style.display !== 'none') renderSpacesList();
@@ -540,31 +496,58 @@ async function deleteOfflineFile(tempId) {
   return dbLocal('offline_files', 'readwrite', s => s.delete(tempId));
 }
 
-async function syncOfflineFiles() {
-  if(!navigator.onLine) return;
-  const files = await getOfflineFiles();
-  if(!files.length) return;
-  for(const f of files) {
-    try {
-      const blob = await fetch(f.base64).then(r=>r.blob());
-      const file = new File([blob], f.name, {type:f.type});
-      const att = await uploadToStorage(file);
-      // Update card entry with real URL
-      const card = cards.find(c=>c.id===f.cardId);
-      if(card) {
-        const entries = card.entries||[];
-        const entry = entries.find(e=>e.id===f.entryId);
-        if(entry) {
-          entry.sessionAtts = (entry.sessionAtts||[]).map(a=>a.data===f.base64?att:a);
-        } else {
-          card.attachments = (card.attachments||[]).map(a=>a.data===f.base64?att:a);
-        }
-        await dbUpdate(card);
-      }
-      await deleteOfflineFile(f.tempId);
-    } catch(e) {
-      console.log('Offline file sync error:', e.message);
-    }
-  }
+let _syncOffBusy = false;
+// заменяет в карточке временный офлайн-файл (по id или по base64) на настоящий из хранилища
+function _replaceOfflineAtt(card, f, att) {
+  let hit = false;
+  const sw = a => {
+    if(a && (a.id === f.tempId || (f.base64 && a.data === f.base64))) { hit = true; const n = { ...a, ...att }; delete n.offline; return n; }
+    return a;
+  };
+  if(Array.isArray(card.attachments)) card.attachments = card.attachments.map(sw);
+  (card.entries || []).forEach(en => {
+    if(Array.isArray(en.attachments)) en.attachments = en.attachments.map(sw);
+    if(Array.isArray(en.sessionAtts)) en.sessionAtts = en.sessionAtts.map(sw);
+  });
+  return hit;
 }
+async function syncOfflineFiles() {
+  if(!navigator.onLine || _syncOffBusy) return;
+  _syncOffBusy = true;
+  try {
+    const files = await getOfflineFiles();
+    if(!files.length) return;
+    // все карточки: открытого кабинета (в памяти) + сохранённые на устройстве (другие кабинеты, чаты)
+    const pool = new Map();
+    try { (await local.getAll('cards')).forEach(c => pool.set(c.id, c)); } catch(e) {}
+    (cards || []).forEach(c => pool.set(c.id, c));
+    let okCount = 0;
+    for(const f of files) {
+      try {
+        const holder = [...pool.values()].find(c => JSON.stringify([c.attachments, (c.entries || []).map(e => [e.attachments, e.sessionAtts])]).includes(f.tempId));
+        const blob = await fetch(f.base64).then(r => r.blob());
+        const file = new File([blob], f.name, { type: f.type });
+        const att = await uploadToStorage(file, holder ? holder.id : (f.cardId || undefined));
+        if(att && att.offline) continue; // сети всё ещё нет — оставим на потом
+        let touched = false;
+        for(const c of pool.values()) {
+          if(_replaceOfflineAtt(c, f, att)) {
+            touched = true;
+            const live = (cards || []).find(x => x.id === c.id);
+            if(live && live !== c) _replaceOfflineAtt(live, f, att);
+            await dbUpdate(c);
+          }
+        }
+        await deleteOfflineFile(f.tempId); // карточки с этим файлом нет (удалена) — файл просто не нужен
+        okCount++;
+      } catch(e) {
+        console.log('Offline file sync error:', e && e.message);
+      }
+    }
+    if(okCount) { try { toast('✓ Загружено из очереди: ' + okCount); } catch(_) {} if(typeof render === 'function') try { render(); } catch(_) {} }
+  } finally { _syncOffBusy = false; }
+}
+// приложение открыли уже с интернетом, а файлы остались с прошлого раза — догружаем
+window.addEventListener('load', () => setTimeout(() => { if(navigator.onLine) syncOfflineFiles().catch(() => {}); }, 6000));
+document.addEventListener('visibilitychange', () => { if(!document.hidden && navigator.onLine) syncOfflineFiles().catch(() => {}); });
 
