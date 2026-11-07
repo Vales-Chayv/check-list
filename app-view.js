@@ -1276,7 +1276,14 @@ function mediaOpen(gid, i) {
       }, 380);
     });
     root.addEventListener('pointermove', e => { if(timer && Math.hypot(e.clientX - sx, e.clientY - sy) > 10) { clearTimeout(timer); timer = null; } });
-    ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => root.addEventListener(n, hide));
+    // Android при долгом нажатии на картинку присылает «cancel» (меню/перетаскивание) — пока плитка показана, его игнорируем
+    root.addEventListener('pointercancel', () => { if(!prev) hide(); });
+    ['pointerup'].forEach(n => root.addEventListener(n, hide));
+    document.addEventListener('touchend', hide, { passive: true });
+    document.addEventListener('touchcancel', hide, { passive: true });
+    document.addEventListener('pointerup', hide);
+    root.addEventListener('dragstart', e => e.preventDefault());
+    root.querySelectorAll('img,video').forEach(m => { m.draggable = false; m.style.pointerEvents = 'none'; m.style.webkitUserDrag = 'none'; });
     root.addEventListener('contextmenu', e => e.preventDefault());
     root.addEventListener('click', e => { if(window._mxSuppress) { e.stopPropagation(); e.preventDefault(); } }, true);
   };
