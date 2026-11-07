@@ -428,6 +428,7 @@ async function toggleBall(cardId, val) {
 }
 
 function openImgDirect(src) {
+  if(typeof openMediaViewer === 'function') { openMediaViewer([{ data: src, vid: false, name: '' }], 0); return; }
   imgScale = 1;
   const img = document.getElementById('viewer-img');
   img.src = src;
@@ -1037,9 +1038,250 @@ function mediaStackHTML(tiles, gid) {
   document.addEventListener('touchcancel', () => { if(t) { clearTimeout(t.timer); t.el.style.outline = ''; t = null; } }, {passive: true});
 })();
 function mediaOpen(gid, i) {
-  const t = (window._mediaGroups[gid] || [])[i]; if(!t) return;
-  if(t.vid) openVideoViewer(t.data); else openImgDirect(t.data);
+  const tiles = window._mediaGroups[gid] || []; if(!tiles[i]) return;
+  openMediaViewer(tiles, i);
 }
+// ── Просмотр фото/видео: листание (виден край соседних), масштаб, перемещение ──
+(function(){
+  if(window.openMediaViewer) return;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  let S = null;
+
+  function setZ(sl, animate) {
+    const m = sl.media;
+    m.style.transition = animate ? 'transform .22s ease' : 'none';
+    m.style.transform = `translate(${sl.tx}px,${sl.ty}px) scale(${sl.s})`;
+    sl.el.style.overflow = sl.s > 1.001 ? 'visible' : 'hidden';
+    sl.el.style.zIndex = sl.s > 1.001 ? '5' : '1';
+  }
+  function resetZ(sl, animate) { sl.s = 1; sl.tx = 0; sl.ty = 0; setZ(sl, animate); }
+  function clampPan(sl) {
+    const nw = sl.media.naturalWidth || S.slideW, nh = sl.media.naturalHeight || S.H;
+    const fit = Math.min(S.slideW / nw, S.H / nh);
+    const dw = nw * fit * sl.s, dh = nh * fit * sl.s;
+    const mx = Math.max(0, (dw - S.W) / 2), my = Math.max(0, (dh - S.H) / 2);
+    sl.tx = clamp(sl.tx, -mx, mx); sl.ty = clamp(sl.ty, -my, my);
+  }
+  function baseX() { return (S.W - S.slideW) / 2 - S.i * S.stride; }
+  function layout(animate) {
+    if(!S) return;
+    S.track.style.transition = animate ? 'transform .26s cubic-bezier(.2,.8,.2,1)' : 'none';
+    S.track.style.transform = `translate(${baseX()}px,0)`;
+    S.ov.style.background = '#000';
+  }
+  function measure() {
+    S.W = S.ov.clientWidth; S.H = S.ov.clientHeight;
+    const many = S.slides.length > 1;
+    S.slideW = many ? S.W * 0.84 : S.W;
+    S.stride = S.slideW + (many ? S.W * 0.02 : 0);
+    S.slides.forEach(sl => { sl.el.style.width = S.slideW + 'px'; sl.el.style.marginRight = (S.stride - S.slideW) + 'px'; });
+  }
+  function head() {
+    S.cnt.textContent = S.slides.length > 1 ? (S.i + 1) + ' / ' + S.slides.length : '';
+    S.prev.style.visibility = S.i > 0 ? '' : 'hidden';
+    S.next.style.visibility = S.i < S.slides.length - 1 ? '' : 'hidden';
+  }
+  function go(i, animate) {
+    i = clamp(i, 0, S.slides.length - 1);
+    if(i !== S.i) {
+      resetZ(S.slides[S.i], false);
+      S.slides.forEach((sl, k) => { if(k !== i && sl.tile.vid) { try { sl.media.pause(); } catch(_) {} } });
+      S.i = i;
+    }
+    head(); layout(animate !== false);
+  }
+  function toggleVideo(sl) {
+    const v = sl.media;
+    if(!v.controls) v.controls = true;
+    if(v.paused) { const p = v.play(); if(p && p.catch) p.catch(() => { v.muted = true; v.play().catch(() => {}); }); } else v.pause();
+  }
+  function zoomAt(sl, x, y, s) {
+    const px = x - S.W / 2, py = y - S.H / 2;
+    sl.s = s; sl.tx = px * (1 - s); sl.ty = py * (1 - s);
+    clampPan(sl); setZ(sl, true);
+  }
+  function tap(e) {
+    const sl = S.slides[S.i];
+    const left = (S.W - S.slideW) / 2, right = left + S.slideW;
+    if(S.slides.length > 1 && e.clientX < left) { go(S.i - 1); return; }
+    if(S.slides.length > 1 && e.clientX > right) { go(S.i + 1); return; }
+    if(sl.tile.vid) { toggleVideo(sl); return; }
+    const now = Date.now(), lt = S.lastTap;
+    if(lt && now - lt.t < 330 && Math.hypot(lt.x - e.clientX, lt.y - e.clientY) < 40) {
+      S.lastTap = null;
+      if(sl.s > 1.02) resetZ(sl, true); else zoomAt(sl, e.clientX, e.clientY, 2.5);
+    } else S.lastTap = { t: now, x: e.clientX, y: e.clientY };
+  }
+
+  window.openMediaViewer = function(tiles, start) {
+    tiles = (tiles || []).filter(Boolean); if(!tiles.length) return;
+    window.closeMediaViewer(true);
+    const ov = document.createElement('div');
+    ov.id = 'mv-ov';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:2100;background:#000;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none';
+    ov.innerHTML = `<div id="mv-track" style="position:absolute;left:0;top:0;bottom:0;display:flex;will-change:transform"></div>
+      <div style="position:absolute;left:0;right:0;top:0;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;pointer-events:none;z-index:20;background:linear-gradient(rgba(0,0,0,.55),transparent)">
+        <span id="mv-cnt" style="color:#fff;font:600 14px system-ui,sans-serif"></span>
+        <button data-mvbtn onclick="closeMediaViewer()" style="pointer-events:auto;background:rgba(255,255,255,.14);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:17px;cursor:pointer">✕</button>
+      </div>
+      <button data-mvbtn id="mv-prev" class="mv-arrow" style="left:10px">‹</button>
+      <button data-mvbtn id="mv-next" class="mv-arrow" style="right:10px">›</button>
+      <style>.mv-arrow{display:none;position:absolute;top:50%;transform:translateY(-50%);z-index:20;background:rgba(255,255,255,.14);border:none;color:#fff;width:44px;height:44px;border-radius:50%;font-size:26px;cursor:pointer}@media (hover:hover){.mv-arrow{display:block}}</style>`;
+    document.body.appendChild(ov);
+    S = { ov, track: ov.querySelector('#mv-track'), cnt: ov.querySelector('#mv-cnt'), prev: ov.querySelector('#mv-prev'), next: ov.querySelector('#mv-next'), slides: [], i: clamp(start || 0, 0, tiles.length - 1), ptrs: new Map(), g: null, lastTap: null };
+    tiles.forEach(t => {
+      const el = document.createElement('div');
+      el.style.cssText = 'flex:0 0 auto;height:100%;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center';
+      let media;
+      if(t.vid) {
+        media = document.createElement('video');
+        media.preload = 'metadata'; media.playsInline = true; media.src = t.data + '#t=0.1';
+      } else { media = document.createElement('img'); media.src = t.data; media.draggable = false; }
+      media.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block;transform-origin:50% 50%;pointer-events:' + (t.vid ? 'auto' : 'none');
+      el.appendChild(media);
+      const sl = { el, media, tile: t, s: 1, tx: 0, ty: 0 };
+      if(t.vid) {
+        const pl = document.createElement('div');
+        pl.textContent = '▶';
+        pl.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;font-size:28px;display:flex;align-items:center;justify-content:center;pointer-events:none';
+        el.appendChild(pl);
+        media.addEventListener('play', () => { pl.style.display = 'none'; });
+        media.addEventListener('pause', () => { pl.style.display = 'flex'; });
+        media.addEventListener('ended', () => { pl.style.display = 'flex'; });
+      }
+      S.slides.push(sl); S.track.appendChild(el);
+    });
+    measure(); go(S.i, false);
+    S.prev.onclick = () => go(S.i - 1); S.next.onclick = () => go(S.i + 1);
+
+    ov.addEventListener('pointerdown', e => {
+      if(e.target.closest('[data-mvbtn]')) return;
+      const sl = S.slides[S.i];
+      if(sl.tile.vid && sl.media.controls && e.target === sl.media) { // низ ролика — родные кнопки плеера
+        const r = sl.media.getBoundingClientRect(); if(e.clientY > r.bottom - 64) return;
+      }
+      S.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      try { ov.setPointerCapture(e.pointerId); } catch(_) {}
+      if(S.ptrs.size === 1) {
+        S.g = { mode: null, x0: e.clientX, y0: e.clientY, t0: Date.now(), tx0: sl.tx, ty0: sl.ty, moved: 0 };
+        S.track.style.transition = 'none';
+      } else if(S.ptrs.size === 2) {
+        layout(false);
+        if(sl.tile.vid) { S.g = { mode: 'none' }; return; }
+        const [a, b] = [...S.ptrs.values()];
+        S.g = { mode: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, s0: sl.s, tx0: sl.tx, ty0: sl.ty, mx0: (a.x + b.x) / 2 - S.W / 2, my0: (a.y + b.y) / 2 - S.H / 2 };
+      }
+    });
+    ov.addEventListener('pointermove', e => {
+      const p = S.ptrs.get(e.pointerId); if(!p) return;
+      p.x = e.clientX; p.y = e.clientY;
+      const g = S.g; if(!g) return;
+      const sl = S.slides[S.i];
+      if(g.mode === 'pinch' && S.ptrs.size >= 2) {
+        const [a, b] = [...S.ptrs.values()];
+        const d = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+        const s = clamp(g.s0 * d / g.d0, 0.8, 6);
+        const mx = (a.x + b.x) / 2 - S.W / 2, my = (a.y + b.y) / 2 - S.H / 2;
+        sl.s = s; sl.tx = mx - (g.mx0 - g.tx0) * s / g.s0; sl.ty = my - (g.my0 - g.ty0) * s / g.s0;
+        if(s > 1) clampPan(sl);
+        setZ(sl, false); return;
+      }
+      if(S.ptrs.size !== 1 || g.mode === 'none' || g.mode === 'pinch') return;
+      const dx = e.clientX - g.x0, dy = e.clientY - g.y0;
+      g.moved = Math.max(g.moved, Math.hypot(dx, dy));
+      if(!g.mode && g.moved > 8) g.mode = sl.s > 1.02 ? 'pan' : (Math.abs(dx) >= Math.abs(dy) ? 'swipe' : 'vdrag');
+      if(g.mode === 'pan') { sl.tx = g.tx0 + dx; sl.ty = g.ty0 + dy; clampPan(sl); setZ(sl, false); }
+      else if(g.mode === 'swipe') {
+        let x = dx;
+        if((S.i === 0 && dx > 0) || (S.i === S.slides.length - 1 && dx < 0)) x = dx * 0.3;
+        S.track.style.transform = `translate(${baseX() + x}px,0)`;
+      } else if(g.mode === 'vdrag') {
+        S.track.style.transform = `translate(${baseX()}px,${dy}px)`;
+        S.ov.style.background = `rgba(0,0,0,${1 - Math.min(Math.abs(dy) / 420, .6)})`;
+      }
+    });
+    const up = e => {
+      if(!S.ptrs.has(e.pointerId)) return;
+      const sl = S.slides[S.i], g = S.g;
+      S.ptrs.delete(e.pointerId);
+      if(!g) return;
+      if(g.mode === 'pinch' || g.mode === 'none') {
+        if(sl.s < 1.05) resetZ(sl, true);
+        if(S.ptrs.size === 1) { const [p] = [...S.ptrs.values()]; S.g = { mode: sl.tile.vid ? 'none' : 'pan', x0: p.x, y0: p.y, tx0: sl.tx, ty0: sl.ty, moved: 99, t0: Date.now() }; }
+        else S.g = null;
+        return;
+      }
+      if(S.ptrs.size > 0) return;
+      S.g = null;
+      const dx = e.clientX - g.x0, dy = e.clientY - g.y0, dt = Math.max(1, Date.now() - g.t0);
+      if(g.mode === 'swipe') {
+        const v = dx / dt;
+        if(e.type !== 'pointercancel' && (dx < -S.W * 0.15 || v < -0.5)) go(S.i + 1);
+        else if(e.type !== 'pointercancel' && (dx > S.W * 0.15 || v > 0.5)) go(S.i - 1);
+        else layout(true);
+      } else if(g.mode === 'vdrag') {
+        if(Math.abs(dy) > 140 && e.type !== 'pointercancel') window.closeMediaViewer(); else layout(true);
+      } else if(!g.mode && e.type === 'pointerup' && dt < 450) tap(e);
+    };
+    ov.addEventListener('pointerup', up);
+    ov.addEventListener('pointercancel', up);
+    ov.addEventListener('wheel', e => { // ПК: колесо — масштаб
+      e.preventDefault();
+      const sl = S.slides[S.i]; if(sl.tile.vid) return;
+      const s0 = sl.s, s = clamp(s0 * Math.exp(-e.deltaY * 0.002), 1, 6);
+      if(s <= 1.01) { resetZ(sl, false); return; }
+      const px = e.clientX - S.W / 2, py = e.clientY - S.H / 2;
+      sl.s = s; sl.tx = px - (px - sl.tx) * s / s0; sl.ty = py - (py - sl.ty) * s / s0;
+      clampPan(sl); setZ(sl, false);
+    }, { passive: false });
+    ov.addEventListener('contextmenu', e => e.preventDefault());
+    S.onKey = e => {
+      if(e.key === 'Escape') { if(!window.mvBack()) {} e.preventDefault(); }
+      else if(e.key === 'ArrowLeft') go(S.i - 1); else if(e.key === 'ArrowRight') go(S.i + 1);
+    };
+    S.onRes = () => { measure(); S.slides.forEach(sl => { if(sl.s > 1) resetZ(sl, false); }); layout(false); };
+    document.addEventListener('keydown', S.onKey);
+    window.addEventListener('resize', S.onRes);
+  };
+  window.closeMediaViewer = function(silent) {
+    if(!S) return;
+    document.removeEventListener('keydown', S.onKey); window.removeEventListener('resize', S.onRes);
+    S.slides.forEach(sl => { if(sl.tile.vid) { try { sl.media.pause(); } catch(_) {} } });
+    S.ov.remove(); S = null;
+  };
+  // «Назад»: сначала возвращает масштаб, следующее нажатие закрывает просмотр
+  window.mvBack = function() {
+    if(!S) return false;
+    const sl = S.slides[S.i];
+    if(sl.s > 1.02 || sl.tx || sl.ty) { resetZ(sl, true); return true; }
+    window.closeMediaViewer(); return true;
+  };
+  // Матрица: долгое нажатие увеличивает плитку, пока держишь; отпустила — плитка вернулась
+  window.mxAttach = function(root, tiles) {
+    let timer = null, prev = null, sx = 0, sy = 0;
+    const hide = () => { clearTimeout(timer); timer = null; if(prev) { prev.remove(); prev = null; setTimeout(() => { window._mxSuppress = false; }, 60); } };
+    root.addEventListener('pointerdown', e => {
+      const t = e.target.closest('[data-mx]'); if(!t) return;
+      sx = e.clientX; sy = e.clientY;
+      timer = setTimeout(() => {
+        const tile = tiles[+t.dataset.mx]; if(!tile) return;
+        window._mxSuppress = true;
+        prev = document.createElement('div');
+        prev.style.cssText = 'position:fixed;inset:0;z-index:1700;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;pointer-events:none';
+        prev.innerHTML = tile.vid
+          ? `<video src="${tile.data}#t=0.1" preload="metadata" muted playsinline style="max-width:94vw;max-height:84vh;border-radius:10px"></video>`
+          : `<img src="${tile.data}" style="max-width:94vw;max-height:84vh;border-radius:10px;object-fit:contain">`;
+        document.body.appendChild(prev);
+        try { navigator.vibrate && navigator.vibrate(10); } catch(_) {}
+      }, 380);
+    });
+    root.addEventListener('pointermove', e => { if(timer && Math.hypot(e.clientX - sx, e.clientY - sy) > 10) { clearTimeout(timer); timer = null; } });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => root.addEventListener(n, hide));
+    root.addEventListener('contextmenu', e => e.preventDefault());
+    root.addEventListener('click', e => { if(window._mxSuppress) { e.stopPropagation(); e.preventDefault(); } }, true);
+  };
+})();
+
 function openMediaGroup(gid) {
   const tiles = window._mediaGroups[gid] || []; if(!tiles.length) return;
   document.getElementById('media-group-ov')?.remove();
@@ -1047,8 +1289,10 @@ function openMediaGroup(gid) {
   ov.id = 'media-group-ov';
   ov.style.cssText = 'position:fixed;inset:0;z-index:1600;background:rgba(0,0,0,.95);display:flex;flex-direction:column';
   ov.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;color:var(--t1)"><span style="font-size:14px;font-weight:700">${mediaCountLabel(tiles)}</span><button onclick="document.getElementById('media-group-ov').remove()" style="background:none;border:none;color:var(--t1);font-size:22px;cursor:pointer">✕</button></div>
-    <div style="flex:1;overflow-y:auto;padding:0 10px 16px"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:4px">${tiles.map((t, i) => mediaTileHTML(t, gid, i, 'aspect-ratio:1', 0)).join('')}</div></div>`;
+    <div style="flex:1;overflow-y:auto;padding:0 10px 16px"><div class="mx-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:4px;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">${tiles.map((t, i) => mediaTileHTML(t, gid, i, 'aspect-ratio:1', 0)).join('')}</div></div>`;
   document.body.appendChild(ov);
+  const gr = ov.querySelector('.mx-grid');
+  if(gr) { [...gr.children].forEach((c, k) => { c.dataset.mx = k; }); if(window.mxAttach) mxAttach(gr, tiles); }
 }
 // Лоток под стикером: полоса ⇄ мозаика (кнопка или слайд пальцем вниз/вверх)
 function toggleTrayMosaic(stkId, force) {

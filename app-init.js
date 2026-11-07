@@ -72,6 +72,7 @@ window.mcBackStep = function () {
   const on = id => !!$(id) && $(id).classList.contains('on');
   // 1. диалоги и просмотрщики поверх всего
   if ($('edit-entry-dialog')) { closeEditEntry(true); return true; }
+  if (window.mvBack && window.mvBack()) return true;
   const iv = $('img-viewer');
   if (iv && iv.style.display === 'flex') { closeImgViewer(); return true; }
   const dyn = document.querySelector('body > div[style*="z-index:2000"]');
@@ -81,6 +82,7 @@ window.mcBackStep = function () {
   if ($('gal-set') && $('gal-set').classList.contains('show')) { $('gal-set').classList.remove('show'); return true; }
   if ($('gal-sheet') && $('gal-sheet').classList.contains('selmode') && on('gal-ov')) { $('gal-cancel').click(); return true; }
   if (on('gal-ov')) { closeGallery(); return true; }
+  const mgo = $('media-group-ov'); if (mgo) { mgo.remove(); return true; }
   if (on('rem-ov')) { closeLobbyReminders(); return true; }
   if (on('imp-ov')) { closeImportant(); return true; }
   if (on('chk-ov')) { closeLobbyChecklist(); return true; }
