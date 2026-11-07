@@ -574,6 +574,7 @@ function closeAddEntry() {
 async function handleAEFiles(inp) {
   const files = Array.from(inp.files);
   inp.value = '';
+  if(window.mcUpExpect) mcUpExpect(files.length);
   for(const f of files) {
     try {
       toast('⏳ Загрузка ' + f.name + '...');
@@ -1414,6 +1415,7 @@ let _eeAtts = []; // файлы, добавленные в окне редакт
 async function handleEEFiles(inp) {
   const files = Array.from(inp.files);
   inp.value = '';
+  if(window.mcUpExpect) mcUpExpect(files.length);
   for(const f of files) {
     try {
       toast('⏳ Загрузка ' + f.name + '...');
@@ -2476,3 +2478,185 @@ function aeToggleAssign(btn, val, event) {
     btn.style.color = btn.classList.contains('on') ? '#0f0f0f' : 'var(--t2)';
   }
 }
+
+// ═══════════════════════════════════════════
+//  ИНДИКАТОР ЗАГРУЗКИ ФАЙЛОВ: капсула сверху → кружок в левом нижнем углу
+// ═══════════════════════════════════════════
+(function(){
+  if(window._mcUpInit) return; window._mcUpInit = true;
+  const orig = window.uploadToStorage;
+  if(typeof orig !== 'function') return;
+  const POS_KEY = 'mc_up_pos';
+  let seq = 0, st = 'idle'; // idle | run | done | err
+  let total = 0, finished = 0, started = 0, exp = 0, failed = [], doneJobs = [], endTimer = null, capTimer = null, capOpen = false;
+  window.mcUpExpect = n => { exp += (n || 0); }; // сколько файлов выбрано сразу — чтобы счёт был «1 из 5», а не «1 из 1»
+  let cap = null, dot = null;
+
+  const curCtx = cardId => ({
+    spaceId: (typeof currentSpaceId !== 'undefined') ? currentSpaceId : null,
+    cardId: cardId || window._openViewId || ((typeof editId !== 'undefined') ? editId : null) || null
+  });
+  const inThatCard = t => !!t && !!t.cardId && t.cardId === window._openViewId &&
+    ((typeof currentSpaceId === 'undefined') || t.spaceId === currentSpaceId) &&
+    !!document.getElementById('view-ov') && document.getElementById('view-ov').classList.contains('on');
+
+  function ensureUI() {
+    if(cap) return;
+    const style = document.createElement('style');
+    style.textContent = `
+      #mc-up-cap{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%);z-index:2500;background:var(--s2,#2a2a30);border:1px solid var(--accent,#e8c56a);border-radius:22px;padding:9px 16px;font-size:13px;color:var(--t1,#eee);display:none;gap:9px;align-items:center;white-space:nowrap;box-shadow:0 6px 20px rgba(0,0,0,.55);cursor:pointer;max-width:92vw}
+      #mc-up-cap.ok{border-color:var(--green,#5bb87a)}
+      #mc-up-cap.bad{border-color:var(--red,#e86060)}
+      #mc-up-sp{width:16px;height:16px;border:2px solid #555;border-top-color:var(--accent,#e8c56a);border-radius:50%;animation:mcupspin .8s linear infinite;flex-shrink:0}
+      @keyframes mcupspin{to{transform:rotate(360deg)}}
+      #mc-up-dot{position:fixed;z-index:2500;width:46px;height:46px;border-radius:50%;background:var(--s2,#2a2a30);box-shadow:0 6px 20px rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
+      #mc-up-dot svg{position:absolute;inset:0;width:46px;height:46px;transform:rotate(-90deg);pointer-events:none}
+      #mc-up-dot .n{font-size:11px;font-weight:700;color:var(--accent,#e8c56a);pointer-events:none}
+      #mc-up-dot.done{background:var(--green,#5bb87a)} #mc-up-dot.done .n{color:#fff;font-size:20px}
+      #mc-up-dot.err{background:var(--red,#e86060)} #mc-up-dot.err .n{color:#fff;font-size:20px}
+      #mc-up-dot.pulse{animation:mcuppulse 1.6s ease-in-out infinite}
+      @keyframes mcuppulse{0%,100%{box-shadow:0 6px 20px rgba(0,0,0,.6),0 0 0 0 rgba(91,184,122,.55)}50%{box-shadow:0 6px 20px rgba(0,0,0,.6),0 0 0 9px rgba(91,184,122,0)}}`;
+    document.head.appendChild(style);
+    cap = document.createElement('div'); cap.id = 'mc-up-cap';
+    cap.innerHTML = '<span id="mc-up-sp"></span><span id="mc-up-tx"></span>';
+    cap.addEventListener('click', () => collapse());
+    document.body.appendChild(cap);
+    dot = document.createElement('div'); dot.id = 'mc-up-dot';
+    dot.innerHTML = '<svg viewBox="0 0 46 46"><circle cx="23" cy="23" r="20" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="3.5"/><circle id="mc-up-ring" cx="23" cy="23" r="20" fill="none" stroke="#e8c56a" stroke-width="3.5" stroke-dasharray="125.7" stroke-dashoffset="125.7" stroke-linecap="round" style="transition:stroke-dashoffset .35s"/></svg><span class="n" id="mc-up-n"></span>';
+    document.body.appendChild(dot);
+    placeDot();
+    // перетаскивание кружка; короткое нажатие — действие
+    let d = null;
+    dot.addEventListener('pointerdown', e => {
+      const r = dot.getBoundingClientRect();
+      d = { x0: e.clientX, y0: e.clientY, l0: r.left, t0: r.top, moved: false };
+      try { dot.setPointerCapture(e.pointerId); } catch(_) {}
+    });
+    dot.addEventListener('pointermove', e => {
+      if(!d) return;
+      const dx = e.clientX - d.x0, dy = e.clientY - d.y0;
+      if(!d.moved && Math.hypot(dx, dy) > 6) d.moved = true;
+      if(d.moved) { setDotPos(d.l0 + dx, d.t0 + dy); dot.style.cursor = 'grabbing'; }
+    });
+    const end = e => {
+      if(!d) return; const x = d; d = null; dot.style.cursor = '';
+      if(x.moved) { try { const r = dot.getBoundingClientRect(); localStorage.setItem(POS_KEY, JSON.stringify({ l: r.left / innerWidth, t: r.top / innerHeight })); } catch(_) {} return; }
+      if(e.type === 'pointerup') dotTap();
+    };
+    dot.addEventListener('pointerup', end); dot.addEventListener('pointercancel', end);
+    window.addEventListener('resize', placeDot);
+  }
+  function setDotPos(l, t) {
+    const w = innerWidth, h = innerHeight;
+    dot.style.left = Math.max(4, Math.min(w - 50, l)) + 'px';
+    dot.style.top = Math.max(4, Math.min(h - 50, t)) + 'px';
+  }
+  function placeDot() {
+    if(!dot) return;
+    let p = null; try { p = JSON.parse(localStorage.getItem(POS_KEY) || 'null'); } catch(_) {}
+    if(p && typeof p.l === 'number') setDotPos(p.l * innerWidth, p.t * innerHeight);
+    else setDotPos(12, innerHeight - 46 - (innerWidth < 900 ? 92 : 24)); // по умолчанию — левый нижний угол
+  }
+  function paint() {
+    ensureUI();
+    const n = Math.min(finished + 1, total);
+    document.getElementById('mc-up-tx').textContent = st === 'run' ? 'Загружаю ' + n + ' из ' + total + '…' : cap.dataset.msg || '';
+    document.getElementById('mc-up-sp').style.display = st === 'run' ? '' : 'none';
+    const ring = document.getElementById('mc-up-ring'), nn = document.getElementById('mc-up-n');
+    dot.className = st === 'done' ? 'done pulse' : st === 'err' ? 'err' : '';
+    dot.id = 'mc-up-dot';
+    if(st === 'run') { ring.style.strokeDashoffset = (125.7 * (1 - finished / Math.max(1, total))) + ''; ring.style.display = ''; nn.textContent = n + '/' + total; }
+    else { ring.style.display = 'none'; nn.textContent = st === 'done' ? '✓' : st === 'err' ? '!' : ''; }
+  }
+  function showCap(msg, cls) {
+    ensureUI();
+    cap.dataset.msg = msg || ''; cap.className = cls || ''; cap.id = 'mc-up-cap';
+    cap.style.display = 'flex'; capOpen = true; dot.style.display = 'none';
+    paint();
+    cap.animate([{ opacity: 0, transform: 'translate(-50%,-14px)' }, { opacity: 1, transform: 'translate(-50%,0)' }], { duration: 220, easing: 'ease-out' });
+  }
+  function collapse(then) { // капсула сворачивается в кружок и «улетает» в угол
+    clearTimeout(capTimer);
+    if(!cap || !capOpen) { if(dot && st !== 'idle') { dot.style.display = 'flex'; paint(); } return; }
+    const cr = cap.getBoundingClientRect();
+    cap.style.display = 'none'; capOpen = false;
+    if(st === 'idle') return;
+    placeDot(); dot.style.display = 'flex'; paint();
+    const dr = dot.getBoundingClientRect();
+    try { dot.animate([{ transform: `translate(${cr.left + cr.width / 2 - dr.left - dr.width / 2}px,${cr.top + cr.height / 2 - dr.top - dr.height / 2}px) scale(1.5)`, opacity: .2 }, { transform: 'none', opacity: 1 }], { duration: 420, easing: 'cubic-bezier(.2,.8,.2,1)' }); } catch(_) {}
+  }
+  function openCapTemp() { showCap(); clearTimeout(capTimer); capTimer = setTimeout(() => collapse(), 3000); }
+
+  function begin(j) {
+    ensureUI();
+    clearTimeout(endTimer);
+    if(st !== 'run') { total = 0; finished = 0; started = 0; failed = []; doneJobs = []; if(st === 'done' || st === 'err') { dot.style.display = 'none'; } st = 'run'; openCapFirst(); }
+    started++; total = Math.max(total, started, exp);
+    paint();
+  }
+  function openCapFirst() { showCap(); clearTimeout(capTimer); capTimer = setTimeout(() => collapse(), 2500); }
+  function finish(j, ok) {
+    finished++;
+    if(ok) doneJobs.push(j); else failed.push(j);
+    paint();
+    if(finished >= started) { // больше ничего не грузится: ждём следующий файл пачки (до 6 с), иначе завершаем
+      clearTimeout(endTimer);
+      endTimer = setTimeout(() => { if(finished >= started) { total = finished; complete(); } }, finished >= total ? 900 : 6000);
+    }
+  }
+  function complete() {
+    if(finished < total) return;
+    exp = 0;
+    clearTimeout(capTimer);
+    if(failed.length) {
+      st = 'err'; cap.dataset.msg = '⚠ Не загрузилось: ' + failed.length + ' из ' + total;
+      if(capOpen) { cap.className = 'bad'; paint(); capTimer = setTimeout(() => collapse(), 2500); } else { dot.style.display = 'flex'; paint(); }
+      return;
+    }
+    const last = doneJobs[doneJobs.length - 1];
+    const target = last ? last.ctx : null;
+    if(inThatCard(target)) { // остался в той же карточке — кружок уходит сам
+      st = 'idle';
+      showCap('✓ Загружено' + (total > 1 ? ' · ' + total + ' файла' : ''), 'ok'); document.getElementById('mc-up-sp').style.display = 'none';
+      capTimer = setTimeout(() => { cap.style.display = 'none'; capOpen = false; }, 1800);
+      return;
+    }
+    st = 'done';
+    window._mcUpTarget = { spaceId: target && target.spaceId, cardId: target && target.cardId, urls: doneJobs.filter(j => target && j.ctx.cardId === target.cardId).map(j => j.url).filter(Boolean) };
+    cap.dataset.msg = '✓ Загружено';
+    if(capOpen) { cap.className = 'ok'; paint(); capTimer = setTimeout(() => collapse(), 1800); } else { dot.style.display = 'flex'; paint(); }
+  }
+  function dotTap() {
+    if(st === 'run') { openCapTemp(); return; }
+    if(st === 'err') { const names = failed.map(j => j.name).join(', '); st = 'idle'; dot.style.display = 'none'; failed = []; toast('Не загрузилось: ' + names, true); return; }
+    if(st === 'done') { const t = window._mcUpTarget; st = 'idle'; dot.style.display = 'none'; goTo(t); }
+  }
+  async function goTo(t) {
+    if(!t || !t.cardId) { toast('Файлы загружены'); return; }
+    try {
+      if(t.spaceId && typeof currentSpaceId !== 'undefined' && t.spaceId !== currentSpaceId && typeof setCurrentSpace === 'function') await setCurrentSpace(t.spaceId, true);
+    } catch(e) {}
+    let tries = 0;
+    (function w() {
+      const c = (typeof cards !== 'undefined' ? cards : []).find(x => x.id === t.cardId);
+      if(!c) { if(++tries < 20) { setTimeout(w, 150); return; } toast('Карточка не найдена', true); return; }
+      openView(t.cardId);
+      setTimeout(() => focusEntry(c, t.urls || []), 700);
+    })();
+  }
+  function focusEntry(c, urls) {
+    const has = a => a && urls.some(u => u && a.data === u);
+    const e = (c.entries || []).find(en => (en.attachments || []).some(has) || (en.sessionAtts || []).some(has));
+    if(!e) return;
+    const el = document.querySelector('#view-ov .swipe-content[data-entryid="' + String(e.id).replace(/"/g, '') + '"]');
+    if(el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.style.background = 'rgba(232,197,106,.28)'; el.style.borderRadius = '6px'; setTimeout(() => { el.style.background = 'transparent'; }, 3000); }
+  }
+
+  window.uploadToStorage = async function(file, cardId, entryId) {
+    if(!navigator.onLine || window._upQuiet) return orig.apply(this, arguments);
+    const j = { id: ++seq, name: (file && file.name) || 'файл', ctx: curCtx(cardId), url: null };
+    begin(j);
+    try { const att = await orig.apply(this, arguments); j.url = att && att.data; finish(j, true); return att; }
+    catch(e) { finish(j, false); throw e; }
+  };
+})();
