@@ -940,9 +940,17 @@ function mediaStackHTML(tiles, gid) {
   const face = t => t.vid
     ? `<video src="${t.data}#t=0.1" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover;display:block;pointer-events:none"></video>`
     : `<img src="${t.data}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">`;
+  if(n === 2) { // ровно два файла — рядом, каждый раскрывается так же, как первое фото стопки
+    return `<div style="margin-top:8px">
+      <div style="display:flex;gap:8px;align-items:flex-start">
+        ${[t0, t1].map((t, i) => `<div data-reveal="${gid}" data-idx="${i}" style="flex:1;min-width:0;height:100px;border-radius:8px;overflow:hidden;cursor:pointer;touch-action:pan-y">${face(t)}</div>`).join('')}
+      </div>
+      <div style="font-size:11px;color:var(--t3);margin-top:4px">${mediaCountLabel(tiles)}</div>
+    </div>`;
+  }
   return `<div style="margin-top:8px">
     <div style="display:flex;gap:8px;align-items:flex-start">
-      <div data-reveal="${gid}" style="width:60%;height:100px;border-radius:8px;overflow:hidden;cursor:pointer;touch-action:pan-x">${face(t0)}</div>
+      <div data-reveal="${gid}" data-idx="0" style="width:60%;height:100px;border-radius:8px;overflow:hidden;cursor:pointer;touch-action:pan-y">${face(t0)}</div>
       <div onclick="openMediaGroup('${gid}')" style="position:relative;flex:1;height:100px;cursor:pointer">
         <div style="position:absolute;left:12px;top:0;right:0;bottom:12px;border-radius:8px;background:rgba(255,255,255,.10)"></div>
         <div style="position:absolute;left:6px;top:6px;right:6px;bottom:6px;border-radius:8px;background:rgba(255,255,255,.18)"></div>
@@ -952,37 +960,69 @@ function mediaStackHTML(tiles, gid) {
     <div style="font-size:11px;color:var(--t3);margin-top:4px">${mediaCountLabel(tiles)}</div>
   </div>`;
 }
-// Первое фото стопки: потянуть вниз — показывается целиком; нажатие открывает только его
+// Фото стопки: потянуть вниз — показывается целиком; нажатие открывает его.
+// Палец (телефон): сначала лента листается как обычно; раскрытие включается, только если фото чуть придержать (~0,25 с), потом потянуть.
+// Мышь (ПК): тянуть сразу.
 (function(){
   if(window._revealInit) return; window._revealInit = true;
+  const HOLD = 250, SLOP = 8;
   let r = null;
-  document.addEventListener('pointerdown', e => {
-    const el = e.target.closest && e.target.closest('[data-reveal]'); if(!el) return;
+  const mk = (el, y, pid) => {
     const img = el.querySelector('img');
     let target = 0;
     if(img && img.naturalWidth) target = Math.min(Math.round(el.offsetWidth * img.naturalHeight / img.naturalWidth), Math.round(window.innerHeight * 0.6));
-    r = { el, gid: el.dataset.reveal, y0: e.clientY, h0: el.offsetHeight, min: 100, target, moved: 0, h: el.offsetHeight, pid: e.pointerId };
-    try { el.setPointerCapture(e.pointerId); } catch(_) {}
-  });
-  document.addEventListener('pointermove', e => {
-    if(!r || e.pointerId !== r.pid) return;
-    const dy = e.clientY - r.y0;
-    r.moved = Math.max(r.moved, Math.abs(dy));
-    if(r.moved < 6 || r.target <= r.min + 4) return;
-    r.el.style.transition = 'none';
-    r.h = Math.max(r.min, Math.min(r.h0 + dy, r.target));
-    r.el.style.height = r.h + 'px';
-  });
-  const end = e => {
-    if(!r || e.pointerId !== r.pid) return;
-    const x = r; r = null;
-    if(x.moved < 6) { mediaOpen(x.gid, 0); return; }
+    return { el, gid: el.dataset.reveal, idx: parseInt(el.dataset.idx || '0', 10), y0: y, h0: el.offsetHeight, min: 100, target, moved: 0, h: el.offsetHeight, pid, armed: false, timer: null };
+  };
+  const drag = (x, y) => {
+    const dy = y - x.y0;
+    x.moved = Math.max(x.moved, Math.abs(dy));
+    if(x.moved < 6 || x.target <= x.min + 4) return;
+    x.el.style.transition = 'none';
+    x.h = Math.max(x.min, Math.min(x.h0 + dy, x.target));
+    x.el.style.height = x.h + 'px';
+  };
+  const finish = x => {
+    if(x.moved < 6) { mediaOpen(x.gid, x.idx); return; }
     if(x.target <= x.min + 4) return;
     x.el.style.transition = 'height .2s ease';
     x.el.style.height = (x.h > x.min + (x.target - x.min) * 0.35 ? x.target : x.min) + 'px';
   };
-  document.addEventListener('pointerup', end);
-  document.addEventListener('pointercancel', end);
+  // мышь
+  document.addEventListener('pointerdown', e => {
+    if(e.pointerType === 'touch') return;
+    const el = e.target.closest && e.target.closest('[data-reveal]'); if(!el) return;
+    r = mk(el, e.clientY, e.pointerId); r.armed = true;
+    try { el.setPointerCapture(e.pointerId); } catch(_) {}
+  });
+  document.addEventListener('pointermove', e => { if(r && r.pid === e.pointerId && e.pointerType !== 'touch') drag(r, e.clientY); });
+  const pend = e => { if(!r || r.pid !== e.pointerId || e.pointerType === 'touch') return; const x = r; r = null; finish(x); };
+  document.addEventListener('pointerup', pend);
+  document.addEventListener('pointercancel', pend);
+  // палец
+  let t = null;
+  document.addEventListener('touchstart', e => {
+    const el = e.target.closest && e.target.closest('[data-reveal]'); if(!el || e.touches.length !== 1) { t = null; return; }
+    t = mk(el, e.touches[0].clientY, 0); t.x0 = e.touches[0].clientX; t.scrolled = false;
+    t.timer = setTimeout(() => { if(t && !t.scrolled) { t.armed = true; t.el.style.outline = '2px solid var(--accent)'; try { navigator.vibrate && navigator.vibrate(12); } catch(_) {} } }, HOLD);
+  }, {passive: true});
+  document.addEventListener('touchmove', e => {
+    if(!t) return;
+    const y = e.touches[0].clientY, x = e.touches[0].clientX;
+    if(!t.armed) { // ещё не «зацепили» — это обычная прокрутка ленты
+      if(Math.abs(y - t.y0) > SLOP || Math.abs(x - t.x0) > SLOP) { t.scrolled = true; clearTimeout(t.timer); t = null; }
+      return;
+    }
+    if(e.cancelable) e.preventDefault();
+    drag(t, y);
+  }, {passive: false});
+  const tend = () => {
+    if(!t) return; const x = t; t = null; clearTimeout(x.timer);
+    x.el.style.outline = '';
+    if(x.scrolled) return;
+    finish(x);
+  };
+  document.addEventListener('touchend', tend, {passive: true});
+  document.addEventListener('touchcancel', () => { if(t) { clearTimeout(t.timer); t.el.style.outline = ''; t = null; } }, {passive: true});
 })();
 function mediaOpen(gid, i) {
   const t = (window._mediaGroups[gid] || [])[i]; if(!t) return;
