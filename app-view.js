@@ -943,7 +943,7 @@ function mediaStackHTML(tiles, gid) {
   if(n === 2) { // ровно два файла — рядом, каждый раскрывается так же, как первое фото стопки
     return `<div style="margin-top:8px">
       <div style="display:flex;gap:8px;align-items:flex-start">
-        ${[t0, t1].map((t, i) => `<div data-reveal="${gid}" data-idx="${i}" style="flex:1;min-width:0;height:100px;border-radius:8px;overflow:hidden;cursor:pointer;touch-action:pan-y">${face(t)}</div>`).join('')}
+        ${[t0, t1].map((t, i) => `<div data-reveal="${gid}" data-idx="${i}" data-pair="1" style="flex:1;min-width:0;height:100px;border-radius:8px;overflow:hidden;cursor:pointer;touch-action:pan-y">${face(t)}</div>`).join('')}
       </div>
       <div style="font-size:11px;color:var(--t3);margin-top:4px">${mediaCountLabel(tiles)}</div>
     </div>`;
@@ -971,7 +971,16 @@ function mediaStackHTML(tiles, gid) {
     const img = el.querySelector('img');
     let target = 0;
     if(img && img.naturalWidth) target = Math.min(Math.round(el.offsetWidth * img.naturalHeight / img.naturalWidth), Math.round(window.innerHeight * 0.6));
-    return { el, gid: el.dataset.reveal, idx: parseInt(el.dataset.idx || '0', 10), y0: y, h0: el.offsetHeight, min: 100, target, moved: 0, h: el.offsetHeight, pid, armed: false, timer: null };
+    const peers = [];
+    if(el.dataset.pair) { // два фото: раскрываются вместе
+      document.querySelectorAll('[data-reveal][data-pair]').forEach(p => {
+        if(p === el || p.dataset.reveal !== el.dataset.reveal || !p.parentNode || p.parentNode !== el.parentNode) return;
+        const pi = p.querySelector('img'); let pt = 0;
+        if(pi && pi.naturalWidth) pt = Math.min(Math.round(p.offsetWidth * pi.naturalHeight / pi.naturalWidth), Math.round(window.innerHeight * 0.6));
+        peers.push({ el: p, h0: p.offsetHeight, target: pt });
+      });
+    }
+    return { el, peers, gid: el.dataset.reveal, idx: parseInt(el.dataset.idx || '0', 10), y0: y, h0: el.offsetHeight, min: 100, target, moved: 0, h: el.offsetHeight, pid, armed: false, timer: null };
   };
   const drag = (x, y) => {
     const dy = y - x.y0;
@@ -980,12 +989,15 @@ function mediaStackHTML(tiles, gid) {
     x.el.style.transition = 'none';
     x.h = Math.max(x.min, Math.min(x.h0 + dy, x.target));
     x.el.style.height = x.h + 'px';
+    x.peers.forEach(p => { if(p.target <= x.min + 4) return; p.el.style.transition = 'none'; p.el.style.height = Math.max(x.min, Math.min(p.h0 + dy, p.target)) + 'px'; });
   };
   const finish = x => {
     if(x.moved < 6) { mediaOpen(x.gid, x.idx); return; }
     if(x.target <= x.min + 4) return;
     x.el.style.transition = 'height .2s ease';
-    x.el.style.height = (x.h > x.min + (x.target - x.min) * 0.35 ? x.target : x.min) + 'px';
+    const open = x.h > x.min + (x.target - x.min) * 0.35;
+    x.el.style.height = (open ? x.target : x.min) + 'px';
+    x.peers.forEach(p => { if(p.target <= x.min + 4) return; p.el.style.transition = 'height .2s ease'; p.el.style.height = (open ? p.target : x.min) + 'px'; });
   };
   // мышь
   document.addEventListener('pointerdown', e => {
