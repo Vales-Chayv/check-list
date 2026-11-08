@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════
 (function(){
   const CLOUD = '<svg width="22" height="17" viewBox="0 0 34 26" fill="none" stroke="#e8c56a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 22a6 6 0 0 1-.7-11.95A8 8 0 0 1 23.6 8.2 6.6 6.6 0 0 1 25 22z"/><path d="M17 10v8m-3.5-3.2L17 18.4l3.5-3.6"/></svg>';
-  const G = { type: 'all', space: 'all', sel: false, picked: new Set(), items: [], local: new Set(), shown: 90, built: false };
+  const G = { type: 'all', space: 'all', sel: false, picked: new Set(), items: [], local: new Set(), orig: new Set(), shown: 90, built: false };
   const $ = id => document.getElementById(id);
   const X = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const isDesk = () => window.matchMedia('(min-width:900px)').matches;
@@ -33,6 +33,7 @@
   .gal-dl span{width:34px;height:26px;border-radius:13px;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center}
   .gal-dl.busy{opacity:.6;pointer-events:none}
   #gal-sheet.selmode .gal-dl{display:none}
+  .gal-or{position:absolute;left:4px;bottom:3px;font-size:10px;background:rgba(0,0,0,.6);border-radius:8px;padding:0 4px;z-index:2;text-decoration:none}
   .gal-t.cl::after{content:'';position:absolute;inset:0;background:rgba(0,0,0,.22);pointer-events:none;z-index:1}
   .gal-t.doc{display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:var(--t2);text-align:center;padding:4px;word-break:break-all}
   .gal-t.doc b{font-size:24px;display:block;margin-bottom:2px}
@@ -132,7 +133,8 @@
     } catch(e) { console.log('gallery pull error:', e.message || e); return false; }
   }
   async function loadLocal() {
-    G.local = new Set();
+    G.local = new Set(); G.orig = new Set();
+    try { (await mcVaultMeta()).forEach(m => { if(m.url) G.orig.add(m.url); }); } catch(e) {}
     try {
       const db = await mcMediaDb();
       const all = await new Promise((res, rej) => { const q = db.transaction('idx').objectStore('idx').getAll(); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
@@ -172,6 +174,8 @@
         <div class="gal-row"><span>Скачивать ролики на Wi-Fi</span><span class="gal-sw" id="gal-s1"></span></div>
         <div class="gal-row"><span>Скачивать фото автоматически</span><span class="gal-sw" id="gal-s2"></span></div>
         <div class="gal-row"><span>Лимит на устройстве</span><select id="gal-lim" style="background:var(--s1);color:var(--t1);border:1px solid var(--b1);border-radius:6px;padding:4px"><option value="300">300 МБ</option><option value="500">500 МБ</option><option value="1024">1 ГБ</option><option value="2048">2 ГБ</option></select></div>
+        <div class="gal-row"><span>После съёмки камерой</span><select id="gal-cap" style="background:var(--s1);color:var(--t1);border:1px solid var(--b1);border-radius:6px;padding:4px"><option value="ask">Спрашивать</option><option value="orig">Оригинал + копия</option><option value="small">Только копия</option></select></div>
+        <div class="gal-row"><span id="gal-vault"></span><button class="gal-btn" id="gal-vzip">Оригиналы ZIP</button></div>
         <div class="gal-row" style="border:none"><span id="gal-us2"></span><button class="gal-btn" id="gal-clear">Очистить</button></div>
         <div style="text-align:center;margin-top:6px"><button class="gal-btn" id="gal-setx">Закрыть</button></div>
       </div></div>`;
@@ -222,6 +226,8 @@
     $('gal-setx').onclick = () => $('gal-set').classList.remove('show');
     $('gal-s1').onclick = e => { const c = cfg(); c.videosWifi = !c.videosWifi; saveCfg(c); fillSettings(); };
     $('gal-s2').onclick = e => { const c = cfg(); c.photosAuto = !c.photosAuto; saveCfg(c); fillSettings(); };
+    $('gal-cap').onchange = e => { try { localStorage.setItem('mc_cap_mode', e.target.value); } catch(_) {} };
+    $('gal-vzip').onclick = async () => { const l = await mcVaultAllItems(); if(!l.length) { toast('Оригиналов пока нет'); return; } if(window.mcSaveZip) mcSaveZip(l, 'Оригиналы.zip'); };
     $('gal-lim').onchange = e => { const c = cfg(); c.capMB = +e.target.value; saveCfg(c); fillSettings(); };
     $('gal-clear').onclick = async () => {
       try {
@@ -262,6 +268,8 @@
     $('gal-s1').classList.toggle('on', !!c.videosWifi);
     $('gal-s2').classList.toggle('on', !!c.photosAuto);
     $('gal-lim').value = String(c.capMB);
+    $('gal-cap').value = mcCapMode();
+    try { const v = await mcVaultStats(); $('gal-vault').textContent = '💎 Оригиналы: ' + v.count + ' · ' + fmtMB(v.bytes); } catch(e) {}
     const u = await mcMediaUsage();
     $('gal-us2').textContent = 'Занято: ' + fmtMB(u.bytes) + ' · ' + u.files + ' файлов' + (u.pinned ? ' (📌 ' + u.pinned + ' закреплено: не вытесняются)' : '');
   }
@@ -290,7 +298,7 @@
       if(it.kind === 'img') inner = `<img src="${X(it.url)}" loading="lazy" alt="">`;
       else if(it.kind === 'vid') inner = `<video src="${X(it.url)}#t=0.1" preload="metadata" muted playsinline></video><i>▶</i>`;
       else inner = `<b>${it.kind === 'aud' ? '🎤' : '📄'}</b>${X(it.name || (it.kind === 'aud' ? 'запись' : 'файл'))}`;
-      h += `<div class="${cls}" data-i="${o.i}">${inner}${cl ? '<button class="gal-dl" data-dl="' + o.i + '" aria-label="Скачать на устройство"><span>' + CLOUD + '</span></button>' : ''}<span class="gal-sel"></span></div>`;
+      h += `<div class="${cls}" data-i="${o.i}">${inner}${cl ? '<button class="gal-dl" data-dl="' + o.i + '" aria-label="Скачать на устройство"><span>' + CLOUD + '</span></button>' : ''}${G.orig.has(it.url) ? '<u class="gal-or" title="Оригинал на этом устройстве">💎</u>' : ''}<span class="gal-sel"></span></div>`;
     });
     if(cur !== null) h += '</div>';
     if(L.length > G.shown) h += `<button class="gal-more">Показать ещё (${L.length - G.shown})</button>`;
@@ -307,6 +315,7 @@
   // ── действия ──
   async function fetchBlob(url) {
     if(url.startsWith('data:')) return await (await fetch(url)).blob();
+    try { const o = await mcVaultBlobByUrl(url); if(o) return o; } catch(e) {}
     const r = await fetch(url, { mode: 'cors' });
     if(r.status === 404 || r.status === 400) throw new Error('gone');
     if(!r.ok) throw new Error('http ' + r.status);

@@ -1348,14 +1348,14 @@ function openMediaGroup(gid) {
   if(window.mcSaveFolder) return;
   const EXT = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif', 'video/mp4': '.mp4', 'video/webm': '.webm', 'video/quicktime': '.mov', 'audio/webm': '.webm', 'application/pdf': '.pdf' };
   const baseName = (it, blob, k) => {
-    let n = it.name || '';
+    let n = (blob && blob.name) || it.name || '';
     if(!n) { try { n = decodeURIComponent(String(it.url).split('?')[0].split('/').pop() || ''); } catch(_) { n = ''; } n = n.replace(/^[A-Za-z0-9]{6,}_/, ''); }
     if(!n || String(it.url).startsWith('data:')) n = n || 'mycards_' + (k + 1);
     if(!/\.[A-Za-z0-9]{2,5}$/.test(n)) n += EXT[blob.type] || '';
     return n.replace(/[\\/:*?"<>|]/g, '_');
   };
   const uniq = (n, used) => { if(!used.has(n)) { used.add(n); return n; } const d = n.lastIndexOf('.'), a = d > 0 ? n.slice(0, d) : n, b = d > 0 ? n.slice(d) : ''; let i = 2; while(used.has(a + ' (' + i + ')' + b)) i++; const r = a + ' (' + i + ')' + b; used.add(r); return r; };
-  async function getBlob(url) { const r = await fetch(url, url.startsWith('data:') ? undefined : { mode: 'cors' }); if(!r.ok) throw new Error('http ' + r.status); return await r.blob(); }
+  async function getBlob(url) { try { const o = typeof mcVaultBlobByUrl === 'function' ? await mcVaultBlobByUrl(url) : null; if(o) return o; } catch(_) {} const r = await fetch(url, url.startsWith('data:') ? undefined : { mode: 'cors' }); if(!r.ok) throw new Error('http ' + r.status); return await r.blob(); }
   window.mcSaveFolder = async function(items) {
     if(!items || !items.length) return;
     if(!window.showDirectoryPicker) { toast('Этот браузер не умеет сохранять в папку — нажми «ZIP»', true); return; }

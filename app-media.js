@@ -48,6 +48,7 @@ async function mcPrepareFile(file) {
 // оборачиваем загрузку: сначала сжимаем и проверяем размер, потом грузим
 const mcOrigUpload = uploadToStorage;
 uploadToStorage = async function(file, cardId, entryId) {
+  const _capKey = mcCapKey(file), _capId = _mcCapPend.get(_capKey); // если это снимок из камеры приложения — у него есть оригинал в 💎
   file = await mcPrepareFile(file);
   const _vid = (file.type || '').startsWith('video/') && typeof window.mcNativeStatus === 'function';
   const _t0 = Date.now();
@@ -66,6 +67,7 @@ uploadToStorage = async function(file, cardId, entryId) {
   if(_vid) window.mcNativeStatus(null);
   if(att && typeof att === 'object' && !att.ts) att.ts = Date.now(); // время загрузки: нужно для галереи
   try { if(att && att.data && MC_ATT_RE.test(String(att.data))) mcCacheOwn(String(att.data), file).catch(() => {}); } catch(e) {}
+  try { if(_capId && att && att.data && MC_ATT_RE.test(String(att.data))) { _mcCapPend.delete(_capKey); mcVaultLink(_capId, String(att.data)).catch(() => {}); } } catch(e) {}
   try { // у отправителя файл уже есть: отмечаем получение сразу
     const p = att && mcPathOf(att.data);
     if(p && typeof currentUser !== 'undefined' && currentUser && currentUser.id) sb.from('attachment_receipts').upsert([{ path: p, user_id: currentUser.id }], { onConflict: 'path,user_id', ignoreDuplicates: true }).then(() => {}, () => {});
@@ -227,6 +229,7 @@ async function mcStorageNotice() {
   if(st.danger > 0) mcWarnOnce('danger', '⚠ ' + st.danger + ' файл(ов) скоро исчезнут из облака и ещё не сохранены на этом устройстве. Зайди в Галерею — там кнопка «Сохранить сейчас».');
   if(st.pct >= 0.95) mcWarnOnce('cap95', '🔴 Память приложения почти заполнена: ' + mb(st.bytes) + ' из ' + mb(st.cap) + ' МБ. Увеличь лимит в Галерее (⚙) или сделай резервную копию.');
   else if(st.pct >= 0.8) mcWarnOnce('cap80', '🟡 Память приложения заполнена на ' + Math.round(st.pct * 100) + '% (' + mb(st.bytes) + ' из ' + mb(st.cap) + ' МБ).');
+  try { const v = await mcVaultStats(); if(v.bytes >= 1536 * 1048576) mcWarnOnce('vault', '💎 Оригиналы занимают ' + (v.bytes / 1073741824).toFixed(1) + ' ГБ на устройстве. Сделай резервную копию и освободи место (скоро появится кнопка в Галерее).'); } catch(e) {}
   if(st.dev && st.dev.quota && st.dev.quota - st.dev.usage < 300 * 1048576) mcWarnOnce('dev', '🔴 На устройстве заканчивается свободное место: осталось ' + mb(st.dev.quota - st.dev.usage) + ' МБ.');
 }
 
@@ -318,6 +321,114 @@ document.addEventListener('error', e => {
   el.title = 'Файл удалён из облака и не был сохранён на этом устройстве';
 }, true);
 
+// ═══════════════════════════════════════════
+//  ХРАНИЛИЩЕ ОРИГИНАЛОВ (💎)
+//  Снимки и ролики, снятые камерой внутри приложения, можно оставить на устройстве в исходном качестве,
+//  а в облако отправить сжатую копию. Оригиналы лежат в отдельной базе 'mc-vault' и сами никогда не удаляются.
+//  meta — описание (быстро читается), orig — сам файл.
+// ═══════════════════════════════════════════
+let _mcVaultP = null;
+function mcVaultDb() {
+  if(_mcVaultP) return _mcVaultP;
+  _mcVaultP = new Promise((res, rej) => {
+    const r = indexedDB.open('mc-vault', 1);
+    r.onupgradeneeded = () => {
+      const d = r.result;
+      d.createObjectStore('orig', { keyPath: 'id' });
+      d.createObjectStore('meta', { keyPath: 'id' }).createIndex('url', 'url');
+    };
+    r.onsuccess = () => res(r.result); r.onerror = () => { _mcVaultP = null; rej(r.error); };
+  });
+  return _mcVaultP;
+}
+const _mcIdb = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+const _mcTx = t => new Promise((res, rej) => { t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); });
+async function mcVaultPut(file, kind) {
+  const db = await mcVaultDb(), id = 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const t = db.transaction(['orig', 'meta'], 'readwrite');
+  t.objectStore('orig').put({ id, blob: file });
+  t.objectStore('meta').put({ id, name: file.name || (kind === 'video' ? 'video' : 'photo'), type: file.type || '', size: file.size, ts: Date.now(), kind: kind || '', url: null });
+  await _mcTx(t);
+  return id;
+}
+async function mcVaultLink(id, url) {
+  const db = await mcVaultDb();
+  const t = db.transaction('meta', 'readwrite'), st = t.objectStore('meta');
+  const r = await _mcIdb(st.get(id));
+  if(r) st.put({ ...r, url });
+  await _mcTx(t);
+}
+async function mcVaultMeta() {
+  try { const db = await mcVaultDb(); return await _mcIdb(db.transaction('meta').objectStore('meta').getAll()); } catch(e) { return []; }
+}
+async function mcVaultStats() {
+  const m = await mcVaultMeta();
+  return { count: m.length, bytes: m.reduce((s, x) => s + (x.size || 0), 0) };
+}
+async function _mcVaultFile(db, id, m) {
+  const o = await _mcIdb(db.transaction('orig').objectStore('orig').get(id));
+  return o ? new File([o.blob], m.name, { type: m.type || o.blob.type }) : null;
+}
+// оригинал по адресу копии в облаке (или null)
+async function mcVaultBlobByUrl(url) {
+  try {
+    if(!url || !MC_ATT_RE.test(url)) return null;
+    const db = await mcVaultDb();
+    const m = await _mcIdb(db.transaction('meta').objectStore('meta').index('url').get(url));
+    return m ? await _mcVaultFile(db, m.id, m) : null;
+  } catch(e) { return null; }
+}
+window.mcVaultBlobByUrl = mcVaultBlobByUrl;
+// все оригиналы в виде {url, name} для «Сохранить в ZIP»
+async function mcVaultAllItems() {
+  const db = await mcVaultDb(), out = [];
+  for(const m of await mcVaultMeta()) {
+    const f = await _mcVaultFile(db, m.id, m);
+    if(f) out.push({ url: URL.createObjectURL(f), name: m.name });
+  }
+  setTimeout(() => out.forEach(x => { try { URL.revokeObjectURL(x.url); } catch(e) {} }), 20 * 60000);
+  return out;
+}
+
+// ── Вопрос после съёмки ──
+const _mcCapPend = new Map(); // ключ файла → id оригинала, пока файл не загрузился в облако
+const mcCapKey = f => (f.name || '') + '|' + f.size + '|' + f.lastModified;
+function mcCapMode() { try { return localStorage.getItem('mc_cap_mode') || 'ask'; } catch(e) { return 'ask'; } }
+function mcCapAsk(kind, file) {
+  return new Promise(resolve => {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;font-family:inherit';
+    const mb = (file.size / 1048576).toFixed(1);
+    const b = 'width:100%;border-radius:12px;padding:13px 12px;font-size:14px;cursor:pointer;font-family:inherit;text-align:left;line-height:1.35;border:1px solid #555;background:#2a2a2a;color:#eee';
+    ov.innerHTML = '<div style="background:#1c1c1c;color:#eee;border-radius:16px;padding:18px 16px;max-width:380px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.6)">' +
+      '<div style="font-size:16px;font-weight:700;margin-bottom:4px">' + (kind === 'video' ? '🎥 Ролик снят' : '📷 Снимок сделан') + ' · ' + mb + ' МБ</div>' +
+      '<div style="font-size:12px;opacity:.7;margin-bottom:12px">В облако всегда уходит сжатая копия (фото до 1920 px). Что сделать с оригиналом?</div>' +
+      '<button id="mc-cap-o" style="' + b + ';background:#B8892B;color:#111;border-color:#B8892B;font-weight:600;margin-bottom:8px">💎 Оставить оригинал на устройстве<br><span style="font-weight:400;font-size:12px">и отправить сжатую копию</span></button>' +
+      '<button id="mc-cap-s" style="' + b + '">☁ Только сжатая копия<br><span style="opacity:.7;font-size:12px">оригинал не сохранять</span></button>' +
+      '<label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;opacity:.85"><input type="checkbox" id="mc-cap-r"> Запомнить выбор (меняется в Галерее ⚙)</label></div>';
+    document.body.appendChild(ov);
+    const fin = mode => { const r = ov.querySelector('#mc-cap-r').checked; ov.remove(); resolve({ mode, remember: r }); };
+    ov.querySelector('#mc-cap-o').onclick = () => fin('orig');
+    ov.querySelector('#mc-cap-s').onclick = () => fin('small');
+  });
+}
+// вызывается для каждого снимка/ролика, снятого через камеру приложения
+async function mcCapFlow(kind, file, deliver) {
+  try {
+    let mode = mcCapMode();
+    if(mode === 'ask') {
+      const r = await mcCapAsk(kind, file);
+      mode = r.mode;
+      if(r.remember) { try { localStorage.setItem('mc_cap_mode', mode); } catch(e) {} }
+    }
+    if(mode === 'orig') {
+      try { _mcCapPend.set(mcCapKey(file), await mcVaultPut(file, kind)); }
+      catch(e) { try { toast('Не удалось сохранить оригинал на устройстве (нет места?). Отправляю только копию.', true); } catch(_) {} }
+    }
+  } catch(e) {}
+  deliver(file);
+}
+
 // ===== Камера: снимок и запись ролика =====
 // Телефон: родная камера Android (input capture). ПК: своё окно с веб-камерой.
 // target — id скрытого input (положим файл в него и вызовем его onchange) или функция(file)
@@ -334,15 +445,16 @@ function mcCamDeliver(target, file) {
   } catch (e) { toast('Не удалось передать файл: ' + e.message, true); }
 }
 function mcCam(kind, target) {
+  // снятый файл сначала проходит через вопрос «оставить оригинал?» (mcCapFlow), потом попадает в поле загрузки
+  const give = f => mcCapFlow(kind, f, x => { if (typeof target === 'function') target(x); else mcCamDeliver(target, x); });
   const useInput = () => {
-    if (typeof target === 'string') { const i = document.getElementById(target); if (i) i.click(); return; }
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = kind === 'video' ? 'video/*' : 'image/*'; inp.setAttribute('capture', 'environment');
-    inp.onchange = () => { if (inp.files && inp.files[0]) target(inp.files[0]); };
+    inp.onchange = () => { if (inp.files && inp.files[0]) give(inp.files[0]); };
     inp.click();
   };
   if (mcIsMobile() || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { useInput(); return; }
-  mcCamOpen(kind, f => mcCamDeliver(target, f), useInput);
+  mcCamOpen(kind, give, useInput);
 }
 function mcCamOpen(kind, onFile, onFail) {
   if (document.getElementById('mc-cam-ov')) return;
