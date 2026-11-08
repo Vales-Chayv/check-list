@@ -300,13 +300,14 @@ async function mergeCardEntries(card) {
 }
 async function dbInsert(card) {
   await local.put('cards', card);
+  const rc = window.mcPendStrip ? window.mcPendStrip(card) : card; // файлы, что ещё грузятся, на сервер не уходят
   if (navigator.onLine) {
     setSyncDot('sync');
-    const {error}=await sb.from('cards').insert(card);
-    if(!error) saveCardBase(card);
-    if(error){ if(error.code!=='23505') await queueOp({type:'insert',data:card}); setSyncDot('err'); }
+    const {error}=await sb.from('cards').insert(rc);
+    if(!error) saveCardBase(rc);
+    if(error){ if(error.code!=='23505') await queueOp({type:'insert',data:rc}); setSyncDot('err'); }
     else setSyncDot('ok');
-  } else { await queueOp({type:'insert',data:card}); setSyncDot('err'); }
+  } else { await queueOp({type:'insert',data:rc}); setSyncDot('err'); }
 }
 
 async function dbUpdate(card) {
@@ -319,10 +320,11 @@ async function dbUpdate(card) {
       await local.put('cards', card);
       if(typeof render === 'function') render();
     }
-    const {id,...d}=card; const {error}=await sb.from('cards').update(d).eq('id',id);
-    if(error){ await queueOp({type:'update',data:card}); setSyncDot('err'); }
-    else { saveCardBase(card); setSyncDot('ok'); }
-  } else { await queueOp({type:'update',data:card}); setSyncDot('err'); }
+    const rc = window.mcPendStrip ? window.mcPendStrip(card) : card; // файлы, что ещё грузятся, на сервер не уходят
+    const {id,...d}=rc; const {error}=await sb.from('cards').update(d).eq('id',id);
+    if(error){ await queueOp({type:'update',data:rc}); setSyncDot('err'); }
+    else { saveCardBase(rc); setSyncDot('ok'); }
+  } else { await queueOp({type:'update',data:window.mcPendStrip ? window.mcPendStrip(card) : card}); setSyncDot('err'); }
 }
 
 async function dbDelete(id) {
@@ -496,58 +498,31 @@ async function deleteOfflineFile(tempId) {
   return dbLocal('offline_files', 'readwrite', s => s.delete(tempId));
 }
 
-let _syncOffBusy = false;
-// заменяет в карточке временный офлайн-файл (по id или по base64) на настоящий из хранилища
-function _replaceOfflineAtt(card, f, att) {
-  let hit = false;
-  const sw = a => {
-    if(a && (a.id === f.tempId || (f.base64 && a.data === f.base64))) { hit = true; const n = { ...a, ...att }; delete n.offline; return n; }
-    return a;
-  };
-  if(Array.isArray(card.attachments)) card.attachments = card.attachments.map(sw);
-  (card.entries || []).forEach(en => {
-    if(Array.isArray(en.attachments)) en.attachments = en.attachments.map(sw);
-    if(Array.isArray(en.sessionAtts)) en.sessionAtts = en.sessionAtts.map(sw);
-  });
-  return hit;
-}
 async function syncOfflineFiles() {
-  if(!navigator.onLine || _syncOffBusy) return;
-  _syncOffBusy = true;
-  try {
-    const files = await getOfflineFiles();
-    if(!files.length) return;
-    // все карточки: открытого кабинета (в памяти) + сохранённые на устройстве (другие кабинеты, чаты)
-    const pool = new Map();
-    try { (await local.getAll('cards')).forEach(c => pool.set(c.id, c)); } catch(e) {}
-    (cards || []).forEach(c => pool.set(c.id, c));
-    let okCount = 0;
-    for(const f of files) {
-      try {
-        const holder = [...pool.values()].find(c => JSON.stringify([c.attachments, (c.entries || []).map(e => [e.attachments, e.sessionAtts])]).includes(f.tempId));
-        const blob = await fetch(f.base64).then(r => r.blob());
-        const file = new File([blob], f.name, { type: f.type });
-        const att = await uploadToStorage(file, holder ? holder.id : (f.cardId || undefined));
-        if(att && att.offline) continue; // сети всё ещё нет — оставим на потом
-        let touched = false;
-        for(const c of pool.values()) {
-          if(_replaceOfflineAtt(c, f, att)) {
-            touched = true;
-            const live = (cards || []).find(x => x.id === c.id);
-            if(live && live !== c) _replaceOfflineAtt(live, f, att);
-            await dbUpdate(c);
-          }
+  if(!navigator.onLine) return;
+  const files = await getOfflineFiles();
+  if(!files.length) return;
+  for(const f of files) {
+    try {
+      const blob = await fetch(f.base64).then(r=>r.blob());
+      const file = new File([blob], f.name, {type:f.type});
+      const att = await uploadToStorage(file);
+      // Update card entry with real URL
+      const card = cards.find(c=>c.id===f.cardId);
+      if(card) {
+        const entries = card.entries||[];
+        const entry = entries.find(e=>e.id===f.entryId);
+        if(entry) {
+          entry.sessionAtts = (entry.sessionAtts||[]).map(a=>a.data===f.base64?att:a);
+        } else {
+          card.attachments = (card.attachments||[]).map(a=>a.data===f.base64?att:a);
         }
-        await deleteOfflineFile(f.tempId); // карточки с этим файлом нет (удалена) — файл просто не нужен
-        okCount++;
-      } catch(e) {
-        console.log('Offline file sync error:', e && e.message);
+        await dbUpdate(card);
       }
+      await deleteOfflineFile(f.tempId);
+    } catch(e) {
+      console.log('Offline file sync error:', e.message);
     }
-    if(okCount) { try { toast('✓ Загружено из очереди: ' + okCount); } catch(_) {} if(typeof render === 'function') try { render(); } catch(_) {} }
-  } finally { _syncOffBusy = false; }
+  }
 }
-// приложение открыли уже с интернетом, а файлы остались с прошлого раза — догружаем
-window.addEventListener('load', () => setTimeout(() => { if(navigator.onLine) syncOfflineFiles().catch(() => {}); }, 6000));
-document.addEventListener('visibilitychange', () => { if(!document.hidden && navigator.onLine) syncOfflineFiles().catch(() => {}); });
 

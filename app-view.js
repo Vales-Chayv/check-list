@@ -578,7 +578,7 @@ async function handleAEFiles(inp) {
   for(const f of files) {
     try {
       toast('⏳ Загрузка ' + f.name + '...');
-      const att = await uploadToStorage(f);
+      const att = await (window.uploadDeferred || uploadToStorage)(f);
       aeAtts.push(att);
       renderAEPrev();
     } catch(e) {
@@ -607,7 +607,7 @@ function toggleAEVoice() {
   try {
     const name = `Голос_${nowStr().replace(/[,:]/g,'-')}.webm`;
     const file = new File([blob], name, {type:'audio/webm'});
-    const att = await uploadToStorage(file);
+    const att = await (window.uploadDeferred || uploadToStorage)(file);
     aeAtts.push(att);
     renderAEPrev();
   } catch(e) {
@@ -1520,7 +1520,7 @@ async function handleEEFiles(inp) {
   for(const f of files) {
     try {
       toast('⏳ Загрузка ' + f.name + '...');
-      const att = await uploadToStorage(f);
+      const att = await (window.uploadDeferred || uploadToStorage)(f);
       _eeAtts.push(att);
       renderEEPrev();
     } catch(e) {

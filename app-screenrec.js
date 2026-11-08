@@ -147,7 +147,7 @@
     if (!arr || !holder || !holder.offsetParent) { download(file); tst('Форма уже закрыта, скачала ролик на компьютер', true); return; }
     try {
       tst('⏳ Загружаю ролик…');
-      const att = await uploadToStorage(file);
+      const att = await (window.uploadDeferred || uploadToStorage)(file);
       arr.push(att);
       try { window[cfg[1]](); } catch (e) {}
       tst('✓ Ролик прикреплён');

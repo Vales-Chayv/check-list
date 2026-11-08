@@ -38,9 +38,7 @@ const deckBtn = document.getElementById('deck-btn');
 document.getElementById('e-body').closest('.fld').style.display = isFamily ? 'flex' : 'none';
   document.getElementById('e-body').value=card?.body||'';
   document.getElementById('e-priority').value=card?.priority||'normal';
-  // новая карточка: рубрика по умолчанию — та, в которой мы сейчас (выбранный фильтр)
-  const _defCat = card ? null : (filterCats.length===1 ? filterCats[0] : (filterCat!=='all' ? filterCat : null));
-  populateCatSel(card?.category || ((_defCat && cats.some(c=>c.name===_defCat)) ? _defCat : undefined));
+  populateCatSel(card?.category);
 
   // Family vs personal fields
   document.getElementById('status-fld').style.display   = isFamily ? 'none' : '';
@@ -109,7 +107,7 @@ async function toggleVoice() {
         try {
           const name=`Голосовое_${nowStr().replace(/[,:]/g,'-')}.webm`;
           const file=new File([blob],name,{type:'audio/webm'});
-          const att=await uploadToStorage(file);
+          const att=await (window.uploadDeferred||uploadToStorage)(file);
           tempAtt.push(att);
           renderAttPrev();
         } catch(e) { toast('Ошибка загрузки голоса: '+e.message,true); }
@@ -270,7 +268,7 @@ async function handleFiles(inp) {
   for(const f of files) {
     try {
       toast('⏳ Загрузка ' + f.name + '...');
-      const att = await uploadToStorage(f);
+      const att = await (window.uploadDeferred || uploadToStorage)(f);
       tempAtt.push(att);
       renderAttPrev();
     } catch(e) {
@@ -592,7 +590,6 @@ async function saveCard() {
     document.getElementById('edit-ov').classList.remove('on');
     render();
     toast('✓ Карточка создана');
-    if(!isFamily && currentSpace?.type!=='group') setTimeout(()=>{ try{ openView(card.id); }catch(_){} }, 50); // открываем созданную карточку
 	// Push уведомления при первой карточке
 if(!localStorage.getItem('mc_push_asked')) {
   localStorage.setItem('mc_push_asked', '1');
