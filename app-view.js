@@ -912,12 +912,17 @@ function mediaCountLabel(tiles) {
   const v = tiles.filter(t => t.vid).length, p = tiles.length - v;
   return [p ? p + ' фото' : '', v ? v + ' видео' : ''].filter(Boolean).join(' · ');
 }
+// ручка «⠿» для перетаскивания файла на рабочий стол (только мышь, при наведении)
+function mcGripHTML(t) {
+  if(!t || !/^https?:/i.test(String(t.data || ''))) return '';
+  return `<span class="mc-grip" draggable="true" data-dl="${esc(t.data)}" data-nm="${esc(t.name || (t.vid ? 'video' : 'photo'))}" onclick="event.stopPropagation()" title="Перетащить на рабочий стол">⠿</span>`;
+}
 function mediaTileHTML(t, gid, i, extra, more) {
   const click = more ? `openMediaGroup('${gid}')` : `mediaOpen('${gid}',${i})`;
   const inner = t.vid
     ? `<video src="${t.data}#t=0.1" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover;display:block;pointer-events:none"></video><span style="position:absolute;left:5px;bottom:4px;font-size:10px;color:#fff;background:rgba(0,0,0,.55);border-radius:9px;padding:0 5px">▶</span>`
     : `<img src="${t.data}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">`;
-  return `<div data-dl="${esc(t.data || '')}" data-nm="${esc(t.name || (t.vid ? 'video' : 'photo'))}" onclick="event.stopPropagation();${click}" style="position:relative;border-radius:7px;overflow:hidden;cursor:pointer;background:#333;min-height:0;${extra||''}">${inner}${more ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:#fff">+${more}</div>` : ''}</div>`;
+  return `<div data-dl="${esc(t.data || '')}" data-nm="${esc(t.name || (t.vid ? 'video' : 'photo'))}" onclick="event.stopPropagation();${click}" style="position:relative;border-radius:7px;overflow:hidden;cursor:pointer;background:#333;min-height:0;${extra||''}">${inner}${more ? '' : mcGripHTML(t)}${more ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:#fff">+${more}</div>` : ''}</div>`;
 }
 // Мозаика А: 1, 2, 3, 4 или 4 окна + «+N»
 function mediaMosaicHTML(tiles, gid) {
@@ -945,14 +950,14 @@ function mediaStackHTML(tiles, gid) {
   if(n === 2) { // ровно два файла — рядом, каждый раскрывается так же, как первое фото стопки
     return `<div style="margin-top:8px">
       <div style="display:flex;gap:8px;align-items:flex-start">
-        ${[t0, t1].map((t, i) => `<div data-reveal="${gid}" data-idx="${i}" data-pair="1" style="flex:1;min-width:0;height:100px;border-radius:8px;overflow:hidden;cursor:pointer;touch-action:pan-y">${face(t)}</div>`).join('')}
+        ${[t0, t1].map((t, i) => `<div data-reveal="${gid}" data-idx="${i}" data-pair="1" style="position:relative;flex:1;min-width:0;height:100px;border-radius:8px;overflow:hidden;cursor:pointer;touch-action:pan-y">${face(t)}${mcGripHTML(t)}</div>`).join('')}
       </div>
       <div style="font-size:11px;color:var(--t3);margin-top:4px">${mediaCountLabel(tiles)}</div>
     </div>`;
   }
   return `<div style="margin-top:8px">
     <div style="display:flex;gap:8px;align-items:flex-start">
-      <div data-reveal="${gid}" data-idx="0" style="width:60%;height:100px;border-radius:8px;overflow:hidden;cursor:pointer;touch-action:pan-y">${face(t0)}</div>
+      <div data-reveal="${gid}" data-idx="0" style="position:relative;width:60%;height:100px;border-radius:8px;overflow:hidden;cursor:pointer;touch-action:pan-y">${face(t0)}${mcGripHTML(t0)}</div>
       <div onclick="openMediaGroup('${gid}')" style="position:relative;flex:1;height:100px;cursor:pointer">
         <div style="position:absolute;left:12px;top:0;right:0;bottom:12px;border-radius:8px;background:rgba(255,255,255,.10)"></div>
         <div style="position:absolute;left:6px;top:6px;right:6px;bottom:6px;border-radius:8px;background:rgba(255,255,255,.18)"></div>
@@ -1004,6 +1009,7 @@ function mediaStackHTML(tiles, gid) {
   // мышь
   document.addEventListener('pointerdown', e => {
     if(e.pointerType === 'touch') return;
+    if(e.target.closest && e.target.closest('.mc-grip')) return;
     const el = e.target.closest && e.target.closest('[data-reveal]'); if(!el) return;
     r = mk(el, e.clientY, e.pointerId); r.armed = true;
     try { el.setPointerCapture(e.pointerId); } catch(_) {}
@@ -1262,7 +1268,7 @@ function mediaOpen(gid, i) {
     let timer = null, prev = null, sx = 0, sy = 0;
     const hide = () => { clearTimeout(timer); timer = null; if(prev) { prev.remove(); prev = null; setTimeout(() => { window._mxSuppress = false; }, 60); } };
     root.addEventListener('pointerdown', e => {
-      const t = e.target.closest('[data-mx]'); if(!t) return;
+      const t = e.target.closest('[data-mx]'); if(!t || window._mxSelMode) return;
       sx = e.clientX; sy = e.clientY;
       timer = setTimeout(() => {
         const tile = tiles[+t.dataset.mx]; if(!tile) return;
@@ -1296,12 +1302,96 @@ function openMediaGroup(gid) {
   const ov = document.createElement('div');
   ov.id = 'media-group-ov';
   ov.style.cssText = 'position:fixed;inset:0;z-index:1600;background:rgba(0,0,0,.95);display:flex;flex-direction:column';
-  ov.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;color:var(--t1)"><span style="font-size:14px;font-weight:700">${mediaCountLabel(tiles)}</span><button onclick="document.getElementById('media-group-ov').remove()" style="background:none;border:none;color:var(--t1);font-size:22px;cursor:pointer">✕</button></div>
-    <div style="flex:1;overflow-y:auto;padding:0 10px 16px"><div class="mx-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:4px;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">${tiles.map((t, i) => mediaTileHTML(t, gid, i, 'aspect-ratio:1', 0)).join('')}</div></div>`;
+  ov.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;color:var(--t1)"><span id="mx-title" style="font-size:14px;font-weight:700">${mediaCountLabel(tiles)}</span><span style="flex:1"></span><button id="mx-sel" style="background:rgba(255,255,255,.12);border:none;color:var(--t1);font-size:13px;border-radius:14px;padding:6px 12px;cursor:pointer;margin-right:10px">☑ Выбрать</button><button onclick="document.getElementById('media-group-ov').remove()" style="background:none;border:none;color:var(--t1);font-size:22px;cursor:pointer">✕</button></div>
+    <div style="flex:1;overflow-y:auto;padding:0 10px 16px"><div class="mx-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:4px;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">${tiles.map((t, i) => mediaTileHTML(t, gid, i, 'aspect-ratio:1', 0)).join('')}</div></div>
+    <div id="mx-bar" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));background:#1b1b1f;border-top:1px solid #333;color:var(--t1);font-size:13px"></div>`;
   document.body.appendChild(ov);
   const gr = ov.querySelector('.mx-grid');
-  if(gr) { [...gr.children].forEach((c, k) => { c.dataset.mx = k; }); if(window.mxAttach) mxAttach(gr, tiles); }
+  window._mxSelMode = false;
+  if(gr) {
+    [...gr.children].forEach((c, k) => { c.dataset.mx = k; const ck = document.createElement('span'); ck.className = 'mx-ck'; ck.style.cssText = 'position:absolute;right:5px;top:5px;width:20px;height:20px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;font-size:12px;color:#111;pointer-events:none;z-index:3'; c.appendChild(ck); });
+    const picked = new Set(), bar = ov.querySelector('#mx-bar'), selBtn = ov.querySelector('#mx-sel');
+    const items = () => [...picked].sort((a, b) => a - b).map(i => ({ url: tiles[i].data, name: tiles[i].name || '' }));
+    const paint = () => {
+      [...gr.children].forEach((c, k) => { const on = picked.has(k), ck = c.querySelector('.mx-ck'); if(ck) { ck.style.display = window._mxSelMode ? 'flex' : 'none'; ck.style.background = on ? 'var(--accent,#e8c56a)' : 'rgba(0,0,0,.4)'; ck.style.borderColor = on ? 'var(--accent,#e8c56a)' : '#fff'; ck.textContent = on ? '✓' : ''; } c.style.outline = on ? '3px solid var(--accent,#e8c56a)' : ''; c.style.outlineOffset = '-3px'; });
+      selBtn.textContent = window._mxSelMode ? '✕ Отмена' : '☑ Выбрать';
+      bar.style.display = window._mxSelMode ? 'flex' : 'none';
+      if(!window._mxSelMode) return;
+      const b = 'background:#2a2a30;border:1px solid #444;border-radius:12px;color:var(--t1);padding:7px 12px;font-size:13px;cursor:pointer;font-family:inherit';
+      const one = picked.size === 1 && /^https?:/i.test(String(tiles[[...picked][0]].data || ''));
+      const dis = picked.size ? '' : ';opacity:.4;pointer-events:none';
+      bar.innerHTML = `<span style="color:var(--t2)">Выбрано ${picked.size}</span>
+        <button data-a="all" style="${b}">Все</button>
+        ${one ? `<span class="mx-grip-chip" draggable="true" data-dl="${esc(tiles[[...picked][0]].data)}" data-nm="${esc(tiles[[...picked][0]].name || 'file')}" style="${b};cursor:grab">⠿ Перетащить</span>` : ''}
+        ${window.showDirectoryPicker ? `<button data-a="folder" style="${b}${dis}">📁 В папку</button>` : ''}
+        <button data-a="zip" style="${b}${dis}">⬇ ZIP</button>`;
+    };
+    selBtn.onclick = () => { window._mxSelMode = !window._mxSelMode; picked.clear(); paint(); };
+    gr.addEventListener('click', e => {
+      if(!window._mxSelMode) return;
+      const t = e.target.closest('[data-mx]'); if(!t) return;
+      e.stopPropagation(); e.preventDefault();
+      const k = +t.dataset.mx; if(picked.has(k)) picked.delete(k); else picked.add(k);
+      paint();
+    }, true);
+    bar.addEventListener('click', async e => {
+      const a = e.target.closest('[data-a]'); if(!a) return;
+      if(a.dataset.a === 'all') { if(picked.size === tiles.length) picked.clear(); else tiles.forEach((_, i) => picked.add(i)); paint(); }
+      else if(a.dataset.a === 'folder') await mcSaveFolder(items());
+      else if(a.dataset.a === 'zip') await mcSaveZip(items(), 'Файлы.zip');
+    });
+    if(window.mxAttach) mxAttach(gr, tiles);
+  }
 }
+// ── сохранение нескольких файлов на устройство: в выбранную папку или одним ZIP ──
+(function(){
+  if(window.mcSaveFolder) return;
+  const EXT = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif', 'video/mp4': '.mp4', 'video/webm': '.webm', 'video/quicktime': '.mov', 'audio/webm': '.webm', 'application/pdf': '.pdf' };
+  const baseName = (it, blob, k) => {
+    let n = it.name || '';
+    if(!n) { try { n = decodeURIComponent(String(it.url).split('?')[0].split('/').pop() || ''); } catch(_) { n = ''; } n = n.replace(/^[A-Za-z0-9]{6,}_/, ''); }
+    if(!n || String(it.url).startsWith('data:')) n = n || 'mycards_' + (k + 1);
+    if(!/\.[A-Za-z0-9]{2,5}$/.test(n)) n += EXT[blob.type] || '';
+    return n.replace(/[\\/:*?"<>|]/g, '_');
+  };
+  const uniq = (n, used) => { if(!used.has(n)) { used.add(n); return n; } const d = n.lastIndexOf('.'), a = d > 0 ? n.slice(0, d) : n, b = d > 0 ? n.slice(d) : ''; let i = 2; while(used.has(a + ' (' + i + ')' + b)) i++; const r = a + ' (' + i + ')' + b; used.add(r); return r; };
+  async function getBlob(url) { const r = await fetch(url, url.startsWith('data:') ? undefined : { mode: 'cors' }); if(!r.ok) throw new Error('http ' + r.status); return await r.blob(); }
+  window.mcSaveFolder = async function(items) {
+    if(!items || !items.length) return;
+    if(!window.showDirectoryPicker) { toast('Этот браузер не умеет сохранять в папку — нажми «ZIP»', true); return; }
+    let dir; try { dir = await window.showDirectoryPicker({ mode: 'readwrite' }); } catch(e) { return; } // отменила выбор папки
+    const used = new Set(); let ok = 0;
+    for(let k = 0; k < items.length; k++) {
+      try {
+        toast('⏳ Сохраняю ' + (k + 1) + ' из ' + items.length + '…');
+        const blob = await getBlob(items[k].url);
+        const fh = await dir.getFileHandle(uniq(baseName(items[k], blob, k), used), { create: true });
+        const w = await fh.createWritable(); await w.write(blob); await w.close(); ok++;
+      } catch(e) { console.log('save folder', e && e.message); }
+    }
+    toast(ok === items.length ? '✓ Сохранено файлов: ' + ok : 'Сохранено ' + ok + ' из ' + items.length, ok !== items.length);
+  };
+  window.mcSaveZip = async function(items, zipName) {
+    if(!items || !items.length) return;
+    if(typeof JSZip === 'undefined') { toast('Архиватор не загрузился — попробуй позже', true); return; }
+    const z = new JSZip(), used = new Set(); let ok = 0;
+    for(let k = 0; k < items.length; k++) {
+      try { toast('⏳ Собираю архив ' + (k + 1) + ' из ' + items.length + '…'); const blob = await getBlob(items[k].url); z.file(uniq(baseName(items[k], blob, k), used), blob); ok++; }
+      catch(e) { console.log('zip', e && e.message); }
+    }
+    if(!ok) { toast('Не удалось собрать архив', true); return; }
+    const out = await z.generateAsync({ type: 'blob', compression: 'STORE' });
+    const name = zipName || 'Файлы.zip';
+    if(typeof window.isNativeApp === 'function' && window.isNativeApp() && typeof mcNativeShareFile === 'function') { if(await mcNativeShareFile(out, 'mycards_files.zip', name)) return; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(out); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    toast(ok === items.length ? '✓ Архив готов: ' + ok + ' файлов' : 'В архиве ' + ok + ' из ' + items.length);
+  };
+  // стили ручки «⠿»
+  const st = document.createElement('style');
+  st.textContent = '.mc-grip{display:none;position:absolute;left:5px;top:5px;width:24px;height:24px;border-radius:7px;background:rgba(0,0,0,.65);color:#fff;font-size:16px;line-height:24px;text-align:center;cursor:grab;z-index:6;user-select:none;-webkit-user-select:none}@media (hover:hover) and (pointer:fine){[data-reveal]:hover>.mc-grip,[data-dl]:hover>.mc-grip{display:block}}.mc-grip:active{cursor:grabbing}';
+  document.head.appendChild(st);
+})();
 // Лоток под стикером: полоса ⇄ мозаика (кнопка или слайд пальцем вниз/вверх)
 function toggleTrayMosaic(stkId, force) {
   const st = document.getElementById(stkId + '_strip'), mo = document.getElementById(stkId + '_mos'), hd = document.getElementById(stkId + '_hd');
@@ -2727,6 +2817,6 @@ function aeToggleAssign(btn, val, event) {
     const url = el.dataset.dl || el.href || '';
     if(!/^https?:/i.test(url)) return;
     const nm = (el.dataset.nm || el.getAttribute('download') || 'file').replace(/[:\\/]/g, '_');
-    try { e.dataTransfer.setData('DownloadURL', 'application/octet-stream:' + nm + ':' + url); e.dataTransfer.effectAllowed = 'copy'; } catch(_) {}
+    try { e.dataTransfer.setData('DownloadURL', 'application/octet-stream:' + nm + ':' + url); e.dataTransfer.effectAllowed = 'copy'; if(el.classList.contains('mc-grip') && el.parentElement) e.dataTransfer.setDragImage(el.parentElement, 20, 20); } catch(_) {}
   });
 })();

@@ -44,6 +44,9 @@
   .gal-act{display:none;align-items:center;justify-content:space-around;padding:12px 8px;background:var(--s2);font-size:13px;color:var(--accent);flex-shrink:0;border-top:1px solid var(--b1)}
   .gal-act span{cursor:pointer;padding:2px 6px}
   #gal-sheet.selmode .gal-act{display:flex}
+  #gal-folder,#gal-zip,#gal-grip{display:none}
+  @media (hover:hover) and (pointer:fine){#gal-zip{display:inline}#gal-grip.show{display:inline;cursor:grab}}
+  #gal-folder.ok{display:inline}
   #gal-sheet.selmode .gal-bar{display:none}
   .gal-more{display:block;margin:12px auto;background:var(--s2);border:1px solid var(--b1);border-radius:10px;color:var(--accent);padding:8px 16px;font-size:13px;cursor:pointer;font-family:inherit}
   #gal-set{position:absolute;left:0;right:0;bottom:0;background:var(--s2);border-radius:16px 16px 0 0;padding:14px 16px calc(14px + var(--safe));display:none;z-index:10;box-shadow:0 -6px 20px rgba(0,0,0,.4)}
@@ -159,7 +162,7 @@
       <div class="gal-fl" id="gal-f2"></div>
       <div id="gal-body"></div>
       <div class="gal-bar"><span id="gal-usage"></span><span>☁ со стрелкой — файл только в облаке: нажми, чтобы сохранить на устройство</span></div>
-      <div class="gal-act"><span id="gal-share">↗ Поделиться</span><span id="gal-save">⬇ Сохранить</span><span id="gal-rm">🗑 С устройства</span><span id="gal-cancel">✕ Отмена</span></div>
+      <div class="gal-act"><span id="gal-share">↗ Поделиться</span><span id="gal-save">⬇ Сохранить</span><span id="gal-folder">📁 В папку</span><span id="gal-zip">⬇ ZIP</span><span id="gal-grip" draggable="true" title="Перетащи на рабочий стол">⠿ Перетащить</span><span id="gal-rm">🗑 С устройства</span><span id="gal-cancel">✕ Отмена</span></div>
       <div id="gal-set">
         <div style="font-weight:700;margin-bottom:2px">Хранение на устройстве</div>
         <div class="gal-row"><span>Скачивать ролики на Wi-Fi</span><span class="gal-sw" id="gal-s1"></span></div>
@@ -202,6 +205,14 @@
     $('gal-share').onclick = () => doShare(false);
     $('gal-save').onclick = () => doShare(true);
     $('gal-rm').onclick = removeLocal;
+    const picks = () => [...G.picked].map(i => G.items[i]).filter(Boolean).map(it => ({ url: it.url, name: fileNameOf(it) }));
+    if(window.showDirectoryPicker) $('gal-folder').classList.add('ok');
+    $('gal-folder').onclick = () => { const l = picks(); if(l.length && window.mcSaveFolder) mcSaveFolder(l); };
+    $('gal-zip').onclick = () => { const l = picks(); if(l.length && window.mcSaveZip) mcSaveZip(l, 'Галерея.zip'); };
+    $('gal-grip').addEventListener('dragstart', e => { // один отмеченный файл можно утащить на рабочий стол
+      const l = picks(); if(l.length !== 1 || !/^https?:/i.test(l[0].url)) { e.preventDefault(); return; }
+      try { e.dataTransfer.setData('DownloadURL', 'application/octet-stream:' + l[0].name.replace(/[:\\/]/g, '_') + ':' + l[0].url); e.dataTransfer.effectAllowed = 'copy'; } catch(_) {}
+    });
     $('gal-sync').onclick = () => { toast('Обновляю…'); refresh(true); };
     $('gal-gear').onclick = () => { fillSettings(); $('gal-set').classList.add('show'); };
     $('gal-setx').onclick = () => $('gal-set').classList.remove('show');
@@ -242,6 +253,7 @@
     const L = filtered();
     $('gal-cnt').textContent = L.length + ' файлов';
     $('gal-sheet').classList.toggle('selmode', G.sel);
+    { const gg = $('gal-grip'); if(gg) { const one = G.sel && G.picked.size === 1 && G.items[[...G.picked][0]] && /^https?:/i.test(G.items[[...G.picked][0]].url); gg.classList.toggle('show', !!one); } }
     const part = L.slice(0, G.shown);
     let h = '', cur = null;
     part.forEach(o => {
