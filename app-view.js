@@ -2601,101 +2601,147 @@ function aeToggleAssign(btn, val, event) {
     ((typeof currentSpaceId === 'undefined') || t.spaceId === currentSpaceId) &&
     !!document.getElementById('view-ov') && document.getElementById('view-ov').classList.contains('on');
 
+  // ── капсула загрузки: одна на всё. Сначала сверху, потом собирается в кружок, из кружка раскрывается на его месте ──
+  let stage = null, flash = null, errMsg = '', fromTop = true, anim = false;
+  const CAPW = 250;
+  const clampN = (v, a, b) => Math.max(a, Math.min(b, v));
   function ensureUI() {
     if(cap) return;
     const style = document.createElement('style');
     style.textContent = `
-      #mc-up-cap{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%);z-index:2500;background:var(--s2,#2a2a30);border:1px solid var(--accent,#e8c56a);border-radius:22px;padding:9px 16px;font-size:13px;color:var(--t1,#eee);display:none;gap:9px;align-items:center;white-space:nowrap;box-shadow:0 6px 20px rgba(0,0,0,.55);cursor:pointer;max-width:92vw}
+      #mc-up-cap{position:fixed;z-index:2500;background:var(--s2,#2a2a30);border:1.5px solid var(--accent,#e8c56a);overflow:hidden;cursor:pointer;box-sizing:border-box;display:none;box-shadow:0 6px 20px rgba(0,0,0,.55);touch-action:none;user-select:none;-webkit-user-select:none;transition:left .45s cubic-bezier(.4,0,.2,1),top .45s cubic-bezier(.4,0,.2,1),width .45s cubic-bezier(.4,0,.2,1),height .45s cubic-bezier(.4,0,.2,1),border-radius .45s cubic-bezier(.4,0,.2,1),border-color .3s,background .3s}
+      #mc-up-cap.nt{transition:none}
       #mc-up-cap.ok{border-color:var(--green,#5bb87a)}
       #mc-up-cap.bad{border-color:var(--red,#e86060)}
+      #mc-up-cap.ok.closed{background:var(--green,#5bb87a)}
+      #mc-up-cap.bad.closed{background:var(--red,#e86060)}
+      #mc-up-in{position:absolute;inset:0;padding:8px 16px;display:flex;flex-direction:column;justify-content:center;gap:6px;color:var(--t1,#eee);font-size:14px;transition:opacity .15s}
+      #mc-up-cap.closed #mc-up-in{opacity:0;pointer-events:none}
+      #mc-up-cap:not(.closed) #mc-up-in{opacity:1;transition:opacity .2s .25s}
+      #mc-up-row{display:flex;align-items:center;gap:10px;white-space:nowrap}
+      #mc-up-tx{overflow:hidden;text-overflow:ellipsis;min-width:0}
+      #mc-up-pc{margin-left:auto;font-weight:600;color:var(--accent,#e8c56a);flex-shrink:0}
+      #mc-up-cap.ok #mc-up-pc,#mc-up-cap.bad #mc-up-pc{display:none}
       #mc-up-sp{width:16px;height:16px;border:2px solid #555;border-top-color:var(--accent,#e8c56a);border-radius:50%;animation:mcupspin .8s linear infinite;flex-shrink:0}
       @keyframes mcupspin{to{transform:rotate(360deg)}}
-      #mc-up-dot{position:fixed;z-index:2500;width:46px;height:46px;border-radius:50%;background:var(--s2,#2a2a30);box-shadow:0 6px 20px rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
-      #mc-up-dot svg{position:absolute;inset:0;width:46px;height:46px;transform:rotate(-90deg);pointer-events:none}
-      #mc-up-dot .n{font-size:11px;font-weight:700;color:var(--accent,#e8c56a);pointer-events:none}
-      #mc-up-dot.done{background:var(--green,#5bb87a)} #mc-up-dot.done .n{color:#fff;font-size:20px}
-      #mc-up-dot.err{background:var(--red,#e86060)} #mc-up-dot.err .n{color:#fff;font-size:20px}
-      #mc-up-dot.pulse{animation:mcuppulse 1.6s ease-in-out infinite}
+      #mc-up-bar{height:4px;border-radius:2px;background:rgba(255,255,255,.18);overflow:hidden;flex-shrink:0}
+      #mc-up-bar i{display:block;height:100%;background:var(--accent,#e8c56a);width:0;transition:width .3s}
+      #mc-up-bar.ind i{width:38%;animation:mcupind 1.3s ease-in-out infinite}
+      @keyframes mcupind{0%{margin-left:-38%}100%{margin-left:100%}}
+      #mc-up-sub{font-size:12px;color:var(--t3,#a8a8a8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      #mc-up-dl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--accent,#e8c56a);opacity:0;pointer-events:none;transition:opacity .15s}
+      #mc-up-cap.closed #mc-up-dl{opacity:1;transition:opacity .2s .3s}
+      #mc-up-cap.ok.closed #mc-up-dl,#mc-up-cap.bad.closed #mc-up-dl{color:#fff;font-size:20px}
+      #mc-up-ring{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg);pointer-events:none;opacity:0;transition:opacity .2s}
+      #mc-up-cap.closed #mc-up-ring{opacity:1;transition:opacity .2s .3s}
+      #mc-up-cap.ok #mc-up-ring,#mc-up-cap.bad #mc-up-ring{display:none}
+      #mc-up-cap.closed.ok.pulse{animation:mcuppulse 1.6s ease-in-out infinite}
       @keyframes mcuppulse{0%,100%{box-shadow:0 6px 20px rgba(0,0,0,.6),0 0 0 0 rgba(91,184,122,.55)}50%{box-shadow:0 6px 20px rgba(0,0,0,.6),0 0 0 9px rgba(91,184,122,0)}}`;
     document.head.appendChild(style);
-    cap = document.createElement('div'); cap.id = 'mc-up-cap';
-    cap.innerHTML = '<span id="mc-up-sp"></span><span id="mc-up-tx"></span>';
-    cap.addEventListener('click', () => collapse());
+    cap = document.createElement('div'); cap.id = 'mc-up-cap'; cap.className = 'closed nt';
+    cap.innerHTML = '<svg id="mc-up-ring" viewBox="0 0 46 46"><circle cx="23" cy="23" r="20" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="3.5"/><circle id="mc-up-rg" cx="23" cy="23" r="20" fill="none" stroke="#e8c56a" stroke-width="3.5" stroke-dasharray="125.7" stroke-dashoffset="125.7" stroke-linecap="round" style="transition:stroke-dashoffset .35s"/></svg>' +
+      '<div id="mc-up-in"><div id="mc-up-row"><span id="mc-up-sp"></span><span id="mc-up-tx"></span><span id="mc-up-pc"></span></div><div id="mc-up-bar"><i></i></div><div id="mc-up-sub"></div></div><div id="mc-up-dl"></div>';
     document.body.appendChild(cap);
-    dot = document.createElement('div'); dot.id = 'mc-up-dot';
-    dot.innerHTML = '<svg viewBox="0 0 46 46"><circle cx="23" cy="23" r="20" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="3.5"/><circle id="mc-up-ring" cx="23" cy="23" r="20" fill="none" stroke="#e8c56a" stroke-width="3.5" stroke-dasharray="125.7" stroke-dashoffset="125.7" stroke-linecap="round" style="transition:stroke-dashoffset .35s"/></svg><span class="n" id="mc-up-n"></span>';
-    document.body.appendChild(dot);
-    placeDot();
+    dot = cap; // старое имя: «кружок» теперь та же капсула в свёрнутом виде
     // перетаскивание кружка; короткое нажатие — действие
     let d = null;
-    dot.addEventListener('pointerdown', e => {
-      const r = dot.getBoundingClientRect();
-      d = { x0: e.clientX, y0: e.clientY, l0: r.left, t0: r.top, moved: false };
-      try { dot.setPointerCapture(e.pointerId); } catch(_) {}
+    cap.addEventListener('pointerdown', e => {
+      d = { x0: e.clientX, y0: e.clientY, l0: dotPos.l, t0: dotPos.t, moved: false, closed: !capOpen };
+      try { cap.setPointerCapture(e.pointerId); } catch(_) {}
     });
-    dot.addEventListener('pointermove', e => {
-      if(!d) return;
+    cap.addEventListener('pointermove', e => {
+      if(!d || !d.closed) return;
       const dx = e.clientX - d.x0, dy = e.clientY - d.y0;
       if(!d.moved && Math.hypot(dx, dy) > 6) d.moved = true;
-      if(d.moved) { setDotPos(d.l0 + dx, d.t0 + dy); dot.style.cursor = 'grabbing'; }
+      if(d.moved) { setDotPos(d.l0 + dx, d.t0 + dy); cap.classList.add('nt'); geom(); }
     });
     const end = e => {
-      if(!d) return; const x = d; d = null; dot.style.cursor = '';
-      if(x.moved) { try { const r = dot.getBoundingClientRect(); localStorage.setItem(POS_KEY, JSON.stringify({ l: r.left / innerWidth, t: r.top / innerHeight })); } catch(_) {} return; }
-      if(e.type === 'pointerup') dotTap();
+      if(!d) return; const x = d; d = null; cap.classList.remove('nt');
+      if(x.moved) { try { localStorage.setItem(POS_KEY, JSON.stringify({ l: dotPos.l / innerWidth, t: dotPos.t / innerHeight })); } catch(_) {} return; }
+      if(e.type === 'pointerup') tap();
     };
-    dot.addEventListener('pointerup', end); dot.addEventListener('pointercancel', end);
-    window.addEventListener('resize', placeDot);
+    cap.addEventListener('pointerup', end); cap.addEventListener('pointercancel', end);
+    window.addEventListener('resize', () => { placeDot(); geom(); });
+    placeDot();
   }
-  function setDotPos(l, t) {
-    const w = innerWidth, h = innerHeight;
-    dot.style.left = Math.max(4, Math.min(w - 50, l)) + 'px';
-    dot.style.top = Math.max(4, Math.min(h - 50, t)) + 'px';
-  }
+  let dotPos = { l: 12, t: 400 };
+  function setDotPos(l, t) { dotPos.l = clampN(l, 4, innerWidth - 50); dotPos.t = clampN(t, 4, innerHeight - 50); }
   function placeDot() {
-    if(!dot) return;
     let p = null; try { p = JSON.parse(localStorage.getItem(POS_KEY) || 'null'); } catch(_) {}
     if(p && typeof p.l === 'number') setDotPos(p.l * innerWidth, p.t * innerHeight);
     else setDotPos(12, innerHeight - 46 - (innerWidth < 900 ? 92 : 24)); // по умолчанию — левый нижний угол
   }
+  function mode() { return st === 'done' ? 'ok' : st === 'err' ? 'bad' : flash ? flash.cls : (stage && stage.bad) ? 'bad' : ''; }
+  function geom() {
+    if(!cap) return;
+    const D = 46;
+    if(!capOpen) { cap.style.width = D + 'px'; cap.style.height = D + 'px'; cap.style.left = dotPos.l + 'px'; cap.style.top = dotPos.t + 'px'; cap.style.borderRadius = (D / 2) + 'px'; return; }
+    const m = mode(), w = Math.min(CAPW, innerWidth - 16), h = (m === 'ok' || m === 'bad') ? 44 : 84;
+    let l, t;
+    if(fromTop) { l = (innerWidth - w) / 2; t = 'calc(env(safe-area-inset-top,0px) + 10px)'; }
+    else { l = clampN(dotPos.l, 8, innerWidth - w - 8); t = clampN(dotPos.t - (h - D), 8, innerHeight - h - 8) + 'px'; }
+    cap.style.width = w + 'px'; cap.style.height = h + 'px'; cap.style.left = l + 'px'; cap.style.top = t; cap.style.borderRadius = (h === 44 ? 22 : 18) + 'px';
+  }
   function paint() {
+    if(st === 'idle' && !flash) return;
     ensureUI();
-    const n = Math.min(finished + 1, total);
-    document.getElementById('mc-up-tx').textContent = st === 'run' ? 'Загружаю ' + n + ' из ' + total + '…' : cap.dataset.msg || '';
-    document.getElementById('mc-up-sp').style.display = st === 'run' ? '' : 'none';
-    const ring = document.getElementById('mc-up-ring'), nn = document.getElementById('mc-up-n');
-    dot.className = st === 'done' ? 'done pulse' : st === 'err' ? 'err' : '';
-    dot.id = 'mc-up-dot';
-    if(st === 'run') { ring.style.strokeDashoffset = (125.7 * (1 - finished / Math.max(1, total))) + ''; ring.style.display = ''; nn.textContent = n + '/' + total; }
-    else { ring.style.display = 'none'; nn.textContent = st === 'done' ? '✓' : st === 'err' ? '!' : ''; }
+    const $ = id => document.getElementById(id), m = mode(), n = Math.min(finished + 1, total || 1);
+    let title, right, sub, pct = null;
+    if(st === 'done') { title = '✓ Загружено' + (total > 1 ? ' · ' + total + ' файла' : ''); right = ''; sub = ''; }
+    else if(st === 'err') { title = '⚠ ' + (errMsg || 'Не загрузилось'); right = ''; sub = ''; }
+    else if(flash) { title = flash.msg; right = ''; sub = ''; }
+    else if(stage && stage.bad) { title = '⚠ ' + stage.title; right = ''; sub = ''; }
+    else {
+      title = stage ? stage.title : 'Загружаю…';
+      pct = stage && stage.pct != null ? stage.pct : (finished > 0 ? Math.round(finished / Math.max(1, total) * 100) : null);
+      right = stage && stage.pct != null ? stage.pct + '%' : (total > 1 ? n + ' из ' + total : '');
+      sub = stage && stage.sub ? stage.sub : (stage && stage.pct != null ? 'Файл ' + n + ' из ' + total + ' · можно сохранять карточку' : 'Можно ходить по кабинетам');
+    }
+    $('mc-up-tx').textContent = title; $('mc-up-pc').textContent = right; $('mc-up-sub').textContent = sub;
+    $('mc-up-sp').style.display = (m === 'ok' || m === 'bad') ? 'none' : '';
+    const bar = $('mc-up-bar'); bar.style.display = (m === 'ok' || m === 'bad') ? 'none' : ''; $('mc-up-sub').style.display = bar.style.display;
+    bar.classList.toggle('ind', pct == null); bar.firstChild.style.width = pct == null ? '' : pct + '%';
+    $('mc-up-rg').style.strokeDashoffset = (125.7 * (1 - (pct == null ? 0.08 : pct / 100))) + '';
+    $('mc-up-dl').textContent = m === 'ok' ? '✓' : m === 'bad' ? '!' : (pct != null ? Math.round(pct) + '%' : (total > 1 ? n + '/' + total : ''));
+    cap.classList.toggle('closed', !capOpen); cap.classList.toggle('ok', m === 'ok'); cap.classList.toggle('bad', m === 'bad'); cap.classList.toggle('pulse', st === 'done');
+    cap.style.display = 'block';
+    geom();
   }
-  function showCap(msg, cls) {
+  function hideAll() { clearTimeout(capTimer); capOpen = false; flash = null; if(cap) cap.style.display = 'none'; }
+  function openAt(top) { // раскрыть: сверху (при старте) или на месте кружка
     ensureUI();
-    cap.dataset.msg = msg || ''; cap.className = cls || ''; cap.id = 'mc-up-cap';
-    cap.style.display = 'flex'; capOpen = true; dot.style.display = 'none';
-    paint();
-    cap.animate([{ opacity: 0, transform: 'translate(-50%,-14px)' }, { opacity: 1, transform: 'translate(-50%,0)' }], { duration: 220, easing: 'ease-out' });
+    const first = cap.style.display === 'none' || cap.style.display === '';
+    fromTop = !!top; capOpen = true;
+    if(first || top) { cap.classList.add('nt'); paint(); void cap.offsetWidth; cap.classList.remove('nt'); if(first && top) try { cap.animate([{ opacity: 0, transform: 'translateY(-14px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'ease-out' }); } catch(_) {} }
+    else paint();
   }
-  function collapse(then) { // капсула сворачивается в кружок и «улетает» в угол
-    clearTimeout(capTimer);
-    if(!cap || !capOpen) { if(dot && st !== 'idle') { dot.style.display = 'flex'; paint(); } return; }
-    const cr = cap.getBoundingClientRect();
-    cap.style.display = 'none'; capOpen = false;
-    if(st === 'idle') return;
-    placeDot(); dot.style.display = 'flex'; paint();
-    const dr = dot.getBoundingClientRect();
-    try { dot.animate([{ transform: `translate(${cr.left + cr.width / 2 - dr.left - dr.width / 2}px,${cr.top + cr.height / 2 - dr.top - dr.height / 2}px) scale(1.5)`, opacity: .2 }, { transform: 'none', opacity: 1 }], { duration: 420, easing: 'cubic-bezier(.2,.8,.2,1)' }); } catch(_) {}
+  function collapse() { clearTimeout(capTimer); capOpen = false; fromTop = false; if(st === 'idle' && !flash) { hideAll(); return; } if(st === 'idle') { hideAll(); return; } paint(); }
+  function openCapTemp() { openAt(false); clearTimeout(capTimer); }
+  function showCap() { openAt(true); }
+  // текст нижней капсулы приложения («Готовлю видео… 32%», «Отправляю ролик…») теперь живёт в этой же капсуле
+  window.mcUpStage = function (text) {
+    if(!text) { stage = null; if(cap) paint(); return; }
+    let t = String(text).replace(/^[^A-Za-zА-Яа-яЁё0-9]+/, '').trim(), bad = /^[⚠]/.test(String(text).trim()), pct = null, sub = '', m;
+    if((m = t.match(/(\d+)%\s*$/))) { pct = +m[1]; t = t.replace(/\s*\d+%\s*$/, ''); }
+    if((m = t.match(/^Отправляю ролик \(([^)]+)\)…?\s*(\d+)\s*с$/))) { t = 'Загружаю ролик…'; sub = m[1] + ' · ' + m[2] + ' с'; }
+    stage = { title: t, pct, sub, bad };
+    if(st === 'run' || flash) { if(!cap || cap.style.display === 'none') openAt(false); else paint(); }
+  };
+  function tap() { // нажатие на капсулу или кружок
+    if(capOpen) { collapse(); return; }
+    if(st === 'done') { const t = window._mcUpTarget; st = 'idle'; hideAll(); goTo(t); return; }
+    if(st === 'err') { const names = failed.map(j => j.name).join(', '); st = 'idle'; failed = []; hideAll(); toast('Не загрузилось: ' + names, true); return; }
+    if(st === 'run') { openAt(false); }
   }
-  function openCapTemp() { showCap(); clearTimeout(capTimer); capTimer = setTimeout(() => collapse(), 3000); }
 
   function begin(j) {
     ensureUI();
     clearTimeout(endTimer);
-    if(st !== 'run') { total = 0; finished = 0; started = 0; failed = []; doneJobs = []; if(st === 'done' || st === 'err') { dot.style.display = 'none'; } st = 'run'; openCapFirst(); }
+    if(st !== 'run') { total = 0; finished = 0; started = 0; failed = []; doneJobs = []; stage = null; flash = null; errMsg = ''; if(st === 'done' || st === 'err') { hideAll(); } st = 'run'; openCapFirst(); }
     started++; total = Math.max(total, started, exp);
     paint();
   }
-  function openCapFirst() { showCap(); clearTimeout(capTimer); capTimer = setTimeout(() => collapse(), 2500); }
+  function openCapFirst() { showCap(); clearTimeout(capTimer); capTimer = setTimeout(() => collapse(), 2600); }
   function finish(j, ok) {
     finished++;
     if(ok) doneJobs.push(j); else failed.push(j);
@@ -2717,29 +2763,25 @@ function aeToggleAssign(btn, val, event) {
   function complete() {
     if(finished < total) return;
     exp = 0;
-    clearTimeout(capTimer);
+    clearTimeout(capTimer); stage = null;
     if(failed.length) {
-      st = 'err'; cap.dataset.msg = '⚠ Не загрузилось: ' + failed.length + ' из ' + total;
-      if(capOpen) { cap.className = 'bad'; paint(); capTimer = setTimeout(() => collapse(), 2500); } else { dot.style.display = 'flex'; paint(); }
+      st = 'err'; errMsg = 'Не загрузилось: ' + failed.length + ' из ' + total;
+      paint();
+      if(capOpen) capTimer = setTimeout(() => collapse(), 2500);
       return;
     }
     const last = doneJobs[doneJobs.length - 1];
     const target = last ? ctxOf(last) : null;
-    if(inThatCard(target)) { // остался в той же карточке — кружок уходит сам
-      st = 'idle';
-      showCap('✓ Загружено' + (total > 1 ? ' · ' + total + ' файла' : ''), 'ok'); document.getElementById('mc-up-sp').style.display = 'none';
-      capTimer = setTimeout(() => { cap.style.display = 'none'; capOpen = false; }, 1800);
+    if(inThatCard(target)) { // остался в той же карточке: капсула покажет «Загружено» и уйдёт сама
+      st = 'idle'; flash = { msg: '✓ Загружено' + (total > 1 ? ' · ' + total + ' файла' : ''), cls: 'ok' };
+      openAt(true);
+      capTimer = setTimeout(() => hideAll(), 1800);
       return;
     }
     st = 'done';
     window._mcUpTarget = { spaceId: target && target.spaceId, cardId: target && target.cardId, urls: doneJobs.filter(j => target && ctxOf(j).cardId === target.cardId).map(j => j.url).filter(Boolean) };
-    cap.dataset.msg = '✓ Загружено';
-    if(capOpen) { cap.className = 'ok'; paint(); capTimer = setTimeout(() => collapse(), 1800); } else { dot.style.display = 'flex'; paint(); }
-  }
-  function dotTap() {
-    if(st === 'run') { openCapTemp(); return; }
-    if(st === 'err') { const names = failed.map(j => j.name).join(', '); st = 'idle'; dot.style.display = 'none'; failed = []; toast('Не загрузилось: ' + names, true); return; }
-    if(st === 'done') { const t = window._mcUpTarget; st = 'idle'; dot.style.display = 'none'; goTo(t); }
+    paint();
+    if(capOpen) capTimer = setTimeout(() => collapse(), 1800);
   }
   async function goTo(t) {
     if(!t || !t.cardId) { toast('Файлы загружены'); return; }

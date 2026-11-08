@@ -72,6 +72,7 @@
     const MIN = 6 * 1024 * 1024, MAX = 400 * 1024 * 1024, CH = 3 * 1024 * 1024;
     let ui = null;
     const show = t => {
+      if (window.mcUpStage) { window.mcUpStage(t); return; } // статус живёт в верхней капсуле загрузки
       if (!ui) {
         ui = document.createElement('div');
         ui.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:rgba(20,20,20,.92);color:#fff;padding:10px 16px;border-radius:14px;font:600 14px system-ui,sans-serif;z-index:99999;box-shadow:0 4px 18px rgba(0,0,0,.4)';
@@ -79,7 +80,7 @@
       }
       ui.textContent = t;
     };
-    const hide = () => { if (ui) { ui.remove(); ui = null; } };
+    const hide = () => { if (window.mcUpStage) { window.mcUpStage(null); return; } if (ui) { ui.remove(); ui = null; } };
     const b64 = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = () => rej(r.error); r.readAsDataURL(blob); });
 
     const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -293,8 +294,7 @@
   // ── локальные будильники для интервальных напоминаний ──
   const LN = cap.Plugins && cap.Plugins.LocalNotifications;
   const ALARMS_KEY = 'mc_alarms';   // {cardId: номер последнего поставленного будильника}
-  const ALARMS_AHEAD = 40;          // сколько будильников ставим вперёд одной карточке
-  const ALARMS_TOTAL = 400;         // всего на приложение (лимит Android — 500, при превышении приложение падает)
+  const ALARMS_AHEAD = 100;         // сколько будильников ставим вперёд
   const alarmsLoad = () => { try { return JSON.parse(localStorage.getItem(ALARMS_KEY) || '{}'); } catch (e) { return {}; } };
   const alarmsSave = m => { try { localStorage.setItem(ALARMS_KEY, JSON.stringify(m)); } catch (e) {} };
   function alarmBase(cardId) {
@@ -330,19 +330,6 @@
     } catch (e) { console.log('[native] alarms cancel', e && e.message); }
     delete map[cardId];
     alarmsSave(map);
-    await alarmsCancelPending(c => c === cardId); // страховка: снимаем всё, что реально стоит для этой карточки
-  }
-  const urlCardId = u => { const m = /[?&]openCard=([^&]+)/.exec(String(u || '')); return m ? decodeURIComponent(m[1]) : null; };
-  async function alarmsCancelPending(pred) {
-    try {
-      const pend = await LN.getPending();
-      const list = ((pend && pend.notifications) || []).filter(x => {
-        const c = urlCardId(x.extra && x.extra.url);
-        return c && pred(c);
-      }).map(x => ({ id: x.id }));
-      if (list.length) await LN.cancel({ notifications: list });
-      return list.length;
-    } catch (e) { console.log('[native] cancel pending', e && e.message); return 0; }
   }
 
   async function alarmsFill(card, run) {
@@ -354,15 +341,12 @@
     const kNow = Math.floor((now - start) / step);
     const map = alarmsLoad();
     const lastK = map[card.id] || 0;
-    if (lastK - kNow >= 20) return 0; // запас ещё большой
-    let room = ALARMS_AHEAD;
-    try { const pend = await LN.getPending(); room = Math.min(ALARMS_AHEAD, ALARMS_TOTAL - ((pend && pend.notifications) || []).length); } catch (e) {}
-    if (room <= 0) return -1; // общий лимит будильников исчерпан
+    if (lastK - kNow >= 50) return 0; // запас ещё большой
     const end = new Date(); end.setHours(24, 0, 0, 0);
     const url = SITE_PREFIX + '?openSpace=' + encodeURIComponent(card.space_id) + '&openCard=' + encodeURIComponent(card.id);
     const items = [];
     let lastUsed = lastK;
-    for (let k = Math.max(lastK + 1, kNow + 1); items.length < room; k++) {
+    for (let k = Math.max(lastK + 1, kNow + 1); items.length < ALARMS_AHEAD; k++) {
       const t = start + k * step;
       if (t >= end.getTime()) break;
       if (t <= now + 3000) continue;
@@ -383,39 +367,14 @@
     return items.length;
   }
 
-  // будильники карточек, которых нет в открытом кабинете (выключены с ПК, удалены, перенесены): сверяем с базой
-  async function alarmsSweepForeign(token) {
-    try {
-      if (typeof sb === 'undefined' || !navigator.onLine) return;
-      const pend = await LN.getPending();
-      const mine = new Set(((typeof cards !== 'undefined' && Array.isArray(cards)) ? cards : []).map(c => c.id));
-      const ids = [...new Set(((pend && pend.notifications) || []).map(x => urlCardId(x.extra && x.extra.url)).filter(c => c && !mine.has(c)))];
-      if (!ids.length) return;
-      const r = await sb.from('cards').select('id,status,reminder').in('id', ids);
-      if (r.error) return; // не уверены — ничего не снимаем
-      const found = new Map((r.data || []).map(c => [c.id, c]));
-      const dead = new Set();
-      ids.forEach(id => {
-        const c = found.get(id);
-        const run = c && c.reminder && c.reminder.intervalRun;
-        if (!c || c.status === 'done' || !run || !run.everyMin || !token || run.localToken !== token) dead.add(id);
-      });
-      if (dead.size) {
-        await alarmsCancelPending(c => dead.has(c));
-        const map = alarmsLoad(); dead.forEach(id => delete map[id]); alarmsSave(map);
-      }
-    } catch (e) { console.log('[native] sweep', e && e.message); }
-  }
-
   // проверка: что стоит — актуально ли, при необходимости снять или дозавести
   async function alarmsSync() {
     if (!LN || typeof cards === 'undefined' || !Array.isArray(cards)) return;
     const token = localStorage.getItem(TOKEN_KEY);
-    await alarmsSweepForeign(token);
     const map = alarmsLoad();
     for (const cardId of Object.keys(map)) {
       const card = cards.find(c => c.id === cardId);
-      if (!card) continue; // карточка из другого кабинета — ею занимается alarmsSweepForeign
+      if (!card) continue; // карточка из другого кабинета — не трогаем
       const run = (typeof intervalRunActive === 'function') ? intervalRunActive(card) : null;
       if (!run || card.status === 'done' || !token || run.localToken !== token) { await alarmsCancel(cardId); continue; }
       try { await alarmsFill(card, run); } catch (e) {}
@@ -428,7 +387,6 @@
       if (!(await alarmsPerm(true))) return null;
       await alarmsCancel(card.id);
       const n = await alarmsFill(card, run);
-      if (n < 0) toast('Слишком много активных интервалов: выключи ненужные, иначе напоминания не встанут', true);
       return n > 0 ? localStorage.getItem(TOKEN_KEY) : null;
     } catch (e) { console.log('[native] alarms start', e && e.message); return null; }
   };
@@ -444,16 +402,6 @@
     setTimeout(alarmsSync, 8000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) alarmsSync(); });
   }
-  // ── кнопка «Назад» на телефоне: шаг назад, в лобби — свернуть приложение ──
-  (function () {
-    const AP = cap.Plugins && cap.Plugins.App;
-    if (!AP || !AP.addListener) return;
-    AP.addListener('backButton', () => {
-      let handled = false;
-      try { handled = window.innerWidth < 900 && typeof window.mcBackStep === 'function' && window.mcBackStep(); } catch (e) {}
-      if (!handled) { try { AP.minimizeApp(); } catch (e) {} }
-    });
-  })();
   // ── старт: при каждом запуске обновляем токен, при первом запуске сами просим разрешение ──
   window.subscribeToPush();
 })();
