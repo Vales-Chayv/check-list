@@ -2708,7 +2708,7 @@ function aeToggleAssign(btn, val, event) {
   // файл, который грузился в фоне, при старте не знал свою карточку: берём её у модуля фоновой загрузки
   function ctxOf(j) {
     let c = j.ctx;
-    if(!(c && c.cardId) && j.file && window._mcPendCards) {
+    if(j.file && window._mcPendCards && window._mcPendCards.has(j.file)) { // у фоновой загрузки карточка известна точно; старая («открытая раньше») неверна
       const id = window._mcPendCards.get(j.file);
       if(id) { const cd = (typeof cards !== 'undefined' ? cards : []).find(x => x.id === id); c = { spaceId: (cd && cd.space_id) || (c && c.spaceId) || null, cardId: id }; }
     }

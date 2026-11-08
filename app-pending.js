@@ -92,6 +92,7 @@
     const att = { id, pendId: id, pending: true, name: file.name, type: t, size: file.size, data: URL.createObjectURL(file), ts: Date.now() };
     const j = { pendId: id, file, att, cardId: cardId || null, entryId: entryId || null, running: false, err: false };
     jobs.set(id, j);
+    window._mcPendCards.set(file, null); // карточка пока неизвестна
     await save(j);
     run(j);
     return att;
@@ -116,15 +117,15 @@
     const real = { ...att }; delete real.pending; delete real.pendId;
     if (!real.id) real.id = uid();
     jobs.delete(j.pendId);
-    let ok = await patchAll(j.pendId, real);
-    for (let n = 0; !ok && n < 4; n++) { await wait(1000); ok = await patchAll(j.pendId, real); } // карточка могла ещё сохраняться
+    let ok = await patchAll(j.pendId, real, j.file);
+    for (let n = 0; !ok && n < 4; n++) { await wait(1000); ok = await patchAll(j.pendId, real, j.file); } // карточка могла ещё сохраняться
     await drop(j.pendId);
     setTimeout(() => { try { URL.revokeObjectURL(j.att.data); } catch (e) {} }, 30000);
     decorate();
   }
 
   // подменить плитку на готовый файл везде: в формах, в открытых карточках и в сохранённых копиях
-  async function patchAll(pendId, real) {
+  async function patchAll(pendId, real, file) {
     let hit = false;
     const forms = [['tempAtt', () => typeof tempAtt !== 'undefined' ? tempAtt : null, 'renderAttPrev'], ['aeAtts', () => typeof aeAtts !== 'undefined' ? aeAtts : null, 'renderAEPrev'], ['_eeAtts', () => typeof _eeAtts !== 'undefined' ? _eeAtts : null, 'renderEEPrev']];
     for (const [, get, rn] of forms) {
@@ -136,6 +137,7 @@
     const upd = new Map();
     if (typeof cards !== 'undefined') for (const c of cards) if (replaceIn(c, pendId, real)) upd.set(c.id, c);
     try { for (const c of await local.getAll('cards')) if (!upd.has(c.id) && replaceIn(c, pendId, real)) upd.set(c.id, c); } catch (e) {}
+    if (file && real && upd.size) { try { window._mcPendCards.set(file, [...upd.keys()][0]); } catch (e) {} }
     for (const c of upd.values()) { hit = true; try { await dbUpdate(c); } catch (e) {} }
     if (upd.size) {
       try { if (typeof render === 'function') render(); if (typeof openView === 'function' && upd.has(window._openViewId) && document.getElementById('view-ov') && document.getElementById('view-ov').classList.contains('on')) openView(window._openViewId); } catch (e) {}
