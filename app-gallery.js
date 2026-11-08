@@ -304,7 +304,7 @@
     const L = filtered();
     $('gal-cnt').textContent = L.length + ' файлов';
     $('gal-sheet').classList.toggle('selmode', G.sel);
-    { const ge = $('gal-edit'); if(ge) { const one = G.sel && G.picked.size === 1 ? G.items[[...G.picked][0]] : null; ge.style.display = one && one.kind === 'img' && window.mcPhotoEdit && /^https?:/i.test(one.url) ? '' : 'none'; } }
+    { const ge = $('gal-edit'); if(ge) { const one = G.sel && G.picked.size === 1 ? G.items[[...G.picked][0]] : null; ge.style.display = one && one.kind === 'img' && window.mcPhotoEdit && /^(https?|data):/i.test(one.url) ? '' : 'none'; } }
     { const gg = $('gal-grip'); if(gg) { const one = G.sel && G.picked.size === 1 && G.items[[...G.picked][0]] && /^https?:/i.test(G.items[[...G.picked][0]].url); gg.classList.toggle('show', !!one); } }
     const part = L.slice(0, G.shown);
     let h = '', cur = null;

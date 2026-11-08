@@ -1089,7 +1089,7 @@ function mediaOpen(gid, i) {
     S.next.style.visibility = S.i < S.slides.length - 1 ? '' : 'hidden';
     // кнопки редактора: только для фото
     const t = S.slides[S.i] && S.slides[S.i].tile, ed = S.ov.querySelector('#mv-ed'), rs = S.ov.querySelector('#mv-rs');
-    if(ed) ed.style.display = (t && !t.vid && window.mcPhotoEdit && !String(t.data).startsWith('data:')) ? '' : 'none';
+    if(ed) ed.style.display = (t && !t.vid && window.mcPhotoEdit) ? '' : 'none';
     if(rs) { rs.style.display = 'none'; if(t && !t.vid && window.mcPhotoIsEdited) mcPhotoIsEdited(t.data).then(x => { if(S && S.slides[S.i] && S.slides[S.i].tile === t) rs.style.display = x ? '' : 'none'; }); }
   }
   function go(i, animate) {
