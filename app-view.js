@@ -1087,6 +1087,10 @@ function mediaOpen(gid, i) {
     S.cnt.textContent = S.slides.length > 1 ? (S.i + 1) + ' / ' + S.slides.length : '';
     S.prev.style.visibility = S.i > 0 ? '' : 'hidden';
     S.next.style.visibility = S.i < S.slides.length - 1 ? '' : 'hidden';
+    // кнопки редактора: только для фото
+    const t = S.slides[S.i] && S.slides[S.i].tile, ed = S.ov.querySelector('#mv-ed'), rs = S.ov.querySelector('#mv-rs');
+    if(ed) ed.style.display = (t && !t.vid && window.mcPhotoEdit && !String(t.data).startsWith('data:')) ? '' : 'none';
+    if(rs) { rs.style.display = 'none'; if(t && !t.vid && window.mcPhotoIsEdited) mcPhotoIsEdited(t.data).then(x => { if(S && S.slides[S.i] && S.slides[S.i].tile === t) rs.style.display = x ? '' : 'none'; }); }
   }
   function go(i, animate) {
     i = clamp(i, 0, S.slides.length - 1);
@@ -1129,7 +1133,11 @@ function mediaOpen(gid, i) {
     ov.innerHTML = `<div id="mv-track" style="position:absolute;left:0;top:0;bottom:0;display:flex;will-change:transform"></div>
       <div style="position:absolute;left:0;right:0;top:0;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;pointer-events:none;z-index:20;background:linear-gradient(rgba(0,0,0,.55),transparent)">
         <span id="mv-cnt" style="color:#fff;font:600 14px system-ui,sans-serif"></span>
-        <button data-mvbtn onclick="closeMediaViewer()" style="pointer-events:auto;background:rgba(255,255,255,.14);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:17px;cursor:pointer">✕</button>
+        <span style="display:flex;gap:8px;align-items:center;pointer-events:auto">
+          <button data-mvbtn id="mv-rs" style="display:none;background:rgba(255,255,255,.14);border:none;color:#fff;height:36px;border-radius:18px;padding:0 12px;font-size:13px;cursor:pointer">↩ Оригинал</button>
+          <button data-mvbtn id="mv-ed" style="display:none;background:rgba(255,255,255,.14);border:none;color:#fff;height:36px;border-radius:18px;padding:0 12px;font-size:13px;cursor:pointer">✎ Править</button>
+          <button data-mvbtn onclick="closeMediaViewer()" style="background:rgba(255,255,255,.14);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:17px;cursor:pointer">✕</button>
+        </span>
       </div>
       <button data-mvbtn id="mv-prev" class="mv-arrow" style="left:10px">‹</button>
       <button data-mvbtn id="mv-next" class="mv-arrow" style="right:10px">›</button>
@@ -1160,6 +1168,8 @@ function mediaOpen(gid, i) {
     });
     measure(); go(S.i, false);
     S.prev.onclick = () => go(S.i - 1); S.next.onclick = () => go(S.i + 1);
+    S.ov.querySelector('#mv-ed').onclick = () => { const t = S.slides[S.i].tile; mcPhotoEdit(t.data, { name: t.name, onSaved: () => window.closeMediaViewer(true) }); };
+    S.ov.querySelector('#mv-rs').onclick = async () => { const t = S.slides[S.i].tile; if(confirm('Вернуть оригинал фото? Исправленная версия будет заменена.')) { await mcPhotoRestore(t.data); window.closeMediaViewer(true); } };
 
     ov.addEventListener('pointerdown', e => {
       if(e.target.closest('[data-mvbtn]')) return;

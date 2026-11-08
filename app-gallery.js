@@ -168,7 +168,7 @@
       <div class="gal-fl" id="gal-f2"></div>
       <div id="gal-body"></div>
       <div class="gal-bar"><span id="gal-usage"></span><span>☁ со стрелкой — файл только в облаке: нажми, чтобы сохранить на устройство</span></div>
-      <div class="gal-act"><span id="gal-share">↗ Поделиться</span><span id="gal-save">⬇ Сохранить</span><span id="gal-folder">📁 В папку</span><span id="gal-zip">⬇ ZIP</span><span id="gal-grip" draggable="true" title="Перетащи на рабочий стол">⠿ Перетащить</span><span id="gal-rm">🗑 С устройства</span><span id="gal-cancel">✕ Отмена</span></div>
+      <div class="gal-act"><span id="gal-edit" style="display:none">✎ Править</span><span id="gal-share">↗ Поделиться</span><span id="gal-save">⬇ Сохранить</span><span id="gal-folder">📁 В папку</span><span id="gal-zip">⬇ ZIP</span><span id="gal-grip" draggable="true" title="Перетащи на рабочий стол">⠿ Перетащить</span><span id="gal-rm">🗑 С устройства</span><span id="gal-cancel">✕ Отмена</span></div>
       <div id="gal-set">
         <div style="font-weight:700;margin-bottom:2px">Хранение на устройстве</div>
         <div class="gal-row"><span>Скачивать ролики на Wi-Fi</span><span class="gal-sw" id="gal-s1"></span></div>
@@ -212,6 +212,7 @@
       openItem(G.items[i]);
     });
     $('gal-cancel').onclick = () => { G.sel = false; G.picked.clear(); renderBody(); };
+    $('gal-edit').onclick = () => { const it = G.items[[...G.picked][0]]; if(it && window.mcPhotoEdit) mcPhotoEdit(it.url, { name: it.name, onSaved: () => { G.sel = false; G.picked.clear(); refresh(); } }); };
     $('gal-share').onclick = () => doShare(false);
     $('gal-save').onclick = () => doShare(true);
     $('gal-rm').onclick = removeLocal;
@@ -303,6 +304,7 @@
     const L = filtered();
     $('gal-cnt').textContent = L.length + ' файлов';
     $('gal-sheet').classList.toggle('selmode', G.sel);
+    { const ge = $('gal-edit'); if(ge) { const one = G.sel && G.picked.size === 1 ? G.items[[...G.picked][0]] : null; ge.style.display = one && one.kind === 'img' && window.mcPhotoEdit && /^https?:/i.test(one.url) ? '' : 'none'; } }
     { const gg = $('gal-grip'); if(gg) { const one = G.sel && G.picked.size === 1 && G.items[[...G.picked][0]] && /^https?:/i.test(G.items[[...G.picked][0]].url); gg.classList.toggle('show', !!one); } }
     const part = L.slice(0, G.shown);
     let h = '', cur = null;

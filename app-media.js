@@ -358,6 +358,14 @@ async function mcVaultLink(id, url) {
   if(r) st.put({ ...r, url });
   await _mcTx(t);
 }
+// привязка оригинала: origOf — «оригинал до правки» для этого адреса; url — обычный оригинал снимка
+async function mcVaultSetOrigOf(id, origOf, url) {
+  const db = await mcVaultDb();
+  const t = db.transaction('meta', 'readwrite'), st = t.objectStore('meta');
+  const r = await _mcIdb(st.get(id));
+  if(r) st.put({ ...r, origOf: origOf || null, url: url || null });
+  await _mcTx(t);
+}
 async function mcVaultMeta() {
   try { const db = await mcVaultDb(); return await _mcIdb(db.transaction('meta').objectStore('meta').getAll()); } catch(e) { return []; }
 }
