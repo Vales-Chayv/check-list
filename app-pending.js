@@ -88,7 +88,9 @@
   // ── вызов вместо uploadToStorage ──
   window.uploadDeferred = async function (file, cardId, entryId) {
     const t = file.type || '', kind = t.startsWith('video/') ? 'video' : t.startsWith('audio/') ? 'audio' : t.startsWith('image/') ? 'image' : 'other';
-    if (kind !== 'image' && typeof MC_LIMITS !== 'undefined' && file.size > MC_LIMITS[kind]) return window.uploadToStorage(file, cardId, entryId); // обычный отказ про размер
+    // ролик больше лимита в APK сначала сожмётся, поэтому тоже грузим в фоне (до 300 МБ); остальное большое — обычный отказ про размер
+    const squeeze = kind === 'video' && typeof window.mcCompressVideo === 'function' && file.size <= 300 * 1024 * 1024;
+    if (kind !== 'image' && !squeeze && typeof MC_LIMITS !== 'undefined' && file.size > MC_LIMITS[kind]) return window.uploadToStorage(file, cardId, entryId);
     const id = 'p_' + uid();
     const att = { id, pendId: id, pending: true, name: file.name, type: t, size: file.size, data: URL.createObjectURL(file), ts: Date.now() };
     const j = { pendId: id, file, att, cardId: cardId || null, entryId: entryId || null, running: false, err: false };
