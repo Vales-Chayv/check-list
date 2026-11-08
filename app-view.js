@@ -917,7 +917,7 @@ function mediaTileHTML(t, gid, i, extra, more) {
   const inner = t.vid
     ? `<video src="${t.data}#t=0.1" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover;display:block;pointer-events:none"></video><span style="position:absolute;left:5px;bottom:4px;font-size:10px;color:#fff;background:rgba(0,0,0,.55);border-radius:9px;padding:0 5px">▶</span>`
     : `<img src="${t.data}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">`;
-  return `<div onclick="event.stopPropagation();${click}" style="position:relative;border-radius:7px;overflow:hidden;cursor:pointer;background:#333;min-height:0;${extra||''}">${inner}${more ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:#fff">+${more}</div>` : ''}</div>`;
+  return `<div data-dl="${esc(t.data || '')}" data-nm="${esc(t.name || (t.vid ? 'video' : 'photo'))}" onclick="event.stopPropagation();${click}" style="position:relative;border-radius:7px;overflow:hidden;cursor:pointer;background:#333;min-height:0;${extra||''}">${inner}${more ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:#fff">+${more}</div>` : ''}</div>`;
 }
 // Мозаика А: 1, 2, 3, 4 или 4 окна + «+N»
 function mediaMosaicHTML(tiles, gid) {
@@ -970,7 +970,7 @@ function mediaStackHTML(tiles, gid) {
   const HOLD = 250, SLOP = 8;
   let r = null;
   const mk = (el, y, pid) => {
-    const img = el.querySelector('img');
+    const img = el.querySelector('img'); if(img) img.draggable = false;
     let target = 0;
     if(img && img.naturalWidth) target = Math.min(Math.round(el.offsetWidth * img.naturalHeight / img.naturalWidth), Math.round(window.innerHeight * 0.6));
     const peers = [];
@@ -1009,7 +1009,7 @@ function mediaStackHTML(tiles, gid) {
     try { el.setPointerCapture(e.pointerId); } catch(_) {}
   });
   document.addEventListener('pointermove', e => { if(r && r.pid === e.pointerId && e.pointerType !== 'touch') drag(r, e.clientY); });
-  const pend = e => { if(!r || r.pid !== e.pointerId || e.pointerType === 'touch') return; const x = r; r = null; finish(x); };
+  const pend = e => { if(!r || r.pid !== e.pointerId || e.pointerType === 'touch') return; const x = r; r = null; if(e.type === 'pointercancel' && x.moved < 6) return; finish(x); };
   document.addEventListener('pointerup', pend);
   document.addEventListener('pointercancel', pend);
   // палец
@@ -2677,4 +2677,56 @@ function aeToggleAssign(btn, val, event) {
       finish(j, false); throw e;
     }
   };
+})();
+
+
+// ═══════════════════════════════════════════
+//  ПЕРЕТАСКИВАНИЕ ФАЙЛОВ (ПК): в приложение с компьютера и из приложения на компьютер
+// ═══════════════════════════════════════════
+(function(){
+  if(window._mcDndInit) return; window._mcDndInit = true;
+  const isFiles = e => !!(e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files'));
+  const on = id => { const el = document.getElementById(id); return !!el && el.classList.contains('on'); };
+  let hint = null, cnt = 0;
+  // куда упадут файлы: открыто окно записи / редактирования записи / карточка
+  function target() {
+    if(on('ae-ov')) return 'ae';
+    if(on('view-ov') && window._openViewId) return 'view';
+    return null;
+  }
+  function eeOpen() { const p = document.getElementById('ee-att-prev'); return !!(p && p.offsetParent !== null); }
+  function resolve() { if(eeOpen()) return 'ee'; return target(); }
+  function showHint(t) {
+    if(!hint) {
+      hint = document.createElement('div');
+      hint.style.cssText = 'position:fixed;inset:10px;z-index:2400;border:3px dashed var(--accent,#e8c56a);border-radius:18px;background:rgba(232,197,106,.10);display:flex;align-items:center;justify-content:center;pointer-events:none;font:600 18px system-ui,sans-serif;color:var(--accent,#e8c56a);text-align:center;padding:20px';
+      document.body.appendChild(hint);
+    }
+    hint.textContent = t === 'view' ? 'Отпусти файлы — добавим новую запись в эту карточку' : 'Отпусти файлы — прикрепим к записи';
+  }
+  function hideHint() { if(hint) { hint.remove(); hint = null; } cnt = 0; }
+  document.addEventListener('dragenter', e => { if(!isFiles(e)) return; e.preventDefault(); cnt++; const t = resolve(); if(t) showHint(t); });
+  document.addEventListener('dragover', e => { if(!isFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = resolve() ? 'copy' : 'none'; });
+  document.addEventListener('dragleave', e => { if(!isFiles(e)) return; cnt = Math.max(0, cnt - 1); if(!cnt) hideHint(); });
+  document.addEventListener('drop', async e => {
+    if(!isFiles(e)) return;
+    e.preventDefault(); hideHint();
+    const files = [...e.dataTransfer.files]; if(!files.length) return;
+    const t = resolve();
+    if(!t) { try { toast('Открой карточку, чтобы добавить в неё файлы'); } catch(_) {} return; }
+    const fake = { files, value: '' };
+    try {
+      if(t === 'ee') { await handleEEFiles(fake); }
+      else if(t === 'ae') { await handleAEFiles(fake); }
+      else { openAddEntry(window._openViewId); setTimeout(() => handleAEFiles(fake), 250); }
+    } catch(err) { try { toast('Не удалось добавить файлы: ' + (err && err.message), true); } catch(_) {} }
+  });
+  // из приложения на компьютер: тянешь фото или файл за окно — он сохраняется
+  document.addEventListener('dragstart', e => {
+    const el = e.target.closest && e.target.closest('[data-dl],a[download]'); if(!el) return;
+    const url = el.dataset.dl || el.href || '';
+    if(!/^https?:/i.test(url)) return;
+    const nm = (el.dataset.nm || el.getAttribute('download') || 'file').replace(/[:\\/]/g, '_');
+    try { e.dataTransfer.setData('DownloadURL', 'application/octet-stream:' + nm + ':' + url); e.dataTransfer.effectAllowed = 'copy'; } catch(_) {}
+  });
 })();
