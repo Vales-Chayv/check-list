@@ -2661,6 +2661,7 @@ function aeToggleAssign(btn, val, event) {
       if(e.type === 'pointerup') tap();
     };
     cap.addEventListener('pointerup', end); cap.addEventListener('pointercancel', end);
+    cap.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); }); // нажатие целиком забирает капсула
     window.addEventListener('resize', () => { placeDot(); geom(); });
     placeDot();
   }
@@ -2729,8 +2730,8 @@ function aeToggleAssign(btn, val, event) {
   };
   function tap() { // нажатие на капсулу или кружок
     if(capOpen) { collapse(); return; }
-    if(st === 'done') { const t = window._mcUpTarget; st = 'idle'; hideAll(); goTo(t); return; }
-    if(st === 'err') { const names = failed.map(j => j.name).join(', '); st = 'idle'; failed = []; hideAll(); toast('Не загрузилось: ' + names, true); return; }
+    if(st === 'done') { const t = window._mcUpTarget; st = 'idle'; setTimeout(() => { hideAll(); goTo(t); }, 380); return; } // чуть позже: иначе «хвост» нажатия попадёт в только что открытую карточку и закроет её
+    if(st === 'err') { const names = failed.map(j => j.name).join(', '); st = 'idle'; failed = []; setTimeout(hideAll, 380); toast('Не загрузилось: ' + names, true); return; }
     if(st === 'run') { openAt(false); }
   }
 
