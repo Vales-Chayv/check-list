@@ -2831,3 +2831,22 @@ function aeToggleAssign(btn, val, event) {
     try { e.dataTransfer.setData('DownloadURL', 'application/octet-stream:' + nm + ':' + url); e.dataTransfer.effectAllowed = 'copy'; if(el.classList.contains('mc-grip') && el.parentElement) e.dataTransfer.setDragImage(el.parentElement, 20, 20); } catch(_) {}
   });
 })();
+
+// Фото из карточки (в списке и в открытой карточке) открываем новым просмотром: там листание, масштаб и «✎ Править»
+(function(){
+  try {
+    if(typeof App === 'undefined' || !App || typeof App.viewImg !== 'function' || App._mvImg) return;
+    const old = App.viewImg.bind(App);
+    App.viewImg = function(cardId, i) {
+      try {
+        const card = cards.find(c => c.id === cardId);
+        if(card && typeof window.openMediaViewer === 'function') {
+          const imgs = (card.attachments || []).filter(a => a.type && a.type.startsWith('image/'));
+          if(imgs[i]) { window.openMediaViewer(imgs.map(a => ({ data: a.data, vid: false, name: a.name || '' })), i); return; }
+        }
+      } catch(e) {}
+      return old(cardId, i);
+    };
+    App._mvImg = true;
+  } catch(e) {}
+})();
