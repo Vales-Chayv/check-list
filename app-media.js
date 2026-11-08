@@ -607,8 +607,14 @@ async function mcBackupRun(dest) {
     try { toast('Не удалось сделать копию: ' + String((e && e.message) || e).slice(0, 100), true); } catch(_) {}
   }
 }
+const mcIsApk = () => typeof window.isNativeApp === 'function' && window.isNativeApp();
 async function mcBackupStart() {
   if(_mcBkBusy) return;
+  if(mcIsApk()) { // в APK большие файлы нельзя передавать через мост Android: приложение вылетает по памяти. Включим вместе с плагином «Поделиться» в следующей сборке APK
+    const ov = mcBkDialog('<div style="font-size:16px;font-weight:700">🛡 Резервная копия на телефоне</div><div style="font-size:13px;margin-top:8px;line-height:1.5">В приложении на телефоне резервная копия пока недоступна: для неё нужен новый компонент, он войдёт в следующее обновление APK. Сделай копию на компьютере: в Галерее ⚙ → «Резерв».</div><button id="bk-ok" style="' + MC_BK_BTN + ';text-align:center">Понятно</button>');
+    ov.querySelector('#bk-ok').onclick = () => ov.remove();
+    return;
+  }
   _mcBkBusy = true;
   try {
     const v = await mcVaultStats();
@@ -643,7 +649,7 @@ async function mcVaultFreeBacked() { // удаляет оригиналы, ко�
 // ── напоминание раз в месяц ──
 async function mcBackupRemind() {
   try {
-    if(_mcBkBusy || document.hidden || typeof currentUser === 'undefined' || !currentUser || document.querySelector('[data-mc-bk]')) return;
+    if(_mcBkBusy || mcIsApk() || document.hidden || typeof currentUser === 'undefined' || !currentUser || document.querySelector('[data-mc-bk]')) return;
     let first = mcBkGet('mc_bk_first');
     if(!first) { first = Date.now() - (MC_BK_DAYS - 7) * 864e5; mcBkSet('mc_bk_first', first); } // первое напоминание — через неделю после обновления
     const last = mcBkGet('mc_bk_last'), base = last ? last.ts : first;

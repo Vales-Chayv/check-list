@@ -1382,6 +1382,7 @@ function openMediaGroup(gid) {
     if(!ok) { toast('Не удалось собрать архив', true); return; }
     const out = await z.generateAsync({ type: 'blob', compression: 'STORE' });
     const name = zipName || 'Файлы.zip';
+    if(typeof window.isNativeApp === 'function' && window.isNativeApp() && out.size > 8 * 1048576) { toast('На телефоне большие архивы пока не сохраняются (нужно обновление APK). Выбери меньше файлов или сделай это на компьютере.', true); return; }
     if(typeof window.isNativeApp === 'function' && window.isNativeApp() && typeof mcNativeShareFile === 'function') { if(await mcNativeShareFile(out, 'mycards_files.zip', name)) return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(out); a.download = name;
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
