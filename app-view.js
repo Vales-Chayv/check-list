@@ -2784,14 +2784,23 @@ function aeToggleAssign(btn, val, event) {
     if(capOpen) capTimer = setTimeout(() => collapse(), 1800);
   }
   async function goTo(t) {
-    if(!t || !t.cardId) { toast('Файлы загружены'); return; }
+    if(!t || !t.cardId) { toast('Файлы загружены. Карточку найти не удалось: адрес не сохранился'); return; }
     try {
-      if(t.spaceId && typeof currentSpaceId !== 'undefined' && t.spaceId !== currentSpaceId && typeof setCurrentSpace === 'function') await setCurrentSpace(t.spaceId, true);
-    } catch(e) {}
-    let tries = 0;
+      const sel = document.getElementById('space-selector');
+      const inLobby = !!sel && sel.style.display !== 'none' && getComputedStyle(sel).display !== 'none'; // лобби закрывает карточку, пока не выйти из него
+      const known = typeof spaces !== 'undefined' && spaces.some(x => x.id === t.spaceId);
+      const other = t.spaceId && typeof currentSpaceId !== 'undefined' && t.spaceId !== currentSpaceId;
+      if(known && (other || inLobby) && typeof setCurrentSpace === 'function') await setCurrentSpace(t.spaceId, true);
+      else if(inLobby && typeof hideSpaceSelector === 'function') hideSpaceSelector();
+    } catch(e) { try { if(typeof hideSpaceSelector === 'function') hideSpaceSelector(); } catch(_) {} }
+    let tries = 0, synced = false;
     (function w() {
       const c = (typeof cards !== 'undefined' ? cards : []).find(x => x.id === t.cardId);
-      if(!c) { if(++tries < 20) { setTimeout(w, 150); return; } toast('Карточка не найдена', true); return; }
+      if(!c) {
+        if(++tries === 14 && !synced && typeof syncFromServer === 'function') { synced = true; try { syncFromServer(); } catch(_) {} }
+        if(tries < 40) { setTimeout(w, 150); return; }
+        toast('Карточку не нашла: кабинет ' + (t.spaceId || '?') + ', карточка ' + String(t.cardId).slice(0, 6), true); return;
+      }
       openView(t.cardId);
       setTimeout(() => focusEntry(c, t.urls || []), 700);
     })();
