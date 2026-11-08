@@ -2705,6 +2705,15 @@ function aeToggleAssign(btn, val, event) {
       endTimer = setTimeout(() => { if(finished >= started) { total = finished; complete(); } }, finished >= total ? 900 : 6000);
     }
   }
+  // файл, который грузился в фоне, при старте не знал свою карточку: берём её у модуля фоновой загрузки
+  function ctxOf(j) {
+    let c = j.ctx;
+    if(!(c && c.cardId) && j.file && window._mcPendCards) {
+      const id = window._mcPendCards.get(j.file);
+      if(id) { const cd = (typeof cards !== 'undefined' ? cards : []).find(x => x.id === id); c = { spaceId: (cd && cd.space_id) || (c && c.spaceId) || null, cardId: id }; }
+    }
+    return c || {};
+  }
   function complete() {
     if(finished < total) return;
     exp = 0;
@@ -2715,7 +2724,7 @@ function aeToggleAssign(btn, val, event) {
       return;
     }
     const last = doneJobs[doneJobs.length - 1];
-    const target = last ? last.ctx : null;
+    const target = last ? ctxOf(last) : null;
     if(inThatCard(target)) { // остался в той же карточке — кружок уходит сам
       st = 'idle';
       showCap('✓ Загружено' + (total > 1 ? ' · ' + total + ' файла' : ''), 'ok'); document.getElementById('mc-up-sp').style.display = 'none';
@@ -2723,7 +2732,7 @@ function aeToggleAssign(btn, val, event) {
       return;
     }
     st = 'done';
-    window._mcUpTarget = { spaceId: target && target.spaceId, cardId: target && target.cardId, urls: doneJobs.filter(j => target && j.ctx.cardId === target.cardId).map(j => j.url).filter(Boolean) };
+    window._mcUpTarget = { spaceId: target && target.spaceId, cardId: target && target.cardId, urls: doneJobs.filter(j => target && ctxOf(j).cardId === target.cardId).map(j => j.url).filter(Boolean) };
     cap.dataset.msg = '✓ Загружено';
     if(capOpen) { cap.className = 'ok'; paint(); capTimer = setTimeout(() => collapse(), 1800); } else { dot.style.display = 'flex'; paint(); }
   }
@@ -2768,7 +2777,7 @@ function aeToggleAssign(btn, val, event) {
       if(file && file.size > 60 * 1024 * 1024) throw new Error('Файл больше 60 МБ: без интернета его не сохранить, дождись сети');
       const r = await orig.apply(this, arguments); offlineToast(); return r;
     }
-    const j = { id: ++seq, name: (file && file.name) || 'файл', ctx: curCtx(cardId), url: null };
+    const j = { id: ++seq, name: (file && file.name) || 'файл', ctx: curCtx(cardId), url: null, file };
     begin(j);
     try { const att = await orig.apply(this, arguments); j.url = att && att.data; finish(j, true); return att; }
     catch(e) {

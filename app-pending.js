@@ -9,6 +9,7 @@
 (function () {
   if (window._mcPend) return; window._mcPend = true;
   const jobs = new Map(); // pendId → job
+  window._mcPendCards = new WeakMap(); // файл → карточка (для кружка «✓»: открыть нужную карточку)
   const tst = (m, e) => { try { toast(m, e); } catch (_) {} };
   const isP = a => !!a && a.pending === true && !!a.pendId;
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -64,6 +65,7 @@
   function note(a, cardId, entryId, key, entryRef) {
     const j = jobs.get(a.pendId); if (!j) return;
     j.cardId = cardId; j.entryId = entryId; j.list = key; if (entryRef) j.entryRef = entryRef;
+    try { window._mcPendCards.set(j.file, cardId); } catch (e) {}
     save(j);
   }
 
@@ -183,7 +185,7 @@
       const file = new File([r.blob], r.name || 'file', { type: r.type || '' });
       const att = { id: r.pendId, pendId: r.pendId, pending: true, name: file.name, type: file.type, size: file.size, data: URL.createObjectURL(file), ts: r.ts || Date.now() };
       const j = { pendId: r.pendId, file, att, cardId: r.cardId, entryId: r.entryId, list: r.list, running: false, err: false };
-      jobs.set(r.pendId, j);
+      jobs.set(r.pendId, j); if (r.cardId) window._mcPendCards.set(file, r.cardId);
       const fix = c => listsOf(c).forEach(l => l.list.forEach(a => { if (a && a.pendId === r.pendId) { a.data = att.data; a.pending = true; } }));
       if (typeof cards !== 'undefined') cards.forEach(fix);
       try { for (const c of await local.getAll('cards')) { let h = false; listsOf(c).forEach(l => l.list.forEach(a => { if (a && a.pendId === r.pendId) { a.data = att.data; h = true; } })); if (h) await local.put('cards', c); } } catch (e) {}
