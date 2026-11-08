@@ -65,6 +65,7 @@ uploadToStorage = async function(file, cardId, entryId) {
   if(_tm) clearInterval(_tm);
   if(_vid) window.mcNativeStatus(null);
   if(att && typeof att === 'object' && !att.ts) att.ts = Date.now(); // время загрузки: нужно для галереи
+  try { if(att && att.data && MC_ATT_RE.test(String(att.data))) mcCacheOwn(String(att.data), file).catch(() => {}); } catch(e) {}
   try { // у отправителя файл уже есть: отмечаем получение сразу
     const p = att && mcPathOf(att.data);
     if(p && typeof currentUser !== 'undefined' && currentUser && currentUser.id) sb.from('attachment_receipts').upsert([{ path: p, user_id: currentUser.id }], { onConflict: 'path,user_id', ignoreDuplicates: true }).then(() => {}, () => {});
@@ -77,7 +78,10 @@ uploadToStorage = async function(file, cardId, entryId) {
 //  Фоновая «прогревка»: фото из карточек и чатов скачиваются на устройство один раз.
 // ═══════════════════════════════════════════
 const MC_ATT_RE = /\/storage\/v1\/object\/(public|sign)\/attachments\//;
-const _mcWarmed = new Set();
+const MC_DANGER_DAYS = 46;          // облако стирает файлы через 60 дней: с этого возраста файл «под угрозой» — его скачиваем в первую очередь и закрепляем
+const _mcWarmed = new Set();        // эти файлы за текущий сеанс уже пробовали скачать
+const _mcGone = new Set();          // в облаке этих файлов уже нет
+const mcIsRec = x => x.url !== '__cap__' && x.url.indexOf('__ev__') !== 0; // служебные записи в списке файлов: лимит и метки вытеснения
 function mcMediaDb() {
   return new Promise((res, rej) => {
     const r = indexedDB.open('mc-media', 1);
@@ -85,9 +89,22 @@ function mcMediaDb() {
     r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
   });
 }
-// сколько места занимают сохранённые на устройстве вложения (байты)
+async function mcIdxAll() {
+  const db = await mcMediaDb();
+  return new Promise((res, rej) => { const q = db.transaction('idx').objectStore('idx').getAll(); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+}
+// дописать поля (например pin) в записи файлов
+async function mcIdxPatch(urls, patch) {
+  if(!urls.length) return;
+  const db = await mcMediaDb();
+  await new Promise((res) => {
+    const t = db.transaction('idx', 'readwrite'), st = t.objectStore('idx');
+    urls.forEach(u => { const g = st.get(u); g.onsuccess = () => { if(g.result) st.put({ ...g.result, ...patch }); }; });
+    t.oncomplete = t.onerror = t.onabort = () => res();
+  });
+}
 function mcGalCfg() {
-  const d = { videosWifi: false, photosAuto: true, capMB: 500 };
+  const d = { videosWifi: true, photosAuto: true, capMB: 500 };
   try { return Object.assign(d, JSON.parse(localStorage.getItem('mc_gal_cfg') || '{}')); } catch(e) { return d; }
 }
 // лимит места на устройстве: записываем туда, откуда его читает service worker
@@ -98,37 +115,172 @@ async function mcApplyCap() {
     t.objectStore('idx').put({ url: '__cap__', size: 0, t: 0, cap: mcGalCfg().capMB * 1024 * 1024 });
   } catch(e) {}
 }
+// сколько места занимают сохранённые на устройстве вложения (байты); pinned — закреплённые (последние копии, не вытесняются)
 async function mcMediaUsage() {
   try {
-    const db = await mcMediaDb();
-    const all = (await new Promise((res, rej) => { const q = db.transaction('idx').objectStore('idx').getAll(); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); })).filter(x => x.url !== '__cap__');
-    return { files: all.length, bytes: all.reduce((s, x) => s + x.size, 0) };
-  } catch(e) { return { files: 0, bytes: 0 }; }
+    const all = (await mcIdxAll()).filter(mcIsRec);
+    const pin = all.filter(x => x.pin);
+    return { files: all.length, bytes: all.reduce((s, x) => s + x.size, 0), pinned: pin.length, pinnedBytes: pin.reduce((s, x) => s + x.size, 0) };
+  } catch(e) { return { files: 0, bytes: 0, pinned: 0, pinnedBytes: 0 }; }
 }
-async function mcWarmMedia() {
+// все вложения карточки (карточка, записи, файлы сеанса)
+function mcAttsOfCard(c) {
+  const out = [], add = a => { if(a && a.data) out.push(a); };
+  (c.attachments || []).forEach(add);
+  (c.entries || []).forEach(e => { (e.attachments || []).forEach(add); (e.sessionAtts || []).forEach(add); });
+  return out;
+}
+// карточки всех кабинетов: из памяти устройства, открытого кабинета и (раз в 30 минут) с сервера
+let _mcRemote = { t: 0, cards: [] };
+async function mcAllCardsForMedia(force) {
+  const map = new Map();
+  try { if(typeof local !== 'undefined') (await local.getAll('cards')).forEach(c => map.set(c.id, c)); } catch(e) {}
+  _mcRemote.cards.forEach(c => map.set(c.id, c));
+  (typeof cards !== 'undefined' ? cards : []).forEach(c => map.set(c.id, c));
+  if(navigator.onLine && typeof sb !== 'undefined' && typeof spaces !== 'undefined' && spaces.length && (force || Date.now() - _mcRemote.t > 30 * 60000)) {
+    _mcRemote.t = Date.now();
+    try {
+      const { data } = await sb.from('cards').select('*').in('space_id', spaces.map(s => s.id));
+      if(data) { _mcRemote.cards = data; data.forEach(c => { if(!map.has(c.id)) map.set(c.id, c); }); }
+    } catch(e) {}
+  }
+  return [...map.values()];
+}
+
+// Догрузка файлов на устройство. Сначала те, которым меньше всего осталось жить в облаке; такие файлы закрепляются.
+let _mcWarmBusy = false;
+async function mcWarmMedia(force) {
+  if(_mcWarmBusy) return;
+  _mcWarmBusy = true;
   try {
-    if(!navigator.onLine || document.hidden || !navigator.serviceWorker || !navigator.serviceWorker.controller) return;
-    if(typeof cards === 'undefined' || typeof cardAttsOf !== 'function') return;
-    const cfg = mcGalCfg();
-    const conn = navigator.connection;
-    const onWifi = !conn || !conn.type || conn.type === 'wifi' || conn.type === 'ethernet';
-    const urls = [];
-    (cards || []).forEach(c => cardAttsOf(c).forEach(a => {
-      const u = String(a.data || '');
-      if(!MC_ATT_RE.test(u) || _mcWarmed.has(u)) return;
-      const vid = (a.type || '').startsWith('video/');
-      if(vid ? !(cfg.videosWifi && onWifi) : !cfg.photosAuto) return;
-      urls.push(u);
-    }));
-    for(const u of urls.slice(0, 40)) {
-      _mcWarmed.add(u);
-      try { const r = await fetch(u, { mode: 'cors' }); await r.arrayBuffer(); } catch(e) { _mcWarmed.delete(u); }
+    if(!navigator.onLine || (document.hidden && force !== true) || !navigator.serviceWorker || !navigator.serviceWorker.controller) return;
+    await mcSyncEvictions();
+    const cfg = mcGalCfg(), conn = navigator.connection || {};
+    const cell = conn.type === 'cellular' || conn.saveData === true;
+    const wifiLoose = !cell && (!conn.type || conn.type === 'wifi' || conn.type === 'ethernet');
+    const idx = (await mcIdxAll()).filter(mcIsRec);
+    const info = new Map(idx.map(x => [x.url, x]));
+    let used = idx.reduce((s, x) => s + x.size, 0);
+    const cap = cfg.capMB * 1024 * 1024, now = Date.now();
+    const list = [], seen = new Set();
+    (await mcAllCardsForMedia(force === true)).forEach(c => {
+      const base = Date.parse(c.created_at || '') || 0;
+      mcAttsOfCard(c).forEach(a => {
+        const u = String(a.data || '');
+        if(!MC_ATT_RE.test(u) || seen.has(u)) return;
+        seen.add(u);
+        const age = (now - (a.ts || base || now)) / 864e5;
+        list.push({ u, vid: (a.type || '').startsWith('video/'), size: a.size || 0, age, urgent: age >= MC_DANGER_DAYS });
+      });
+    });
+    // уже сохранённые файлы, которым осталось мало: закрепляем
+    await mcIdxPatch(list.filter(x => x.urgent && info.has(x.u) && !info.get(x.u).pin).map(x => x.u), { pin: true });
+    // что скачивать
+    const todo = list.filter(x => !info.has(x.u) && !_mcWarmed.has(x.u) && !_mcGone.has(x.u)).filter(x => {
+      if(x.urgent) return x.vid ? (force === true || !cell) : true;
+      if(x.vid ? !(cfg.videosWifi && wifiLoose) : !cfg.photosAuto) return false;
+      return used + x.size <= cap * 0.8; // обычные файлы не заполняют память больше чем на 80%: иначе они вытесняли бы друг друга по кругу
+    }).sort((a, b) => (b.urgent - a.urgent) || (b.age - a.age));
+    const got = [];
+    for(const x of todo.slice(0, 30)) {
+      _mcWarmed.add(x.u);
+      try {
+        const r = await fetch(x.u, { mode: 'cors' });
+        if(r.status === 404 || r.status === 400) { _mcGone.add(x.u); continue; }
+        if(!r.ok) { _mcWarmed.delete(x.u); continue; }
+        await r.arrayBuffer();
+        used += x.size; got.push(x);
+      } catch(e) { _mcWarmed.delete(x.u); }
     }
+    await mcIdxPatch(got.filter(x => x.urgent).map(x => x.u), { pin: true });
+    // сколько файлов под угрозой и ещё не сохранено здесь
+    const have = new Set((await mcIdxAll()).filter(mcIsRec).map(x => x.url));
+    window._mcDanger = list.filter(x => x.urgent && !have.has(x.u) && !_mcGone.has(x.u)).length;
+    await mcStorageNotice();
   } catch(e) {}
+  finally { _mcWarmBusy = false; }
 }
 setInterval(mcWarmMedia, 25000);
 setTimeout(mcWarmMedia, 6000);
 setTimeout(mcApplyCap, 1500);
+try { if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch(e) {} // просим браузер не чистить хранилище самому
+
+// ═══════════════════════════════════════════
+//  СЧЁТЧИКИ И ПРЕДУПРЕЖДЕНИЯ О ПАМЯТИ
+// ═══════════════════════════════════════════
+async function mcStorageStatus() {
+  const u = await mcMediaUsage(), cap = mcGalCfg().capMB * 1024 * 1024;
+  let dev = null;
+  try { const e = await navigator.storage.estimate(); dev = { quota: e.quota, usage: e.usage }; } catch(_) {}
+  return { bytes: u.bytes, files: u.files, pinned: u.pinned, pinnedBytes: u.pinnedBytes, cap, pct: cap ? u.bytes / cap : 0, danger: window._mcDanger || 0, dev };
+}
+function mcWarnOnce(key, msg) { // каждое предупреждение — не чаще раза в сутки
+  try {
+    const m = JSON.parse(localStorage.getItem('mc_warn') || '{}');
+    if(Date.now() - (m[key] || 0) < 864e5) return;
+    m[key] = Date.now(); localStorage.setItem('mc_warn', JSON.stringify(m));
+  } catch(e) {}
+  try { toast(msg, true); } catch(e) {}
+}
+async function mcStorageNotice() {
+  const st = await mcStorageStatus(), mb = b => Math.round(b / 1048576);
+  if(st.danger > 0) mcWarnOnce('danger', '⚠ ' + st.danger + ' файл(ов) скоро исчезнут из облака и ещё не сохранены на этом устройстве. Зайди в Галерею — там кнопка «Сохранить сейчас».');
+  if(st.pct >= 0.95) mcWarnOnce('cap95', '🔴 Память приложения почти заполнена: ' + mb(st.bytes) + ' из ' + mb(st.cap) + ' МБ. Увеличь лимит в Галерее (⚙) или сделай резервную копию.');
+  else if(st.pct >= 0.8) mcWarnOnce('cap80', '🟡 Память приложения заполнена на ' + Math.round(st.pct * 100) + '% (' + mb(st.bytes) + ' из ' + mb(st.cap) + ' МБ).');
+  if(st.dev && st.dev.quota && st.dev.quota - st.dev.usage < 300 * 1048576) mcWarnOnce('dev', '🔴 На устройстве заканчивается свободное место: осталось ' + mb(st.dev.quota - st.dev.usage) + ' МБ.');
+}
+
+// ═══════════════════════════════════════════
+//  ЗАЩИТА ПОСЛЕДНЕЙ КОПИИ
+//  Облако стирает файл, когда все получатели его забрали. Поэтому, если файл убрали с устройства
+//  (кэш вытеснил или пользователь удалил), отметка «получено» снимается — тогда облако его не стирает.
+// ═══════════════════════════════════════════
+async function mcRetract(urls) {
+  try {
+    if(typeof sb === 'undefined' || typeof currentUser === 'undefined' || !currentUser || !currentUser.id || !navigator.onLine) return false;
+    const paths = urls.map(mcPathOf).filter(Boolean);
+    for(let i = 0; i < paths.length; i += 100) {
+      const { error } = await sb.from('attachment_receipts').delete().eq('user_id', currentUser.id).in('path', paths.slice(i, i + 100));
+      if(error) { console.log('retract error:', error.message); return false; }
+    }
+    return true;
+  } catch(e) { return false; }
+}
+async function mcSyncEvictions() {
+  try {
+    const db = await mcMediaDb();
+    const ev = (await mcIdxAll()).filter(x => x.url.indexOf('__ev__') === 0).slice(0, 200);
+    if(!ev.length) return;
+    if(!(await mcRetract(ev.map(x => x.url.slice(6))))) return;
+    const t = db.transaction('idx', 'readwrite');
+    ev.forEach(x => t.objectStore('idx').delete(x.url));
+  } catch(e) {}
+}
+// есть ли файл ещё в облаке: dead — нет, unknown — не удалось проверить
+async function mcCloudCheck(urls) {
+  const dead = [], unknown = [];
+  let i = 0;
+  const worker = async () => {
+    while(i < urls.length) {
+      const u = urls[i++];
+      if(!MC_ATT_RE.test(u)) continue;
+      try {
+        const r = await fetch(u, { method: 'HEAD', mode: 'cors', cache: 'no-store' });
+        if(r.status === 404 || r.status === 400) dead.push(u); else if(!r.ok) unknown.push(u);
+      } catch(e) { unknown.push(u); }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(8, urls.length) }, worker));
+  return { dead, unknown };
+}
+// у отправителя свой файл должен сразу лежать на устройстве (отметку «получено» мы ему ставим сразу)
+async function mcCacheOwn(url, file) {
+  const db = await mcMediaDb();
+  const t = db.transaction(['files', 'idx'], 'readwrite');
+  t.objectStore('files').put({ url, blob: file, type: file.type || 'application/octet-stream' });
+  t.objectStore('idx').put({ url, size: file.size, t: Date.now(), a: Date.now(), rep: true });
+  t.objectStore('idx').delete('__ev__' + url);
+}
 
 // ═══════════════════════════════════════════
 //  ОТМЕТКИ «ФАЙЛ ПОЛУЧЕН НА УСТРОЙСТВО»
@@ -143,15 +295,13 @@ function mcPathOf(url) {
 async function mcReportReceipts() {
   try {
     if(!navigator.onLine || typeof sb === 'undefined' || typeof currentUser === 'undefined' || !currentUser || !currentUser.id) return;
-    const db = await mcMediaDb();
-    const all = await new Promise((res, rej) => { const q = db.transaction('idx').objectStore('idx').getAll(); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
-    const fresh = all.filter(x => x.url !== '__cap__' && !x.rep && mcPathOf(x.url)).slice(0, 200);
+    const all = await mcIdxAll();
+    const fresh = all.filter(x => mcIsRec(x) && !x.rep && mcPathOf(x.url)).slice(0, 200);
     if(!fresh.length) return;
     const rows = fresh.map(x => ({ path: mcPathOf(x.url), user_id: currentUser.id }));
     const { error } = await sb.from('attachment_receipts').upsert(rows, { onConflict: 'path,user_id', ignoreDuplicates: true });
     if(error) { console.log('receipts error:', error.message); return; }
-    const t = db.transaction('idx', 'readwrite');
-    fresh.forEach(x => t.objectStore('idx').put({ ...x, rep: true }));
+    await mcIdxPatch(fresh.map(x => x.url), { rep: true });
   } catch(e) {}
 }
 setInterval(mcReportReceipts, 60000);

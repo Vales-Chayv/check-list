@@ -40,6 +40,9 @@
   #gal-sheet.selmode .gal-sel{display:block}
   .gal-t.on .gal-sel{background:var(--accent);border-color:var(--accent)}
   .gal-t.on .gal-sel::after{content:'✓';color:#111;font-size:11px;position:absolute;left:3px;top:-2px}
+  .gal-warn{display:none;margin:0 14px 6px;padding:8px 10px;border-radius:10px;background:var(--s2);border:1px solid #b8892b;font-size:12px;color:var(--t2);line-height:1.5}
+  .gal-warn .gal-btn{margin-left:6px;padding:3px 9px}
+  .gal-bar .bad{color:#e06060;font-weight:700}.gal-bar .mid{color:#e8c56a}
   .gal-bar{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;font-size:11px;color:var(--t3);border-top:1px solid var(--b1);flex-shrink:0}
   .gal-act{display:none;align-items:center;justify-content:space-around;padding:12px 8px;background:var(--s2);font-size:13px;color:var(--accent);flex-shrink:0;border-top:1px solid var(--b1)}
   .gal-act span{cursor:pointer;padding:2px 6px}
@@ -133,7 +136,7 @@
     try {
       const db = await mcMediaDb();
       const all = await new Promise((res, rej) => { const q = db.transaction('idx').objectStore('idx').getAll(); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
-      all.forEach(x => { if(x.url !== '__cap__') G.local.add(x.url); });
+      all.forEach(x => { if(mcIsRec(x)) G.local.add(x.url); });
     } catch(e) {}
   }
   const isLocal = it => it.url.startsWith('data:') || G.local.has(it.url);
@@ -158,6 +161,7 @@
     ov.innerHTML = `<div class="sheet" id="gal-sheet">
       <div class="sheet-handle"></div>
       <div class="gal-top"><span>🖼 Галерея</span><span class="sp"></span><span class="cnt" id="gal-cnt"></span><button class="gal-ib" id="gal-sync" aria-label="Обновить из облака" title="Обновить из облака">⟳</button><button class="gal-ib" id="gal-gear" aria-label="Настройки">⚙</button><button class="gal-ib" style="color:var(--t2)" onclick="closeGallery()" aria-label="Закрыть">✕</button></div>
+      <div class="gal-warn" id="gal-warn"></div>
       <div class="gal-fl" id="gal-f1"></div>
       <div class="gal-fl" id="gal-f2"></div>
       <div id="gal-body"></div>
@@ -221,16 +225,37 @@
     $('gal-lim').onchange = e => { const c = cfg(); c.capMB = +e.target.value; saveCfg(c); fillSettings(); };
     $('gal-clear').onclick = async () => {
       try {
+        toast('Проверяю облако…');
+        await mcSyncEvictions();
+        const urls = (await mcIdxAll()).filter(mcIsRec).map(x => x.url);
+        const chk = await mcCloudCheck(urls), risky = new Set(chk.dead.concat(chk.unknown));
+        let del = urls;
+        if(risky.size && !confirm(riskMsg(chk) + '\n\nOK — очистить всё равно.\nОтмена — оставить эти файлы, остальные очистить.')) del = urls.filter(u => !risky.has(u));
         const db = await mcMediaDb();
         const t = db.transaction(['files', 'idx'], 'readwrite');
-        t.objectStore('files').clear();
-        const idx = t.objectStore('idx'); idx.clear();
-        idx.put({ url: '__cap__', size: 0, t: 0, cap: cfg().capMB * MB });
+        del.forEach(u => { t.objectStore('files').delete(u); t.objectStore('idx').delete(u); try { _mcWarmed.delete(u); } catch(e) {} });
         await new Promise(r => { t.oncomplete = r; t.onerror = r; t.onabort = r; });
-        try { _mcWarmed.clear(); } catch(e) {}
-      } catch(e) {}
-      await loadLocal(); renderAll(); fillSettings(); toast('Файлы на устройстве очищены');
+        mcRetract(del);
+        await loadLocal(); renderAll(); fillSettings();
+        toast(del.length < urls.length ? 'Очищено: ' + del.length + '. Оставлено ' + (urls.length - del.length) + ' файл(ов) — копий в облаке у них нет' : 'Файлы на устройстве очищены. В облаке копии остались');
+      } catch(e) { toast('Не удалось очистить', true); }
     };
+    $('gal-warn').onclick = async e => {
+      if(e.target.id === 'gal-pull') { e.target.textContent = 'Сохраняю…'; await mcWarmMedia(true); await loadLocal(); renderBody(); toast('Готово: файлы сохраняются на устройстве'); }
+      else if(e.target.id === 'gal-lim') { fillSettings(); $('gal-set').classList.add('show'); }
+    };
+  }
+  function riskMsg(chk) {
+    const n = chk.dead.length + chk.unknown.length;
+    return chk.dead.length ? 'У ' + n + ' файл(ов) копии в облаке уже нет: на этом устройстве они последние.' : 'Не удалось проверить облако (нет связи?). У ' + n + ' файл(ов) копия на устройстве может быть последней.';
+  }
+  async function fillWarn() {
+    const el = $('gal-warn'); if(!el) return;
+    let st; try { st = await mcStorageStatus(); } catch(e) { return; }
+    const m = [];
+    if(st.danger) m.push('⚠ ' + st.danger + ' файл(ов) скоро исчезнут из облака и ещё не сохранены на этом устройстве <button class="gal-btn" id="gal-pull">Сохранить сейчас</button>');
+    if(st.pct >= 0.8) m.push((st.pct >= 0.95 ? '🔴' : '🟡') + ' Память приложения заполнена на ' + Math.round(st.pct * 100) + '% <button class="gal-btn" id="gal-lim">Лимит</button>');
+    el.innerHTML = m.join('<br>'); el.style.display = m.length ? 'block' : 'none';
   }
   async function fillSettings() {
     const c = cfg();
@@ -238,7 +263,7 @@
     $('gal-s2').classList.toggle('on', !!c.photosAuto);
     $('gal-lim').value = String(c.capMB);
     const u = await mcMediaUsage();
-    $('gal-us2').textContent = 'Занято: ' + fmtMB(u.bytes) + ' · ' + u.files + ' файлов';
+    $('gal-us2').textContent = 'Занято: ' + fmtMB(u.bytes) + ' · ' + u.files + ' файлов' + (u.pinned ? ' (📌 ' + u.pinned + ' закреплено: не вытесняются)' : '');
   }
   function renderFilters() {
     const T = [['all', 'Все'], ['img', 'Фото'], ['vid', 'Ролики'], ['doc', 'Файлы']];
@@ -270,7 +295,12 @@
     if(cur !== null) h += '</div>';
     if(L.length > G.shown) h += `<button class="gal-more">Показать ещё (${L.length - G.shown})</button>`;
     $('gal-body').innerHTML = h || '<div style="padding:50px 0;text-align:center;color:var(--t3)">Здесь пока ничего нет</div>';
-    mcMediaUsage().then(u => { const el = $('gal-usage'); if(el) el.textContent = 'На устройстве: ' + fmtMB(u.bytes) + ' из ' + (cfg().capMB >= 1024 ? (cfg().capMB / 1024) + ' ГБ' : cfg().capMB + ' МБ'); });
+    mcMediaUsage().then(u => {
+      const el = $('gal-usage'); if(!el) return;
+      const cap = cfg().capMB * MB, p = cap ? u.bytes / cap : 0;
+      el.innerHTML = 'На устройстве: <span class="' + (p >= 0.95 ? 'bad' : p >= 0.8 ? 'mid' : '') + '">' + fmtMB(u.bytes) + ' из ' + (cfg().capMB >= 1024 ? (cfg().capMB / 1024) + ' ГБ' : cfg().capMB + ' МБ') + '</span>' + (u.pinned ? ' · 📌 ' + u.pinned : '');
+    });
+    fillWarn();
   }
   function renderAll() { renderFilters(); renderBody(); }
 
@@ -343,14 +373,20 @@
   }
   async function removeLocal() {
     const urls = [...G.picked].map(i => G.items[i] && G.items[i].url).filter(u => u && !u.startsWith('data:'));
+    if(!urls.length) return;
+    let del = urls;
     try {
+      toast('Проверяю облако…');
+      const chk = await mcCloudCheck(urls), risky = new Set(chk.dead.concat(chk.unknown));
+      if(risky.size && !confirm(riskMsg(chk) + '\n\nOK — удалить всё равно.\nОтмена — оставить эти файлы, остальные освободятся.')) del = urls.filter(u => !risky.has(u));
       const db = await mcMediaDb();
       const t = db.transaction(['files', 'idx'], 'readwrite');
-      urls.forEach(u => { t.objectStore('files').delete(u); t.objectStore('idx').delete(u); try { _mcWarmed.delete(u); } catch(e) {} });
+      del.forEach(u => { t.objectStore('files').delete(u); t.objectStore('idx').delete(u); try { _mcWarmed.delete(u); } catch(e) {} });
       await new Promise(r => { t.oncomplete = r; t.onerror = r; t.onabort = r; });
-    } catch(e) {}
+      mcRetract(del);
+    } catch(e) { del = []; }
     G.sel = false; G.picked.clear(); await loadLocal(); renderBody();
-    toast('Освобождено на устройстве. В облаке файлы остались');
+    toast(!del.length ? 'Ничего не удалено' : del.length < urls.length ? 'Освобождено: ' + del.length + '. Оставлено ' + (urls.length - del.length) + ' — копий в облаке у них нет' : 'Освобождено на устройстве. В облаке копии остались');
   }
 
   // ── открытие и закрытие ──
