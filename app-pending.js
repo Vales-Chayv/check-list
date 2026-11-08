@@ -22,7 +22,7 @@
     r.onsuccess = () => res(r.result); r.onerror = () => { dbp = null; rej(r.error); };
   }));
   const idb = async (mode, fn) => { const d = await open(); return new Promise((res, rej) => { const t = d.transaction('jobs', mode), q = fn(t.objectStore('jobs')); t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); }); };
-  const save = j => idb('readwrite', s => s.put({ pendId: j.pendId, blob: j.file, name: j.file.name, type: j.file.type, size: j.file.size, ts: j.att.ts, cardId: j.cardId || null, entryId: j.entryId || null, list: j.list || null, err: !!j.err })).catch(() => {});
+  const save = j => idb('readwrite', s => s.put({ pendId: j.pendId, blob: j.real ? null : j.file, real: j.real || null, name: j.file.name, type: j.file.type, size: j.file.size, ts: j.att.ts, cardId: j.cardId || null, spaceId: j.spaceId || null, entryId: j.entryId || null, list: j.list || null, entryRef: j.entryRef || null, err: !!j.err })).catch(() => {});
   const drop = id => idb('readwrite', s => s.delete(id)).catch(() => {});
 
   // ── обход карточки ──
@@ -47,7 +47,7 @@
     const out = { ...card };
     if (Array.isArray(card.attachments) && card.attachments.some(isP)) {
       any = true; out.attachments = card.attachments.filter(a => !isP(a));
-      card.attachments.filter(isP).forEach(a => note(a, card.id, null, 'attachments', null));
+      card.attachments.filter(isP).forEach(a => note(a, card, null, 'attachments', null));
     }
     if (Array.isArray(card.entries) && card.entries.some(e => e && ['attachments', 'sessionAtts'].some(k => Array.isArray(e[k]) && e[k].some(isP)))) {
       any = true; out.entries = [];
@@ -56,24 +56,25 @@
         const e2 = { ...e };
         ['attachments', 'sessionAtts'].forEach(k => { if (Array.isArray(e[k])) e2[k] = e[k].filter(a => !isP(a)); });
         const empty = !e.text && !e.sessionNote && !(e2.attachments || []).length && !(e2.sessionAtts || []).length;
-        ['attachments', 'sessionAtts'].forEach(k => (e[k] || []).filter(isP).forEach(a => note(a, card.id, e.id, k, empty ? e : null)));
+        ['attachments', 'sessionAtts'].forEach(k => (e[k] || []).filter(isP).forEach(a => note(a, card, e.id, k, empty ? e : null)));
         if (!empty) out.entries.push(e2);
       }
     }
     return any ? out : card;
   };
-  function note(a, cardId, entryId, key, entryRef) {
+  function note(a, card, entryId, key, entryRef) { // запоминаем «адрес»: куда положить файл, когда он догрузится
     const j = jobs.get(a.pendId); if (!j) return;
-    j.cardId = cardId; j.entryId = entryId; j.list = key; if (entryRef) j.entryRef = entryRef;
-    try { window._mcPendCards.set(j.file, cardId); } catch (e) {}
+    j.cardId = card.id; j.spaceId = card.space_id || null; j.entryId = entryId; j.list = key; if (entryRef) j.entryRef = entryRef;
+    try { window._mcPendCards.set(j.file, { cardId: j.cardId, spaceId: j.spaceId }); } catch (e) {}
     save(j);
+    if (j.real) deliver(j); // файл успел догрузиться раньше сохранения
   }
 
   // ── вернуть плитки в карточки, если их затёрла синхронизация ──
   function reinject() {
     if (!jobs.size || typeof cards === 'undefined') return;
     for (const j of jobs.values()) {
-      if (!j.cardId) continue;
+      if (!j.cardId || j.real) continue;
       const card = cards.find(c => c.id === j.cardId); if (!card) continue;
       if (listsOf(card).some(l => l.list.some(a => a && a.pendId === j.pendId))) continue;
       if (j.entryId) {
@@ -116,12 +117,63 @@
     if (j.cancelled) { await drop(j.pendId); return; }
     const real = { ...att }; delete real.pending; delete real.pendId;
     if (!real.id) real.id = uid();
-    jobs.delete(j.pendId);
-    let ok = await patchAll(j.pendId, real, j.file);
-    for (let n = 0; !ok && n < 4; n++) { await wait(1000); ok = await patchAll(j.pendId, real, j.file); } // карточка могла ещё сохраняться
-    await drop(j.pendId);
-    setTimeout(() => { try { URL.revokeObjectURL(j.att.data); } catch (e) {} }, 30000);
+    j.real = real; await save(j);   // файл в облаке; в журнале помним «куда его положить»
+    await deliver(j);
     decorate();
+  }
+
+  const FORMS = () => [['tempAtt', typeof tempAtt !== 'undefined' ? tempAtt : null, 'renderAttPrev'], ['aeAtts', typeof aeAtts !== 'undefined' ? aeAtts : null, 'renderAEPrev'], ['_eeAtts', typeof _eeAtts !== 'undefined' ? _eeAtts : null, 'renderEEPrev']];
+  function patchForms(pendId, real) {
+    let hit = false;
+    for (const [, arr, rn] of FORMS()) {
+      if (!Array.isArray(arr)) continue;
+      let h = false;
+      for (let i = arr.length - 1; i >= 0; i--) if (arr[i] && arr[i].pendId === pendId) { arr[i] = real; h = true; }
+      if (h) { hit = true; try { window[rn](); } catch (e) {} }
+    }
+    return hit;
+  }
+  function place(card, j, real) { // положить файл в карточку по адресу; false — адреса больше нет (запись удалили)
+    if (replaceIn(card, j.pendId, real)) return true;
+    if (listsOf(card).some(l => l.list.some(a => a && a.data === real.data))) return true;
+    if (j.entryId) {
+      let e = (card.entries || []).find(x => x && x.id === j.entryId);
+      if (!e && j.entryRef) { e = j.entryRef; ['attachments', 'sessionAtts'].forEach(k => { if (Array.isArray(e[k])) e[k] = e[k].map(a => a && a.pendId === j.pendId ? real : a); }); card.entries = [e, ...(card.entries || [])]; return true; }
+      if (!e) return false;
+      const k = j.list || 'attachments'; e[k] = e[k] || []; e[k].push(real); return true;
+    }
+    card.attachments = [...(card.attachments || []), real]; return true;
+  }
+  async function orphan(j, why) { // файл никуда не приписан: убираем из облака
+    jobs.delete(j.pendId); await drop(j.pendId);
+    try { if (typeof storageRemoveAtts === 'function' && j.real) storageRemoveAtts([j.real]); } catch (e) {}
+    if (why) tst(why, true);
+  }
+  // доставка готового файла: плитку в карточке мы не ищем, едем по адресу из журнала
+  async function deliver(j) {
+    if (j.delivering) return; j.delivering = true;
+    try {
+      const real = j.real;
+      const inForm = patchForms(j.pendId, real);
+      if (!j.cardId) { // карточка ещё не сохранена
+        if (inForm) { jobs.delete(j.pendId); await drop(j.pendId); return; } // форма сама унесёт файл при сохранении
+        for (let n = 0; n < 4 && !j.cardId; n++) await wait(1000); // вдруг сохранение как раз идёт
+        if (!j.cardId) { await orphan(j, 'Файл ' + (j.file.name || '') + ' не прикреплён: карточку не сохранили'); return; }
+      }
+      let card = (typeof cards !== 'undefined' ? cards : []).find(c => c.id === j.cardId), mem = !!card;
+      if (!card && navigator.onLine) { try { const r = await sb.from('cards').select('*').eq('id', j.cardId).maybeSingle(); if (!r.error) { card = r.data; if (!card) { await orphan(j, 'Файл не прикреплён: карточку удалили'); return; } } } catch (e) {} }
+      if (!card) { try { card = (await local.getAll('cards')).find(c => c.id === j.cardId); } catch (e) {} }
+      if (!card) return; // нет сети: повторим позже, запись в журнале остаётся
+      if (!place(card, j, real)) { await orphan(j, 'Файл не прикреплён: запись удалили'); return; }
+      try { window._mcPendCards.set(j.file, { cardId: j.cardId, spaceId: card.space_id || j.spaceId || null }); } catch (e) {}
+      await dbUpdate(card);
+      jobs.delete(j.pendId); await drop(j.pendId);
+      setTimeout(() => { try { URL.revokeObjectURL(j.att.data); } catch (e) {} }, 30000);
+      try {
+        if (mem && typeof render === 'function') render();
+        if (typeof openView === 'function' && window._openViewId === j.cardId && document.getElementById('view-ov') && document.getElementById('view-ov').classList.contains('on')) openView(j.cardId);
+      } catch (e) {}
+    } finally { j.delivering = false; decorate(); }
   }
 
   // подменить плитку на готовый файл везде: в формах, в открытых карточках и в сохранённых копиях
@@ -183,18 +235,27 @@
     if (resumed) return; resumed = true;
     let recs = []; try { recs = await idb('readonly', s => s.getAll()) || []; } catch (e) {}
     for (const r of recs) {
-      if (jobs.has(r.pendId) || !r.blob) continue;
-      const file = new File([r.blob], r.name || 'file', { type: r.type || '' });
-      const att = { id: r.pendId, pendId: r.pendId, pending: true, name: file.name, type: file.type, size: file.size, data: URL.createObjectURL(file), ts: r.ts || Date.now() };
-      const j = { pendId: r.pendId, file, att, cardId: r.cardId, entryId: r.entryId, list: r.list, running: false, err: false };
-      jobs.set(r.pendId, j); if (r.cardId) window._mcPendCards.set(file, r.cardId);
+      if (jobs.has(r.pendId) || (!r.blob && !r.real)) continue;
+      const file = new File([r.blob || new Blob([])], r.name || 'file', { type: r.type || '' });
+      const att = { id: r.pendId, pendId: r.pendId, pending: true, name: file.name, type: file.type, size: r.size || file.size, data: r.real ? r.real.data : URL.createObjectURL(file), ts: r.ts || Date.now() };
+      const j = { pendId: r.pendId, file, att, real: r.real || null, cardId: r.cardId, spaceId: r.spaceId, entryId: r.entryId, list: r.list, entryRef: r.entryRef || null, running: false, err: false };
+      jobs.set(r.pendId, j); if (r.cardId) window._mcPendCards.set(file, { cardId: r.cardId, spaceId: r.spaceId || null });
+      if (r.real) continue; // уже в облаке, осталось положить в карточку
       const fix = c => listsOf(c).forEach(l => l.list.forEach(a => { if (a && a.pendId === r.pendId) { a.data = att.data; a.pending = true; } }));
       if (typeof cards !== 'undefined') cards.forEach(fix);
       try { for (const c of await local.getAll('cards')) { let h = false; listsOf(c).forEach(l => l.list.forEach(a => { if (a && a.pendId === r.pendId) { a.data = att.data; h = true; } })); if (h) await local.put('cards', c); } } catch (e) {}
     }
-    if (jobs.size) { reinject(); try { render(); } catch (e) {} tst('⏳ Докачиваю файлы: ' + jobs.size); for (const j of jobs.values()) { if (navigator.onLine) run(j); else { j.err = true; } } decorate(); }
+    if (jobs.size) {
+      reinject(); try { render(); } catch (e) {}
+      const up = [...jobs.values()].filter(j => !j.real).length;
+      if (up) tst('⏳ Докачиваю файлы: ' + up);
+      for (const j of jobs.values()) { if (j.real) { if (j.cardId) deliver(j); else orphan(j); } else if (navigator.onLine) run(j); else j.err = true; }
+      decorate();
+    }
   }
-  window.addEventListener('online', () => { for (const j of jobs.values()) if (j.err) run(j); });
+  const retry = () => { for (const j of jobs.values()) { if (j.real && j.cardId) deliver(j); else if (j.err) run(j); } };
+  setInterval(() => { if (jobs.size && navigator.onLine) retry(); }, 30000);
+  window.addEventListener('online', retry);
 
   // ── вставка в render: вернуть плитки и один раз запустить докачку ──
   const r0 = window.render;
