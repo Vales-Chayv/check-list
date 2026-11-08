@@ -53,7 +53,7 @@
   #gal-folder.ok{display:inline}
   #gal-sheet.selmode .gal-bar{display:none}
   .gal-more{display:block;margin:12px auto;background:var(--s2);border:1px solid var(--b1);border-radius:10px;color:var(--accent);padding:8px 16px;font-size:13px;cursor:pointer;font-family:inherit}
-  #gal-set{position:absolute;left:0;right:0;bottom:0;background:var(--s2);border-radius:16px 16px 0 0;padding:14px 16px calc(14px + var(--safe));display:none;z-index:10;box-shadow:0 -6px 20px rgba(0,0,0,.4)}
+  #gal-set{max-height:75%;overflow-y:auto;position:absolute;left:0;right:0;bottom:0;background:var(--s2);border-radius:16px 16px 0 0;padding:14px 16px calc(14px + var(--safe));display:none;z-index:10;box-shadow:0 -6px 20px rgba(0,0,0,.4)}
   #gal-set.show{display:block}
   .gal-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;font-size:13px;border-bottom:1px solid var(--b1);gap:10px}
   .gal-sw{width:38px;height:22px;border-radius:12px;background:#444;position:relative;cursor:pointer;flex-shrink:0}
@@ -176,6 +176,8 @@
         <div class="gal-row"><span>Лимит на устройстве</span><select id="gal-lim" style="background:var(--s1);color:var(--t1);border:1px solid var(--b1);border-radius:6px;padding:4px"><option value="300">300 МБ</option><option value="500">500 МБ</option><option value="1024">1 ГБ</option><option value="2048">2 ГБ</option></select></div>
         <div class="gal-row"><span>После съёмки камерой</span><select id="gal-cap" style="background:var(--s1);color:var(--t1);border:1px solid var(--b1);border-radius:6px;padding:4px"><option value="ask">Спрашивать</option><option value="orig">Оригинал + копия</option><option value="small">Только копия</option></select></div>
         <div class="gal-row"><span id="gal-vault"></span><button class="gal-btn" id="gal-vzip">Оригиналы ZIP</button></div>
+        <div class="gal-row"><span id="gal-bk"></span><button class="gal-btn" id="gal-bkgo">Резерв</button></div>
+        <div class="gal-row" id="gal-free-row" style="display:none"><span id="gal-free"></span><button class="gal-btn" id="gal-freego">Освободить</button></div>
         <div class="gal-row" style="border:none"><span id="gal-us2"></span><button class="gal-btn" id="gal-clear">Очистить</button></div>
         <div style="text-align:center;margin-top:6px"><button class="gal-btn" id="gal-setx">Закрыть</button></div>
       </div></div>`;
@@ -228,6 +230,14 @@
     $('gal-s2').onclick = e => { const c = cfg(); c.photosAuto = !c.photosAuto; saveCfg(c); fillSettings(); };
     $('gal-cap').onchange = e => { try { localStorage.setItem('mc_cap_mode', e.target.value); } catch(_) {} };
     $('gal-vzip').onclick = async () => { const l = await mcVaultAllItems(); if(!l.length) { toast('Оригиналов пока нет'); return; } if(window.mcSaveZip) mcSaveZip(l, 'Оригиналы.zip'); };
+    $('gal-bkgo').onclick = () => { $('gal-set').classList.remove('show'); mcBackupStart().then(() => fillSettings()); };
+    $('gal-freego').onclick = async () => {
+      const b = await mcVaultBacked();
+      if(!b.count) return;
+      if(!confirm('Удалить с устройства ' + b.count + ' оригинал(ов) (' + fmtMB(b.bytes) + '), которые попали в резервную копию?\n\nСначала убедись, что файлы резерва лежат в нужном месте. Сжатые копии в карточках останутся.')) return;
+      await mcVaultFreeBacked(); await loadLocal(); renderBody(); fillSettings();
+      toast('Освобождено: ' + fmtMB(b.bytes));
+    };
     $('gal-lim').onchange = e => { const c = cfg(); c.capMB = +e.target.value; saveCfg(c); fillSettings(); };
     $('gal-clear').onclick = async () => {
       try {
@@ -269,6 +279,13 @@
     $('gal-s2').classList.toggle('on', !!c.photosAuto);
     $('gal-lim').value = String(c.capMB);
     $('gal-cap').value = mcCapMode();
+    try {
+      const k = mcBkGet('mc_bk_last');
+      $('gal-bk').textContent = '🛡 Резервная копия: ' + (k ? new Date(k.ts).toLocaleDateString('ru') + ' · ' + k.files + ' файлов' : 'ещё не делали');
+      const b = await mcVaultBacked();
+      $('gal-free-row').style.display = b.count ? '' : 'none';
+      $('gal-free').textContent = 'Оригиналов в резерве: ' + b.count + ' · ' + fmtMB(b.bytes);
+    } catch(e) {}
     try { const v = await mcVaultStats(); $('gal-vault').textContent = '💎 Оригиналы: ' + v.count + ' · ' + fmtMB(v.bytes); } catch(e) {}
     const u = await mcMediaUsage();
     $('gal-us2').textContent = 'Занято: ' + fmtMB(u.bytes) + ' · ' + u.files + ' файлов' + (u.pinned ? ' (📌 ' + u.pinned + ' закреплено: не вытесняются)' : '');
