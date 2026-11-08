@@ -402,7 +402,7 @@ async function mcVaultAllItems() {
 const _mcCapPend = new Map(); // ключ файла → id оригинала, пока файл не загрузился в облако
 const mcCapKey = f => (f.name || '') + '|' + f.size + '|' + f.lastModified;
 function mcCapMode() { try { return localStorage.getItem('mc_cap_mode') || 'ask'; } catch(e) { return 'ask'; } }
-function mcCapAsk(kind, file) {
+function mcCapAsk(kind, file, canEdit) {
   return new Promise(resolve => {
     const ov = document.createElement('div');
     ov.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;font-family:inherit';
@@ -413,24 +413,38 @@ function mcCapAsk(kind, file) {
       '<div style="font-size:12px;opacity:.7;margin-bottom:12px">В облако всегда уходит сжатая копия (фото до 1920 px). Что сделать с оригиналом?</div>' +
       '<button id="mc-cap-o" style="' + b + ';background:#B8892B;color:#111;border-color:#B8892B;font-weight:600;margin-bottom:8px">💎 Оставить оригинал на устройстве<br><span style="font-weight:400;font-size:12px">и отправить сжатую копию</span></button>' +
       '<button id="mc-cap-s" style="' + b + '">☁ Только сжатая копия<br><span style="opacity:.7;font-size:12px">оригинал не сохранять</span></button>' +
+      (canEdit ? '<button id="mc-cap-e" style="' + b + ';margin-top:8px;text-align:center">✎ Править фото</button>' : '') +
       '<label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;opacity:.85"><input type="checkbox" id="mc-cap-r"> Запомнить выбор (меняется в Галерее ⚙)</label></div>';
     document.body.appendChild(ov);
     const fin = mode => { const r = ov.querySelector('#mc-cap-r').checked; ov.remove(); resolve({ mode, remember: r }); };
     ov.querySelector('#mc-cap-o').onclick = () => fin('orig');
     ov.querySelector('#mc-cap-s').onclick = () => fin('small');
+    const ce = ov.querySelector('#mc-cap-e'); if(ce) ce.onclick = () => { ov.remove(); resolve({ mode: 'edit' }); };
+  });
+}
+// правка снимка до отправки: вернёт исправленный файл или null, если закрыли без сохранения
+function mcEditReturn(file) {
+  return new Promise(resolve => {
+    const u = URL.createObjectURL(file);
+    window.mcPhotoEdit(u, { name: file.name, custom: async f => { resolve(f); }, onClose: () => resolve(null) }).then(() => setTimeout(() => URL.revokeObjectURL(u), 60000), () => resolve(null));
   });
 }
 // вызывается для каждого снимка/ролика, снятого через камеру приложения
 async function mcCapFlow(kind, file, deliver) {
   try {
-    let mode = mcCapMode();
+    let mode = mcCapMode(), raw = file;
+    const canEdit = kind === 'photo' && typeof window.mcPhotoEdit === 'function' && /^image\/(jpeg|jpg|png|webp)$/i.test(file.type || '');
     if(mode === 'ask') {
-      const r = await mcCapAsk(kind, file);
-      mode = r.mode;
-      if(r.remember) { try { localStorage.setItem('mc_cap_mode', mode); } catch(e) {} }
+      for(;;) {
+        const r = await mcCapAsk(kind, file, canEdit);
+        if(r.mode === 'edit') { const f = await mcEditReturn(file); if(f) file = f; continue; }
+        mode = r.mode;
+        if(r.remember) { try { localStorage.setItem('mc_cap_mode', mode); } catch(e) {} }
+        break;
+      }
     }
-    if(mode === 'orig') {
-      try { _mcCapPend.set(mcCapKey(file), await mcVaultPut(file, kind)); }
+    if(mode === 'orig') { // оригинал — то, что снято камерой, до правок
+      try { _mcCapPend.set(mcCapKey(file), await mcVaultPut(raw, kind)); }
       catch(e) { try { toast('Не удалось сохранить оригинал на устройстве (нет места?). Отправляю только копию.', true); } catch(_) {} }
     }
   } catch(e) {}
@@ -720,13 +734,14 @@ function mcCamOpen(kind, onFile, onFail) {
       '<select id="mc-cam-dev" style="' + btnCss + ';display:none;max-width:240px"></select>' +
       '<button id="mc-cam-go" style="' + btnCss + ';background:#B8892B;color:#111;border-color:#B8892B;font-weight:600">' + (isVid ? '⏺ Начать запись' : '📸 Снять') + '</button>' +
       '<button id="mc-cam-again" style="' + btnCss + ';display:none">↺ Переснять</button>' +
+      '<button id="mc-cam-edit" style="' + btnCss + ';display:none">✎ Править</button>' +
       '<button id="mc-cam-use" style="' + btnCss + ';display:none;background:#B8892B;color:#111;border-color:#B8892B;font-weight:600">✓ Использовать</button>' +
       '<button id="mc-cam-x" style="' + btnCss + '">Отмена</button>' +
     '</div>';
   document.body.appendChild(ov);
   const $ = id => ov.querySelector('#' + id);
   const live = $('mc-cam-live'), rev = $('mc-cam-rev'), img = $('mc-cam-img'), info = $('mc-cam-info');
-  const go = $('mc-cam-go'), again = $('mc-cam-again'), use = $('mc-cam-use'), dev = $('mc-cam-dev');
+  const go = $('mc-cam-go'), again = $('mc-cam-again'), use = $('mc-cam-use'), dev = $('mc-cam-dev'), edit = $('mc-cam-edit');
   let stream = null, rec = null, chunks = [], result = null, timer = null, t0 = 0, closed = false, url = null;
   const MAX_SEC = 300;
   const stamp = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '_' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()); };
@@ -769,13 +784,13 @@ function mcCamOpen(kind, onFile, onFail) {
   function showResult(isVideoResult) {
     live.style.display = 'none'; go.style.display = 'none'; dev.style.display = 'none';
     again.style.display = ''; use.style.display = '';
-    if (isVideoResult) { rev.style.display = ''; } else { img.style.display = ''; }
+    if (isVideoResult) { rev.style.display = ''; } else { img.style.display = ''; if (window.mcPhotoEdit) edit.style.display = ''; }
   }
   function retake() {
     result = null; info.textContent = '';
     if (url) { URL.revokeObjectURL(url); url = null; }
     rev.style.display = 'none'; img.style.display = 'none'; rev.removeAttribute('src');
-    live.style.display = ''; go.style.display = ''; again.style.display = 'none'; use.style.display = 'none';
+    live.style.display = ''; go.style.display = ''; again.style.display = 'none'; use.style.display = 'none'; edit.style.display = 'none';
     go.textContent = isVid ? '⏺ Начать запись' : '📸 Снять'; go.dataset.rec = '';
     start(dev.value || '');
   }
@@ -821,6 +836,10 @@ function mcCamOpen(kind, onFile, onFail) {
     }, 500);
   };
   again.onclick = retake;
+  edit.onclick = () => { // правка снятого фото до «Использовать»
+    if (!result || !url) return;
+    window.mcPhotoEdit(url, { name: result.name, custom: async f => { result = f; if (url) URL.revokeObjectURL(url); url = URL.createObjectURL(f); img.src = url; } });
+  };
   use.onclick = () => { const f = result; close(); if (f) onFile(f); };
   $('mc-cam-x').onclick = close;
   start('');
