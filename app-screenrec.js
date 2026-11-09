@@ -12,9 +12,7 @@
   const isApk = () => typeof window.isNativeApp === 'function' && window.isNativeApp();
   const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
   // телефон (приложение): нативный плагин McScreen
-  const cap = window.Capacitor;
-  const McSc = isApk() && cap ? ((cap.Plugins && cap.Plugins.McScreen) || (cap.registerPlugin && cap.registerPlugin('McScreen'))) : null;
-  let nativeOK = false;
+  let cap = null, McSc = null, nativeOK = false;
   const can = () => nativeOK || (!!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) && window.MediaRecorder && !isApk() && !mobile);
   const tst = (m, e) => { try { toast(m, e); } catch (_) {} };
   let R = null; // идущая запись
@@ -248,7 +246,12 @@
       try { McSc.discard({ name: res.name }); } catch (_) {}
     };
   }
-  if (McSc) {
+  // подключаем нативную запись позже, чем грузится страница: файл с isNativeApp мог выполниться после этого
+  function setupNative() {
+    if (McSc || !isApk()) return;
+    cap = window.Capacitor; if (!cap) return;
+    McSc = (cap.Plugins && cap.Plugins.McScreen) || (cap.registerPlugin && cap.registerPlugin('McScreen'));
+    if (!McSc) return;
     try { McSc.addListener('finished', ev => { if (R && R.native && !R.stopping) { R.stopping = true; finishNative(ev && (ev.name || ev.error) ? ev : null, true); } }); } catch (e) {}
     try { McSc.status().then(() => { nativeOK = true; init(); }).catch(() => {}); } catch (e) {}
     // вернулись в приложение, а запись уже остановили в шторке
@@ -267,7 +270,8 @@
     b.onclick = () => start(target);
     v.parentNode.insertBefore(b, v.nextSibling);
   }
-  function init() { if (!can()) return; addBtn('voice-btn', 'new'); addBtn('ae-voice-btn', 'ae'); }
+  function init() { setupNative(); if (!can()) return; addBtn('voice-btn', 'new'); addBtn('ae-voice-btn', 'ae'); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+  setTimeout(init, 1500); setTimeout(init, 5000); // на случай, если приложение определилось позже
   window.mcScreenRecStart = start;
 })();
