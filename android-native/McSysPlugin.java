@@ -29,6 +29,7 @@ import java.util.UUID;
  *  keepAlive    — служба переднего плана на время больших загрузок;
  *  pickFolder   — выбор папки на телефоне (запоминается навсегда);
  *  hasFolder    — доступ к ранее выбранной папке ещё действует?
+ *  mkdirs       — создать (или найти) вложенные папки внутри выбранной;
  *  openWrite / writeChunk / closeWrite — запись большого файла в папку кусками;
  *  copyToFolder — копирование готового файла из кэша приложения в папку.
  */
@@ -144,10 +145,61 @@ public class McSysPlugin extends Plugin {
         return n;
     }
 
-    private Uri createIn(String folder, String name, String mime) throws IOException {
+    /** Папка-адресат: вложенная (dir — адрес из mkdirs) или корень выбранной папки. */
+    private Uri parentOf(String folder, String dir) throws IOException {
         if (folder == null) throw new IOException("Папка не выбрана");
+        if (dir != null && dir.length() > 0) return Uri.parse(dir);
         Uri tree = Uri.parse(folder);
-        Uri parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree));
+        return DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree));
+    }
+
+    /** Ищет подпапку с таким именем, иначе создаёт. */
+    private Uri childDir(Uri tree, Uri parent, String name) throws IOException {
+        String pid = DocumentsContract.getDocumentId(parent);
+        Uri kids = DocumentsContract.buildChildDocumentsUriUsingTree(tree, pid);
+        Cursor c = null;
+        try {
+            c = getContext().getContentResolver().query(kids, new String[]{
+                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                    DocumentsContract.Document.COLUMN_MIME_TYPE}, null, null, null);
+            while (c != null && c.moveToNext()) {
+                if (name.equals(c.getString(1)) && DocumentsContract.Document.MIME_TYPE_DIR.equals(c.getString(2))) {
+                    return DocumentsContract.buildDocumentUriUsingTree(tree, c.getString(0));
+                }
+            }
+        } catch (Exception e) {
+            // не смогли прочитать список — попробуем просто создать
+        } finally {
+            if (c != null) c.close();
+        }
+        Uri d = DocumentsContract.createDocument(getContext().getContentResolver(), parent,
+                DocumentsContract.Document.MIME_TYPE_DIR, name);
+        if (d == null) throw new IOException("Не удалось создать папку «" + name + "»");
+        return d;
+    }
+
+    @PluginMethod
+    public void mkdirs(PluginCall call) {
+        try {
+            String folder = call.getString("folder");
+            String path = call.getString("path", "");
+            Uri tree = Uri.parse(folder == null ? "" : folder);
+            Uri cur = parentOf(folder, null);
+            for (String part : path.split("/")) {
+                if (part == null || part.trim().length() == 0) continue;
+                cur = childDir(tree, cur, safeName(part));
+            }
+            JSObject r = new JSObject();
+            r.put("dir", cur.toString());
+            call.resolve(r);
+        } catch (Exception e) {
+            call.reject(msg(e));
+        }
+    }
+
+    private Uri createIn(String folder, String dir, String name, String mime) throws IOException {
+        Uri parent = parentOf(folder, dir);
         Uri doc = DocumentsContract.createDocument(getContext().getContentResolver(), parent,
                 mime == null || mime.length() == 0 ? "application/octet-stream" : mime, safeName(name));
         if (doc == null) throw new IOException("Не удалось создать файл в папке");
@@ -157,7 +209,7 @@ public class McSysPlugin extends Plugin {
     @PluginMethod
     public void openWrite(PluginCall call) {
         try {
-            Uri doc = createIn(call.getString("folder"), call.getString("name"), call.getString("mime"));
+            Uri doc = createIn(call.getString("folder"), call.getString("dir"), call.getString("name"), call.getString("mime"));
             Out o = new Out();
             o.doc = doc;
             o.os = getContext().getContentResolver().openOutputStream(doc, "w");
@@ -246,7 +298,7 @@ public class McSysPlugin extends Plugin {
         InputStream in = null;
         OutputStream os = null;
         try {
-            doc = createIn(call.getString("folder"), name, call.getString("mime"));
+            doc = createIn(call.getString("folder"), call.getString("dir"), name, call.getString("mime"));
             os = getContext().getContentResolver().openOutputStream(doc, "w");
             if (os == null) throw new IOException("Не удалось открыть файл для записи");
             in = new FileInputStream(src);
