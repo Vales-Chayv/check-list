@@ -67,7 +67,7 @@ function switchToChecklist() {
 // ═══════════════════════════════════════════
 // Телефон: «Назад» = шаг назад (закрыть верхний слой → вкладка → «Все карточки» → лобби → свернуть).
 // ПК (ширина ≥900): всё как раньше, ничего не меняется.
-window.mcBackStep = function () {
+window.mcBackStepCore = function () {
   const $ = id => document.getElementById(id);
   const on = id => !!$(id) && $(id).classList.contains('on');
   // 1. диалоги и просмотрщики поверх всего
@@ -76,7 +76,8 @@ window.mcBackStep = function () {
   if (window.mvBack && window.mvBack()) return true;
   const iv = $('img-viewer');
   if (iv && iv.style.display === 'flex') { closeImgViewer(); return true; }
-  const dyn = document.querySelector('body > div[style*="z-index:2000"]');
+  const vis = el => !!el && (el.offsetParent !== null || getComputedStyle(el).position === 'fixed') && getComputedStyle(el).display !== 'none';
+  const dyn = Array.from(document.querySelectorAll('body > div[style*="z-index:2000"]')).filter(vis).pop();
   if (dyn) { dyn.remove(); return true; }
   // галерея: аудио-плеер → настройки хранения → режим выбора → само окно
   const gAud = $('gal-audio-ov'); if (gAud) { gAud.remove(); return true; }
@@ -106,7 +107,7 @@ window.mcBackStep = function () {
   if (on('space-member-ov')) { $('space-member-ov').classList.remove('on'); return true; }
   if (on('space-pwd-ov')) { $('space-pwd-ov').classList.remove('on'); return true; }
   // любое другое окно (поиск, галерея и т.п.): нажимаем его кнопку закрытия
-  const other = Array.from(document.querySelectorAll('.overlay.on')).pop();
+  const other = Array.from(document.querySelectorAll('.overlay.on')).filter(vis).pop();
   if (other) {
     const x = Array.from(other.querySelectorAll('button')).find(b => /close|закры|cancel/i.test((b.getAttribute('onclick') || '') + ' ' + (b.title || '')) || /^[✕×]$/.test((b.textContent || '').trim()));
     if (x) x.click(); else other.classList.remove('on');
@@ -128,12 +129,58 @@ window.mcBackStep = function () {
   }
   return false; // мы в лобби — дальше выход
 };
+// ── Обёртка: любая ошибка внутри шага не должна «убивать» кнопку назад ──
+window.mcBackStep = function () {
+  try { return window.mcBackStepCore(); }
+  catch (e) {
+    try { console.warn('[back] ошибка шага:', e); } catch (_) {}
+    // аварийно закрываем всё видимое сверху
+    let any = false;
+    try {
+      const d = Array.from(document.querySelectorAll('body > div[style*="z-index:2000"]')).pop();
+      if (d) { d.remove(); any = true; }
+      else {
+        const o = Array.from(document.querySelectorAll('.overlay.on')).pop();
+        if (o) { o.classList.remove('on'); any = true; }
+      }
+    } catch (_) {}
+    return any;
+  }
+};
+// «Отпечаток» экрана: если нажали «назад», а на экране ничего не изменилось — это зависший шаг
+const mcBackSig = () => [
+  document.querySelectorAll('.overlay.on').length, document.body.childElementCount,
+  typeof currentSpaceId !== 'undefined' ? currentSpaceId : '', typeof view !== 'undefined' ? view : '',
+  document.body.classList.contains('lobby-panels-open') ? 1 : 0,
+  (document.getElementById('img-viewer') || {style:{}}).style.display || ''
+].join('|');
+let _bkLast = { sig: '', t: 0 };
+const mcPush = () => { try { history.pushState({app:true}, ''); } catch (e) {} };
 // Push a history state so back button can be intercepted
-history.pushState({app:true}, '');
+mcPush();
+// Chrome пропускает записи истории, добавленные без касания пользователя. Поэтому после первого касания добавляем ещё одну «настоящую».
+(function () {
+  let armed = false;
+  const arm = () => { if (armed) return; armed = true; document.removeEventListener('click', arm, true); document.removeEventListener('touchend', arm, true); mcPush(); };
+  document.addEventListener('click', arm, true);
+  document.addEventListener('touchend', arm, true);
+})();
 window.addEventListener('popstate', e => {
   if (window.innerWidth < 900) {
     // телефон в браузере/PWA: один шаг назад; в лобби — выходим как обычно
-    if (window.mcBackStep()) history.pushState({app:true}, '');
+    const before = mcBackSig(), now = Date.now();
+    let handled = false;
+    try { handled = window.mcBackStep(); } catch (err) { handled = false; }
+    if (handled) {
+      const after = mcBackSig();
+      const stuck = after === before && _bkLast.sig === after && now - _bkLast.t < 3000;
+      _bkLast = { sig: after, t: now };
+      if (stuck) return;       // дважды подряд «назад» и ничего не изменилось — не держим, даём выйти
+      mcPush();
+    } else {
+      // лобби: сворачиваем накопленные записи, следующее «назад» закроет приложение
+      setTimeout(() => { try { if (history.state && history.state.app) history.back(); } catch (_) {} }, 0);
+    }
     return;
   }
   // ПК: прежнее поведение
