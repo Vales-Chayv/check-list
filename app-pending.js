@@ -9,6 +9,9 @@
 (function () {
   if (window._mcPend) return; window._mcPend = true;
   const jobs = new Map(); // pendId → job
+  const gone = new Set(); // отменённые: докачка не должна их возвращать
+  const hist = []; // последние завершённые: для журнала загрузок
+  const pushHist = (j, state) => { try { const m = (j.file && window._mcPendCards.get(j.file)) || null; hist.unshift({ name: (j.file && j.file.name) || j.att.name || 'файл', size: j.att.size || 0, type: j.att.type || '', state, ts: Date.now(), cardId: j.cardId || null, spaceId: (m && m.spaceId) || j.spaceId || null }); if (hist.length > 15) hist.length = 15; } catch (e) {} };
   window._mcPendCards = new WeakMap(); // файл → карточка (для кружка «✓»: открыть нужную карточку)
   const tst = (m, e) => { try { toast(m, e); } catch (_) {} };
   const isP = a => !!a && a.pending === true && !!a.pendId;
@@ -111,7 +114,7 @@
     catch (e) {
       j.running = false;
       if (isNet(e)) { j.err = true; save(j); decorate(); return; }
-      jobs.delete(j.pendId); await patchAll(j.pendId, null); await drop(j.pendId); decorate();
+      pushHist(j, 'fail'); jobs.delete(j.pendId); await patchAll(j.pendId, null); await drop(j.pendId); decorate();
       if (!(e && e.message === 'file_too_big')) tst('Файл не загрузился: ' + String((e && e.message) || e).slice(0, 80), true);
       return;
     }
@@ -147,7 +150,7 @@
     card.attachments = [...(card.attachments || []), real]; return true;
   }
   async function orphan(j, why) { // файл никуда не приписан: убираем из облака
-    jobs.delete(j.pendId); await drop(j.pendId);
+    if (why) pushHist(j, 'fail'); jobs.delete(j.pendId); await drop(j.pendId);
     try { if (typeof storageRemoveAtts === 'function' && j.real) storageRemoveAtts([j.real]); } catch (e) {}
     if (why) tst(why, true);
   }
@@ -169,7 +172,7 @@
       if (!place(card, j, real)) { await orphan(j, 'Файл не прикреплён: запись удалили'); return; }
       try { window._mcPendCards.set(j.file, { cardId: j.cardId, spaceId: card.space_id || j.spaceId || null }); } catch (e) {}
       await dbUpdate(card);
-      jobs.delete(j.pendId); await drop(j.pendId);
+      pushHist(j, 'done'); jobs.delete(j.pendId); await drop(j.pendId);
       setTimeout(() => { try { URL.revokeObjectURL(j.att.data); } catch (e) {} }, 30000);
       try {
         if (mem && typeof render === 'function') render();
@@ -200,7 +203,8 @@
   }
 
   function cancel(j) {
-    j.cancelled = true; jobs.delete(j.pendId);
+    j.cancelled = true; gone.add(j.pendId); pushHist(j, 'cancel'); jobs.delete(j.pendId);
+    drop(j.pendId); // запись из журнала убираем сразу, иначе докачка могла бы вернуть файл
     patchAll(j.pendId, null).then(() => { drop(j.pendId); decorate(); tst('Загрузка отменена'); });
   }
 
@@ -237,7 +241,7 @@
     if (resumed) return; resumed = true;
     let recs = []; try { recs = await idb('readonly', s => s.getAll()) || []; } catch (e) {}
     for (const r of recs) {
-      if (jobs.has(r.pendId) || (!r.blob && !r.real)) continue;
+      if (jobs.has(r.pendId) || gone.has(r.pendId) || (!r.blob && !r.real)) continue;
       const file = new File([r.blob || new Blob([])], r.name || 'file', { type: r.type || '' });
       const att = { id: r.pendId, pendId: r.pendId, pending: true, name: file.name, type: file.type, size: r.size || file.size, data: r.real ? r.real.data : URL.createObjectURL(file), ts: r.ts || Date.now() };
       const j = { pendId: r.pendId, file, att, real: r.real || null, cardId: r.cardId, spaceId: r.spaceId, entryId: r.entryId, list: r.list, entryRef: r.entryRef || null, running: false, err: false };
@@ -269,5 +273,20 @@
       return out;
     };
   }
+
+  // ═══ Журнал загрузок: список файлов по нажатию на капсулу ═══
+  const rowOf = j => ({
+    id: j.pendId, name: (j.file && j.file.name) || j.att.name || 'файл', size: j.att.size || 0, type: j.att.type || '', cardId: j.cardId || null,
+    spaceId: (j.file && window._mcPendCards.get(j.file) && window._mcPendCards.get(j.file).spaceId) || j.spaceId || null,
+    state: j.real ? 'deliver' : j.err ? 'err' : j.running ? 'run' : 'wait'
+  });
+  window.mcPendList = () => ({ active: [...jobs.values()].filter(j => !j.cancelled).map(rowOf), hist: hist.slice() });
+  window.mcPendClearHist = () => { hist.length = 0; };
+  window.mcPendRetry = id => { const j = jobs.get(id); if (!j) return; if (j.real) { if (j.cardId) deliver(j); } else run(j); };
+  window.mcPendCancel = id => {
+    const j = jobs.get(id); if (!j) return;
+    if (j.real) { try { if (typeof storageRemoveAtts === 'function') storageRemoveAtts([j.real]); } catch (e) {} }
+    cancel(j);
+  };
   setTimeout(() => { try { if (!resumed && typeof currentUser !== 'undefined' && currentUser) resume(); } catch (e) {} }, 6000);
 })();

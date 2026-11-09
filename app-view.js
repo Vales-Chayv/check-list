@@ -2602,7 +2602,7 @@ function aeToggleAssign(btn, val, event) {
     !!document.getElementById('view-ov') && document.getElementById('view-ov').classList.contains('on');
 
   // ── капсула загрузки: одна на всё. Сначала сверху, потом собирается в кружок, из кружка раскрывается на его месте ──
-  let stage = null, flash = null, errMsg = '', fromTop = true, anim = false;
+  let stage = null, flash = null, errMsg = '', fromTop = true, anim = false, panel = false, panelAt = 0, panelTm = null, lsTxt = '', scr = null;
   const CAPW = 250;
   const clampN = (v, a, b) => Math.max(a, Math.min(b, v));
   function ensureUI() {
@@ -2636,16 +2636,48 @@ function aeToggleAssign(btn, val, event) {
       #mc-up-cap.closed #mc-up-ring{opacity:1;transition:opacity .2s .3s}
       #mc-up-cap.ok #mc-up-ring,#mc-up-cap.bad #mc-up-ring{display:none}
       #mc-up-cap.closed.ok.pulse{animation:mcuppulse 1.6s ease-in-out infinite}
-      @keyframes mcuppulse{0%,100%{box-shadow:0 6px 20px rgba(0,0,0,.6),0 0 0 0 rgba(91,184,122,.55)}50%{box-shadow:0 6px 20px rgba(0,0,0,.6),0 0 0 9px rgba(91,184,122,0)}}`;
+      @keyframes mcuppulse{0%,100%{box-shadow:0 6px 20px rgba(0,0,0,.6),0 0 0 0 rgba(91,184,122,.55)}50%{box-shadow:0 6px 20px rgba(0,0,0,.6),0 0 0 9px rgba(91,184,122,0)}}
+      #mc-up-cap.pn{touch-action:auto;cursor:default}
+      #mc-up-cap.pn #mc-up-in,#mc-up-cap.pn #mc-up-dl,#mc-up-cap.pn #mc-up-ring{opacity:0;pointer-events:none;transition:opacity .12s}
+      #mc-up-ls{position:absolute;inset:0;display:flex;flex-direction:column;opacity:0;pointer-events:none;color:var(--t1,#eee);font-size:14px;transition:opacity .12s}
+      #mc-up-cap.pn #mc-up-ls{opacity:1;pointer-events:auto;transition:opacity .2s .25s}
+      #mc-up-scr{position:fixed;inset:0;z-index:2490;background:rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .3s}
+      #mc-up-scr.on{opacity:1;pointer-events:auto}
+      .mc-ls-h{display:flex;align-items:center;gap:8px;padding:12px 14px 6px;font-weight:700;font-size:15px;flex-shrink:0}
+      .mc-ls-h .p{margin-left:auto;color:var(--t3,#a8a8a8);font-weight:500;font-size:13px}
+      .mc-ls-h button{background:none;border:0;color:inherit;font-size:20px;line-height:1;cursor:pointer;padding:2px 4px}
+      .mc-ls-bar{height:5px;border-radius:3px;background:rgba(255,255,255,.14);margin:0 14px 4px;overflow:hidden;flex-shrink:0}
+      .mc-ls-bar i{display:block;height:100%;background:var(--accent,#e8c56a);border-radius:3px;transition:width .3s}
+      .mc-ls-b{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:0 10px 12px;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+      .mc-ls-f{border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:9px 11px;margin-top:7px;display:flex;gap:10px;align-items:flex-start}
+      .mc-ls-f[data-c]{cursor:pointer}
+      .mc-ls-f.dim{opacity:.62}
+      .mc-ls-ty{flex:0 0 auto;width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,.08);display:grid;place-items:center;font-size:10px;font-weight:700;letter-spacing:.03em;color:var(--accent,#e8c56a)}
+      .mc-ls-in{flex:1;min-width:0}
+      .mc-ls-nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .mc-ls-nm s{text-decoration:none;color:var(--t3,#a8a8a8);font-weight:400;font-size:11.5px;margin-left:6px}
+      .mc-ls-st{font-size:12px;color:var(--t3,#a8a8a8);margin-top:2px}
+      .mc-ls-st.e{color:var(--red,#e86060)} .mc-ls-st.g{color:var(--green,#5bb87a)}
+      .mc-ls-go{flex:0 0 auto;align-self:center;opacity:.5;font-size:18px}
+      .mc-ls-bt{display:flex;gap:6px;margin-top:7px}
+      .mc-ls-bt button{font:inherit;font-size:12px;border:1px solid rgba(255,255,255,.25);background:none;color:inherit;border-radius:14px;padding:4px 11px;cursor:pointer}
+      .mc-ls-ib{height:4px;border-radius:2px;background:rgba(255,255,255,.14);margin-top:7px;overflow:hidden}
+      .mc-ls-ib i{display:block;height:100%;width:38%;background:var(--accent,#e8c56a);animation:mcupind 1.3s ease-in-out infinite}
+      .mc-ls-t{font-size:11.5px;color:var(--t3,#a8a8a8);margin:12px 4px 0;display:flex;justify-content:space-between}
+      .mc-ls-t button{background:none;border:0;color:inherit;text-decoration:underline;cursor:pointer;font-size:11.5px}`;
     document.head.appendChild(style);
     cap = document.createElement('div'); cap.id = 'mc-up-cap'; cap.className = 'closed nt';
     cap.innerHTML = '<svg id="mc-up-ring" viewBox="0 0 46 46"><circle cx="23" cy="23" r="20" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="3.5"/><circle id="mc-up-rg" cx="23" cy="23" r="20" fill="none" stroke="#e8c56a" stroke-width="3.5" stroke-dasharray="125.7" stroke-dashoffset="125.7" stroke-linecap="round" style="transition:stroke-dashoffset .35s"/></svg>' +
-      '<div id="mc-up-in"><div id="mc-up-row"><span id="mc-up-sp"></span><span id="mc-up-tx"></span><span id="mc-up-pc"></span></div><div id="mc-up-bar"><i></i></div><div id="mc-up-sub"></div></div><div id="mc-up-dl"></div>';
+      '<div id="mc-up-ls"></div><div id="mc-up-in"><div id="mc-up-row"><span id="mc-up-sp"></span><span id="mc-up-tx"></span><span id="mc-up-pc"></span></div><div id="mc-up-bar"><i></i></div><div id="mc-up-sub"></div></div><div id="mc-up-dl"></div>';
+    scr = document.createElement('div'); scr.id = 'mc-up-scr'; document.body.appendChild(scr);
+    scr.addEventListener('click', e => { e.stopPropagation(); if(Date.now() - panelAt > 450) closePanel(); });
     document.body.appendChild(cap);
+    cap.addEventListener('click', lsClick);
     dot = cap; // старое имя: «кружок» теперь та же капсула в свёрнутом виде
     // перетаскивание кружка; короткое нажатие — действие
     let d = null;
     cap.addEventListener('pointerdown', e => {
+      if(panel) return; // в списке нажатия обрабатывает сам список, а прокрутка пальцем должна работать
       d = { x0: e.clientX, y0: e.clientY, l0: dotPos.l, t0: dotPos.t, moved: false, closed: !capOpen };
       try { cap.setPointerCapture(e.pointerId); } catch(_) {}
     });
@@ -2676,6 +2708,10 @@ function aeToggleAssign(btn, val, event) {
   function geom() {
     if(!cap) return;
     const D = 46;
+    if(capOpen && panel) {
+      const w = Math.min(360, innerWidth - 16), h = clampN(Math.round(innerHeight * 0.62), 260, 460), bottom = dotPos.t + D;
+      cap.style.width = w + 'px'; cap.style.height = h + 'px'; cap.style.left = clampN(dotPos.l, 8, innerWidth - w - 8) + 'px'; cap.style.top = clampN(bottom - h, 8, innerHeight - h - 8) + 'px'; cap.style.borderRadius = '18px'; return;
+    }
     if(!capOpen) { cap.style.width = D + 'px'; cap.style.height = D + 'px'; cap.style.left = dotPos.l + 'px'; cap.style.top = dotPos.t + 'px'; cap.style.borderRadius = (D / 2) + 'px'; return; }
     const m = mode(), w = Math.min(CAPW, innerWidth - 16), h = (m === 'ok' || m === 'bad') ? 44 : 84;
     let l, t;
@@ -2706,9 +2742,11 @@ function aeToggleAssign(btn, val, event) {
     $('mc-up-dl').textContent = m === 'ok' ? '✓' : m === 'bad' ? '!' : (pct != null ? Math.round(pct) + '%' : (total > 1 ? n + '/' + total : ''));
     cap.classList.toggle('closed', !capOpen); cap.classList.toggle('ok', m === 'ok'); cap.classList.toggle('bad', m === 'bad'); cap.classList.toggle('pulse', st === 'done');
     cap.style.display = 'block';
+    cap.classList.toggle('pn', panel);
+    if(panel) lsPaint();
     geom();
   }
-  function hideAll() { clearTimeout(capTimer); capOpen = false; flash = null; if(cap) cap.style.display = 'none'; }
+  function hideAll() { clearTimeout(capTimer); capOpen = false; flash = null; panel = false; clearInterval(panelTm); if(scr) scr.classList.remove('on'); if(cap) { cap.classList.remove('pn'); cap.style.display = 'none'; } }
   function openAt(top) { // раскрыть: сверху (при старте) или на месте кружка
     ensureUI();
     const first = cap.style.display === 'none' || cap.style.display === '';
@@ -2716,7 +2754,7 @@ function aeToggleAssign(btn, val, event) {
     if(first || top) { cap.classList.add('nt'); paint(); void cap.offsetWidth; cap.classList.remove('nt'); if(first && top) try { cap.animate([{ opacity: 0, transform: 'translateY(-14px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'ease-out' }); } catch(_) {} }
     else paint();
   }
-  function collapse() { clearTimeout(capTimer); capOpen = false; fromTop = false; if(st === 'idle' && !flash) { hideAll(); return; } if(st === 'idle') { hideAll(); return; } paint(); }
+  function collapse() { clearTimeout(capTimer); capOpen = false; fromTop = false; panel = false; clearInterval(panelTm); if(scr) scr.classList.remove('on'); if(cap) cap.classList.remove('pn'); if(st === 'idle' && !flash) { hideAll(); return; } if(st === 'idle') { hideAll(); return; } paint(); }
   function openCapTemp() { openAt(false); clearTimeout(capTimer); }
   function showCap() { openAt(true); }
   // текст нижней капсулы приложения («Готовлю видео… 32%», «Отправляю ролик…») теперь живёт в этой же капсуле
@@ -2729,10 +2767,83 @@ function aeToggleAssign(btn, val, event) {
     if(st === 'run' || flash) { if(!cap || cap.style.display === 'none') openAt(false); else paint(); }
   };
   function tap() { // нажатие на капсулу или кружок
-    if(capOpen) { collapse(); return; }
+    if(panel) return; // внутри списка нажатия обрабатывает сам список
+    if(capOpen) { // раскрытая капсула: нажатие открывает список файлов
+      if((st === 'run' || st === 'err') && hasList()) { openPanel(); return; }
+      collapse(); return;
+    }
     if(st === 'done') { const t = window._mcUpTarget; st = 'idle'; setTimeout(() => { hideAll(); goTo(t); }, 380); return; } // чуть позже: иначе «хвост» нажатия попадёт в только что открытую карточку и закроет её
+    if(st === 'err' && hasList()) { openAt(false); return; } // красный кружок: раскрыть, дальше список с «Повторить»
     if(st === 'err') { const names = failed.map(j => j.name).join(', '); st = 'idle'; failed = []; setTimeout(hideAll, 380); toast('Не загрузилось: ' + names, true); return; }
     if(st === 'run') { openAt(false); }
+  }
+
+  // ── список файлов внутри капсулы (журнал загрузок) ──
+  const hasList = () => !!(window.mcPendList && window.mcPendList().active.length);
+  const lsEsc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const lsMb = b => !b ? '' : (b < 1048576 ? Math.max(1, Math.round(b / 1024)) + ' КБ' : (b / 1048576).toFixed(b < 10485760 ? 1 : 0).replace('.', ',') + ' МБ');
+  const lsTy = (n, t) => { const m = /\.([A-Za-z0-9]{1,4})$/.exec(n || ''); return m ? m[1].toUpperCase() : /^video/.test(t) ? 'ВИД' : /^image/.test(t) ? 'ФОТО' : /^audio/.test(t) ? 'ЗВУК' : 'ФАЙЛ'; };
+  const lsCard = id => {
+    if(!id) return 'новая карточка (ещё не сохранена)';
+    const c = (typeof cards !== 'undefined' ? cards : []).find(x => x.id === id);
+    const t = c && (c.title || c.name || c.text); return t ? 'карточка «' + String(t).slice(0, 40) + '»' : 'карточка';
+  };
+  const LS_ST = { wait: 'ждёт очереди', run: 'загружается…', err: 'нет связи, повторю сама', deliver: 'в облаке, прикрепляю к карточке' };
+  function lsHtml() {
+    const L = window.mcPendList ? window.mcPendList() : { active: [], hist: [] };
+    const finishedAll = st === 'done' || (st === 'idle' && !!flash);
+    const pct = stage && stage.pct != null ? stage.pct : (finished > 0 ? Math.round(finished / Math.max(1, total) * 100) : null);
+    const head = finishedAll ? 'Готово' : 'Загрузки · ' + L.active.length;
+    const right = finishedAll ? '' : st === 'err' ? 'пауза' : (pct != null ? pct + '%' : '');
+    let h = '<div class="mc-ls-h"><span>' + head + '</span><span class="p">' + right + '</span><button data-x aria-label="Свернуть">✕</button></div>';
+    if(st === 'run' && pct != null) h += '<div class="mc-ls-bar"><i style="width:' + pct + '%"></i></div>';
+    h += '<div class="mc-ls-b">';
+    if(!L.active.length && !L.hist.length) h += '<div style="opacity:.6;padding:18px 4px;text-align:center">Загрузок нет</div>';
+    L.active.forEach(r => {
+      const go = r.cardId ? ' data-c="' + lsEsc(r.cardId) + '" data-s="' + lsEsc(r.spaceId || '') + '"' : '';
+      h += '<div class="mc-ls-f"' + go + '><div class="mc-ls-ty">' + lsEsc(lsTy(r.name, r.type)) + '</div><div class="mc-ls-in"><div class="mc-ls-nm">' + lsEsc(r.name) + '<s>' + lsMb(r.size) + '</s></div>' +
+        '<div class="mc-ls-st' + (r.state === 'err' ? ' e' : '') + '">' + LS_ST[r.state] + ' · ' + lsEsc(lsCard(r.cardId)) + '</div>' +
+        (r.state === 'run' ? '<div class="mc-ls-ib"><i></i></div>' : '') +
+        '<div class="mc-ls-bt">' + (r.state === 'err' || r.state === 'wait' ? '<button data-re="' + lsEsc(r.id) + '">Повторить</button>' : '') + '<button data-ca="' + lsEsc(r.id) + '">Отменить</button></div></div>' + (r.cardId ? '<span class="mc-ls-go">›</span>' : '') + '</div>';
+    });
+    if(L.hist.length) {
+      h += '<div class="mc-ls-t"><span>Недавно</span><button data-clr>очистить</button></div>';
+      L.hist.forEach(r => {
+        const m = r.state === 'done' ? ['✓ прикреплено', 'g'] : r.state === 'cancel' ? ['✕ отменено', ''] : ['⚠ не загрузилось', 'e'];
+        const go = r.state === 'done' && r.cardId ? ' data-c="' + lsEsc(r.cardId) + '" data-s="' + lsEsc(r.spaceId || '') + '"' : '';
+        h += '<div class="mc-ls-f dim"' + go + '><div class="mc-ls-ty">' + lsEsc(lsTy(r.name, r.type)) + '</div><div class="mc-ls-in"><div class="mc-ls-nm">' + lsEsc(r.name) + '<s>' + lsMb(r.size) + '</s></div><div class="mc-ls-st ' + m[1] + '">' + m[0] + '</div></div>' + (go ? '<span class="mc-ls-go">›</span>' : '') + '</div>';
+      });
+    }
+    return h + '</div>';
+  }
+  function lsPaint() {
+    const el = document.getElementById('mc-up-ls'); if(!el) return;
+    const h = lsHtml(); if(h === lsTxt) return;
+    const sc = el.querySelector('.mc-ls-b'), top = sc ? sc.scrollTop : 0;
+    lsTxt = h; el.innerHTML = h;
+    const sc2 = el.querySelector('.mc-ls-b'); if(sc2 && top) sc2.scrollTop = top;
+  }
+  function openPanel() {
+    ensureUI(); clearTimeout(capTimer);
+    panel = true; capOpen = true; fromTop = false; panelAt = Date.now(); lsTxt = '';
+    scr.classList.add('on'); paint();
+    clearInterval(panelTm); panelTm = setInterval(() => { if(panel) lsPaint(); else clearInterval(panelTm); }, 1000);
+  }
+  function closePanel() { collapse(); }
+  window.mcJournalBack = function () { if(!panel) return false; closePanel(); return true; }; // системная «назад» закрывает список
+  function lsClick(e) {
+    if(!panel) return;
+    if(Date.now() - panelAt < 450) return; // «хвост» нажатия по капсуле
+    const b = e.target.closest('button');
+    if(b) {
+      if(b.hasAttribute('data-x')) { closePanel(); return; }
+      if(b.dataset.re) { window.mcPendRetry && window.mcPendRetry(b.dataset.re); }
+      else if(b.dataset.ca) { if(confirm('Отменить загрузку этого файла?')) window.mcPendCancel && window.mcPendCancel(b.dataset.ca); }
+      else if(b.hasAttribute('data-clr')) { window.mcPendClearHist && window.mcPendClearHist(); }
+      setTimeout(lsPaint, 80); return;
+    }
+    const row = e.target.closest('.mc-ls-f[data-c]');
+    if(row) { const t = { spaceId: row.dataset.s || null, cardId: row.dataset.c, urls: [] }; closePanel(); setTimeout(() => goTo(t), 380); }
   }
 
   function begin(j) {
@@ -2775,6 +2886,7 @@ function aeToggleAssign(btn, val, event) {
     const target = last ? ctxOf(last) : null;
     if(inThatCard(target)) { // остался в той же карточке: капсула покажет «Загружено» и уйдёт сама
       st = 'idle'; flash = { msg: '✓ Загружено' + (total > 1 ? ' · ' + total + ' файла' : ''), cls: 'ok' };
+      if(panel) { paint(); return; } // смотрит список: не прячем, закроет сама
       openAt(true);
       capTimer = setTimeout(() => hideAll(), 1800);
       return;
@@ -2782,7 +2894,7 @@ function aeToggleAssign(btn, val, event) {
     st = 'done';
     window._mcUpTarget = { spaceId: target && target.spaceId, cardId: target && target.cardId, urls: doneJobs.filter(j => target && ctxOf(j).cardId === target.cardId).map(j => j.url).filter(Boolean) };
     paint();
-    if(capOpen) capTimer = setTimeout(() => collapse(), 1800);
+    if(capOpen && !panel) capTimer = setTimeout(() => collapse(), 1800);
   }
   async function goTo(t) {
     if(!t || !t.cardId) { toast('Файлы загружены. Карточку найти не удалось: адрес не сохранился'); return; }

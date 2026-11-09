@@ -71,6 +71,7 @@ window.mcBackStepCore = function () {
   const $ = id => document.getElementById(id);
   const on = id => !!$(id) && $(id).classList.contains('on');
   // 1. диалоги и просмотрщики поверх всего
+  if (window.mcJournalBack && window.mcJournalBack()) return true; // журнал загрузок
   if (window.mcEdBack && window.mcEdBack()) return true; // редактор фото
   if ($('edit-entry-dialog')) { closeEditEntry(true); return true; }
   if (window.mvBack && window.mvBack()) return true;
