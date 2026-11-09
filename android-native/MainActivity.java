@@ -8,6 +8,8 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(McVideoPlugin.class);
         registerPlugin(McRecPlugin.class);
+        registerPlugin(McSysPlugin.class);
+        registerPlugin(McScreenPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
