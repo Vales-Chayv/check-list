@@ -722,6 +722,8 @@ completions: completions,
       inTasks: !!deadline && !(currentSpace?.type==='family' || currentSpace?.type==='group')
     });
   });
+  // Общий кабинет: новая запись с файлами, что ещё грузятся, скрыта от других, пока не догрузятся все её файлы (см. app-pending.js)
+  if((currentSpace?.type==='family' || currentSpace?.type==='group') && sessionEntries.some(e => (e.sessionAtts||[]).some(a => a && a.pending))) sessionEntries.forEach(e => { e.mcHold = true; });
   card.entries = [...sessionEntries, ...(card.entries||[])];
   card.deadline = ([...(card.entries||[])].filter(e=>!e.done&&e.deadline).map(e=>e.deadline).sort()[0])||null;
 
@@ -742,7 +744,7 @@ completions: completions,
   render();
   toast('✓ Сохранено');
   await dbUpdate(card);
-  if(Array.isArray(card.chatParticipants) && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof notifyUsers === 'function') {
+  if(Array.isArray(card.chatParticipants) && (currentSpace?.type==='family'||currentSpace?.type==='group') && typeof notifyUsers === 'function' && !sessionEntries.some(e => e.mcHold)) { // запись с файлами в пути: пуш уйдёт, когда всё загрузится
     const senderName = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
     const preview = (sessionEntries[0]?.text || sessionNote || '📎 Вложение').slice(0,60);
     const _plain = sessionEntries.some(e => !e.assigned_to);

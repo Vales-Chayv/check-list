@@ -71,6 +71,7 @@ window.mcBackStepCore = function () {
   const $ = id => document.getElementById(id);
   const on = id => !!$(id) && $(id).classList.contains('on');
   // 1. диалоги и просмотрщики поверх всего
+  if (window.mcExitBack && window.mcExitBack()) return true; // окно «Загрузка ещё идёт»: «назад» = «Остаться»
   if (window.mcJournalBack && window.mcJournalBack()) return true; // журнал загрузок
   if (window.mcEdBack && window.mcEdBack()) return true; // редактор фото
   if ($('edit-entry-dialog')) { closeEditEntry(true); return true; }
@@ -166,6 +167,8 @@ mcPush();
   document.addEventListener('click', arm, true);
   document.addEventListener('touchend', arm, true);
 })();
+// после «Выйти» любое касание возвращает защиту: приложение снова не закроется случайно
+document.addEventListener('click', () => { if (window._mcExitOK) { window._mcExitOK = false; mcPush(); } }, true);
 window.addEventListener('popstate', e => {
   if (window.innerWidth < 900) {
     // телефон в браузере/PWA: один шаг назад; в лобби — выходим как обычно
@@ -179,7 +182,9 @@ window.addEventListener('popstate', e => {
       if (stuck) return;       // дважды подряд «назад» и ничего не изменилось — не держим, даём выйти
       mcPush();
     } else {
-      // лобби: сворачиваем накопленные записи, следующее «назад» закроет приложение
+      // лобби: если загрузка не закончена, спрашиваем, выходить ли
+      if (window.mcPendBusy && window.mcPendBusy() && !window._mcExitOK) { mcPush(); if (window.mcExitAsk) window.mcExitAsk(); return; }
+      // иначе сворачиваем накопленные записи, следующее «назад» закроет приложение
       setTimeout(() => { try { if (history.state && history.state.app) history.back(); } catch (_) {} }, 0);
     }
     return;
