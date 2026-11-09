@@ -92,6 +92,22 @@ jobs:
           grep -q 'android:name=".McApp"' $M || sed -i '0,/<application/s#<application#<application android:name=".McApp"#' $M
           grep -n "FOREGROUND_SERVICE\|McRecService" $M
 
+      - name: Add upload service, folder access and screen recording
+        run: |
+          D=android/app/src/main/java/app/mycards/mobile
+          cp android-native/McUpService.java $D/McUpService.java
+          cp android-native/McSysPlugin.java $D/McSysPlugin.java
+          cp android-native/McScreenService.java $D/McScreenService.java
+          cp android-native/McScreenPlugin.java $D/McScreenPlugin.java
+          M=android/app/src/main/AndroidManifest.xml
+          grep -q 'permission.FOREGROUND_SERVICE"' $M || sed -i 's#<application#<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <application#' $M
+          grep -q FOREGROUND_SERVICE_DATA_SYNC $M || sed -i 's#<application#<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />\n    <application#' $M
+          grep -q FOREGROUND_SERVICE_MEDIA_PROJECTION $M || sed -i 's#<application#<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />\n    <application#' $M
+          grep -q FOREGROUND_SERVICE_MICROPHONE $M || sed -i 's#<application#<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />\n    <application#' $M
+          grep -q 'android:name=".McUpService"' $M || sed -i 's#</application>#    <service android:name=".McUpService" android:exported="false" android:foregroundServiceType="dataSync" />\n    </application>#' $M
+          grep -q 'android:name=".McScreenService"' $M || sed -i 's#</application>#    <service android:name=".McScreenService" android:exported="false" android:foregroundServiceType="mediaProjection|microphone" />\n    </application>#' $M
+          grep -n "FOREGROUND_SERVICE\|McUpService\|McScreenService" $M
+
       - name: Point Gradle at the permanent test key
         run: |
           cat > "$GITHUB_WORKSPACE/sign.gradle" <<'EOF'
