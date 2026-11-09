@@ -104,8 +104,8 @@ jobs:
           grep -q FOREGROUND_SERVICE_DATA_SYNC $M || sed -i 's#<application#<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />\n    <application#' $M
           grep -q FOREGROUND_SERVICE_MEDIA_PROJECTION $M || sed -i 's#<application#<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />\n    <application#' $M
           grep -q FOREGROUND_SERVICE_MICROPHONE $M || sed -i 's#<application#<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />\n    <application#' $M
-          grep -q 'android:name=".McUpService"' $M || sed -i 's#</application>#    <service android:name=".McUpService" android:exported="false" android:foregroundServiceType="dataSync" />\n    </application>#' $M
-          grep -q 'android:name=".McScreenService"' $M || sed -i 's#</application>#    <service android:name=".McScreenService" android:exported="false" android:foregroundServiceType="mediaProjection|microphone" />\n    </application>#' $M
+          grep -q 'android:name=".McUpService"' $M || sed -i 's#</application>#    <service android:name=".McUpService" android:exported="false" android:stopWithTask="true" android:foregroundServiceType="dataSync" />\n    </application>#' $M
+          grep -q 'android:name=".McScreenService"' $M || sed -i 's#</application>#    <service android:name=".McScreenService" android:exported="false" android:stopWithTask="true" android:foregroundServiceType="mediaProjection|microphone" />\n    </application>#' $M
           grep -n "FOREGROUND_SERVICE\|McUpService\|McScreenService" $M
 
       - name: Point Gradle at the permanent test key
