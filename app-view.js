@@ -2804,9 +2804,9 @@ function aeToggleAssign(btn, val, event) {
     L.active.forEach(r => {
       const go = r.cardId ? ' data-c="' + lsEsc(r.cardId) + '" data-s="' + lsEsc(r.spaceId || '') + '"' : '';
       h += '<div class="mc-ls-f"' + go + '><div class="mc-ls-ty">' + lsEsc(lsTy(r.name, r.type)) + '</div><div class="mc-ls-in"><div class="mc-ls-nm">' + lsEsc(r.name) + '<s>' + lsMb(r.size) + '</s></div>' +
-        '<div class="mc-ls-st' + (r.state === 'err' ? ' e' : '') + '">' + LS_ST[r.state] + ' · ' + lsEsc(lsCard(r.cardId)) + '</div>' +
+        '<div class="mc-ls-st' + (r.state === 'err' ? ' e' : '') + '">' + (r.wifi ? 'ждёт Wi-Fi (файл большой)' : LS_ST[r.state]) + ' · ' + lsEsc(lsCard(r.cardId)) + '</div>' +
         (r.state === 'run' ? '<div class="mc-ls-ib"><i></i></div>' : '') +
-        '<div class="mc-ls-bt">' + (r.state === 'err' || r.state === 'wait' ? '<button data-re="' + lsEsc(r.id) + '">Повторить</button>' : '') + '<button data-ca="' + lsEsc(r.id) + '">Отменить</button></div></div>' + (r.cardId ? '<span class="mc-ls-go">›</span>' : '') + '</div>';
+        '<div class="mc-ls-bt">' + (r.state === 'err' || r.state === 'wait' ? '<button data-re="' + lsEsc(r.id) + '">' + (r.wifi ? 'Загрузить сейчас' : 'Повторить') + '</button>' : '') + '<button data-ca="' + lsEsc(r.id) + '">Отменить</button></div></div>' + (r.cardId ? '<span class="mc-ls-go">›</span>' : '') + '</div>';
     });
     if(L.hist.length) {
       h += '<div class="mc-ls-t"><span>Недавно</span><button data-clr>очистить</button></div>';

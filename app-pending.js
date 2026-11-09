@@ -126,6 +126,12 @@
 
   async function run(j) {
     if (j.running || j.cancelled) return;
+    // большой файл на мобильной сети при включённом «только Wi-Fi»: ждём Wi-Fi (кнопка «Загрузить сейчас» в журнале обходит это)
+    if (!j.force && !j.real && window.mcWifiBlocks && window.mcWifiBlocks((j.file && j.file.size) || 0)) {
+      if (!j.wifi) tst('📶 «' + String((j.file && j.file.name) || 'файл').slice(0, 30) + '» ждёт Wi-Fi');
+      j.wifi = true; j.err = false; decorate(); return;
+    }
+    j.wifi = false;
     j.running = true; j.err = false; decorate();
     let att;
     try { att = await window.uploadToStorage(j.file, j.cardId || undefined, j.entryId || undefined); }
@@ -288,7 +294,7 @@
       decorate();
     }
   }
-  const retry = () => { for (const j of jobs.values()) { if (j.real && j.cardId) deliver(j); else if (j.err) run(j); } };
+  const retry = () => { for (const j of jobs.values()) { if (j.real && j.cardId) deliver(j); else if (j.err || j.wifi) run(j); } };
   setInterval(() => { if (jobs.size && navigator.onLine) retry(); }, 30000);
   window.addEventListener('online', retry);
 
@@ -307,11 +313,12 @@
   const rowOf = j => ({
     id: j.pendId, name: (j.file && j.file.name) || j.att.name || 'файл', size: j.att.size || 0, type: j.att.type || '', cardId: j.cardId || null,
     spaceId: (j.file && window._mcPendCards.get(j.file) && window._mcPendCards.get(j.file).spaceId) || j.spaceId || null,
-    state: j.real ? 'deliver' : j.err ? 'err' : j.running ? 'run' : 'wait'
+    state: j.real ? 'deliver' : j.err ? 'err' : j.running ? 'run' : 'wait', wifi: !!j.wifi
   });
   window.mcPendList = () => ({ active: [...jobs.values()].filter(j => !j.cancelled).map(rowOf), hist: hist.slice() });
   window.mcPendClearHist = () => { hist.length = 0; };
-  window.mcPendRetry = id => { const j = jobs.get(id); if (!j) return; if (j.real) { if (j.cardId) deliver(j); } else run(j); };
+  window.mcPendRetry = id => { const j = jobs.get(id); if (!j) return; if (j.real) { if (j.cardId) deliver(j); } else { j.force = true; run(j); } };
+  window.mcPendNet = () => { for (const j of jobs.values()) if (j.wifi && !j.running && !j.cancelled) run(j); }; // сеть сменилась или настройку переключили
   window.mcPendCancel = id => {
     const j = jobs.get(id); if (!j) return;
     if (j.real) { try { if (typeof storageRemoveAtts === 'function') storageRemoveAtts([j.real]); } catch (e) {} }

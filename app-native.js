@@ -158,7 +158,7 @@
       let n = 0;
       try {
         const l = window.mcPendList && window.mcPendList();
-        n = l ? l.active.filter(r => r.state !== 'err').length : 0;
+        n = l ? l.active.filter(r => r.state !== 'err' && !r.wifi).length : 0;
       } catch (e) {}
       const comp = !!window._mcCompressing;
       if (n > 0 || comp) {
@@ -172,6 +172,25 @@
     setInterval(sync, 2500);
     // перед выходом из приложения службу выключаем явно
     window.mcKeepOff = async () => { try { await McS.keepAlive({ on: false }); on = false; } catch (e) {} };
+  })();
+
+  // ═══ Большие файлы только по Wi-Fi (только APK; плагин @capacitor/network) ═══
+  (function () {
+    const N = cap.Plugins && cap.Plugins.Network;
+    const KEY = 'mc_wifi_big', MINB = 50 * 1024 * 1024;
+    let type = 'unknown';
+    const get = () => { try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; } };
+    window.mcWifiOnly = {
+      available: !!N,
+      get,
+      set: v => { try { localStorage.setItem(KEY, v ? '1' : '0'); } catch (e) {} try { if (window.mcPendNet) window.mcPendNet(); } catch (e) {} },
+      limit: MINB
+    };
+    window.mcWifiBlocks = size => !!N && get() && (size || 0) >= MINB && type === 'cellular';
+    if (!N) return;
+    const apply = s => { type = !s || s.connected === false ? 'none' : (s.connectionType || 'unknown'); };
+    try { N.getStatus().then(apply).catch(() => {}); } catch (e) {}
+    try { N.addListener('networkStatusChange', s => { apply(s); try { if (window.mcPendNet) window.mcPendNet(); } catch (e) {} }); } catch (e) {}
   })();
 
   // ═══ Запись голоса в фоне: пока идёт запись с микрофона, держим службу переднего плана (только APK) ═══
