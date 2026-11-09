@@ -297,6 +297,7 @@ public class McSysPlugin extends Plugin {
 
     @Override
     protected void handleOnDestroy() {
+        McUpService.stop(getContext());
         synchronized (outs) {
             for (Out o : outs.values()) {
                 try {
