@@ -296,6 +296,7 @@
   }
   const retry = () => { for (const j of jobs.values()) { if (j.real && j.cardId) deliver(j); else if (j.err || j.wifi) run(j); } };
   setInterval(() => { if (jobs.size && navigator.onLine) retry(); }, 30000);
+  setInterval(() => { try { if (window.mcUpWifi) window.mcUpWifi([...jobs.values()].filter(j => j.wifi && !j.cancelled && !j.running).length); } catch (e) {} }, 1200);
   window.addEventListener('online', retry);
 
   // ── вставка в render: вернуть плитки и один раз запустить докачку ──

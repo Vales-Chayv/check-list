@@ -2700,6 +2700,8 @@ function aeToggleAssign(btn, val, event) {
     placeDot();
   }
   let dotPos = { l: 12, t: 400 };
+  let wf = 0; // сколько файлов ждёт Wi-Fi (нет активной загрузки: показываем кружок «📶»)
+  const wfOn = () => st === 'idle' && !flash && wf > 0;
   function setDotPos(l, t) { dotPos.l = clampN(l, 4, innerWidth - 50); dotPos.t = clampN(t, 4, innerHeight - 50); }
   function placeDot() {
     let p = null; try { p = JSON.parse(localStorage.getItem(POS_KEY) || 'null'); } catch(_) {}
@@ -2715,21 +2717,22 @@ function aeToggleAssign(btn, val, event) {
       cap.style.width = w + 'px'; cap.style.height = h + 'px'; cap.style.left = clampN(dotPos.l, 8, innerWidth - w - 8) + 'px'; cap.style.top = clampN(bottom - h, 8, innerHeight - h - 8) + 'px'; cap.style.borderRadius = '18px'; return;
     }
     if(!capOpen) { cap.style.width = D + 'px'; cap.style.height = D + 'px'; cap.style.left = dotPos.l + 'px'; cap.style.top = dotPos.t + 'px'; cap.style.borderRadius = (D / 2) + 'px'; return; }
-    const m = mode(), w = Math.min(CAPW, innerWidth - 16), h = (m === 'ok' || m === 'bad') ? 44 : 84;
+    const m = mode(), w = Math.min(CAPW, innerWidth - 16), h = (m === 'ok' || m === 'bad' || wfOn()) ? 44 : 84;
     let l, t;
     if(fromTop) { l = (innerWidth - w) / 2; t = 'calc(env(safe-area-inset-top,0px) + 10px)'; }
     else { l = clampN(dotPos.l, 8, innerWidth - w - 8); t = clampN(dotPos.t - (h - D), 8, innerHeight - h - 8) + 'px'; }
     cap.style.width = w + 'px'; cap.style.height = h + 'px'; cap.style.left = l + 'px'; cap.style.top = t; cap.style.borderRadius = (h === 44 ? 22 : 18) + 'px';
   }
   function paint() {
-    if(st === 'idle' && !flash) return;
+    if(st === 'idle' && !flash && !wf) return;
     ensureUI();
-    const $ = id => document.getElementById(id), m = mode(), n = Math.min(finished + 1, total || 1);
+    const $ = id => document.getElementById(id), m = mode(), n = Math.min(finished + 1, total || 1), qt = m === 'ok' || m === 'bad' || wfOn();
     let title, right, sub, pct = null;
     if(st === 'done') { title = '✓ Загружено' + (total > 1 ? ' · ' + total + ' файла' : ''); right = ''; sub = ''; }
     else if(st === 'err') { title = '⚠ ' + (errMsg || 'Не загрузилось'); right = ''; sub = ''; }
     else if(flash) { title = flash.msg; right = ''; sub = ''; }
     else if(stage && stage.bad) { title = '⚠ ' + stage.title; right = ''; sub = ''; }
+    else if(wfOn()) { title = '📶 Ждёт Wi-Fi: ' + wf; right = ''; sub = ''; }
     else {
       title = stage ? stage.title : 'Загружаю…';
       pct = stage && stage.pct != null ? stage.pct : (finished > 0 ? Math.round(finished / Math.max(1, total) * 100) : null);
@@ -2737,17 +2740,26 @@ function aeToggleAssign(btn, val, event) {
       sub = stage && stage.sub ? stage.sub : (stage && stage.pct != null ? 'Файл ' + n + ' из ' + total + ' · можно сохранять карточку' : 'Можно ходить по кабинетам');
     }
     $('mc-up-tx').textContent = title; $('mc-up-pc').textContent = right; $('mc-up-sub').textContent = sub;
-    $('mc-up-sp').style.display = (m === 'ok' || m === 'bad') ? 'none' : '';
-    const bar = $('mc-up-bar'); bar.style.display = (m === 'ok' || m === 'bad') ? 'none' : ''; $('mc-up-sub').style.display = bar.style.display;
+    $('mc-up-sp').style.display = qt ? 'none' : '';
+    const bar = $('mc-up-bar'); bar.style.display = qt ? 'none' : ''; $('mc-up-sub').style.display = bar.style.display;
     bar.classList.toggle('ind', pct == null); bar.firstChild.style.width = pct == null ? '' : pct + '%';
     $('mc-up-rg').style.strokeDashoffset = (125.7 * (1 - (pct == null ? 0.08 : pct / 100))) + '';
-    $('mc-up-dl').textContent = m === 'ok' ? '✓' : m === 'bad' ? '!' : (pct != null ? Math.round(pct) + '%' : (total > 1 ? n + '/' + total : ''));
+    $('mc-up-dl').textContent = m === 'ok' ? '✓' : m === 'bad' ? '!' : wfOn() ? '📶' : (pct != null ? Math.round(pct) + '%' : (total > 1 ? n + '/' + total : ''));
     cap.classList.toggle('closed', !capOpen); cap.classList.toggle('ok', m === 'ok'); cap.classList.toggle('bad', m === 'bad'); cap.classList.toggle('pulse', st === 'done');
     cap.style.display = 'block';
     cap.classList.toggle('pn', panel);
     if(panel) lsPaint();
     geom();
   }
+  // файлы, которые ждут Wi-Fi (вызывает модуль фоновой загрузки): без активной загрузки показываем кружок «📶»
+  window.mcUpWifi = function (n) {
+    n = n | 0;
+    if (n === wf) { if (n && st === 'idle' && !flash && !panel && (!cap || cap.style.display !== 'block')) { ensureUI(); capOpen = false; paint(); } return; }
+    wf = n;
+    if (st !== 'idle' || flash) return; // идёт обычная загрузка или итог: капсула сама, кружок появится после
+    if (wf) { ensureUI(); if (!panel) capOpen = false; paint(); }
+    else if (!panel) hideAll(); else paint();
+  };
   function hideAll() { clearTimeout(capTimer); capOpen = false; flash = null; panel = false; clearInterval(panelTm); if(scr) scr.classList.remove('on'); if(cap) { cap.classList.remove('pn'); cap.style.display = 'none'; } }
   function openAt(top) { // раскрыть: сверху (при старте) или на месте кружка
     ensureUI();
@@ -2756,7 +2768,7 @@ function aeToggleAssign(btn, val, event) {
     if(first || top) { cap.classList.add('nt'); paint(); void cap.offsetWidth; cap.classList.remove('nt'); if(first && top) try { cap.animate([{ opacity: 0, transform: 'translateY(-14px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'ease-out' }); } catch(_) {} }
     else paint();
   }
-  function collapse() { clearTimeout(capTimer); capOpen = false; fromTop = false; panel = false; clearInterval(panelTm); if(scr) scr.classList.remove('on'); if(cap) cap.classList.remove('pn'); if(st === 'idle' && !flash) { hideAll(); return; } if(st === 'idle') { hideAll(); return; } paint(); }
+  function collapse() { clearTimeout(capTimer); capOpen = false; fromTop = false; panel = false; clearInterval(panelTm); if(scr) scr.classList.remove('on'); if(cap) cap.classList.remove('pn'); if(wfOn()) { paint(); return; } if(st === 'idle' && !flash) { hideAll(); return; } if(st === 'idle') { hideAll(); return; } paint(); }
   function openCapTemp() { openAt(false); clearTimeout(capTimer); }
   function showCap() { openAt(true); }
   // текст нижней капсулы приложения («Готовлю видео… 32%», «Отправляю ролик…») теперь живёт в этой же капсуле
@@ -2771,13 +2783,14 @@ function aeToggleAssign(btn, val, event) {
   function tap() { // нажатие на капсулу или кружок
     if(panel) return; // внутри списка нажатия обрабатывает сам список
     if(capOpen) { // раскрытая капсула: нажатие открывает список файлов
-      if((st === 'run' || st === 'err') && hasList()) { openPanel(); return; }
+      if((st === 'run' || st === 'err' || wfOn()) && hasList()) { openPanel(); return; }
       collapse(); return;
     }
     if(st === 'done') { const t = window._mcUpTarget; st = 'idle'; setTimeout(() => { hideAll(); goTo(t); }, 380); return; } // чуть позже: иначе «хвост» нажатия попадёт в только что открытую карточку и закроет её
     if(st === 'err' && hasList()) { openAt(false); return; } // красный кружок: раскрыть, дальше список с «Повторить»
     if(st === 'err') { const names = failed.map(j => j.name).join(', '); st = 'idle'; failed = []; setTimeout(hideAll, 380); toast('Не загрузилось: ' + names, true); return; }
     if(st === 'run') { openAt(false); }
+    else if(wfOn()) { openAt(false); clearTimeout(capTimer); capTimer = setTimeout(() => { if(!panel) collapse(); }, 4000); }
   }
 
   // ── список файлов внутри капсулы (журнал загрузок) ──
@@ -2796,7 +2809,7 @@ function aeToggleAssign(btn, val, event) {
     const finishedAll = st === 'done' || (st === 'idle' && !!flash);
     const pct = stage && stage.pct != null ? stage.pct : (finished > 0 ? Math.round(finished / Math.max(1, total) * 100) : null);
     const head = finishedAll ? 'Готово' : 'Загрузки · ' + L.active.length;
-    const right = finishedAll ? '' : st === 'err' ? 'пауза' : (pct != null ? pct + '%' : '');
+    const right = finishedAll ? '' : st === 'err' ? 'пауза' : wfOn() ? 'ждёт Wi-Fi' : (pct != null ? pct + '%' : '');
     let h = '<div class="mc-ls-h"><span>' + head + '</span><span class="p">' + right + '</span><button data-x aria-label="Свернуть">✕</button></div>';
     if(st === 'run' && pct != null) h += '<div class="mc-ls-bar"><i style="width:' + pct + '%"></i></div>';
     h += '<div class="mc-ls-b">';
