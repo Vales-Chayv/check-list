@@ -10,6 +10,7 @@ async function openSettings() {
   checkPushStatus();
   updatePwdUI();
   mcWifiRow();
+  mcFolderRow();
   document.getElementById('set-ov').classList.add('on');
 }
 async function savePhone() {
@@ -120,4 +121,39 @@ function toggleWifiBig() {
   w.set(!w.get());
   mcWifiPaint();
   toast(w.get() ? '📶 Большие файлы — только по Wi-Fi' : 'Большие файлы грузятся по любой сети');
+}
+
+// ═══════════════════════════════════════════
+//  ПАПКА НА ТЕЛЕФОНЕ ДЛЯ «В ПАПКУ» (строка появляется только в приложении для телефона)
+// ═══════════════════════════════════════════
+function mcFolderRow() {
+  try {
+    const f = window.mcSysFolder;
+    if (!f || !f.available) return;
+    let row = document.getElementById('folder-row');
+    if (!row) {
+      const ph = document.getElementById('set-phone');
+      const anchor = ph && ph.closest('.fld');
+      if (!anchor || !anchor.parentNode) return;
+      row = document.createElement('div');
+      row.id = 'folder-row';
+      row.style.cssText = 'background:var(--s2);border-radius:var(--rsm);padding:13px 14px';
+      row.innerHTML = '<div style="font-size:15px;font-weight:600">📁 Папка для сохранения файлов</div>' +
+        '<div id="folder-name" style="font-size:12.5px;color:var(--t2);margin-top:4px"></div>' +
+        '<button onclick="mcFolderPick()" style="margin-top:9px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);border-radius:var(--rsm);padding:9px 14px;font-size:14px;cursor:pointer;font-family:inherit">Выбрать папку</button>';
+      anchor.parentNode.insertBefore(row, anchor);
+    }
+    mcFolderPaint();
+  } catch (e) {}
+}
+function mcFolderPaint() {
+  const f = window.mcSysFolder && window.mcSysFolder.get();
+  const el = document.getElementById('folder-name');
+  if (el) el.textContent = f ? 'Сейчас: «' + f.name + '»' : 'Не выбрана. Её спросят при первом сохранении «В папку».';
+}
+async function mcFolderPick() {
+  const f = window.mcSysFolder; if (!f) return;
+  const r = await f.pick();
+  mcFolderPaint();
+  if (r) toast('✓ Папка: «' + r.name + '»');
 }

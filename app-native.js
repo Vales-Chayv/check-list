@@ -193,6 +193,69 @@
     try { N.addListener('networkStatusChange', s => { apply(s); try { if (window.mcPendNet) window.mcPendNet(); } catch (e) {} }); } catch (e) {}
   })();
 
+  // ═══ Папка на телефоне: выбор, запоминание и запись файлов кусками (только APK; плагин McSys) ═══
+  (function () {
+    const McS = (cap.Plugins && cap.Plugins.McSys) || (cap.registerPlugin && cap.registerPlugin('McSys'));
+    const KEY = 'mc_save_dir', CH = 3 * 1024 * 1024;
+    const api = { available: false };
+    window.mcSysFolder = api;
+    if (!McS) return;
+    const b64 = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = () => rej(r.error); r.readAsDataURL(blob); });
+    const toastX = (m, bad) => { try { if (window.toast) window.toast(m, !!bad); } catch (e) {} };
+    api.get = () => { try { const o = JSON.parse(localStorage.getItem(KEY) || 'null'); return o && o.uri ? o : null; } catch (e) { return null; } };
+    api.forget = () => { try { localStorage.removeItem(KEY); } catch (e) {} };
+    // выбор папки системным окном; null — отменила
+    api.pick = async () => {
+      let r; try { r = await McS.pickFolder(); } catch (e) { toastX('Не удалось выбрать папку', true); return null; }
+      if (!r || r.cancelled || !r.uri) return null;
+      const o = { uri: r.uri, name: r.name || 'Папка' };
+      try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) {}
+      return o;
+    };
+    // папка, в которую можно писать: прежняя, если доступ ещё действует, иначе просим выбрать
+    api.ensure = async () => {
+      const f = api.get();
+      if (f) { try { const r = await McS.hasFolder({ uri: f.uri }); if (r && r.ok) return f; } catch (e) {} }
+      toastX('Выбери папку, куда сохранять файлы');
+      return await api.pick();
+    };
+    // записать файл (Blob или Response с body) в папку кусками, без загрузки всего файла в память
+    api.write = async (folder, name, mime, src, onProgress) => {
+      const { id } = await McS.openWrite({ folder: folder.uri, name, mime: mime || 'application/octet-stream' });
+      let ok = false;
+      try {
+        if (src && typeof src.slice === 'function') {
+          for (let off = 0; off < src.size; off += CH) {
+            await McS.writeChunk({ id, data: await b64(src.slice(off, off + CH)) });
+            if (onProgress) onProgress(Math.min(off + CH, src.size), src.size);
+          }
+        } else if (src && src.body && src.body.getReader) {
+          const total = +(src.headers && src.headers.get('content-length')) || 0;
+          const rd = src.body.getReader(); let buf = [], n = 0, got = 0;
+          for (;;) {
+            const { done, value } = await rd.read();
+            if (value && value.length) {
+              for (let o = 0; o < value.length; o += CH) { // кусок из сети бывает любого размера: режем по 3 МБ
+                const part = value.subarray(o, o + CH);
+                buf.push(part); n += part.length; got += part.length;
+                if (n >= CH) { await McS.writeChunk({ id, data: await b64(new Blob(buf)) }); buf = []; n = 0; if (onProgress) onProgress(got, total); }
+              }
+            }
+            if (done) { if (n > 0) { await McS.writeChunk({ id, data: await b64(new Blob(buf)) }); buf = []; n = 0; if (onProgress) onProgress(got, total); } break; }
+          }
+        } else {
+          const bl = await src.blob();
+          for (let off = 0; off < bl.size; off += CH) await McS.writeChunk({ id, data: await b64(bl.slice(off, off + CH)) });
+        }
+        ok = true;
+      } finally {
+        try { await McS.closeWrite({ id, abort: !ok }); } catch (e) { if (ok) throw e; }
+      }
+    };
+    // плагин есть в этой сборке приложения?
+    McS.hasFolder({ uri: '' }).then(() => { api.available = true; }).catch(() => {});
+  })();
+
   // ═══ Запись голоса в фоне: пока идёт запись с микрофона, держим службу переднего плана (только APK) ═══
   (function () {
     const McR = (cap.Plugins && cap.Plugins.McRec) || (cap.registerPlugin && cap.registerPlugin('McRec'));

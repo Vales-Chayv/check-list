@@ -1335,7 +1335,7 @@ function openMediaGroup(gid) {
       bar.innerHTML = `<span style="color:var(--t2)">Выбрано ${picked.size}</span>
         <button data-a="all" style="${b}">Все</button>
         ${one ? `<span class="mx-grip-chip" draggable="true" data-dl="${esc(tiles[[...picked][0]].data)}" data-nm="${esc(tiles[[...picked][0]].name || 'file')}" style="${b};cursor:grab">⠿ Перетащить</span>` : ''}
-        ${window.showDirectoryPicker ? `<button data-a="folder" style="${b}${dis}">📁 В папку</button>` : ''}
+        ${(window.showDirectoryPicker || (window.mcSysFolder && window.mcSysFolder.available)) ? `<button data-a="folder" style="${b}${dis}">📁 В папку</button>` : ''}
         <button data-a="zip" style="${b}${dis}">⬇ ZIP</button>`;
     };
     selBtn.onclick = () => { window._mxSelMode = !window._mxSelMode; picked.clear(); paint(); };
@@ -1370,6 +1370,24 @@ function openMediaGroup(gid) {
   async function getBlob(url) { try { const o = typeof mcVaultBlobByUrl === 'function' ? await mcVaultBlobByUrl(url) : null; if(o) return o; } catch(_) {} const r = await fetch(url, url.startsWith('data:') ? undefined : { mode: 'cors' }); if(!r.ok) throw new Error('http ' + r.status); return await r.blob(); }
   window.mcSaveFolder = async function(items) {
     if(!items || !items.length) return;
+    if(window.mcSysFolder && window.mcSysFolder.available) { // приложение на телефоне: папка выбирается один раз и запоминается
+      const fd = await window.mcSysFolder.ensure(); if(!fd) return;
+      const used = new Set(); let ok = 0;
+      for(let k = 0; k < items.length; k++) {
+        const it = items[k], label = '⏳ Сохраняю ' + (k + 1) + ' из ' + items.length + '…';
+        try {
+          toast(label);
+          let src = null, meta = { name: '', type: '' };
+          try { const o = typeof mcVaultBlobByUrl === 'function' ? await mcVaultBlobByUrl(it.url) : null; if(o) { src = o; meta = o; } } catch(_) {}
+          if(!src) { const r = await fetch(it.url, String(it.url).startsWith('data:') ? undefined : { mode: 'cors' }); if(!r.ok) throw new Error('http ' + r.status); src = r; meta = { name: '', type: r.headers.get('content-type') || '' }; }
+          let last = 0;
+          await window.mcSysFolder.write(fd, uniq(baseName(it, meta, k), used), meta.type, src, (d, t) => { if(t && Date.now() - last > 1500) { last = Date.now(); toast(label + ' ' + Math.round(d / t * 100) + '%'); } });
+          ok++;
+        } catch(e) { console.log('save folder', e && e.message); }
+      }
+      toast(ok === items.length ? '✓ Сохранено в «' + fd.name + '»: ' + ok : 'Сохранено ' + ok + ' из ' + items.length, ok !== items.length);
+      return;
+    }
     if(!window.showDirectoryPicker) { toast('Этот браузер не умеет сохранять в папку — нажми «ZIP»', true); return; }
     let dir; try { dir = await window.showDirectoryPicker({ mode: 'readwrite' }); } catch(e) { return; } // отменила выбор папки
     const used = new Set(); let ok = 0;
