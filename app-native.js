@@ -93,6 +93,7 @@
       const inName = 'mcv_' + Date.now() + '.mp4';
       const outName = inName + '.out.mp4';
       let h = null;
+      window._mcCompressing = true; try { if (window.mcKeepSync) window.mcKeepSync(); } catch (e) {}
       try {
         show('🎞 Готовлю видео…');
         for (let off = 0, i = 0; off < file.size; off += CH, i++) {
@@ -130,6 +131,7 @@
         await sleep(6000);
         return file;
       } finally {
+        window._mcCompressing = false;
         hide();
         try { if (h) h.remove(); } catch (e) {}
         // временные файлы удаляем в фоне, не дожидаясь: отправка ролика не должна от этого зависеть
@@ -137,6 +139,39 @@
       }
     };
     window.mcNativeStatus = t => { if (t) show(t); else hide(); };
+  })();
+
+  // ═══ Служба «идёт загрузка»: пока грузятся или сжимаются файлы, Android не усыпляет приложение (только APK) ═══
+  (function () {
+    const McS = (cap.Plugins && cap.Plugins.McSys) || (cap.registerPlugin && cap.registerPlugin('McSys'));
+    if (!McS) return;
+    let on = false, text = '', dead = false, idle = 0, busy = false;
+    async function set(want, t) {
+      if (dead || busy) return;
+      if (want === on && (!want || t === text)) return;
+      busy = true;
+      try { await McS.keepAlive({ on: want, text: t }); on = want; text = t; }
+      catch (e) { if (/implemented|unavailable/i.test(String((e && e.message) || e))) dead = true; } // старое приложение без службы — молчим
+      finally { busy = false; }
+    }
+    function sync() {
+      let n = 0;
+      try {
+        const l = window.mcPendList && window.mcPendList();
+        n = l ? l.active.filter(r => r.state !== 'err').length : 0;
+      } catch (e) {}
+      const comp = !!window._mcCompressing;
+      if (n > 0 || comp) {
+        idle = 0;
+        set(true, comp ? 'Сжимаю видео…' : 'Загружается файлов: ' + n);
+      } else if (on && ++idle >= 2) { // выключаем не сразу: между сжатием и отправкой бывает пауза
+        set(false, '');
+      }
+    }
+    window.mcKeepSync = sync;
+    setInterval(sync, 2500);
+    // перед выходом из приложения службу выключаем явно
+    window.mcKeepOff = async () => { try { await McS.keepAlive({ on: false }); on = false; } catch (e) {} };
   })();
 
   // ═══ Запись голоса в фоне: пока идёт запись с микрофона, держим службу переднего плана (только APK) ═══

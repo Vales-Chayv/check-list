@@ -378,11 +378,19 @@
     xd = document.createElement('div');
     xd.style.cssText = 'position:fixed;inset:0;z-index:100050;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:18px';
     const bs = 'flex:1;border-radius:20px;padding:11px 14px;font-size:14px;cursor:pointer;font-family:inherit;border:1px solid #555;background:#2a2a2a;color:#eee';
-    xd.innerHTML = '<div style="background:#1c1c1c;color:#eee;border-radius:16px;padding:18px;max-width:360px;width:100%;font-family:inherit"><div style="font-size:16px;font-weight:700">Загрузка ещё идёт</div><div style="font-size:13.5px;opacity:.8;margin-top:8px;line-height:1.45">Не догружено файлов: ' + n + '. Если выйти, они догрузятся, когда ты снова откроешь приложение. Участники ничего не увидят, пока загрузка не закончится.</div><div style="display:flex;gap:10px;margin-top:16px"><button data-s style="' + bs + ';background:#e8c56a;border-color:#e8c56a;color:#111;font-weight:700">Остаться</button><button data-q style="' + bs + '">Выйти</button></div></div>';
+    const nat = typeof window.mcAppExit === 'function' && typeof window.mcAppMinimize === 'function';
+    const txt = nat
+      ? 'Не догружено файлов: ' + n + '. «Свернуть» — загрузка продолжится в фоне. «Выйти» — догрузится, когда ты снова откроешь приложение. Участники ничего не увидят, пока загрузка не закончится.'
+      : 'Не догружено файлов: ' + n + '. Если выйти, они догрузятся, когда ты снова откроешь приложение. Участники ничего не увидят, пока загрузка не закончится.';
+    xd.innerHTML = '<div style="background:#1c1c1c;color:#eee;border-radius:16px;padding:18px;max-width:360px;width:100%;font-family:inherit"><div style="font-size:16px;font-weight:700">Загрузка ещё идёт</div><div style="font-size:13.5px;opacity:.8;margin-top:8px;line-height:1.45">' + txt + '</div><div style="display:flex;gap:8px;margin-top:16px"><button data-s style="' + bs + ';background:#e8c56a;border-color:#e8c56a;color:#111;font-weight:700">Остаться</button>' + (nat ? '<button data-m style="' + bs + '">Свернуть</button>' : '') + '<button data-q style="' + bs + '">Выйти</button></div></div>';
     xd.addEventListener('click', e => {
       const b = e.target.closest('button'); if (!b) return;
       xd.remove(); xd = null;
-      if (b.hasAttribute('data-q')) { window._mcExitOK = true; try { history.back(); } catch (_) {} tst('Нажми «назад» ещё раз, приложение закроется'); }
+      if (b.hasAttribute('data-m')) { window.mcAppMinimize(); return; }
+      if (b.hasAttribute('data-q')) {
+        if (nat) { window.mcAppExit(); return; }
+        window._mcExitOK = true; try { history.back(); } catch (_) {} tst('Нажми «назад» ещё раз, приложение закроется');
+      }
     });
     document.body.appendChild(xd);
   };

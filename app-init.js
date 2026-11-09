@@ -200,6 +200,36 @@ window.addEventListener('popstate', e => {
   history.pushState({app:true}, '');
 });
 
+// ── Приложение (APK): системная кнопка/жест «назад» приходит сюда напрямую, без истории браузера ──
+(function () {
+  const cp = window.Capacitor;
+  let native = false;
+  try { native = !!(cp && typeof cp.isNativePlatform === 'function' && cp.isNativePlatform()); } catch (e) {}
+  const App = native && cp.Plugins && cp.Plugins.App;
+  if (!App || typeof App.addListener !== 'function') return; // старое приложение или браузер — работает прежний способ
+  window.mcAppMinimize = () => { try { App.minimizeApp(); } catch (e) { try { App.exitApp(); } catch (_) {} } };
+  window.mcAppExit = async () => {
+    try { if (window.mcKeepOff) await window.mcKeepOff(); } catch (e) {}
+    try { App.exitApp(); } catch (e) {}
+  };
+  try {
+    App.addListener('backButton', () => {
+      let handled = false;
+      const before = mcBackSig(), now = Date.now();
+      try { handled = window.mcBackStep(); } catch (e) { handled = false; }
+      if (handled) {
+        const after = mcBackSig();
+        const stuck = after === before && _bkLast.sig === after && now - _bkLast.t < 3000;
+        _bkLast = { sig: after, t: now };
+        if (!stuck) return;            // шаг назад выполнен
+      }
+      // мы в лобби (или «назад» завис)
+      if (window.mcPendBusy && window.mcPendBusy() && window.mcExitAsk) { window.mcExitAsk(); return; }
+      window.mcAppMinimize();
+    });
+  } catch (e) { console.warn('[back] слушатель не установлен', e); }
+})();
+
 // ═══════════════════════════════════════════
 //  LOCK (personal space password — handled by spaces)
 // ═══════════════════════════════════════════
