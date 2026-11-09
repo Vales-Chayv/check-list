@@ -505,9 +505,22 @@ function mcBkFolderSink(root) {
     async finish() { return true; }
   };
 }
+const mcBkEsc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const mcBkNat = () => !!(window.mcSysFolder && window.mcSysFolder.available && window.mcSysFolder.hasDirs);
+function mcBkNativeSink(folder, root) { // телефон: пишем в выбранную папку через нативный плагин, вложенные папки создаются по пути
+  const dirs = new Map();
+  return {
+    async write(path, blob) {
+      const parts = path.split('/'), file = parts.pop(), dp = [root].concat(parts).join('/');
+      let d = dirs.get(dp); if(!d) { d = await window.mcSysFolder.mkdirs(folder, dp); dirs.set(dp, d); }
+      await window.mcSysFolder.write(folder, file, blob.type || 'application/octet-stream', blob, null, d);
+    },
+    async finish() { return true; }
+  };
+}
 async function mcBkDeliver(out, fileName) { // отдать готовый ZIP: родное «Поделиться» → системное «Поделиться» → скачивание
   try {
-    if(typeof window.isNativeApp === 'function' && window.isNativeApp() && typeof mcNativeShareFile === 'function') { if(await mcNativeShareFile(out, 'mycards_backup.zip', fileName)) return true; }
+    if(typeof window.isNativeApp === 'function' && window.isNativeApp() && typeof mcNativeShareFile === 'function') { const sr = await mcNativeShareFile(out, 'mycards_backup.zip', fileName); if(sr === true) return true; if(sr === 'cancel') return false; }
   } catch(e) {}
   try {
     const f = new File([out], fileName, { type: 'application/zip' });
@@ -537,11 +550,11 @@ function mcBkZipSink(limit, date, deliver) {
 // ── окно выбора места ──
 function mcBkAskDest(stats) {
   return new Promise(resolve => {
-    const canDir = !!window.showDirectoryPicker, mobile = mcIsMobile();
+    const natDir = mcBkNat(), canDir = !!window.showDirectoryPicker || natDir, mobile = mcIsMobile();
     const ov = mcBkDialog(
       '<div style="font-size:16px;font-weight:700">🛡 Куда сохранить резервную копию?</div>' +
       '<div style="font-size:12px;opacity:.7;margin-top:4px">Все карточки и файлы всех кабинетов' + (stats.orig ? ', оригиналы 💎: ' + stats.orig + ' (' + mcFmtMB(stats.origBytes) + ')' : '') + '. Файлы разложатся по папкам кабинетов и карточек.</div>' +
-      (canDir ? '<button id="bk-dir" style="' + MC_BK_BTN + MC_BK_GOLD + '">📁 Папка на этом устройстве<br><span style="font-weight:400;font-size:12px">выбери любую папку, внутри создам «Мои карточки — резерв»</span></button>' : '') +
+      (canDir ? '<button id="bk-dir" style="' + MC_BK_BTN + MC_BK_GOLD + '">📁 Папка на этом устройстве<br><span style="font-weight:400;font-size:12px">' + (natDir && window.mcSysFolder.get() ? 'в папку «' + mcBkEsc(window.mcSysFolder.get().name) + '» создам «Мои карточки — резерв»' : 'выбери любую папку, внутри создам «Мои карточки — резерв»') + '</span></button>' + (natDir && window.mcSysFolder.get() ? '<button id="bk-dir2" style="' + MC_BK_BTN + ';text-align:center;padding:9px 12px;font-size:13px">Другая папка…</button>' : '') : '') +
       '<button id="bk-zip" style="' + MC_BK_BTN + (canDir ? '' : MC_BK_GOLD) + '">' + (mobile ? '📤 Отправить / сохранить файлами<br><span style="font-weight:400;font-size:12px">откроется меню телефона: Google Диск, Файлы, Telegram… Копия идёт частями по ~100 МБ' : '📦 ZIP-файл(ы)<br><span style="font-weight:400;font-size:12px">скачаются в «Загрузки», большие копии — несколькими частями') + '</span></button>' +
       (mobile && !canDir ? '<div style="font-size:11px;opacity:.6;margin-top:8px">Выбор папки на телефоне появится в следующем обновлении приложения.</div>' : '') +
       '<button id="bk-x" style="' + MC_BK_BTN + ';text-align:center">Отмена</button>');
@@ -549,7 +562,11 @@ function mcBkAskDest(stats) {
     ov.querySelector('#bk-x').onclick = () => done(null);
     ov.querySelector('#bk-zip').onclick = () => done({ mode: 'zip', limit: (mobile ? 100 : 500) * 1048576 });
     const bd = ov.querySelector('#bk-dir');
-    if(bd) bd.onclick = async () => { try { const dir = await window.showDirectoryPicker({ mode: 'readwrite' }); done({ mode: 'folder', dir }); } catch(e) { /* выбор папки отменён: остаёмся в окне */ } };
+    if(bd && natDir) { // телефон: прежняя папка из настроек или выбор новой
+      bd.onclick = async () => { const f = await window.mcSysFolder.ensure(); if(f) done({ mode: 'folder', native: true, folder: f }); };
+      const b2 = ov.querySelector('#bk-dir2');
+      if(b2) b2.onclick = async () => { const f = await window.mcSysFolder.pick(); if(f) done({ mode: 'folder', native: true, folder: f }); };
+    } else if(bd) bd.onclick = async () => { try { const dir = await window.showDirectoryPicker({ mode: 'readwrite' }); done({ mode: 'folder', dir }); } catch(e) { /* выбор папки отменён: остаёмся в окне */ } };
   });
 }
 function mcBkProgress() {
@@ -566,7 +583,8 @@ async function mcBackupRun(dest) {
   const manifest = { app: 'Мои карточки', version: 1, created: new Date(now).toISOString(), spaces: [], files: [], missing: [] };
   let sink;
   try {
-    sink = dest.mode === 'folder' ? mcBkFolderSink(await dest.dir.getDirectoryHandle(root, { create: true })) : mcBkZipSink(dest.limit, date, mcBkDeliver);
+    window._mcWork = 'Резервная копия…'; try { if(window.mcKeepSync) window.mcKeepSync(); } catch(_) {}
+    sink = dest.mode === 'folder' ? (dest.native ? mcBkNativeSink(dest.folder, root) : mcBkFolderSink(await dest.dir.getDirectoryHandle(root, { create: true }))) : mcBkZipSink(dest.limit, date, mcBkDeliver);
     if(dest.mode === 'zip' && typeof window.JSZip === 'undefined') throw new Error('Архиватор не загрузился');
     const all = await mcAllCardsForMedia(true);
     const names = new Map((typeof spaces !== 'undefined' ? spaces : []).map(s => [s.id, s.name || 'Кабинет']));
@@ -627,12 +645,12 @@ async function mcBackupRun(dest) {
   } catch(e) {
     try { ui.close(); } catch(_) {}
     try { toast('Не удалось сделать копию: ' + String((e && e.message) || e).slice(0, 100), true); } catch(_) {}
-  }
+  } finally { window._mcWork = null; }
 }
 const mcIsApk = () => typeof window.isNativeApp === 'function' && window.isNativeApp();
 async function mcBackupStart() {
   if(_mcBkBusy) return;
-  if(mcIsApk()) { // в APK большие файлы нельзя передавать через мост Android: приложение вылетает по памяти. Включим вместе с плагином «Поделиться» в следующей сборке APK
+  if(mcIsApk() && typeof window.mcNativeShareFile !== 'function') { // в старом APK большие файлы нельзя передавать через мост Android: приложение вылетает по памяти. Включим вместе с плагином «Поделиться» в следующей сборке APK
     const ov = mcBkDialog('<div style="font-size:16px;font-weight:700">🛡 Резервная копия на телефоне</div><div style="font-size:13px;margin-top:8px;line-height:1.5">В приложении на телефоне резервная копия пока недоступна: для неё нужен новый компонент, он войдёт в следующее обновление APK. Сделай копию на компьютере: в Галерее ⚙ → «Резерв».</div><button id="bk-ok" style="' + MC_BK_BTN + ';text-align:center">Понятно</button>');
     ov.querySelector('#bk-ok').onclick = () => ov.remove();
     return;

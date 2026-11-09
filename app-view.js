@@ -1373,6 +1373,7 @@ function openMediaGroup(gid) {
     if(window.mcSysFolder && window.mcSysFolder.available) { // приложение на телефоне: папка выбирается один раз и запоминается
       const fd = await window.mcSysFolder.ensure(); if(!fd) return;
       const used = new Set(); let ok = 0;
+      window._mcWork = 'Сохраняю файлы в папку…'; try { if(window.mcKeepSync) window.mcKeepSync(); } catch(_) {}
       for(let k = 0; k < items.length; k++) {
         const it = items[k], label = '⏳ Сохраняю ' + (k + 1) + ' из ' + items.length + '…';
         try {
@@ -1385,6 +1386,7 @@ function openMediaGroup(gid) {
           ok++;
         } catch(e) { console.log('save folder', e && e.message); }
       }
+      window._mcWork = null;
       toast(ok === items.length ? '✓ Сохранено в «' + fd.name + '»: ' + ok : 'Сохранено ' + ok + ' из ' + items.length, ok !== items.length);
       return;
     }
@@ -1412,8 +1414,8 @@ function openMediaGroup(gid) {
     if(!ok) { toast('Не удалось собрать архив', true); return; }
     const out = await z.generateAsync({ type: 'blob', compression: 'STORE' });
     const name = zipName || 'Файлы.zip';
-    if(typeof window.isNativeApp === 'function' && window.isNativeApp() && out.size > 8 * 1048576) { toast('На телефоне большие архивы пока не сохраняются (нужно обновление APK). Выбери меньше файлов или сделай это на компьютере.', true); return; }
-    if(typeof window.isNativeApp === 'function' && window.isNativeApp() && typeof mcNativeShareFile === 'function') { if(await mcNativeShareFile(out, 'mycards_files.zip', name)) return; }
+    if(typeof window.isNativeApp === 'function' && window.isNativeApp() && out.size > (typeof mcNativeShareFile === 'function' ? 250 : 8) * 1048576) { toast('На телефоне большие архивы пока не сохраняются (нужно обновление APK). Выбери меньше файлов или сделай это на компьютере.', true); return; }
+    if(typeof window.isNativeApp === 'function' && window.isNativeApp() && typeof mcNativeShareFile === 'function') { const sr = await mcNativeShareFile(out, 'mycards_files.zip', name); if(sr) return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(out); a.download = name;
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     toast(ok === items.length ? '✓ Архив готов: ' + ok + ' файлов' : 'В архиве ' + ok + ' из ' + items.length);

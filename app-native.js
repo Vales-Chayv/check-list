@@ -160,10 +160,10 @@
         const l = window.mcPendList && window.mcPendList();
         n = l ? l.active.filter(r => r.state !== 'err' && !r.wifi).length : 0;
       } catch (e) {}
-      const comp = !!window._mcCompressing;
-      if (n > 0 || comp) {
+      const comp = !!window._mcCompressing, work = window._mcWork || '';
+      if (n > 0 || comp || work) {
         idle = 0;
-        set(true, comp ? 'Сжимаю видео…' : 'Загружается файлов: ' + n);
+        set(true, work ? work : comp ? 'Сжимаю видео…' : 'Загружается файлов: ' + n);
       } else if (on && ++idle >= 2) { // выключаем не сразу: между сжатием и отправкой бывает пауза
         set(false, '');
       }
@@ -220,8 +220,9 @@
       return await api.pick();
     };
     // записать файл (Blob или Response с body) в папку кусками, без загрузки всего файла в память
-    api.write = async (folder, name, mime, src, onProgress) => {
-      const { id } = await McS.openWrite({ folder: folder.uri, name, mime: mime || 'application/octet-stream' });
+    api.mkdirs = async (folder, path) => (await McS.mkdirs({ folder: folder.uri, path })).dir; // вложенные папки; вернёт адрес последней
+    api.write = async (folder, name, mime, src, onProgress, dir) => {
+      const { id } = await McS.openWrite({ folder: folder.uri, dir: dir || undefined, name, mime: mime || 'application/octet-stream' });
       let ok = false;
       try {
         if (src && typeof src.slice === 'function') {
@@ -254,6 +255,40 @@
     };
     // плагин есть в этой сборке приложения?
     McS.hasFolder({ uri: '' }).then(() => { api.available = true; }).catch(() => {});
+    // умеет ли эта сборка приложения вложенные папки (нужны резервной копии)? В старой сборке метода нет
+    try { McS.mkdirs({}).then(() => { api.hasDirs = true; }).catch(e => { if (!/implemented|unavailable/i.test(String((e && e.message) || e))) api.hasDirs = true; }); } catch (e) {}
+  })();
+
+  // ═══ Отправка большого файла через «Поделиться»: пишем в кэш кусками, отдаём системному меню по адресу файла (только APK) ═══
+  (function () {
+    const FS = cap.Plugins && cap.Plugins.Filesystem, SH = cap.Plugins && cap.Plugins.Share;
+    if (!FS || !SH) return;
+    const CH = 3 * 1024 * 1024;
+    const b64 = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = () => rej(r.error); r.readAsDataURL(blob); });
+    // true — отправлено; 'cancel' — человек закрыл меню; false — не получилось (можно пробовать другой способ)
+    window.mcNativeShareFile = async function (blob, cacheName, title) {
+      const name = 'mcs_' + Date.now() + '_' + String(cacheName || 'file').replace(/[^\w.\-]/g, '_');
+      try {
+        for (let off = 0, i = 0; i === 0 || off < blob.size; off += CH, i++) {
+          const data = await b64(blob.slice(off, off + CH));
+          if (i === 0) await FS.writeFile({ path: name, directory: 'CACHE', data });
+          else await FS.appendFile({ path: name, directory: 'CACHE', data });
+        }
+        const { uri } = await FS.getUri({ path: name, directory: 'CACHE' });
+        try { await SH.share({ title: title || name, url: uri, dialogTitle: title || 'Поделиться' }); }
+        catch (e) { if (/cancel/i.test(String((e && e.message) || e))) return 'cancel'; throw e; }
+        return true;
+      } catch (e) {
+        console.log('[share]', e && e.message);
+        return false;
+      } finally {
+        setTimeout(() => { try { FS.deleteFile({ path: name, directory: 'CACHE' }).catch(() => {}); } catch (e) {} }, 10 * 60000);
+      }
+    };
+    // временные файлы прошлых запусков убираем
+    setTimeout(async () => {
+      try { const r = await FS.readdir({ path: '', directory: 'CACHE' }); for (const f of (r && r.files) || []) { const n = f && (f.name || f); if (typeof n === 'string' && n.indexOf('mcs_') === 0) { try { await FS.deleteFile({ path: n, directory: 'CACHE' }); } catch (e) {} } } } catch (e) {}
+    }, 20000);
   })();
 
   // ═══ Запись голоса в фоне: пока идёт запись с микрофона, держим службу переднего плана (только APK) ═══
