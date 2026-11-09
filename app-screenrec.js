@@ -3,14 +3,19 @@
 //  Запись идёт без ограничения по времени. После «Стоп»:
 //   • ролик до 40 МБ — выбор: прикрепить / скачать / и то и другое;
 //   • больше 40 МБ — сам скачивается на компьютер (в облако такой файл не пройдёт).
-//  На телефоне кнопка скрыта: там нужен системный плагин (будет в большой сборке APK).
+//  Телефон (приложение): запись идёт через системную службу Android, можно переключаться в другие приложения;
+//  остановить можно в шторке уведомлений или кнопкой «Стоп» здесь. После записи: прикрепить / в папку.
 // ═══════════════════════════════════════════
 (function () {
   if (window._mcScreenRec) return; window._mcScreenRec = true;
   const LIMIT = 40 * 1024 * 1024, Z = 100030;
   const isApk = () => typeof window.isNativeApp === 'function' && window.isNativeApp();
   const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
-  const can = () => !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) && window.MediaRecorder && !isApk() && !mobile;
+  // телефон (приложение): нативный плагин McScreen
+  const cap = window.Capacitor;
+  const McSc = isApk() && cap ? ((cap.Plugins && cap.Plugins.McScreen) || (cap.registerPlugin && cap.registerPlugin('McScreen'))) : null;
+  let nativeOK = false;
+  const can = () => nativeOK || (!!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) && window.MediaRecorder && !isApk() && !mobile);
   const tst = (m, e) => { try { toast(m, e); } catch (_) {} };
   let R = null; // идущая запись
 
@@ -29,11 +34,11 @@
   }
 
   // ── окно перед стартом ──
-  function askStart() {
+  function askStart(nat) {
     return new Promise(res => {
       const d = modal(
         '<div style="font-size:16px;font-weight:700">🖥 Запись экрана</div>' +
-        '<div style="font-size:13px;opacity:.75;margin-top:6px;line-height:1.4">Дальше браузер спросит, что записывать: весь экран, окно или вкладку. Чтобы остановить, нажми «Стоп» в плашке внизу.</div>' +
+        '<div style="font-size:13px;opacity:.75;margin-top:6px;line-height:1.4">' + (nat ? 'Android спросит разрешение на запись экрана. Дальше можно переключаться в другие приложения. Чтобы остановить, нажми «Остановить» в шторке уведомлений или вернись сюда и нажми «Стоп».' : 'Дальше браузер спросит, что записывать: весь экран, окно или вкладку. Чтобы остановить, нажми «Стоп» в плашке внизу.') + '</div>' +
         '<label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px;cursor:pointer"><input type="checkbox" id="sr-mic" style="width:18px;height:18px"> 🎙 Добавить голос с микрофона</label>' +
         '<div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end"><button data-x style="' + bs + '">Отмена</button><button data-go style="' + bs + ';background:' + GOLD + ';border-color:' + GOLD + ';color:#111;font-weight:700">Начать</button></div>');
       d.onclick = e => {
@@ -44,6 +49,7 @@
   }
 
   async function start(target) {
+    if (nativeOK) return startNative(target);
     if (R) { tst('Запись уже идёт'); return; }
     const o = await askStart(); if (!o) return;
     let disp, mic = null;
@@ -87,13 +93,14 @@
       if (!R) return;
       const s = Math.floor((Date.now() - R.t0) / 1000);
       p.querySelector('#sr-t').textContent = Math.floor(s / 60) + ':' + pad(s % 60);
-      p.querySelector('#sr-s').textContent = mb(R.size);
+      p.querySelector('#sr-s').textContent = R.native ? '' : mb(R.size);
     }, 500);
     R.pill = p;
   }
 
   function stop(keep) {
     if (!R) return;
+    if (R.native) { stopNative(keep); return; }
     R.cancelled = !keep;
     if (R.rec.state !== 'inactive') { try { R.rec.stop(); } catch (e) { onStop(); } } else onStop();
   }
@@ -155,6 +162,100 @@
       if (!(e && e.message === 'file_too_big')) tst('Не удалось загрузить: ' + String((e && e.message) || e).slice(0, 80), true);
       if (offerDl) { download(file); tst('В облако не загрузилось, скачала ролик на компьютер', true); }
     }
+  }
+
+  // ═══ Телефон: запись экрана через службу Android ═══
+  const msgOf = e => String((e && e.message) || e || '').slice(0, 100);
+  async function startNative(target) {
+    if (R) { tst('Запись уже идёт'); return; }
+    const o = await askStart(true); if (!o) return;
+    let audio = !!o.mic;
+    if (audio) { // просим доступ к микрофону заранее: без него Android запишет экран без голоса
+      try { const s = await navigator.mediaDevices.getUserMedia({ audio: true }); s.getTracks().forEach(t => t.stop()); }
+      catch (e) { audio = false; tst('Микрофон недоступен, пишу без голоса', true); }
+    }
+    let r;
+    try { r = await McSc.start({ audio }); } catch (e) { tst('Запись не началась: ' + msgOf(e), true); return; }
+    if (!r || !r.started) { tst('Запись не началась: доступ к экрану не дан', true); return; }
+    if (audio && !r.audio) tst('Голос не записывается: нет доступа к микрофону', true);
+    R = { native: true, t0: Date.now(), target, size: 0 };
+    pill();
+  }
+  async function stopNative(keep) {
+    const r = R; if (!r || r.stopping) return;
+    r.stopping = true;
+    let res = null;
+    try { res = await McSc.stop(); }
+    catch (e) { try { const st = await McSc.status(); res = st && st.last || null; } catch (_) {} if (!res) tst('Не удалось остановить запись: ' + msgOf(e), true); }
+    finishNative(res, keep);
+  }
+  function finishNative(res, keep) {
+    const r = R; if (!r || r.done) return; r.done = true;
+    cleanup(); R = null;
+    if (!keep) { if (res && res.name) { try { McSc.discard({ name: res.name }); } catch (_) {} } return; }
+    if (!res || !res.name) { tst((res && res.error) || 'Запись пустая', true); return; }
+    nativeDone(res, r.target);
+  }
+  async function readNative(res) { // ролик из кэша приложения → обычный файл в памяти
+    const FS = cap.Plugins && cap.Plugins.Filesystem;
+    const wt = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('таймаут чтения ролика')), ms))]);
+    const { uri } = await FS.getUri({ path: res.name, directory: 'CACHE' });
+    const rr = await wt(fetch(cap.convertFileSrc(uri)), 20000);
+    if (!rr.ok) throw new Error('http ' + rr.status);
+    const blob = await wt(rr.blob(), 120000);
+    if (!blob || !blob.size) throw new Error('пустой файл');
+    return new Blob([await wt(blob.arrayBuffer(), 120000)], { type: 'video/mp4' });
+  }
+  function nativeDone(res, target) {
+    const form = { new: 'att-prev', ae: 'ae-att-prev' }[target], holder = form && document.getElementById(form);
+    const big = res.size > 100 * 1048576;
+    const canAtt = !!(holder && holder.offsetParent) && !big, f = window.mcSysFolder, canDir = !!(f && f.available);
+    const name = 'Экран_' + stamp() + '.mp4', sec = Math.round((res.ms || 0) / 1000);
+    const b = ';text-align:left;border-radius:12px';
+    const d = modal(
+      '<div style="font-size:16px;font-weight:700">Запись готова · ' + mb(res.size) + (sec ? ' · ' + Math.floor(sec / 60) + ':' + pad(sec % 60) : '') + '</div>' +
+      '<div id="sr-body"><div style="font-size:13px;opacity:.75;margin-top:4px">Что сделать с роликом?' + (big ? ' Он большой, в облако не прикрепляется.' : !canAtt ? ' Форма уже закрыта, прикрепить не получится.' : '') + '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">' +
+      (canAtt ? '<button data-m="att" style="' + bs + b + '">📎 Прикрепить к записи</button>' : '') +
+      (canDir ? '<button data-m="dir" style="' + bs + b + '">📁 Сохранить в папку' + (f.get() ? ' «' + String(f.get().name).replace(/[<>&"]/g, '') + '»' : '') + '</button>' : '') +
+      (canAtt && canDir ? '<button data-m="both" style="' + bs + b + '">📎 + 📁 И прикрепить, и в папку</button>' : '') +
+      '<button data-m="no" style="' + bs + ';text-align:center;border-radius:12px;opacity:.8">Не сохранять</button></div></div>');
+    let busy = false;
+    d.onclick = async e => {
+      const bt = e.target.closest('[data-m]'); if (!bt || busy) return;
+      const m = bt.dataset.m;
+      if (m === 'no') { if (!confirm('Удалить запись?')) return; d.remove(); try { McSc.discard({ name: res.name }); } catch (_) {} return; }
+      busy = true;
+      const body = d.querySelector('#sr-body'), keepHtml = body.innerHTML, say = t => { body.innerHTML = '<div style="font-size:14px;margin-top:10px">' + t + '</div>'; };
+      try {
+        if (m === 'dir' || m === 'both') {
+          const fd = await f.ensure();
+          if (!fd) { busy = false; return; } // выбор папки отменили: окно остаётся
+          say('⏳ Сохраняю в папку…');
+          await f.copy(fd, res.name, name, 'video/mp4');
+          tst('✓ Сохранено в «' + fd.name + '»');
+        }
+        if (m === 'att' || m === 'both') {
+          say('⏳ Готовлю ролик…');
+          const blob = await readNative(res);
+          d.remove();
+          await attach(new File([blob], name, { type: 'video/mp4', lastModified: Date.now() }), target, false);
+        }
+      } catch (err) { // не вышло: окно остаётся, ролик цел, можно выбрать другое
+        body.innerHTML = keepHtml; busy = false; tst('Не получилось: ' + msgOf(err), true); return;
+      }
+      d.remove();
+      try { McSc.discard({ name: res.name }); } catch (_) {}
+    };
+  }
+  if (McSc) {
+    try { McSc.addListener('finished', ev => { if (R && R.native && !R.stopping) { R.stopping = true; finishNative(ev && (ev.name || ev.error) ? ev : null, true); } }); } catch (e) {}
+    try { McSc.status().then(() => { nativeOK = true; init(); }).catch(() => {}); } catch (e) {}
+    // вернулись в приложение, а запись уже остановили в шторке
+    document.addEventListener('visibilitychange', async () => {
+      if (document.hidden || !R || !R.native || R.stopping) return;
+      try { const st = await McSc.status(); if (st && !st.recording && R && !R.stopping) { R.stopping = true; finishNative(st.last || null, true); } } catch (e) {}
+    });
   }
 
   // ── кнопки ──

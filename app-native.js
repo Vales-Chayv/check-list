@@ -220,6 +220,7 @@
       return await api.pick();
     };
     // записать файл (Blob или Response с body) в папку кусками, без загрузки всего файла в память
+    api.copy = async (folder, cacheName, name, mime) => McS.copyToFolder({ folder: folder.uri, cacheName, name, mime: mime || 'application/octet-stream' }); // файл из кэша приложения → в папку
     api.mkdirs = async (folder, path) => (await McS.mkdirs({ folder: folder.uri, path })).dir; // вложенные папки; вернёт адрес последней
     api.write = async (folder, name, mime, src, onProgress, dir) => {
       const { id } = await McS.openWrite({ folder: folder.uri, dir: dir || undefined, name, mime: mime || 'application/octet-stream' });
