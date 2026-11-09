@@ -553,12 +553,18 @@ function mcBkAskDest(stats) {
     const natDir = mcBkNat(), canDir = !!window.showDirectoryPicker || natDir, mobile = mcIsMobile();
     const ov = mcBkDialog(
       '<div style="font-size:16px;font-weight:700">🛡 Куда сохранить резервную копию?</div>' +
-      '<div style="font-size:12px;opacity:.7;margin-top:4px">Все карточки и файлы всех кабинетов' + (stats.orig ? ', оригиналы 💎: ' + stats.orig + ' (' + mcFmtMB(stats.origBytes) + ')' : '') + '. Файлы разложатся по папкам кабинетов и карточек.</div>' +
+      '<div style="font-size:12px;opacity:.7;margin-top:4px">Файлы разложатся по папкам кабинетов и карточек.</div>' +
+      '<div style="margin-top:10px"><div style="font-size:12px;opacity:.7;margin-bottom:4px">Что копировать</div><select id="bk-sc" style="width:100%;background:#2a2a2a;color:#eee;border:1px solid #555;border-radius:10px;padding:10px;font-size:14px;font-family:inherit">' +
+      '<option value="all">Всё: все кабинеты' + (stats.orig ? ' и оригиналы 💎 (' + stats.orig + ', ' + mcFmtMB(stats.origBytes) + ')' : '') + '</option>' +
+      (typeof spaces !== 'undefined' ? spaces.map(s => '<option value="sp:' + mcBkEsc(s.id) + '">Только кабинет: ' + mcBkEsc(s.name || 'Кабинет') + '</option>').join('') : '') +
+      '<option value="d:7">Файлы за последние 7 дней</option><option value="d:30">Файлы за последние 30 дней</option>' +
+      (stats.orig ? '<option value="orig">Только оригиналы 💎</option>' : '') +
+      '</select></div>' +
       (canDir ? '<button id="bk-dir" style="' + MC_BK_BTN + MC_BK_GOLD + '">📁 Папка на этом устройстве<br><span style="font-weight:400;font-size:12px">' + (natDir && window.mcSysFolder.get() ? 'в папку «' + mcBkEsc(window.mcSysFolder.get().name) + '» создам «Мои карточки — резерв»' : 'выбери любую папку, внутри создам «Мои карточки — резерв»') + '</span></button>' + (natDir && window.mcSysFolder.get() ? '<button id="bk-dir2" style="' + MC_BK_BTN + ';text-align:center;padding:9px 12px;font-size:13px">Другая папка…</button>' : '') : '') +
       '<button id="bk-zip" style="' + MC_BK_BTN + (canDir ? '' : MC_BK_GOLD) + '">' + (mobile ? '📤 Отправить / сохранить файлами<br><span style="font-weight:400;font-size:12px">откроется меню телефона: Google Диск, Файлы, Telegram… Копия идёт частями по ~100 МБ' : '📦 ZIP-файл(ы)<br><span style="font-weight:400;font-size:12px">скачаются в «Загрузки», большие копии — несколькими частями') + '</span></button>' +
       (mobile && !canDir ? '<div style="font-size:11px;opacity:.6;margin-top:8px">Выбор папки на телефоне появится в следующем обновлении приложения.</div>' : '') +
       '<button id="bk-x" style="' + MC_BK_BTN + ';text-align:center">Отмена</button>');
-    const done = v => { ov.remove(); resolve(v); };
+    const done = v => { const sc = (ov.querySelector('#bk-sc') || {}).value || 'all'; ov.remove(); resolve(v && Object.assign(v, { scope: sc })); };
     ov.querySelector('#bk-x').onclick = () => done(null);
     ov.querySelector('#bk-zip').onclick = () => done({ mode: 'zip', limit: (mobile ? 100 : 500) * 1048576 });
     const bd = ov.querySelector('#bk-dir');
@@ -586,7 +592,13 @@ async function mcBackupRun(dest) {
     window._mcWork = 'Резервная копия…'; try { if(window.mcKeepSync) window.mcKeepSync(); } catch(_) {}
     sink = dest.mode === 'folder' ? (dest.native ? mcBkNativeSink(dest.folder, root) : mcBkFolderSink(await dest.dir.getDirectoryHandle(root, { create: true }))) : mcBkZipSink(dest.limit, date, mcBkDeliver);
     if(dest.mode === 'zip' && typeof window.JSZip === 'undefined') throw new Error('Архиватор не загрузился');
-    const all = await mcAllCardsForMedia(true);
+    let all = await mcAllCardsForMedia(true);
+    const sc = String(dest.scope || 'all'), cutoff = sc.indexOf('d:') === 0 ? now - (+sc.slice(2)) * 864e5 : 0, origOnly = sc === 'orig';
+    if(sc.indexOf('sp:') === 0) all = all.filter(c => String(c.space_id || 'personal') === sc.slice(3));
+    const vurls = origOnly ? new Set((await mcVaultMeta()).map(m => m.url).filter(Boolean)) : null;
+    const attOk = c => a => (!cutoff || (a.ts || Date.parse(c.created_at || '') || 0) >= cutoff) && (!origOnly || vurls.has(String(a.data || '')));
+    if(cutoff || origOnly) all = all.filter(c => mcAttsOfCard(c).some(attOk(c))); // в частичную копию попадают только карточки с нужными файлами
+    manifest.scope = sc;
     const names = new Map((typeof spaces !== 'undefined' ? spaces : []).map(s => [s.id, s.name || 'Кабинет']));
     const by = new Map();
     all.forEach(c => { const k = c.space_id || 'personal'; if(!by.has(k)) by.set(k, []); by.get(k).push(c); });
@@ -599,7 +611,7 @@ async function mcBackupRun(dest) {
       tasks.push({ json: sp + '/cards.json', data: list });
       list.forEach(c => {
         const dir = sp + '/' + mcSafe(c.title || 'Без названия', 50) + ' [' + String(c.id).slice(0, 6) + ']', used = new Set();
-        mcAttsOfCard(c).forEach(a => {
+        mcAttsOfCard(c).filter(attOk(c)).forEach(a => {
           const u = String(a.data || ''); if(!u || seenUrl.has(u)) return; seenUrl.add(u);
           if(!MC_ATT_RE.test(u) && !u.startsWith('data:')) return;
           let raw = a.name; if(!raw) { try { raw = decodeURIComponent(u.split('?')[0].split('/').pop() || 'file').replace(/^[A-Za-z0-9]{6,}_/, ''); } catch(_) { raw = 'file'; } }
@@ -609,8 +621,9 @@ async function mcBackupRun(dest) {
       });
     }
     // оригиналы без привязки к карточке
-    const loose = (await mcVaultMeta()).filter(m => !m.url);
+    const loose = (sc === 'all' || origOnly) ? (await mcVaultMeta()).filter(m => !m.url) : [];
     const total = tasks.filter(t => t.url).length + loose.length;
+    if(!total && sc !== 'all') { ui.close(); try { toast('По выбранному нет файлов для копии'); } catch(_) {} return; }
     let i = 0, bytes = 0; const vids = [];
     const uniq = (n, used) => { if(!used.has(n)) { used.add(n); return n; } const d = n.lastIndexOf('.'), a = d > 0 ? n.slice(0, d) : n, b = d > 0 ? n.slice(d) : ''; let k = 2; while(used.has(a + ' (' + k + ')' + b)) k++; const r = a + ' (' + k + ')' + b; used.add(r); return r; };
     for(const t of tasks) {
@@ -640,7 +653,7 @@ async function mcBackupRun(dest) {
     ui.close();
     if(!ok) { toast('Копия не сохранена: отправка была отменена', true); return; }
     await mcVaultMark(vids, now);
-    mcBkSet('mc_bk_last', { ts: now, files: manifest.files.length, bytes, mode: dest.mode, missing: manifest.missing.length });
+    if(sc === 'all') mcBkSet('mc_bk_last', { ts: now, files: manifest.files.length, bytes, mode: dest.mode, missing: manifest.missing.length });
     toast('✓ Резервная копия готова: ' + manifest.files.length + ' файлов, ' + mcFmtMB(bytes) + (manifest.missing.length ? '. Не удалось взять: ' + manifest.missing.length : ''), !!manifest.missing.length);
   } catch(e) {
     try { ui.close(); } catch(_) {}

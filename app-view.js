@@ -1368,6 +1368,16 @@ function openMediaGroup(gid) {
   };
   const uniq = (n, used) => { if(!used.has(n)) { used.add(n); return n; } const d = n.lastIndexOf('.'), a = d > 0 ? n.slice(0, d) : n, b = d > 0 ? n.slice(d) : ''; let i = 2; while(used.has(a + ' (' + i + ')' + b)) i++; const r = a + ' (' + i + ')' + b; used.add(r); return r; };
   async function getBlob(url) { try { const o = typeof mcVaultBlobByUrl === 'function' ? await mcVaultBlobByUrl(url) : null; if(o) return o; } catch(_) {} const r = await fetch(url, url.startsWith('data:') ? undefined : { mode: 'cors' }); if(!r.ok) throw new Error('http ' + r.status); return await r.blob(); }
+  // Сообщение поверх всех окон: обычный toast прячется под просмотром группы файлов, и не видно, что сохранение идёт
+  let sayEl = null, sayTm = 0, saveBusy = false;
+  const say = (m, bad, kind) => {
+    try { if(typeof toast === 'function' && !document.getElementById('media-group-ov')) toast(m, bad); } catch(_) {}
+    if(!sayEl) { sayEl = document.createElement('div'); sayEl.style.cssText = 'position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 14px);transform:translateX(-50%);z-index:100100;max-width:calc(100% - 28px);box-sizing:border-box;padding:10px 18px;border-radius:18px;font:600 14px system-ui,sans-serif;color:#fff;box-shadow:0 4px 18px rgba(0,0,0,.5);text-align:center;pointer-events:none'; document.body.appendChild(sayEl); }
+    const prog = kind === 'p' || (!kind && /^⏳/.test(String(m)));
+    sayEl.textContent = m; sayEl.style.display = 'block';
+    sayEl.style.background = bad ? '#c0392b' : prog ? '#2b2b30' : '#2e7d4f';
+    clearTimeout(sayTm); if(!prog) sayTm = setTimeout(() => { sayEl.style.display = 'none'; }, 4500);
+  };
   window.mcSaveFolder = async function(items) {
     if(!items || !items.length) return;
     if(window.mcSysFolder && window.mcSysFolder.available) { // приложение на телефоне: папка выбирается один раз и запоминается
@@ -1377,49 +1387,58 @@ function openMediaGroup(gid) {
       for(let k = 0; k < items.length; k++) {
         const it = items[k], label = '⏳ Сохраняю ' + (k + 1) + ' из ' + items.length + '…';
         try {
-          toast(label);
+          say(label);
           let src = null, meta = { name: '', type: '' };
           try { const o = typeof mcVaultBlobByUrl === 'function' ? await mcVaultBlobByUrl(it.url) : null; if(o) { src = o; meta = o; } } catch(_) {}
           if(!src) { const r = await fetch(it.url, String(it.url).startsWith('data:') ? undefined : { mode: 'cors' }); if(!r.ok) throw new Error('http ' + r.status); src = r; meta = { name: '', type: r.headers.get('content-type') || '' }; }
           let last = 0;
-          await window.mcSysFolder.write(fd, uniq(baseName(it, meta, k), used), meta.type, src, (d, t) => { if(t && Date.now() - last > 1500) { last = Date.now(); toast(label + ' ' + Math.round(d / t * 100) + '%'); } });
+          await window.mcSysFolder.write(fd, uniq(baseName(it, meta, k), used), meta.type, src, (d, t) => { if(t && Date.now() - last > 1500) { last = Date.now(); say(label + ' ' + Math.round(d / t * 100) + '%'); } });
           ok++;
         } catch(e) { console.log('save folder', e && e.message); }
       }
       window._mcWork = null;
-      toast(ok === items.length ? '✓ Сохранено в «' + fd.name + '»: ' + ok : 'Сохранено ' + ok + ' из ' + items.length, ok !== items.length);
+      say(ok === items.length ? '✓ Сохранено в «' + fd.name + '»: ' + ok : 'Сохранено ' + ok + ' из ' + items.length, ok !== items.length);
       return;
     }
-    if(!window.showDirectoryPicker) { toast('Этот браузер не умеет сохранять в папку — нажми «ZIP»', true); return; }
+    if(!window.showDirectoryPicker) { say('Этот браузер не умеет сохранять в папку — нажми «ZIP»', true); return; }
     let dir; try { dir = await window.showDirectoryPicker({ mode: 'readwrite' }); } catch(e) { return; } // отменила выбор папки
     const used = new Set(); let ok = 0;
     for(let k = 0; k < items.length; k++) {
       try {
-        toast('⏳ Сохраняю ' + (k + 1) + ' из ' + items.length + '…');
+        say('⏳ Сохраняю ' + (k + 1) + ' из ' + items.length + '…');
         const blob = await getBlob(items[k].url);
         const fh = await dir.getFileHandle(uniq(baseName(items[k], blob, k), used), { create: true });
         const w = await fh.createWritable(); await w.write(blob); await w.close(); ok++;
       } catch(e) { console.log('save folder', e && e.message); }
     }
-    toast(ok === items.length ? '✓ Сохранено файлов: ' + ok : 'Сохранено ' + ok + ' из ' + items.length, ok !== items.length);
+    say(ok === items.length ? '✓ Сохранено файлов: ' + ok : 'Сохранено ' + ok + ' из ' + items.length, ok !== items.length);
   };
   window.mcSaveZip = async function(items, zipName) {
     if(!items || !items.length) return;
-    if(typeof JSZip === 'undefined') { toast('Архиватор не загрузился — попробуй позже', true); return; }
+    if(typeof JSZip === 'undefined') { say('Архиватор не загрузился — попробуй позже', true); return; }
     const z = new JSZip(), used = new Set(); let ok = 0;
     for(let k = 0; k < items.length; k++) {
-      try { toast('⏳ Собираю архив ' + (k + 1) + ' из ' + items.length + '…'); const blob = await getBlob(items[k].url); z.file(uniq(baseName(items[k], blob, k), used), blob); ok++; }
+      try { say('⏳ Собираю архив ' + (k + 1) + ' из ' + items.length + '…'); const blob = await getBlob(items[k].url); z.file(uniq(baseName(items[k], blob, k), used), blob); ok++; }
       catch(e) { console.log('zip', e && e.message); }
     }
-    if(!ok) { toast('Не удалось собрать архив', true); return; }
+    if(!ok) { say('Не удалось собрать архив', true); return; }
     const out = await z.generateAsync({ type: 'blob', compression: 'STORE' });
     const name = zipName || 'Файлы.zip';
-    if(typeof window.isNativeApp === 'function' && window.isNativeApp() && out.size > (typeof mcNativeShareFile === 'function' ? 250 : 8) * 1048576) { toast('На телефоне большие архивы пока не сохраняются (нужно обновление APK). Выбери меньше файлов или сделай это на компьютере.', true); return; }
+    if(typeof window.isNativeApp === 'function' && window.isNativeApp() && out.size > (typeof mcNativeShareFile === 'function' ? 250 : 8) * 1048576) { say('На телефоне большие архивы пока не сохраняются (нужно обновление APK). Выбери меньше файлов или сделай это на компьютере.', true); return; }
     if(typeof window.isNativeApp === 'function' && window.isNativeApp() && typeof mcNativeShareFile === 'function') { const sr = await mcNativeShareFile(out, 'mycards_files.zip', name); if(sr) return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(out); a.download = name;
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-    toast(ok === items.length ? '✓ Архив готов: ' + ok + ' файлов' : 'В архиве ' + ok + ' из ' + items.length);
+    say(ok === items.length ? '✓ Архив готов: ' + ok + ' файлов' : 'В архиве ' + ok + ' из ' + items.length);
   };
+  // повторное нажатие во время сохранения не запускает второе (раньше файлы множились)
+  ['mcSaveFolder', 'mcSaveZip'].forEach(n => {
+    const f = window[n];
+    window[n] = async function() {
+      if(saveBusy) { say('Ещё сохраняю — подожди, это займёт немного времени', false, 'p'); return; }
+      saveBusy = true;
+      try { return await f.apply(this, arguments); } finally { saveBusy = false; }
+    };
+  });
   // стили ручки «⠿»
   const st = document.createElement('style');
   st.textContent = '.mc-grip{display:none;position:absolute;left:5px;top:5px;width:24px;height:24px;border-radius:7px;background:rgba(0,0,0,.65);color:#fff;font-size:16px;line-height:24px;text-align:center;cursor:grab;z-index:6;user-select:none;-webkit-user-select:none}@media (hover:hover) and (pointer:fine){[data-reveal]:hover>.mc-grip,[data-dl]:hover>.mc-grip{display:block}}.mc-grip:active{cursor:grabbing}';
