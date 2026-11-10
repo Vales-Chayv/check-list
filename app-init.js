@@ -548,7 +548,7 @@ async function loadEntryPushHour() {
   try {
     const j = await _entryHourCall({ getEntryHour: true, userId: currentUser.id });
     if(j && Number.isInteger(j.hour)) { sel.value = String(j.hour); localStorage.setItem('mc_entry_hour', String(j.hour)); }
-    if(j && Array.isArray(j.quiet) && _quietTouched < _t0) { _quietDays = j.quiet; try { localStorage.setItem('mc_quiet_days', JSON.stringify(j.quiet)); } catch(_) {} paintQuietDays(); }
+    if(j && Array.isArray(j.quiet) && _quietTouched < _t0 && Date.now() - _quietTouched > 15000) { _quietDays = j.quiet; try { localStorage.setItem('mc_quiet_days', JSON.stringify(j.quiet)); } catch(_) {} paintQuietDays(); }
   } catch(e) {}
 }
 async function saveEntryPushHour() {
@@ -570,6 +570,9 @@ function paintQuietDays() {
 }
 async function toggleQuietDay(d) {
   if(!currentUser?.id) return;
+  const _now = Date.now();
+  if(window._qdLast && window._qdLast.d === d && _now - window._qdLast.t < 450) return; // двойное срабатывание касания
+  window._qdLast = { d, t: _now };
   const next = _quietDays.includes(d) ? _quietDays.filter(x => x !== d) : [..._quietDays, d].sort();
   if(next.length >= 7) { toast('Нельзя отметить все семь дней', true); return; }
   const prev = _quietDays;
@@ -578,6 +581,7 @@ async function toggleQuietDay(d) {
   try {
     await _entryHourCall({ setQuietDays: next, userId: currentUser.id });
     try { localStorage.setItem('mc_quiet_days', JSON.stringify(next)); } catch(_) {}
+    toast(next.includes(d) ? '🌙 ' + ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'][d] + ' — тихий день' : ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'][d] + ' — обычный день');
   } catch(e) { _quietDays = prev; paintQuietDays(); toast('Не удалось сохранить', true); }
 }
 document.addEventListener('click', function(e){
