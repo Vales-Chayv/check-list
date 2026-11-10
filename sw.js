@@ -1,5 +1,5 @@
 importScripts('sw-media.js');
-const CACHE = 'mc-v408';
+const CACHE = 'mc-v409';
 const APP_FILES = [
   '/check-list/',
   '/check-list/index.html',
@@ -12,7 +12,6 @@ const APP_FILES = [
   '/check-list/app-render.js',
   '/check-list/app-view.js',
   '/check-list/app-edit.js',
-  '/check-list/app-archive.js',
   '/check-list/app-settings.js',
   '/check-list/app-init.js',
   '/check-list/app-utils.js',
@@ -21,6 +20,7 @@ const APP_FILES = [
   '/check-list/app-calendar.js',
   '/check-list/app-search.js',
   '/check-list/app-transfer.js',
+  '/check-list/app-zip-archive.js',
   
 ];
 // Внешние библиотеки (грузятся с CDN): без них приложение не запускается без интернета
