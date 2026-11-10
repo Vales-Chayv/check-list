@@ -353,11 +353,11 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 async function subscribeToPush() {
-  if(!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
   try {
     // ждём, пока приложение узнает, кто вошёл (иначе подписка сохранится без владельца)
     for(let i = 0; i < 600 && !currentUser?.id; i++) await new Promise(r => setTimeout(r, 500));
-    if(!currentUser?.id) return;
+    if(!currentUser?.id) return false;
     const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
     if(!sub) {
@@ -366,7 +366,7 @@ async function subscribeToPush() {
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUB)
       });
     }
-     await fetch(FUNC_URL, {
+     const _r = await fetch(FUNC_URL, {
       method: 'POST',
       headers: {
         'Content-Type':'application/json',
@@ -380,7 +380,8 @@ async function subscribeToPush() {
         timezone: (Intl.DateTimeFormat().resolvedOptions().timeZone || null)
       })
     });
-  } catch(e) { console.log('Push subscribe error:', e.message); }
+    return !!(_r && _r.ok);
+  } catch(e) { console.log('Push subscribe error:', e.message); return false; }
 }
 
 // запустить таймер при старте, если разрешение уже выдано
@@ -541,9 +542,12 @@ async function loadEntryPushHour() {
   if(!sel || !currentUser?.id) return;
   const cached = localStorage.getItem('mc_entry_hour');
   sel.value = cached !== null ? cached : '9';
+  try { _quietDays = JSON.parse(localStorage.getItem('mc_quiet_days') || '[]') || []; } catch(_) { _quietDays = []; }
+  paintQuietDays();
   try {
     const j = await _entryHourCall({ getEntryHour: true, userId: currentUser.id });
     if(j && Number.isInteger(j.hour)) { sel.value = String(j.hour); localStorage.setItem('mc_entry_hour', String(j.hour)); }
+    if(j && Array.isArray(j.quiet)) { _quietDays = j.quiet; try { localStorage.setItem('mc_quiet_days', JSON.stringify(j.quiet)); } catch(_) {} paintQuietDays(); }
   } catch(e) {}
 }
 async function saveEntryPushHour() {
@@ -554,6 +558,24 @@ async function saveEntryPushHour() {
     localStorage.setItem('mc_entry_hour', sel.value);
     toast(sel.value === '-1' ? '✓ Напоминания о сроках записей выключены' : '✓ Напомню о сроках записей в ' + String(sel.value).padStart(2,'0') + ':00');
   } catch(e) { toast('Не удалось сохранить', true); }
+}
+// ── Тихие дни: в отмеченные дни недели напоминания не приходят, а копятся и приходят одной сводкой утром первого рабочего дня. Чаты не затрагиваются ──
+let _quietDays = [];
+function paintQuietDays() {
+  document.querySelectorAll('#quiet-days [data-d]').forEach(b => b.classList.toggle('on', _quietDays.includes(+b.dataset.d)));
+  const t = document.getElementById('quiet-txt');
+  if(t) t.textContent = _quietDays.length ? 'Напоминания в эти дни не приходят: утром первого рабочего дня придёт одна сводка. Сообщения чатов приходят как обычно.' : 'Сейчас напоминания приходят каждый день. Отметьте дни, когда вас не беспокоить.';
+}
+async function toggleQuietDay(d) {
+  if(!currentUser?.id) return;
+  const next = _quietDays.includes(d) ? _quietDays.filter(x => x !== d) : [..._quietDays, d].sort();
+  if(next.length >= 7) { toast('Нельзя отметить все семь дней', true); return; }
+  const prev = _quietDays;
+  _quietDays = next; paintQuietDays();
+  try {
+    await _entryHourCall({ setQuietDays: next, userId: currentUser.id });
+    try { localStorage.setItem('mc_quiet_days', JSON.stringify(next)); } catch(_) {}
+  } catch(e) { _quietDays = prev; paintQuietDays(); toast('Не удалось сохранить', true); }
 }
 document.addEventListener('click', function(e){
   if(e.target.closest && e.target.closest('[onclick^="openSettings"]')) setTimeout(loadEntryPushHour, 80);

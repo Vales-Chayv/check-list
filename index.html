@@ -355,6 +355,14 @@
         <span style="font-size:11px;color:var(--t3);line-height:1.5">В день срока записи придёт push в это время. По умолчанию 09:00</span>
       </div>
           <div class="fld" style="border-top:1px solid var(--b1);padding-top:13px">
+        <label>🌙 Тихие дни (без напоминаний)</label>
+        <div id="quiet-days" style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 8px">
+          <style>#quiet-days button{width:42px;height:42px;border-radius:11px;border:1.5px solid var(--b1);background:var(--s2);color:var(--t1);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}#quiet-days button.on{background:var(--accent);border-color:var(--accent);color:#0f0f0f}</style>
+          <button data-d="0" onclick="toggleQuietDay(0)">Пн</button><button data-d="1" onclick="toggleQuietDay(1)">Вт</button><button data-d="2" onclick="toggleQuietDay(2)">Ср</button><button data-d="3" onclick="toggleQuietDay(3)">Чт</button><button data-d="4" onclick="toggleQuietDay(4)">Пт</button><button data-d="5" onclick="toggleQuietDay(5)">Сб</button><button data-d="6" onclick="toggleQuietDay(6)">Вс</button>
+        </div>
+        <span id="quiet-txt" style="font-size:11px;color:var(--t3);line-height:1.5"></span>
+      </div>
+          <div class="fld" style="border-top:1px solid var(--b1);padding-top:13px">
         <label>Телефон</label>
         <input id="set-phone" type="tel" placeholder="+972...">
         <button onclick="savePhone()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t1);border-radius:var(--rsm);padding:10px;font-size:14px;cursor:pointer;font-family:inherit">Сохранить телефон</button>
