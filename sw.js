@@ -1,5 +1,5 @@
 importScripts('sw-media.js');
-const CACHE = 'mc-v405';
+const CACHE = 'mc-v406';
 const APP_FILES = [
   '/check-list/',
   '/check-list/index.html',
@@ -20,7 +20,8 @@ const APP_FILES = [
   '/check-list/app-chat.js',
   '/check-list/app-calendar.js',
   '/check-list/app-search.js',
-  '/check-list/app-native.js',
+  '/check-list/app-transfer.js',
+  
 ];
 // Внешние библиотеки (грузятся с CDN): без них приложение не запускается без интернета
 const CDN_FILES = [
