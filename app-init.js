@@ -544,10 +544,11 @@ async function loadEntryPushHour() {
   sel.value = cached !== null ? cached : '9';
   try { _quietDays = JSON.parse(localStorage.getItem('mc_quiet_days') || '[]') || []; } catch(_) { _quietDays = []; }
   paintQuietDays();
+  const _t0 = Date.now();
   try {
     const j = await _entryHourCall({ getEntryHour: true, userId: currentUser.id });
     if(j && Number.isInteger(j.hour)) { sel.value = String(j.hour); localStorage.setItem('mc_entry_hour', String(j.hour)); }
-    if(j && Array.isArray(j.quiet)) { _quietDays = j.quiet; try { localStorage.setItem('mc_quiet_days', JSON.stringify(j.quiet)); } catch(_) {} paintQuietDays(); }
+    if(j && Array.isArray(j.quiet) && _quietTouched < _t0) { _quietDays = j.quiet; try { localStorage.setItem('mc_quiet_days', JSON.stringify(j.quiet)); } catch(_) {} paintQuietDays(); }
   } catch(e) {}
 }
 async function saveEntryPushHour() {
@@ -561,6 +562,7 @@ async function saveEntryPushHour() {
 }
 // ── Тихие дни: в отмеченные дни недели напоминания не приходят, а копятся и приходят одной сводкой утром первого рабочего дня. Чаты не затрагиваются ──
 let _quietDays = [];
+let _quietTouched = 0; // когда дни меняли руками: более старый ответ сервера их не затирает
 function paintQuietDays() {
   document.querySelectorAll('#quiet-days [data-d]').forEach(b => b.classList.toggle('on', _quietDays.includes(+b.dataset.d)));
   const t = document.getElementById('quiet-txt');
@@ -571,6 +573,7 @@ async function toggleQuietDay(d) {
   const next = _quietDays.includes(d) ? _quietDays.filter(x => x !== d) : [..._quietDays, d].sort();
   if(next.length >= 7) { toast('Нельзя отметить все семь дней', true); return; }
   const prev = _quietDays;
+  _quietTouched = Date.now();
   _quietDays = next; paintQuietDays();
   try {
     await _entryHourCall({ setQuietDays: next, userId: currentUser.id });
