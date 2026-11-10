@@ -562,6 +562,18 @@ async function saveCard() {
     }
   }
 
+  // личный кабинет: голос, записанный в окне карточки (🎙), сохраняем отдельной записью с галочкой, а не просто файлом
+  let _atts = tempAtt;
+  if(!isFamily && currentSpace?.type!=='group') {
+    const _oldIds = new Set((oldCard?.attachments||[]).map(x=>x.id));
+    const _voice = tempAtt.filter(x => x.type?.startsWith('audio/') && !_oldIds.has(x.id));
+    if(_voice.length) {
+      _atts = tempAtt.filter(x => !_voice.includes(x));
+      const _me = localStorage.getItem('mc_current_member')||currentUser?.display_name||'';
+      sessionEntries = [..._voice.map(x => ({id:uid(), text:'', date:nowStr(), done:false, attachments:[], sessionId:uid(), sessionCreator:_me, sessionNote:null, sessionAtts:[x], assigned_to:null, completions:null, deadline:null})), ...sessionEntries];
+    }
+  }
+
   const data={
     title, body: isFamily&&!editId ? '' : bodyVal, category:catVal,
     status:finalStatus, priority:document.getElementById('e-priority').value||'normal',
@@ -569,7 +581,7 @@ async function saveCard() {
     ball:isFamily?'':ballVal,
     ballWho:(!isFamily&&ballVal==='theirs')?(document.getElementById('e-ball-who')?.value||'').trim():'',
     assigned_to:assignedTo,
-    attachments: isFamily&&!editId ? [] : tempAtt,
+    attachments: isFamily&&!editId ? [] : _atts,
    entries:sessionEntries,
     entryGroups: groupedMode ? tempEntryGroups.filter(g=>g.name||!g._naming).map(({_naming,_expanded,...g})=>g) : [],
     reminder:{enabled:remOn,freq:freqVal,days:customDays,hour:remHour,monthDay:remMonthDay,intervalMin:oldCard?.reminder?.intervalMin||null,intervalRun:oldCard?.reminder?.intervalRun||null},
