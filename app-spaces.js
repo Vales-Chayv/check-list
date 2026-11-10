@@ -183,9 +183,32 @@ spaces = Array.isArray(saved) ? saved : [];
   const openCardId = new URLSearchParams(window.location.search).get('openCard');
   const openEntryId = new URLSearchParams(window.location.search).get('openEntry');
   if(new URLSearchParams(window.location.search).get('showEv')) {
+    const _evId = new URLSearchParams(window.location.search).get('evId'), _evDate = new URLSearchParams(window.location.search).get('evDate');
     history.replaceState({}, '', window.location.pathname);
+    // из push про конкретное событие: сначала экран этого события; общее окно «Напоминания» его не перекрывает
+    if(_evId && typeof mcPushEventSheet === 'function') {
+      window._evPopLast = Date.now();
+      showSpaceSelector();
+      setTimeout(()=>mcPushEventSheet(_evId, _evDate), 500);
+      return;
+    }
     showSpaceSelector();
     setTimeout(()=>{ if(typeof evPopupCheck === 'function') evPopupCheck(true); }, 500);
+    return;
+  }
+  if(new URLSearchParams(window.location.search).get('showDay') && typeof mcPushDaySheet === 'function') {
+    history.replaceState({}, '', window.location.pathname);
+    window._evPopLast = Date.now();
+    showSpaceSelector();
+    setTimeout(()=>mcPushDaySheet(), 500);
+    return;
+  }
+  if(openEntryId && openCardId && typeof mcPushEntrySheet === 'function') {
+    // из push про срок записи: экран записи (выполнить / перенести / открыть карточку)
+    history.replaceState({}, '', window.location.pathname);
+    window._evPopLast = Date.now();
+    showSpaceSelector();
+    setTimeout(()=>mcPushEntrySheet(openSpaceId, openCardId, openEntryId), 500);
     return;
   }
   if(new URLSearchParams(window.location.search).get('showDue')) {
