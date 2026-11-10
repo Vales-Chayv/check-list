@@ -136,6 +136,11 @@ function openView(id) {
     // запись без текста, но с вложением (например, только голос): показываем её строкой с галочкой, иначе карточку нельзя завершить
     const _vOk = e => !e.text && ((e.sessionAtts&&e.sessionAtts.length)||(e.attachments&&e.attachments.length));
     const dc = entries.filter(e=>e.done && (e.text||_vOk(e))).length;
+    // та же строка «🎙 Голосовая запись» с галочкой — для записей внутри разделов
+    const _voiceRowG = e => {
+        const _isAud = [...(e.sessionAtts||[]), ...(e.attachments||[])].some(x => x.type?.startsWith('audio/'));
+        return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(128,128,128,.15)"><div style="width:16px;height:16px;border-radius:3px;border:2px solid var(--t2);flex-shrink:0;background:${e.done?'var(--green)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="viewToggleEntry('${id}','${e.id}')">${e.done?'<svg width="10" height="8" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>':''}</div><div style="flex:1;font-size:13px;${e.done?'text-decoration:line-through;opacity:.5':''}">${_isAud?'🎙 Голосовая запись':'📎 Вложение'}</div><div style="font-size:10px;color:var(--t3)">${e.date||''}</div></div>`;
+    };
     const sessionMap = new Map();
     entries.forEach(e => {
       const sid = e.sessionId || e.id;
@@ -357,7 +362,7 @@ const dateCol = textColor ? (_lt ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)') 
     let sessionsHTML;
     if(!isFamily && entryGroups.length) {
       sessionsHTML = entryGroups.map(g => {
-        const gEntries = entries.filter(e => e.groupId === g.id && e.text);
+        const gEntries = entries.filter(e => e.groupId === g.id && (e.text || _vOk(e)));
         const expanded = viewGroupState.get(g.id) !== false;
         const gDone = gEntries.length > 0 && gEntries.every(e => e.done);
         return `<div style="border:1px solid ${gDone?'rgba(91,184,122,.55)':'var(--b1)'};border-radius:var(--rsm);margin-bottom:8px;overflow:hidden">
@@ -365,7 +370,7 @@ const dateCol = textColor ? (_lt ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)') 
             <span style="font-size:13px;font-weight:700;color:${gDone?'var(--green)':'var(--accent)'}">${gDone?'✓ ':''}${esc(g.name)||'Без названия'}</span>
             <span style="display:flex;align-items:center;gap:8px"><button onclick="event.stopPropagation();renameViewGroup('${id}','${g.id}')" title="Переименовать" style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;padding:2px 4px">✎</button><button onclick="event.stopPropagation();deleteViewGroup('${id}','${g.id}')" title="Удалить рубрику" style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;padding:2px 4px">🗑</button><button onclick="event.stopPropagation();openAddEntry('${id}',null,false,'${g.id}')" style="background:rgba(232,197,106,.15);color:var(--accent);border:1px solid rgba(232,197,106,.3);border-radius:6px;padding:2px 10px;font-size:15px;line-height:1.3;cursor:pointer">＋</button><span style="font-size:11px;color:var(--t3)">${gEntries.length} ${expanded?'▲':'▼'}</span></span>
           </div>
-          ${expanded ? `<div style="padding:0 12px">${gEntries.map(e=>entryRowHTML(e,null)).join('')}</div>` : ''}
+          ${expanded ? `<div style="padding:0 12px">${gEntries.map(e=>e.text ? entryRowHTML(e,null) : _voiceRowG(e)).join('')}</div>` : ''}
         </div>`;
       }).join('');
     } else {

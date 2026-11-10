@@ -38,7 +38,9 @@ const deckBtn = document.getElementById('deck-btn');
 document.getElementById('e-body').closest('.fld').style.display = isFamily ? 'flex' : 'none';
   document.getElementById('e-body').value=card?.body||'';
   document.getElementById('e-priority').value=card?.priority||'normal';
-  populateCatSel(card?.category);
+  // новая карточка: рубрика по умолчанию — та, в которой мы сейчас (выбранный фильтр)
+  const _defCat = card ? null : (filterCats.length===1 ? filterCats[0] : (filterCat!=='all' ? filterCat : null));
+  populateCatSel(card?.category || ((_defCat && cats.some(c=>c.name===_defCat)) ? _defCat : undefined));
 
   // Family vs personal fields
   document.getElementById('status-fld').style.display   = isFamily ? 'none' : '';
@@ -590,6 +592,7 @@ async function saveCard() {
     document.getElementById('edit-ov').classList.remove('on');
     render();
     toast('✓ Карточка создана');
+    if(!isFamily && currentSpace?.type!=='group') setTimeout(()=>{ try{ openView(card.id); }catch(_){} }, 50); // открываем созданную карточку
 	// Push уведомления при первой карточке
 if(!localStorage.getItem('mc_push_asked')) {
   localStorage.setItem('mc_push_asked', '1');
