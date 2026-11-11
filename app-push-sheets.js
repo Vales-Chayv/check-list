@@ -115,6 +115,20 @@
   }
   const spaceName = id => { try { return (spaces.find(s => s.id === id) || {}).name || ''; } catch (_) { return ''; } };
 
+  // ── «Напомнить позже»: сервер пришлёт push в нужный момент (работает и при закрытом приложении) ──
+  const hm = d => pad(d.getHours()) + ':' + pad(d.getMinutes());
+  async function remindAt(kind, ref, when) {
+    try {
+      const r = await fetch(FUNC_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SB_ANON, Authorization: 'Bearer ' + SB_ANON }, body: JSON.stringify({ snooze: Object.assign({ kind, fireAt: when.toISOString() }, ref), userId: currentUser && currentUser.id }) });
+      if (!r.ok) throw new Error(r.status);
+      const same = ymd(when) === ymd(new Date());
+      let t = '⏰ Напомню ' + (same ? 'сегодня' : dShort(ymd(when))) + ' в ' + hm(when);
+      if (quietDays().includes(dow(when))) t += '. Это тихий день: напоминание придёт утром первого рабочего дня.';
+      res(t); const m = document.getElementById('ps-menu'); if (m) m.innerHTML = '';
+      return true;
+    } catch (_) { res('Не удалось поставить напоминание. Проверьте интернет и попробуйте ещё раз.'); return false; }
+  }
+
   // ═════════ 1. СРОК ЗАПИСИ ═════════
   let S = null; // текущая запись: {c, e}
   async function mcPushEntrySheet(spaceId, cardId, entryId) {
@@ -143,7 +157,7 @@
           ${(typeof spaces !== 'undefined' && spaces.length > 1 && spaceName(c.space_id)) ? `<span class="ps-chip">🗂 ${E(spaceName(c.space_id))}</span>` : ''}
         </div>
         ${st.n ? `<div style="font-size:12px;color:var(--t2)">В карточке выполнено <b id="ps-pc">${st.done}</b> из ${st.n}</div><div class="ps-bar"><i id="ps-pb" style="width:${Math.round(st.done / st.n * 100)}%"></i></div>` : ''}
-        <div class="ps-btns"><button class="ps-btn p" id="ps-done" onclick="mcPsEntryDone()">✓ Выполнено</button><button class="ps-btn" onclick="mcPsSnoozeMenu()">⏰ Перенести ▾</button></div>
+        <div class="ps-btns"><button class="ps-btn p" id="ps-done" onclick="mcPsEntryDone()">✓ Выполнено</button><button class="ps-btn" onclick="mcPsSnoozeMenu()">⏰ Отложить ▾</button></div>
         <div id="ps-menu"></div><div class="ps-res" id="ps-res"></div>
         <div class="ps-btns"><button class="ps-btn" onclick="mcPsOpenCard()">Открыть карточку →</button></div>`;
     }
@@ -165,15 +179,26 @@
   function mcPsSnoozeMenu() {
     const m = document.getElementById('ps-menu'); if (!m) return;
     if (m.innerHTML) { m.innerHTML = ''; return; }
-    const t = parse(todayS()), q = quietDays();
+    const now = new Date(), t = parse(todayS()), q = quietDays();
+    const eve = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 19, 0);
+    const mh = parseInt(localStorage.getItem('mc_entry_hour'), 10), mornH = Number.isInteger(mh) && mh >= 0 ? mh : 9;
+    const morn = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, mornH, 0);
+    const later = [{ t: 'Через 1 час', d: new Date(now.getTime() + 3600000) }];
+    if (eve - now > 30 * 60000) later.push({ t: 'Сегодня вечером', d: eve });
+    later.push({ t: 'Завтра утром', d: morn });
     const add = n => { const d = new Date(t); d.setDate(d.getDate() + n); return d; };
     const opts = [{ t: 'Завтра', d: add(1) }, { t: 'Через 3 дня', d: add(3) }];
     let w = add(1); for (let i = 0; i < 7 && q.includes(dow(w)); i++) w = new Date(w.getFullYear(), w.getMonth(), w.getDate() + 1);
     if (ymd(w) !== ymd(add(1))) opts.splice(1, 0, { t: 'В ' + DAY[dow(w)].toLowerCase() + ' <small>· первый рабочий день</small>', d: w });
-    m.innerHTML = '<div class="ps-menu">' + opts.map(o => `<button onclick="mcPsSnooze('${ymd(o.d)}')">${o.t} <small>· ${dShort(ymd(o.d))}</small></button>`).join('') +
+    const hdr = x => `<div style="padding:8px 12px 4px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--t3)">${x}</div>`;
+    m.innerHTML = '<div class="ps-menu">' + hdr('Напомнить позже · срок не меняется') +
+      later.map(o => `<button onclick="mcPsRemindAt(${o.d.getTime()})">${o.t} <small>· ${dShort(ymd(o.d)) === dShort(todayS()) ? 'в' : dShort(ymd(o.d)) + ' в'} ${hm(o.d)}</small></button>`).join('') +
+      hdr('Перенести срок на дату') +
+      opts.map(o => `<button onclick="mcPsSnooze('${ymd(o.d)}')">${o.t} <small>· ${dShort(ymd(o.d))}</small></button>`).join('') +
       `<button onclick="document.getElementById('ps-date').showPicker?document.getElementById('ps-date').showPicker():document.getElementById('ps-date').focus()">Другая дата…</button></div>
       <input type="date" id="ps-date" min="${todayS()}" onchange="if(this.value)mcPsSnooze(this.value)" style="opacity:0;height:0;width:0;position:absolute">`;
   }
+  function mcPsRemindAt(ts) { if (S && S.e) remindAt('entry', { cardId: S.c.id, entryId: S.e.id }, new Date(ts)); }
   async function mcPsSnooze(date) {
     if (!S || !S.e) return;
     const old = S.e.deadline;
@@ -230,7 +255,9 @@
       </div>
       ${plain(ev.note) ? `<div style="font-size:14px;color:var(--t1);line-height:1.5;margin-bottom:10px" dir="auto">📝 ${E(plain(ev.note))}</div>` : ''}
       ${later.length ? `<div style="font-size:12px;color:var(--t3);margin-bottom:6px">Дальше сегодня: ${later.map(x => E(evTime(x) + ' ' + (x.title || ''))).join(' · ')}</div>` : ''}
-      <div class="ps-btns"><button class="ps-btn p" onclick="mcPsEvSeen()">Понял</button><button class="ps-btn" onclick="mcPsEvCal()">📅 В календарь</button></div>`;
+      <div class="ps-btns"><button class="ps-btn p" onclick="mcPsEvSeen()">Понял</button><button class="ps-btn" onclick="mcPsEvMenu()">⏰ Отложить ▾</button></div>
+      <div id="ps-menu"></div><div class="ps-res" id="ps-res"></div>
+      <div class="ps-btns"><button class="ps-btn" onclick="mcPsEvCal()">📅 В календарь</button></div>`;
     open(h);
     const tick = () => {
       const el = document.getElementById('ps-cd'); if (!el) { clearInterval(_timer); _timer = null; return; }
@@ -240,6 +267,17 @@
       el.textContent = m > 60 ? 'через ' + Math.floor(m / 60) + ' ч ' + (m % 60 ? (m % 60) + ' мин' : '') : m > 0 ? 'через ' + m + ' мин' : m === 0 ? 'сейчас' : m > -60 ? 'началось ' + (-m) + ' мин назад' : 'уже прошло';
     };
     tick(); _timer = setInterval(tick, 20000);
+  }
+  function mcPsEvMenu() {
+    const m = document.getElementById('ps-menu'); if (!m) return;
+    if (m.innerHTML) { m.innerHTML = ''; return; }
+    const now = Date.now();
+    m.innerHTML = '<div class="ps-menu">' + [[10, '+10 минут'], [30, '+30 минут'], [60, '+1 час']].map(o => { const d = new Date(now + o[0] * 60000); return `<button onclick="mcPsEvRemind(${o[0]})">${o[1]} <small>· в ${hm(d)}</small></button>`; }).join('') + '</div>';
+  }
+  async function mcPsEvRemind(min) {
+    if (!EV) return;
+    const ok = await remindAt('event', { evId: EV.ev.id, evDate: EV.ds }, new Date(Date.now() + min * 60000));
+    if (ok) evSeen(EV.ev, EV.ds); // общее окно «Напоминания» это событие больше не показывает
   }
   function mcPsEvSeen() { if (EV) evSeen(EV.ev, EV.ds); mcPsClose(); }
   function mcPsEvCal() { if (EV) evSeen(EV.ev, EV.ds); mcPsClose(); try { (typeof openCalendarFromLobby === 'function' ? openCalendarFromLobby : openCalendar)(); } catch (_) {} }
@@ -304,5 +342,5 @@
   function mcPsDayOpen(i) { const r = ROWS[i]; if (r && r.c) openCardFrom(r.c.space_id, r.c.id, r.e && r.e.id); }
   function mcPsDayEv(i) { const r = ROWS[i]; if (r && r.ev) mcPushEventSheet(r.ev.id, todayS()); }
 
-  Object.assign(window, { mcPushEntrySheet, mcPushEventSheet, mcPushDaySheet, mcPsClose, mcPsEntryDone, mcPsSnoozeMenu, mcPsSnooze, mcPsOpenCard, mcPsEvSeen, mcPsEvCal, mcPsDayDone, mcPsDayOpen, mcPsDayEv });
+  Object.assign(window, { mcPsRemindAt, mcPsEvMenu, mcPsEvRemind, mcPushEntrySheet, mcPushEventSheet, mcPushDaySheet, mcPsClose, mcPsEntryDone, mcPsSnoozeMenu, mcPsSnooze, mcPsOpenCard, mcPsEvSeen, mcPsEvCal, mcPsDayDone, mcPsDayOpen, mcPsDayEv });
 })();
