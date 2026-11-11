@@ -42,7 +42,8 @@ const LK_ICONS = ['🏢','💡','📁','🏠','🧩','📌','🛠','🎓'];
 
 // ── помощники ──
 function lkPersonalIds(){ return (typeof spaces!=='undefined'&&spaces||[]).filter(s=>s.type!=='family'&&s.type!=='group'&&s.status!=='closed').map(s=>s.id); }
-function lkIsPersonal(card){ return !!card && !Array.isArray(card.chatParticipants) && lkPersonalIds().includes(card.space_id); }
+function lkIsChat(card){ return Array.isArray(card&&card.chatParticipants) && card.chatParticipants.length>0; } // пустой [] — обычная карточка
+function lkIsPersonal(card){ return !!card && !lkIsChat(card) && lkPersonalIds().includes(card.space_id); }
 function lkSpName(id){ return ((typeof spaces!=='undefined'&&spaces||[]).find(s=>s.id===id)?.name) || 'Кабинет'; }
 function lkCabCol(id){ const l=(typeof spaces!=='undefined'&&spaces)||[]; const i=l.findIndex(s=>s.id===id); return (i>=0&&l[i].color) || LK_PAL[(i<0?0:i)%LK_PAL.length]; }
 function lkCatCol(c){ return (window._clCatColors && window._clCatColors[c.space_id+'||'+(c.category||'')]) || 'var(--t1)'; }
@@ -406,17 +407,18 @@ async function lkOpenCard(id){
 
 // ═══════════ Добавить карточки в тему (из окна темы) ═══════════
 async function lkSearchCards(q, exclude){
-  const pids=lkPersonalIds(); if(!pids.length) return [];
+  const pids=lkPersonalIds(); LK.searchErr=''; if(!pids.length){ LK.searchErr='не найдено ни одного личного кабинета'; return []; }
   let res=[];
   try {
     if(!navigator.onLine) throw 0;
     let qq=sb.from('cards').select('id,title,status,space_id,category,deadline,chatParticipants').in('space_id',pids).order('created_at',{ascending:false}).limit(25);
     if(q) qq=qq.ilike('title','%'+q.replace(/[%_]/g,'')+'%');
-    const {data,error}=await qq; if(error) throw error; res=data||[];
-  } catch(_){
+    const {data,error}=await qq; if(error) throw error; res=data||[]; LK.searchErr='';
+  } catch(_e){
+    LK.searchErr=(_e&&(_e.message||_e.code))?String(_e.message||_e.code):(navigator.onLine?'':'нет сети');
     try { const ql=q.toLowerCase(); res=(await local.getAll('cards')).filter(c=>pids.includes(c.space_id)&&(!q||String(c.title||'').toLowerCase().includes(ql))).slice(0,25); } catch(__){ res=[]; }
   }
-  return res.filter(c=>!Array.isArray(c.chatParticipants) && !(exclude||[]).includes(c.id)).slice(0,15);
+  return res.filter(c=>!lkIsChat(c) && !(exclude||[]).includes(c.id)).slice(0,15);
 }
 function lkSheet(html){ // нижнее окно поверх всего (закрывается кнопкой «назад», z-index:2000)
   const d=document.createElement('div');
@@ -447,7 +449,7 @@ function lkAddCards(topicId){
     const box=d.querySelector('#lka-res'); if(!box) return;
     box.innerHTML=list.length?list.map(c=>`<div class="lk-row" data-id="${c.id}"><span class="lk-dot" style="background:${lkCabCol(c.space_id)}"></span>
       <div style="flex:1;min-width:0"><div dir="auto" style="font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${lkE(c.title||'Без названия')}</div><div style="font-size:11px;color:var(--t3)">${lkE(lkSpName(c.space_id))}${c.category?' › '+lkE(c.category):''}</div></div>
-      <span style="color:var(--accent);font-size:20px">＋</span></div>`).join(''):'<div style="font-size:13px;color:var(--t3);padding:8px 2px">Ничего не найдено</div>';
+      <span style="color:var(--accent);font-size:20px">＋</span></div>`).join(''):lkNothing();
     box.querySelectorAll('[data-id]').forEach(row=>row.onclick=async()=>{
       const c=list.find(x=>x.id===row.dataset.id); if(!c) return;
       if(await lkAddItem(target, c)){ row.remove(); lkToast('✓ Добавлено'); lkRender(); }
@@ -458,6 +460,10 @@ function lkAddCards(topicId){
   run();
 }
 
+function lkNothing(){ // пустой результат поиска: где искали и почему могло не найтись
+  const names=lkPersonalIds().map(lkSpName);
+  return `<div style="font-size:13px;color:var(--t3);padding:8px 2px;line-height:1.5">Ничего не найдено.<br><span style="font-size:11px">Искала в кабинетах: ${names.length?names.map(lkE).join(', '):'—'}${LK.searchErr?'<br><span style="color:var(--red)">Ошибка: '+lkE(LK.searchErr)+'</span>':''}</span></div>`;
+}
 // ═══════════ Блок «Связи» в карточке (вызывается из openView) ═══════════
 function mcLkViewBlock(card){
   if(!lkIsPersonal(card)) return '';
@@ -556,7 +562,7 @@ function mcLkPicker(cid){
         const box=body.querySelector('#lkp-res'); if(!box) return;
         box.innerHTML=P.list.length?P.list.map(c=>`<div class="lk-row" data-id="${c.id}" style="${P.pick===c.id?'border-color:var(--accent);background:rgba(232,197,106,.1)':''}"><span class="lk-dot" style="background:${lkCabCol(c.space_id)}"></span>
           <div style="flex:1;min-width:0"><div dir="auto" style="font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${lkE(c.title||'Без названия')}</div><div style="font-size:11px;color:var(--t3)">${lkE(lkSpName(c.space_id))}${c.category?' › '+lkE(c.category):''}</div></div>
-          ${P.pick===c.id?'<span style="color:var(--accent)">✓</span>':''}</div>`).join(''):'<div style="font-size:13px;color:var(--t3);padding:8px 2px">Ничего не найдено</div>';
+          ${P.pick===c.id?'<span style="color:var(--accent)">✓</span>':''}</div>`).join(''):lkNothing();
         box.querySelectorAll('[data-id]').forEach(r=>r.onclick=()=>{ P.pick=r.dataset.id; run(); });
       };
       body.querySelector('#lkp-q').oninput=()=>{ clearTimeout(timer); timer=setTimeout(run,250); };
