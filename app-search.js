@@ -151,6 +151,7 @@ async function srchRun() {
       (await local.getAll('cards')).forEach(c => { if(ids.includes(c.space_id) && !have.has(c.id) && (c.entries || []).some(e => e && e.flag)) cardsRaw.push(c); });
     } catch(_) {}
   }
+  const _lk = (!_srch.flagOnly && _srch.scope !== 'groups' && typeof mcLkSearchHTML === 'function') ? await mcLkSearchHTML(q) : { html: '', n: 0 }; // «🔗 Связи» (app-links.js)
   if(my !== _srch.seq) return; // пришёл более новый запрос
   const rows = [];
   cardsRaw.forEach(c => {
@@ -161,7 +162,7 @@ async function srchRun() {
   });
   rows.sort((a, b) => (b.titleHit - a.titleHit) || String(b.c.created_at || '').localeCompare(String(a.c.created_at || '')));
   const spName = id => { const s = spaces.find(x => x.id === id); return s ? (s.type === 'personal' ? 'Личное' : s.name) : ''; };
-  const total = rows.length + evsRaw.length;
+  const total = rows.length + evsRaw.length + _lk.n;
   info.textContent = total ? 'Найдено: ' + total : '';
   if(!total) { res.innerHTML = '<div style="text-align:center;padding:40px 10px;color:var(--t3);font-size:13px">Ничего не найдено' + (_srch.flagOnly ? `<br><span style="font-size:11px">карточек для проверки: ${cardsRaw.length} (с сервера ${_srvCount}), кабинетов: ${ids.length}</span>` : '') + '</div>'; return; }
   window._srchRows = rows; window._srchEvs = evsRaw;
@@ -174,7 +175,7 @@ async function srchRun() {
   const evHtml = evsRaw.length ? `<div style="font-size:12px;color:var(--accent);font-weight:700;margin:12px 0 2px">События</div>` + evsRaw.map((ev, i) => `<div onclick="srchOpenEvent(${i})" style="padding:10px 4px;border-top:1px solid var(--b1);cursor:pointer">
       <div style="font-size:14px;font-weight:600;word-break:break-word" dir="auto">${srchSnip(ev.title || '', q)}</div>
       <div style="font-size:11px;color:var(--t3)">${esc(ev.event_date || '')}${ev.event_time ? ' · ' + esc(String(ev.event_time).slice(0, 5)) : ''} · ${esc(spName(ev.space_id))}</div></div>`).join('') : '';
-  res.innerHTML = cardHtml + evHtml;
+  res.innerHTML = _lk.html + cardHtml + evHtml;
 }
 
 // ── открыть найденное ──

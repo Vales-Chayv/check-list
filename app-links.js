@@ -538,6 +538,38 @@ function lkNothing(){ // пустой результат поиска: где и
   const names=lkPersonalIds().map(lkSpName);
   return `<div style="font-size:13px;color:var(--t3);padding:8px 2px;line-height:1.5">Ничего не найдено.<br><span style="font-size:11px">Искала в кабинетах: ${names.length?names.map(lkE).join(', '):'—'}${LK.searchErr?'<br><span style="color:var(--red)">Ошибка: '+lkE(LK.searchErr)+'</span>':''}</span></div>`;
 }
+// ═══════════ Поиск 🔍: темы и подтемы «Связей» (вызывается из srchRun в app-search.js) ═══════════
+async function mcLkSearchHTML(q){
+  try {
+    q=String(q||'').trim(); if(q.length<2) return {html:'',n:0};
+    await lkLoad(false); if(LK.err) return {html:'',n:0};
+    const ql=q.toLowerCase(), has=t=>String(t||'').toLowerCase().includes(ql);
+    const hits=new Map(); // корневая тема → что совпало
+    LK.topics.forEach(t=>{
+      const sec=LK.sections.find(s=>s.id===t.section_id), root=lkRootOf(t); if(!root) return;
+      if(has(t.name)) { const h=hits.get(root.id)||{root,subs:[]}; if(t.parent_id) h.subs.push(t.name); else h.self=true; hits.set(root.id,h); }
+      else if(!t.parent_id && sec && has(sec.name) && !hits.has(t.id)) hits.set(t.id,{root:t,subs:[],bySec:true});
+    });
+    if(!hits.size) return {html:'',n:0};
+    const mark=t=>{ t=String(t||''); const i=t.toLowerCase().indexOf(ql); return i<0?lkE(t):lkE(t.slice(0,i))+'<mark>'+lkE(t.slice(i,i+q.length))+'</mark>'+lkE(t.slice(i+q.length)); };
+    const list=[...hits.values()];
+    const html=`<div style="font-size:12px;color:var(--accent);font-weight:700;margin:4px 0 2px">🔗 Связи</div>`+list.map(h=>{
+      const sec=LK.sections.find(s=>s.id===h.root.section_id), st=lkStats(h.root.id), due=lkDueHTML(h.root.id,true);
+      return `<div onclick="mcLkOpenTopicFromSearch('${h.root.id}')" style="padding:10px 4px;border-top:1px solid var(--b1);cursor:pointer">
+        <div style="font-size:14px;font-weight:600" dir="auto">${lkE(sec?.icon||'🔗')} ${mark(h.root.name)}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:1px">${sec?mark(sec.name)+' · ':''}карточек: ${st.total}, готово ${st.done}${due?' · '+due:''}</div>
+        ${h.subs.length?`<div style="font-size:13px;color:var(--t2)" dir="auto"><span style="font-size:10px;color:var(--t3)">подтема</span> ${h.subs.map(mark).join(', ')}</div>`:''}
+      </div>`;
+    }).join('');
+    return {html, n:list.length};
+  } catch(e){ return {html:'',n:0}; }
+}
+function mcLkOpenTopicFromSearch(id){
+  if(typeof closeSearch==='function') closeSearch();
+  LK.view='topic'; LK.topicId=id; LK.cab.clear(); LK.mode='list';
+  mcLkOpen();
+}
+
 // ═══════════ Блок «Связи» в карточке (вызывается из openView) ═══════════
 function mcLkViewBlock(card){
   if(!lkIsPersonal(card)) return '';
