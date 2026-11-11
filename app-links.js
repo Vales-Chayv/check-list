@@ -65,6 +65,41 @@ function lkStats(topicId){
   return { total: ids.length, done: ids.filter(c=>c.status==='done').length };
 }
 
+// сроки темы: ближайший срок у невыполненных и число просроченных
+function lkToday(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function lkDue(topicId, withSubs){
+  const t0=lkToday();
+  const open=lkTopicCardIds(topicId, withSubs).map(lkCard).filter(c=>c&&lkIsPersonal(c)&&c.status!=='done'&&c.deadline);
+  const over=open.filter(c=>String(c.deadline).slice(0,10)<t0).length;
+  const next=open.map(c=>String(c.deadline).slice(0,10)).filter(d=>d>=t0).sort()[0]||null;
+  return {over, next};
+}
+function lkDueHTML(topicId, withSubs){
+  const d=lkDue(topicId, withSubs);
+  if(d.over) return `<span style="font-size:11px;font-weight:700;color:var(--red)">⚠ просрочено ${d.over}</span>`;
+  if(d.next){ const di=(typeof deadlineInfo==='function')?deadlineInfo(d.next):null;
+    return di?`<span class="dl-badge ${di.cls}" style="font-size:11px">${di.text}</span>`:`<span style="font-size:11px;color:var(--t2)">до ${d.next.slice(8,10)}.${d.next.slice(5,7)}</span>`; }
+  return '';
+}
+
+// ── 3. порядок: «↑ Выше» / «↓ Ниже» среди соседей ──
+function lkSortArr(a){ return a.sort((x,y)=>((x.sort||0)-(y.sort||0)) || String(x.created_at||'').localeCompare(String(y.created_at||''))); }
+async function lkMove(kind, id, dir){
+  if(lkNeedNet()) return;
+  const table = kind==='sec' ? 'link_sections' : 'link_topics';
+  const me = kind==='sec' ? LK.sections.find(x=>x.id===id) : lkTopic(id); if(!me) return;
+  const sibs = lkSortArr(kind==='sec' ? [...LK.sections] : LK.topics.filter(t=>t.section_id===me.section_id && (t.parent_id||null)===(me.parent_id||null)));
+  const i=sibs.indexOf(me), j=i+dir; if(i<0||j<0||j>=sibs.length) return;
+  [sibs[i],sibs[j]]=[sibs[j],sibs[i]];
+  const changed=sibs.map((x,k)=>({x,k})).filter(o=>(o.x.sort||0)!==o.k);
+  try {
+    const rs=await Promise.all(changed.map(o=>sb.from(table).update({sort:o.k}).eq('id',o.x.id)));
+    for(const r of rs) if(r.error) throw r.error;
+    changed.forEach(o=>{ o.x.sort=o.k; });
+    lkSortArr(LK.sections); lkSortArr(LK.topics); lkSaveCache(); lkRender();
+  } catch(e){ lkToast('Не удалось сохранить порядок: '+(e.message||e), true); }
+}
+
 // ── загрузка ──
 async function lkLoad(force){
   if(!force && LK.loaded && Date.now()-LK.loaded < 30000) return;
@@ -146,7 +181,7 @@ function lkMenu(anchor, items){ // небольшое меню «⋯»
   document.getElementById('lk-menu')?.remove();
   const r=anchor.getBoundingClientRect();
   const m=document.createElement('div'); m.id='lk-menu';
-  m.style.cssText=`position:fixed;z-index:2000;top:${Math.min(r.bottom+4, innerHeight-140)}px;left:${Math.max(8, Math.min(r.right-190, innerWidth-200))}px;width:190px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--rsm);box-shadow:0 8px 24px rgba(0,0,0,.5);overflow:hidden`;
+  m.style.cssText=`position:fixed;z-index:2000;top:${Math.max(8, Math.min(r.bottom+4, innerHeight-(items.length*44+12)))}px;left:${Math.max(8, Math.min(r.right-190, innerWidth-200))}px;width:190px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--rsm);box-shadow:0 8px 24px rgba(0,0,0,.5);overflow:hidden`;
   m.innerHTML=items.map((it,i)=>`<div data-i="${i}" style="padding:11px 14px;font-size:14px;cursor:pointer;${it.red?'color:var(--red);':''}${i?'border-top:1px solid var(--b1);':''}">${it.t}</div>`).join('');
   document.body.appendChild(m);
   m.querySelectorAll('[data-i]').forEach(el=>el.onclick=()=>{ m.remove(); items[+el.dataset.i].f(); });
@@ -218,7 +253,7 @@ function lkRenderHome(){
         <div dir="auto" style="font-size:15px;font-weight:600">${lkE(t.name)}</div>
         <div class="lk-bar" style="margin-top:6px"><div style="width:${pc}%"></div></div></div>
         <div style="text-align:right;flex-shrink:0"><div style="font-size:12px;color:var(--t2)">${s2.done} из ${s2.total}</div>
-        <div style="font-size:11px;color:var(--t3)">${nsub?nsub+' подт.':''}</div></div></div>`;
+        <div style="font-size:11px;color:var(--t3)">${nsub?nsub+' подт.':''}</div>${lkDueHTML(t.id,true)?`<div style="margin-top:3px">${lkDueHTML(t.id,true)}</div>`:''}</div></div>`;
     });
   });
   h+=`<div style="margin-top:16px"><button class="lk-btn" onclick="lkNewSection()">＋ Раздел</button></div>`;
@@ -237,7 +272,7 @@ function lkCardRowHTML(c, itemId){
     <div style="flex:1;min-width:0"><div dir="auto" style="font-size:14px;color:${lkCatCol(c)};${c.status==='done'?'text-decoration:line-through;':''}overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${lkE(c.title||'Без названия')}</div>
     <div style="font-size:11px;color:var(--t3);margin-top:2px">${lkE(lkSpName(c.space_id))}${c.category?' › '+lkE(c.category):''}</div></div>
     ${right}
-    ${itemId?`<button class="lk-mini" title="Убрать из темы" onclick="event.stopPropagation();lkRemoveItem('${itemId}')">✕</button>`:''}
+    ${itemId?`<button class="lk-mini" title="Перенести или убрать" style="font-size:16px" onclick="event.stopPropagation();lkItemMenu(this,'${itemId}')">⋯</button>`:''}
   </div>`;
 }
 
@@ -263,6 +298,14 @@ function lkRenderTopic(){
     <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none">
       ${cabs.length>1?`<button class="lk-chip${!LK.cab.size?' on':''}" onclick="LK.cab.clear();lkRender()">Все кабинеты</button>`+cabs.map(id=>`<button class="lk-chip${LK.cab.has(id)?' on':''}" onclick="lkToggleCab('${id}')"><span class="lk-dot" style="display:inline-block;background:${lkCabCol(id)};margin-right:5px;vertical-align:1px;width:7px;height:7px"></span>${lkE(lkSpName(id))}</button>`).join(''):''}
       <button class="lk-chip${LK.hideDone?' on':''}" onclick="LK.hideDone=!LK.hideDone;lkRender()">Скрыть готовые</button></div>`;
+  if(!subs.length && !LK.items.some(i=>i.topic_id===t.id)){
+    h+=`<div style="text-align:center;padding:26px 12px;border:1px dashed var(--b2);border-radius:var(--r);margin-top:10px">
+      <div style="font-size:34px;margin-bottom:8px">🗂</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px">Тема пока пустая</div>
+      <div style="font-size:13px;color:var(--t2);line-height:1.5;margin-bottom:14px">Разбейте её на подтемы (например, «Проверка», «Электрика») или сразу добавьте карточки из любых личных кабинетов.</div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="lk-btn" onclick="lkNewTopic('${t.section_id}','${t.id}')">＋ Подтема</button><button class="lk-btn gold" onclick="lkAddCards('${t.id}')">＋ Карточки</button></div></div>`;
+    document.getElementById('lk-body').innerHTML=h; return;
+  }
   if(LK.mode==='map'){ h+=lkMapSVG(t, groups, pass); document.getElementById('lk-body').innerHTML=h; return; }
   groups.forEach(g=>{
     const its=LK.items.filter(i=>i.topic_id===g.t.id);
@@ -272,7 +315,9 @@ function lkRenderTopic(){
     const done=live.filter(r=>r.c.status==='done').length, pc=live.length?Math.round(done/live.length*100):0;
     h+=`<div style="margin-top:14px"><div style="display:flex;align-items:center;gap:6px">
       <span dir="auto" style="font-size:14px;font-weight:700;color:${g.direct?'var(--t2)':'var(--accent)'};flex:1">${lkE(g.name)}</span>
+      ${lkDue(g.t.id,false).over?`<span style="font-size:11px;font-weight:700;color:var(--red)">⚠ ${lkDue(g.t.id,false).over}</span>`:''}
       <span style="font-size:12px;color:var(--t3)">${done} из ${live.length}</span>
+      <button class="lk-mini" title="Добавить карточки сюда" style="color:var(--accent);font-size:18px;padding:0 6px" onclick="lkAddCards('${t.id}','${g.t.id}')">＋</button>
       ${g.direct?'':`<button class="lk-mini" onclick="lkSubMenu(this,'${g.t.id}')">⋯</button>`}</div>
       ${g.direct?'':`<div class="lk-bar" style="margin:6px 0 8px"><div style="width:${pc}%"></div></div>`}
       ${live.filter(r=>pass(r.c)).map(r=>lkCardRowHTML(r.c, r.i.id)).join('')}
@@ -341,6 +386,8 @@ async function lkNewTopic(sectionId, parentId){
 function lkSectionMenu(btn, id){
   const s=LK.sections.find(x=>x.id===id); if(!s) return;
   lkMenu(btn,[
+    {t:'↑ Выше', f:()=>lkMove('sec', id, -1)},
+    {t:'↓ Ниже', f:()=>lkMove('sec', id, 1)},
     {t:'✎ Переименовать', f:async()=>{ if(lkNeedNet()) return; const r=await lkAsk('Раздел', s.name, true, s.icon); if(!r) return;
       const {error}=await sb.from('link_sections').update({name:r.name, icon:r.icon}).eq('id',id); if(error){ lkToast('Ошибка: '+error.message,true); return; }
       s.name=r.name; s.icon=r.icon; lkSaveCache(); lkRender(); }},
@@ -357,6 +404,8 @@ function lkSubMenu(btn, id){
   const t=lkTopic(id); if(!t) return;
   const what=t.parent_id?'подтему':'тему';
   lkMenu(btn,[
+    {t:'↑ Выше', f:()=>lkMove('top', id, -1)},
+    {t:'↓ Ниже', f:()=>lkMove('top', id, 1)},
     {t:'✎ Переименовать', f:async()=>{ if(lkNeedNet()) return; const r=await lkAsk(t.parent_id?'Подтема':'Тема', t.name); if(!r) return;
       const {error}=await sb.from('link_topics').update({name:r.name}).eq('id',id); if(error){ lkToast('Ошибка: '+error.message,true); return; }
       t.name=r.name; lkSaveCache(); lkRender(); }},
@@ -381,6 +430,31 @@ async function lkRemoveLink(id){
   if(!await lkConfirm('Убрать эту связь между карточками?','Убрать')) return;
   const {error}=await sb.from('card_links').delete().eq('id',id); if(error){ lkToast('Ошибка: '+error.message,true); return; }
   LK.links=LK.links.filter(l=>l.id!==id); lkSaveCache(); lkRefreshView();
+}
+function lkItemMenu(btn, itemId){
+  lkMenu(btn,[
+    {t:'↪ Перенести в…', f:()=>lkMoveItem(itemId)},
+    {t:'✕ Убрать из темы', red:true, f:()=>lkRemoveItem(itemId)}
+  ]);
+}
+function lkMoveItem(itemId){
+  const it=LK.items.find(i=>i.id===itemId); if(!it) return;
+  if(lkNeedNet()) return;
+  const cur=lkTopic(it.topic_id), root=lkRootOf(cur); if(!root) return;
+  const c=lkCard(it.card_id);
+  const opts=[...lkSubs(root.id).map(s=>({id:s.id,name:s.name})), {id:root.id,name:'Без подтемы'}].filter(o=>o.id!==it.topic_id);
+  if(!opts.length){ lkToast('Сначала создайте ещё одну подтему'); return; }
+  const d=lkSheet(`<div style="display:flex;align-items:center;margin-bottom:10px"><div dir="auto" style="flex:1;font-size:16px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Перенести «${lkE(c?.title||'карточку')}»</div>
+      <button class="close-btn" onclick="this.closest('.lk-sheet-ov').remove()">✕</button></div>
+    <div class="lk-lbl" style="margin-top:0">Куда в «${lkE(root.name)}»</div>
+    <div class="lk-wrap">${opts.map(o=>`<button class="lk-chip" data-to="${o.id}" dir="auto">${lkE(o.name)}</button>`).join('')}</div>`);
+  d.querySelectorAll('[data-to]').forEach(b=>b.onclick=async()=>{
+    const to=b.dataset.to;
+    if(LK.items.some(i=>i.topic_id===to&&i.card_id===it.card_id)){ lkToast('Карточка уже там'); return; }
+    const {error}=await sb.from('link_items').update({topic_id:to}).eq('id',itemId);
+    if(error){ lkToast('Ошибка: '+error.message,true); return; }
+    it.topic_id=to; lkSaveCache(); d.remove(); lkToast('✓ Перенесено'); lkRender(); lkRefreshView();
+  });
 }
 async function lkAddItem(topicId, card){
   if(LK.items.some(i=>i.topic_id===topicId&&i.card_id===card.id)){ lkToast('Карточка уже здесь'); return false; }
@@ -429,11 +503,11 @@ function lkSheet(html){ // нижнее окно поверх всего (зак
   document.body.appendChild(d);
   return d;
 }
-function lkAddCards(topicId){
+function lkAddCards(topicId, preTarget){
   const t=lkTopic(topicId); if(!t) return;
   if(lkNeedNet()) return;
   const subs=lkSubs(topicId);
-  let target=subs[0]?.id||topicId, timer=null;
+  let target=preTarget||subs[0]?.id||topicId, timer=null;
   const d=lkSheet(`<div style="display:flex;align-items:center;margin-bottom:10px"><div dir="auto" style="flex:1;font-size:16px;font-weight:700">Карточки в «${lkE(t.name)}»</div>
       <button class="close-btn" onclick="this.closest('.lk-sheet-ov').remove()">✕</button></div>
     ${subs.length?`<div class="lk-lbl" style="margin-top:0">Куда</div><div class="lk-wrap" id="lka-sub"></div>`:''}
