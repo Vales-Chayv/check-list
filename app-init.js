@@ -544,10 +544,12 @@ async function loadEntryPushHour() {
   sel.value = cached !== null ? cached : '9';
   try { _quietDays = JSON.parse(localStorage.getItem('mc_quiet_days') || '[]') || []; } catch(_) { _quietDays = []; }
   paintQuietDays();
+  _dayDigest = localStorage.getItem('mc_day_digest') !== '0'; paintDayDigest();
   const _t0 = Date.now();
   try {
     const j = await _entryHourCall({ getEntryHour: true, userId: currentUser.id });
     if(j && Number.isInteger(j.hour)) { sel.value = String(j.hour); localStorage.setItem('mc_entry_hour', String(j.hour)); }
+    if(j && typeof j.digest === 'boolean' && _digestTouched < _t0 && Date.now() - _digestTouched > 15000) { _dayDigest = j.digest; try { localStorage.setItem('mc_day_digest', j.digest ? '1' : '0'); } catch(_) {} paintDayDigest(); }
     if(j && Array.isArray(j.quiet) && _quietTouched < _t0 && Date.now() - _quietTouched > 15000) { _quietDays = j.quiet; try { localStorage.setItem('mc_quiet_days', JSON.stringify(j.quiet)); } catch(_) {} paintQuietDays(); }
   } catch(e) {}
 }
@@ -562,6 +564,23 @@ async function saveEntryPushHour() {
 }
 // ── Тихие дни: в отмеченные дни недели напоминания не приходят, а копятся и приходят одной сводкой утром первого рабочего дня. Чаты не затрагиваются ──
 let _quietDays = [];
+let _dayDigest = true, _digestTouched = 0;
+function paintDayDigest() {
+  const t = document.getElementById('digest-track'), k = document.getElementById('digest-knob');
+  if(t) t.style.background = _dayDigest ? 'var(--accent)' : '#555';
+  if(k) k.style.left = _dayDigest ? '23px' : '3px';
+}
+async function toggleDayDigest() {
+  if(!currentUser?.id) return;
+  const prev = _dayDigest;
+  _digestTouched = Date.now();
+  _dayDigest = !prev; paintDayDigest();
+  try {
+    await _entryHourCall({ setDayDigest: _dayDigest, userId: currentUser.id });
+    try { localStorage.setItem('mc_day_digest', _dayDigest ? '1' : '0'); } catch(_) {}
+    toast(_dayDigest ? '☀️ Утренняя сводка включена' : 'Утренняя сводка выключена: напоминания придут отдельно');
+  } catch(e) { _dayDigest = prev; paintDayDigest(); toast('Не удалось сохранить', true); }
+}
 let _quietTouched = 0; // когда дни меняли руками: более старый ответ сервера их не затирает
 function paintQuietDays() {
   document.querySelectorAll('#quiet-days [data-d]').forEach(b => b.classList.toggle('on', _quietDays.includes(+b.dataset.d)));
