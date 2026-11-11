@@ -366,6 +366,14 @@
         <div class="toggle-row"><span style="font-size:15px;font-weight:600">☀️ Утренняя сводка «Ваш день»</span><div class="tog-track" id="digest-track" onclick="toggleDayDigest()"><div class="tog-knob" id="digest-knob"></div></div></div>
         <span style="font-size:11px;color:var(--t3);line-height:1.5;display:block;margin-top:6px">Если на сегодня несколько дел (события, сроки записей, напоминания), утром придёт одно уведомление вместо отдельных. Одно дело приходит как обычно.</span>
       </div>
+      <div class="fld" style="border-top:1px solid var(--b1);padding-top:13px">
+        <label>🏖 Не беспокоить до даты (отпуск, поездка)</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 6px">
+          <input type="date" id="pause-date" onchange="savePauseDate()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t1);border-radius:var(--rsm);padding:9px 12px;font-size:14px;font-family:inherit">
+          <button id="pause-clear" onclick="clearPause()" style="display:none;background:var(--s2);border:1px solid var(--b1);color:var(--t1);border-radius:var(--rsm);padding:9px 14px;font-size:14px;cursor:pointer;font-family:inherit">Закончить раньше</button>
+        </div>
+        <span id="pause-txt" style="font-size:11px;color:var(--t3);line-height:1.5"></span>
+      </div>
           <div class="fld" style="border-top:1px solid var(--b1);padding-top:13px">
         <label>Телефон</label>
         <input id="set-phone" type="tel" placeholder="+972...">

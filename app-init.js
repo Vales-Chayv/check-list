@@ -544,11 +544,13 @@ async function loadEntryPushHour() {
   sel.value = cached !== null ? cached : '9';
   try { _quietDays = JSON.parse(localStorage.getItem('mc_quiet_days') || '[]') || []; } catch(_) { _quietDays = []; }
   paintQuietDays();
+  _pausedUntil = localStorage.getItem('mc_paused_until') || null; paintPause();
   _dayDigest = localStorage.getItem('mc_day_digest') !== '0'; paintDayDigest();
   const _t0 = Date.now();
   try {
     const j = await _entryHourCall({ getEntryHour: true, userId: currentUser.id });
     if(j && Number.isInteger(j.hour)) { sel.value = String(j.hour); localStorage.setItem('mc_entry_hour', String(j.hour)); }
+    if(j && 'paused' in j && _pauseTouched < _t0 && Date.now() - _pauseTouched > 15000) { _pausedUntil = j.paused || null; try { localStorage.setItem('mc_paused_until', j.paused || ''); } catch(_) {} paintPause(); }
     if(j && typeof j.digest === 'boolean' && _digestTouched < _t0 && Date.now() - _digestTouched > 15000) { _dayDigest = j.digest; try { localStorage.setItem('mc_day_digest', j.digest ? '1' : '0'); } catch(_) {} paintDayDigest(); }
     if(j && Array.isArray(j.quiet) && _quietTouched < _t0 && Date.now() - _quietTouched > 15000) { _quietDays = j.quiet; try { localStorage.setItem('mc_quiet_days', JSON.stringify(j.quiet)); } catch(_) {} paintQuietDays(); }
   } catch(e) {}
@@ -581,6 +583,32 @@ async function toggleDayDigest() {
     toast(_dayDigest ? '☀️ Утренняя сводка включена' : 'Утренняя сводка выключена: напоминания придут отдельно');
   } catch(e) { _dayDigest = prev; paintDayDigest(); toast('Не удалось сохранить', true); }
 }
+// ── Пауза «Не беспокоить до даты»: до этого дня никакие напоминания не приходят (чаты — как обычно); в день возвращения придёт список просроченных записей ──
+let _pausedUntil = null, _pauseTouched = 0;
+function paintPause() {
+  const inp = document.getElementById('pause-date'), clr = document.getElementById('pause-clear'), t = document.getElementById('pause-txt');
+  if(!inp) return;
+  const tm = new Date(); tm.setDate(tm.getDate() + 1);
+  inp.min = tm.getFullYear() + '-' + String(tm.getMonth() + 1).padStart(2, '0') + '-' + String(tm.getDate()).padStart(2, '0');
+  inp.value = _pausedUntil || '';
+  if(clr) clr.style.display = _pausedUntil ? '' : 'none';
+  if(t) t.textContent = _pausedUntil
+    ? 'Напоминания не приходят до ' + _pausedUntil.split('-').reverse().join('.') + '. В этот день утром придёт список просроченных записей. Чаты работают как обычно.'
+    : 'Выберите день возвращения: до него напоминания, события и сводки приходить не будут. Сообщения чатов приходят как обычно.';
+}
+async function _savePause(v) {
+  if(!currentUser?.id) return;
+  const prev = _pausedUntil;
+  _pauseTouched = Date.now();
+  _pausedUntil = v; paintPause();
+  try {
+    await _entryHourCall({ setPausedUntil: v, userId: currentUser.id });
+    try { localStorage.setItem('mc_paused_until', v || ''); } catch(_) {}
+    toast(v ? '🏖 Не беспокою до ' + v.split('-').reverse().join('.') : 'Пауза снята: напоминания снова приходят');
+  } catch(e) { _pausedUntil = prev; paintPause(); toast('Не удалось сохранить', true); }
+}
+function savePauseDate() { const v = document.getElementById('pause-date').value; if(v) _savePause(v); }
+function clearPause() { _savePause(null); }
 let _quietTouched = 0; // когда дни меняли руками: более старый ответ сервера их не затирает
 function paintQuietDays() {
   document.querySelectorAll('#quiet-days [data-d]').forEach(b => b.classList.toggle('on', _quietDays.includes(+b.dataset.d)));
