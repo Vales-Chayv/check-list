@@ -327,7 +327,8 @@ function lkRenderTopic(){
   });
   h+=`<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
     <button class="lk-btn" onclick="lkNewTopic('${t.section_id}','${t.id}')">＋ Подтема</button>
-    <button class="lk-btn gold" onclick="lkAddCards('${t.id}')">＋ Карточки</button></div>`;
+    <button class="lk-btn gold" onclick="lkAddCards('${t.id}')">＋ Карточки</button>
+    <button class="lk-btn" onclick="mcLkExportTopicWord('${t.id}')">📄 В Word</button></div>`;
   document.getElementById('lk-body').innerHTML=h;
 }
 function lkToggleCab(id){ if(LK.cab.has(id)) LK.cab.delete(id); else LK.cab.add(id); lkRender(); }
@@ -404,6 +405,7 @@ function lkSubMenu(btn, id){
   const t=lkTopic(id); if(!t) return;
   const what=t.parent_id?'подтему':'тему';
   lkMenu(btn,[
+    ...(t.parent_id?[]:[{t:'📄 В Word', f:()=>mcLkExportTopicWord(id)}]),
     {t:'↑ Выше', f:()=>lkMove('top', id, -1)},
     {t:'↓ Ниже', f:()=>lkMove('top', id, 1)},
     {t:'✎ Переименовать', f:async()=>{ if(lkNeedNet()) return; const r=await lkAsk(t.parent_id?'Подтема':'Тема', t.name); if(!r) return;
@@ -692,4 +694,198 @@ function mcLkPicker(cid){
     }
   };
   paint();
+}
+
+// ═══════════ Выгрузка темы в Word (ZIP: документ + папка files). Оформление и помощники — из app-export.js ═══════════
+function mcLkExportTopicWord(topicId){
+  const t=lkTopic(topicId); if(!t) return;
+  const root=lkRootOf(t);
+  if(typeof JSZip==='undefined' || typeof mcDocPara!=='function'){ lkToast('Модуль Word не загрузился. Проверьте интернет и обновите страницу', true); return; }
+  if(window._mcExporting){ lkToast('Документ уже собирается'); return; }
+  const subs=lkSubs(root.id);
+  const groups=[...subs.map(s=>({id:s.id,name:s.name})), {id:root.id,name:'Без подтемы',direct:true}]
+    .map(g=>({...g, n:LK.items.filter(i=>i.topic_id===g.id).map(i=>lkCard(i.card_id)).filter(c=>c&&lkIsPersonal(c)).length}))
+    .filter(g=>!g.direct||g.n);
+  if(!groups.some(g=>g.n)){ lkToast('В теме пока нет карточек', true); return; }
+  const P=(typeof mcExpPrefsLoad==='function')?mcExpPrefsLoad():{};
+  const O={sel:new Set(groups.filter(g=>g.n).map(g=>g.id)), cards:'all', entries:'all', files:true, links:true, cab:true, signs:!!P.signs};
+  const d=lkSheet(`<div style="display:flex;align-items:center;margin-bottom:6px"><div dir="auto" style="flex:1;font-size:16px;font-weight:700">📄 «${lkE(root.name)}» в Word</div>
+      <button class="close-btn" onclick="this.closest('.lk-sheet-ov').remove()">✕</button></div>
+    <div id="lkw-body"></div>
+    <div style="display:flex;gap:8px;margin-top:16px"><button type="button" class="btn-s" style="flex:1" id="lkw-x">Отмена</button><button type="button" class="btn-p" style="flex:1" id="lkw-go">Выгрузить</button></div>`);
+  const body=d.querySelector('#lkw-body');
+  const seg=(key,opts)=>`<div class="lk-wrap">${opts.map(([v,l])=>`<button class="lk-chip${O[key]===v?' on':''}" data-k="${key}" data-v="${v}">${l}</button>`).join('')}</div>`;
+  const chk=(key,label)=>`<label style="display:flex;gap:8px;align-items:center;font-size:14px;padding:5px 0;cursor:pointer"><input type="checkbox" data-c="${key}"${O[key]?' checked':''}> ${label}</label>`;
+  const paint=()=>{
+    body.innerHTML=`<div class="lk-lbl" style="margin-top:4px">Подтемы</div>
+      ${groups.map(g=>`<label style="display:flex;gap:8px;align-items:center;font-size:14px;padding:4px 0;cursor:pointer"><input type="checkbox" data-g="${g.id}"${O.sel.has(g.id)?' checked':''}${g.n?'':' disabled'}> <span dir="auto">${lkE(g.name)}</span> <span style="color:var(--t3);font-size:12px">(${g.n})</span></label>`).join('')}
+      <div class="lk-lbl">Карточки</div>${seg('cards',[['all','Все'],['open','Невыполненные']])}
+      <div class="lk-lbl">Записи карточек</div>${seg('entries',[['all','Все'],['open','Только открытые'],['none','Без записей']])}
+      <div class="lk-lbl">Что ещё</div>
+      ${chk('files','Фото и файлы (папка files)')}${chk('links','Связи между карточками')}${chk('cab','Кабинет и рубрика у карточки')}${chk('signs','Строки для подписей')}
+      <div style="font-size:12px;color:var(--t3);margin-top:8px;line-height:1.5">🎨 Оформление (логотип, студия, сайт, цвет разделителя) — то же, что в «📄 Word» у карточки${P.studio?': '+lkE(P.studio):''}.</div>`;
+    body.querySelectorAll('[data-g]').forEach(i=>i.onchange=()=>{ i.checked?O.sel.add(i.dataset.g):O.sel.delete(i.dataset.g); });
+    body.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{ O[b.dataset.k]=b.dataset.v; paint(); });
+    body.querySelectorAll('[data-c]').forEach(i=>i.onchange=()=>{ O[i.dataset.c]=i.checked; });
+  };
+  paint();
+  d.querySelector('#lkw-x').onclick=()=>d.remove();
+  d.querySelector('#lkw-go').onclick=()=>{
+    if(!O.sel.size){ lkToast('Выберите хотя бы одну подтему', true); return; }
+    d.remove();
+    lkWordRun(root, groups.filter(g=>O.sel.has(g.id)), O, P);
+  };
+}
+
+async function lkWordRun(root, groups, O, P){
+  if(window._mcExporting) return;
+  window._mcExporting=true;
+  try {
+    lkToast('⏳ Собираю документ…');
+    // 1. полные карточки (с записями и файлами)
+    const ids=[...new Set(groups.flatMap(g=>LK.items.filter(i=>i.topic_id===g.id).map(i=>i.card_id)))];
+    const full={};
+    (typeof cards!=='undefined'&&cards||[]).forEach(c=>{ if(ids.includes(c.id)) full[c.id]=c; });
+    const need=ids.filter(id=>!full[id]);
+    try { for(let k=0;k<need.length;k+=100){ const r=await sb.from('cards').select('*').in('id',need.slice(k,k+100)); if(r.error) throw r.error; (r.data||[]).forEach(c=>{ full[c.id]=c; }); } }
+    catch(e){ try { (await local.getAll('cards')).forEach(c=>{ if(need.includes(c.id)) full[c.id]=c; }); } catch(_){} }
+    // 2. структура
+    const allAtts=[], reg=(a,tag)=>{ const o={a,tag}; allAtts.push(o); return o; };
+    let total=0, doneCnt=0;
+    const G=groups.map((g,gi)=>{
+      const list=LK.items.filter(i=>i.topic_id===g.id).map(i=>full[i.card_id]).filter(c=>c&&lkIsPersonal(c)&&(O.cards==='all'||c.status!=='done'));
+      const cs=list.map((c,ci)=>{
+        const tag=String(gi+1)+'-'+String(ci+1);
+        let ents=O.entries==='none'?[]:mcExportEntries(c).sort((a,b)=>(a.ts-b.ts)||(a.i-b.i));
+        if(O.entries==='open') ents=ents.filter(x=>!x.e.done);
+        const E=ents.map(x=>({e:x.e, atts:O.files?[...(x.e.sessionAtts||[]),...(x.e.attachments||[])].filter(a=>a&&a.data).map(a=>reg(a,tag)):[]}));
+        const cardAtts=O.files?(c.attachments||[]).filter(a=>a&&a.data).map(a=>reg(a,tag)):[];
+        total++; if(c.status==='done') doneCnt++;
+        return {c, E, cardAtts, num:(gi+1)+'.'+(ci+1)};
+      });
+      return {...g, num:gi+1, cs};
+    }).filter(g=>g.cs.length);
+    if(!G.length){ lkToast('По выбранным условиям карточек нет', true); return; }
+    // 3. файлы (по 3 одновременно)
+    const zip=new JSZip(), folder=_safeName(root.name,60), rootDir=zip.folder(folder), filesDir=rootDir.folder('files');
+    const used=new Set(), queue=allAtts.slice(); let got=0;
+    const worker=async()=>{ while(queue.length){ const o=queue.shift(), a=o.a;
+      let base=_safeName(a.name||'file',90);
+      if(!/\.[A-Za-z0-9]{1,5}$/.test(base)){ const ext=((a.type||'').split('/')[1]||'').replace(/[^a-z0-9].*$/i,''); if(ext) base+='.'+ext; }
+      let name=o.tag+'_'+base, k=1; while(used.has(name.toLowerCase())) name=o.tag+'_'+(++k)+'_'+base; used.add(name.toLowerCase()); o.name=name;
+      const ty=a.type||'';
+      try { const blob=await mcFetchBlob(a.data), t2=ty||blob.type||''; o.size=blob.size; o.isImg=t2.startsWith('image/'); o.isVid=t2.startsWith('video/'); o.isAud=t2.startsWith('audio/');
+        filesDir.file(name, blob, {compression:'STORE'}); if(o.isImg) o.thumb=await mcThumb(blob); }
+      catch(e){ o.err=true; o.isImg=ty.startsWith('image/'); o.isVid=ty.startsWith('video/'); o.isAud=ty.startsWith('audio/'); }
+      got++; lkToast('⏳ Собираю документ: файл '+got+' из '+allAtts.length); } };
+    await Promise.all([worker(),worker(),worker()]);
+    // 4. документ
+    const GOLD='B8892B', TW=9906, rels=[], media=[]; let docPrId=1, mediaN=0;
+    const relId=()=>'rId'+(rels.length+10);
+    const extRel=name=>{ const id=relId(); rels.push('<Relationship Id="'+id+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="'+_XE('files/'+encodeURIComponent(name))+'" TargetMode="External"/>'); return id; };
+    const addMedia=(buf,ext)=>{ const fn='img'+(++mediaN)+'.'+ext; media.push({name:fn,buf}); const id=relId(); rels.push('<Relationship Id="'+id+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/'+fn+'"/>'); return id; };
+    const drawing=(rid,cx,cy,nm)=>{ const did=docPrId++, n2=_XE(nm);
+      return '<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="'+cx+'" cy="'+cy+'"/><wp:docPr id="'+did+'" name="'+n2+'" descr="'+n2+'"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="'+did+'" name="'+n2+'"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="'+rid+'"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+cx+'" cy="'+cy+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>'; };
+    const imgXml=o=>{ let cx=1980000, cy=Math.round(cx*o.thumb.h/o.thumb.w); if(cy>2520000){ cy=2520000; cx=Math.round(cy*o.thumb.w/o.thumb.h); }
+      return '<w:hyperlink r:id="'+extRel(o.name)+'" w:history="1">'+drawing(addMedia(o.thumb.buf,'jpg'),cx,cy,o.name)+'</w:hyperlink>'+mcDocRun(' ',{size:8}); };
+    const sizeTxt=b=>b==null?'':(b>1048576?(b/1048576).toFixed(1)+' МБ':Math.max(1,Math.round(b/1024))+' КБ');
+    const icon=o=>o.isImg?'📷 ':o.isVid?'🎥 ':o.isAud?'🎙 ':'📎 ';
+    const attXml=list=>{ if(!list.length) return ''; let x='';
+      const imgs=list.filter(o=>o.thumb);
+      for(let i=0;i<imgs.length;i+=3) x+=mcDocPara(imgs.slice(i,i+3).map(imgXml).join(''),{keep:true,after:60});
+      if(P.names==='show'){ list.forEach(o=>{
+          if(o.err){ x+=mcDocPara(mcDocRun(icon(o),{size:19})+mcDocRun((o.a.name||'файл')+' — файл недоступен',{size:19,color:'C0392B'}),{after:30}); return; }
+          x+=mcDocPara(mcDocRun(icon(o),{size:19})+'<w:hyperlink r:id="'+extRel(o.name)+'" w:history="1">'+mcDocRun(o.name,{size:19,color:'1F5FA8',u:true})+'</w:hyperlink>'+mcDocRun('  ('+sizeTxt(o.size)+')',{size:17,color:'8A8A8A'}),{after:30}); });
+      } else { const cnt={v:0,a:0,f:0,p:0}; let line='';
+        list.forEach(o=>{ if(o.thumb&&!o.err) return;
+          if(o.err){ line+=mcDocRun('⚠ '+(o.a.name||'файл')+' — недоступен   ',{size:18,color:'C0392B'}); return; }
+          const lbl=o.isVid?'Видео '+(++cnt.v):o.isAud?'Голосовое '+(++cnt.a):o.isImg?'Фото '+(++cnt.p):'Файл '+(++cnt.f);
+          line+=mcDocRun(icon(o),{size:18})+'<w:hyperlink r:id="'+extRel(o.name)+'" w:history="1">'+mcDocRun(lbl,{size:18,color:'1F5FA8',u:true})+'</w:hyperlink>'+mcDocRun('    ',{size:18}); });
+        if(line) x+=mcDocPara(line,{after:30}); }
+      return x; };
+    const checkbox=on=>'<w:sdt><w:sdtPr><w:alias w:val="Выполнено"/><w14:checkbox><w14:checked w14:val="'+(on?1:0)+'"/><w14:checkedState w14:val="2611" w14:font="Segoe UI Symbol"/><w14:uncheckedState w14:val="2610" w14:font="Segoe UI Symbol"/></w14:checkbox></w:sdtPr><w:sdtContent><w:r><w:rPr><w:rFonts w:ascii="Segoe UI Symbol" w:hAnsi="Segoe UI Symbol" w:eastAsia="Segoe UI Symbol" w:cs="Segoe UI Symbol"/><w:sz w:val="24"/></w:rPr><w:t>'+(on?'☑':'☐')+'</w:t></w:r></w:sdtContent></w:sdt>'+mcDocRun(' ',{size:22});
+    const cell=(inner,w,o)=>{ o=o||{}; return '<w:tc><w:tcPr><w:tcW w:w="'+w+'" w:type="dxa"/>'+(o.borders||'')+(o.fill?'<w:shd w:val="clear" w:color="auto" w:fill="'+o.fill+'"/>':'')+'<w:vAlign w:val="'+(o.v||'center')+'"/></w:tcPr>'+inner+'</w:tc>'; };
+    const rich=(html,size)=>{ const parts=mcRichToParts(html||''), rtl=_isRTL(parts.map(x=>x.t||'').join('')); return {rtl, xml:parts.map(x=>x.br?'<w:r><w:br/></w:r>':mcDocRun(x.t,{...x,rtl,size})).join('')}; };
+    let body='';
+    // шапка (как у выгрузки карточки)
+    if(P.logo||P.studio||P.slogan||P.site){
+      let lw=0, logoXml='';
+      if(P.logo){ try { const bmp=await createImageBitmap(await mcFetchBlob(P.logo)); const cy=720000, cx=Math.round(cy*bmp.width/bmp.height);
+          const bin=await (await fetch(P.logo)).arrayBuffer(); logoXml=mcDocPara(drawing(addMedia(bin,'png'),Math.min(cx,2160000),cy,'logo'),{after:0});
+          lw=Math.min(cx,2160000)/635+200; if(bmp.close) bmp.close(); } catch(e){} }
+      lw=Math.round(lw); const rw=P.site?2900:0, mw=TW-lw-rw;
+      const bb='<w:tcBorders><w:bottom w:val="single" w:sz="6" w:space="0" w:color="DDDDDD"/></w:tcBorders>';
+      const mid=(P.studio?mcDocPara(mcDocRun(P.studio.toUpperCase(),{b:true,size:24}),{after:0,bidi:_isRTL(P.studio)}):'')+(P.slogan?mcDocPara(mcDocRun(P.slogan,{size:17,color:'777777',rtl:_isRTL(P.slogan)}),{after:0,bidi:_isRTL(P.slogan)}):'')||mcDocPara('',{after:0});
+      let cells=''; if(lw) cells+=cell(logoXml,lw,{borders:bb}); cells+=cell(mid,mw,{borders:bb});
+      if(rw) cells+=cell(mcDocPara(mcDocRun(P.site,{size:17,color:'777777'}),{after:0,jc:'right'}),rw,{borders:bb});
+      body+='<w:tbl><w:tblPr><w:tblW w:w="'+TW+'" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid>'+(lw?'<w:gridCol w:w="'+lw+'"/>':'')+'<w:gridCol w:w="'+mw+'"/>'+(rw?'<w:gridCol w:w="'+rw+'"/>':'')+'</w:tblGrid><w:tr>'+cells+'</w:tr></w:tbl>';
+    }
+    body+=mcDocPara(mcDocRun(root.name,{b:true,size:40}),{before:240,after:120,bidi:_isRTL(root.name)});
+    // таблица данных
+    const sec=LK.sections.find(s=>s.id===root.section_id), dt=new Date(), p2=x=>String(x).padStart(2,'0');
+    const pairs=[['Раздел',((sec&&sec.icon)?sec.icon+' ':'')+(sec?sec.name:'')],['Дата',p2(dt.getDate())+'.'+p2(dt.getMonth()+1)+'.'+dt.getFullYear()]];
+    if(P.author) pairs.push(['Составил(а)',P.author]);
+    pairs.push(['Готово',doneCnt+' из '+total+' карточек']);
+    const bAll='<w:tcBorders>'+['top','left','bottom','right'].map(s=>'<w:'+s+' w:val="single" w:sz="4" w:space="0" w:color="DDDDDD"/>').join('')+'</w:tcBorders>';
+    let trs='';
+    for(let i=0;i<pairs.length;i+=2){ const a=pairs[i], b2=pairs[i+1];
+      const mk=pr=>cell(mcDocPara(mcDocRun(pr[0],{b:true,size:19}),{after:0}),1500,{borders:bAll,fill:'F6EFD9'})+cell(mcDocPara(mcDocRun(pr[1],{size:20,rtl:_isRTL(pr[1])}),{after:0,bidi:_isRTL(pr[1])}),3453,{borders:bAll});
+      trs+='<w:tr>'+(b2?mk(a)+mk(b2):mk(a)+cell(mcDocPara('',{after:0}),4953,{borders:bAll}))+'</w:tr>'; }
+    body+='<w:tbl><w:tblPr><w:tblW w:w="'+TW+'" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="60" w:type="dxa"/><w:left w:w="100" w:type="dxa"/><w:bottom w:w="60" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="1500"/><w:gridCol w:w="3453"/><w:gridCol w:w="1500"/><w:gridCol w:w="3453"/></w:tblGrid>'+trs+'</w:tbl>';
+    body+=mcDocPara('',{after:40});
+    const fmtD=s=>{ s=String(s||'').slice(0,10); return /^\d{4}-\d{2}-\d{2}$/.test(s)?s.slice(8,10)+'.'+s.slice(5,7)+'.'+s.slice(0,4):s; };
+    const divC=(P.divColor||'#B8892B').replace('#','');
+    G.forEach(g=>{
+      const gd=g.cs.filter(x=>x.c.status==='done').length, rtlG=_isRTL(g.name);
+      // золотая плашка подтемы
+      body+='<w:p><w:pPr><w:keepNext/><w:pBdr><w:left w:val="single" w:sz="24" w:space="6" w:color="'+GOLD+'"/></w:pBdr><w:shd w:val="clear" w:color="auto" w:fill="F6EFD9"/>'+(rtlG?'<w:bidi/>':'')+'<w:spacing w:before="320" w:after="120"/></w:pPr>'+
+        mcDocRun(g.num+'. '+g.name,{b:true,size:28,rtl:rtlG})+mcDocRun('   · '+gd+' из '+g.cs.length+' готово',{size:18,color:'8A6A1F'})+'</w:p>';
+      g.cs.forEach((x,ci)=>{
+        const c=x.c, rtl=_isRTL(c.title);
+        if(ci && P.divider) body+=mcDocPara('',{before:80,after:80,line:120,divider:divC});
+        const meta=[];
+        if(O.cab) meta.push(lkSpName(c.space_id)+(c.category?' › '+c.category:''));
+        if(c.status==='done') meta.push('готово'); else if(c.deadline) meta.push('срок '+fmtD(c.deadline));
+        body+=mcDocPara(mcDocRun(x.num+'  ',{b:true,color:GOLD,size:24})+mcDocRun(c.status==='done'?'☑ ':'☐ ',{size:24})+mcDocRun(c.title||'Без названия',{b:true,size:24,rtl})+(meta.length?mcDocRun('   · '+meta.join(' · '),{size:17,color:'888888'}):''),{before:120,after:40,keep:true,bidi:rtl});
+        if(c.body){ const r=rich(c.body,20); body+=mcDocPara(r.xml,{after:60,bidi:r.rtl}); }
+        if(x.cardAtts.length) body+=attXml(x.cardAtts);
+        x.E.forEach(y=>{ const e=y.e, r=rich(e.text||e.sessionNote||'',22);
+          body+=mcDocPara((P.checks!==false?checkbox(!!e.done):mcDocRun(e.done?'☑ ':'☐ ',{size:22}))+r.xml+(e.date?mcDocRun('   '+e.date,{size:16,color:'999999'}):''),{after:30,keep:!!y.atts.length,bidi:r.rtl});
+          if(y.atts.length) body+=attXml(y.atts);
+        });
+        if(O.links){ LK.links.filter(l=>l.a_id===c.id||l.b_id===c.id).forEach(l=>{
+          const oid=l.a_id===c.id?l.b_id:l.a_id, o=full[oid]||lkCard(oid); if(!o) return;
+          body+=mcDocPara(mcDocRun('🔗 связана с «'+(o.title||'')+'»'+(O.cab?' ('+lkSpName(o.space_id)+')':'')+(l.label?' — «'+l.label+'»':''),{size:18,color:GOLD})+(l.note?mcDocRun('  '+l.note,{size:17,color:'888888'}):''),{after:30});
+        }); }
+      });
+    });
+    if(O.signs){
+      const top='<w:tcBorders><w:top w:val="single" w:sz="6" w:space="0" w:color="999999"/></w:tcBorders>';
+      const sg=tx=>cell(mcDocPara(mcDocRun(tx,{size:17,color:'666666'}),{after:0}),4400,{borders:top,v:'top'});
+      body+=mcDocPara('',{before:700,after:0,keep:true});
+      body+='<w:tbl><w:tblPr><w:tblW w:w="'+TW+'" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="4400"/><w:gridCol w:w="1106"/><w:gridCol w:w="4400"/></w:tblGrid><w:tr>'+sg('Подпись исполнителя')+cell(mcDocPara('',{after:0}),1106)+sg('Подпись заказчика')+'</w:tr></w:tbl>';
+    }
+    const NS='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="w14"';
+    const docXml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document '+NS+'><w:body>'+body+'<w:sectPr><w:footerReference w:type="default" r:id="rId2"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1000" w:right="1000" w:bottom="1000" w:left="1000" w:header="500" w:footer="500" w:gutter="0"/></w:sectPr></w:body></w:document>';
+    const footTxt=[P.studio,P.site].filter(Boolean).join('  ·  '), FR='<w:rPr><w:color w:val="888888"/><w:sz w:val="16"/></w:rPr>';
+    const footXml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:pBdr><w:top w:val="single" w:sz="4" w:space="6" w:color="DDDDDD"/></w:pBdr><w:tabs><w:tab w:val="right" w:pos="'+TW+'"/></w:tabs></w:pPr><w:r>'+FR+'<w:t xml:space="preserve">'+_XE(footTxt)+'</w:t></w:r><w:r>'+FR+'<w:tab/></w:r><w:r>'+FR+'<w:fldChar w:fldCharType="begin"/></w:r><w:r>'+FR+'<w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r>'+FR+'<w:fldChar w:fldCharType="separate"/></w:r><w:r>'+FR+'<w:t>1</w:t></w:r><w:r>'+FR+'<w:fldChar w:fldCharType="end"/></w:r></w:p></w:ftr>';
+    const stylesXml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial" w:eastAsia="Arial"/><w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="ru-RU" w:bidi="he-IL"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>';
+    const docRels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>'+rels.join('')+'</Relationships>';
+    const ct='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpg" ContentType="image/jpeg"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/></Types>';
+    const topRels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>';
+    const dz=new JSZip();
+    dz.file('[Content_Types].xml',ct); dz.file('_rels/.rels',topRels); dz.file('word/document.xml',docXml); dz.file('word/styles.xml',stylesXml); dz.file('word/footer1.xml',footXml); dz.file('word/_rels/document.xml.rels',docRels);
+    media.forEach(m=>dz.file('word/media/'+m.name,m.buf));
+    rootDir.file(folder+'.docx', await dz.generateAsync({type:'uint8array',compression:'DEFLATE'}));
+    if(!allAtts.length) zip.remove(folder+'/files');
+    lkToast('⏳ Упаковываю архив…');
+    const out=await zip.generateAsync({type:'blob',compression:'STORE'});
+    window._lkLastWord={docXml, out}; // для проверки
+    const url=URL.createObjectURL(out), a=document.createElement('a');
+    a.href=url; a.download=folder+'.zip'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+    const bad=allAtts.filter(o=>o.err).length;
+    lkToast('✓ Готово: '+folder+'.zip'+(bad?' (не удалось скачать файлов: '+bad+')':''));
+  } catch(e){ lkToast('Не удалось собрать документ: '+(e&&e.message||e), true); }
+  finally { window._mcExporting=false; }
 }
