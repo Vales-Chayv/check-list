@@ -393,6 +393,7 @@ const dateCol = textColor ? (_lt ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)') 
     const chips=related.map(rid=>{const rc=cards.find(x=>x.id===rid);if(!rc)return'';const rc_col=catColor(rc.category);return`<div onclick="closeView();setTimeout(()=>openView('${rid}'),200)" style="cursor:pointer;padding:4px 11px;border-radius:18px;font-size:13px;background:${hex2rgba(rc_col,.15)};border:1px solid ${hex2rgba(rc_col,.35)};color:${rc_col}">🔗${esc(rc.title)}</div>`;}).join('');
     if(chips) html+=`<div class="view-sec"><div class="view-lbl">Связанные</div><div style="display:flex;flex-wrap:wrap;gap:5px">${chips}</div></div>`;
   }
+  if(typeof mcLkViewBlock==='function') html+=mcLkViewBlock(card); // «Связи»: темы и прямые связи (только личные кабинеты, app-links.js)
 
  document.getElementById('view-content').innerHTML=html;
 // Сэндвич-градиент: шапка сверху перекрывает верх градиента, "хвост" торчит под шапкой
