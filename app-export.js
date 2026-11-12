@@ -123,6 +123,7 @@ function mcExportCardWord(cardId) {
       '<button data-q="all" style="' + bs + '">Все</button><button data-q="none" style="' + bs + '">Ничего</button>' +
       '<button data-q="done" style="' + bs + '">Только ☑ отмеченные</button><button data-q="open" style="' + bs + '">Только без отметки</button>' +
       '<select id="mc-exp-ord" style="' + bs + '"><option value="asc">Сначала старые</option><option value="desc">Сначала новые</option></select></div>' +
+    ((card.entryGroups || []).length ? '<div style="padding:4px 18px 0;font-size:12px;color:var(--t3)">Разделы (нажми, чтобы выбрать или снять все записи раздела):</div><div id="mc-exp-grp" style="padding:4px 18px;display:flex;gap:6px;flex-wrap:wrap"></div>' : '') +
     '<div id="mc-exp-list" style="padding:6px 12px;max-height:230px;overflow:auto"></div>' +
     (cardAttCount ? '<label style="padding:6px 18px;font-size:14px;display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="mc-exp-card" checked> Вложения самой карточки (' + cardAttCount + ')</label>' : '') +
     '<details style="margin:6px 18px 4px;border-top:1px solid var(--b1);padding-top:8px"' + (P.studio || P.logo ? '' : ' open') + '><summary style="cursor:pointer;font-size:14px;font-weight:600">🎨 Оформление документа</summary>' +
@@ -154,12 +155,31 @@ function mcExportCardWord(cardId) {
       return '<label style="display:flex;gap:9px;align-items:flex-start;padding:7px 6px;border-bottom:1px solid var(--b1);cursor:pointer;font-size:14px">' +
         '<input type="checkbox" data-id="' + _XE(x.e.id) + '"' + (checked.has(x.e.id) ? ' checked' : '') + ' style="margin-top:3px">' +
         '<span style="flex:1;min-width:0;word-break:break-word" dir="auto">' + (x.e.done ? '☑ ' : '') + _XE(plain(x.e)) + '</span>' +
-        '<span style="font-size:12px;color:var(--t3);white-space:nowrap">' + _XE(x.e.date || '') + (na ? ' · 📎' + na : '') + '</span></label>';
+        '<span style="font-size:12px;color:var(--t3);white-space:nowrap">' + (grpName(x.e) ? '▸ ' + _XE(grpName(x.e)) + ' · ' : '') + _XE(x.e.date || '') + (na ? ' · 📎' + na : '') + '</span></label>';
     }).join('') || '<div style="padding:10px;color:var(--t3);font-size:13px">Записей нет</div>';
     box.querySelectorAll('input[data-id]').forEach(i => i.onchange = () => { i.checked ? checked.add(i.dataset.id) : checked.delete(i.dataset.id); count(); });
     count();
   }
-  function count() { $('mc-exp-cnt').textContent = 'Записей: ' + checked.size + ' из ' + list.length; }
+  function count() { $('mc-exp-cnt').textContent = 'Записей: ' + checked.size + ' из ' + list.length; paintGrp(); }
+  // мультикарточка: кнопка раздела выбирает/снимает все его записи
+  const GR = card.entryGroups || [];
+  const grpName = e => ((GR.find(g => g.id === e.groupId) || {}).name) || '';
+  function paintGrp() {
+    const box = $('mc-exp-grp'); if (!box) return;
+    const keys = [...GR.map(g => g.id), ...(list.some(x => !GR.some(g => g.id === x.e.groupId)) ? ['__none'] : [])];
+    box.innerHTML = keys.map(k => {
+      const its = list.filter(x => k === '__none' ? !GR.some(g => g.id === x.e.groupId) : x.e.groupId === k); if (!its.length) return '';
+      const on = its.filter(x => checked.has(x.e.id)).length, all = on === its.length;
+      const nm = k === '__none' ? 'Без раздела' : (((GR.find(g => g.id === k) || {}).name) || 'Без названия');
+      return '<button data-grp="' + _XE(k) + '" style="' + bs + (all ? ';background:var(--accent);color:#0f0f0f;border-color:var(--accent)' : on ? ';border-color:var(--accent);color:var(--accent)' : '') + '">' + _XE(nm) + ' · ' + on + '/' + its.length + '</button>';
+    }).join('');
+    box.querySelectorAll('[data-grp]').forEach(b => b.onclick = () => {
+      const k = b.dataset.grp, its = list.filter(x => k === '__none' ? !GR.some(g => g.id === x.e.groupId) : x.e.groupId === k);
+      const all = its.every(x => checked.has(x.e.id));
+      its.forEach(x => all ? checked.delete(x.e.id) : checked.add(x.e.id));
+      render();
+    });
+  }
   function showLogo() { const im = $('mc-exp-logo-img'); if (P.logo) { im.src = P.logo; im.style.display = ''; $('mc-exp-logo-del').style.display = ''; } else { im.style.display = 'none'; $('mc-exp-logo-del').style.display = 'none'; } }
   showLogo();
   $('mc-exp-logo-btn').onclick = () => $('mc-exp-logo-file').click();
@@ -200,17 +220,24 @@ async function mcExportCardWordRun(card, opt) {
   try {
     // 1. Структура: выбранные записи по дате (рубрика — пометкой), вложения карточки под самой ранней записью
     const groups = card.entryGroups || [];
+    const grouped = groups.length > 0; // мультикарточка: разделы по порядку карточки, внутри раздела — по дате
+    const gIdx = new Map(groups.map((g, k) => [g.id, k]));
+    const gOf = x => gIdx.has(x.e.groupId) ? gIdx.get(x.e.groupId) : 1e9;
     const blocks = mcExportEntries(card).filter(x => opt.ids.has(x.e.id))
-      .sort((a, b) => (opt.order === 'asc' ? 1 : -1) * ((a.ts - b.ts) || (a.i - b.i)))
-      .map(x => ({ ts: x.ts, i: x.i, e: x.e, grp: ((groups.find(g => g.id === x.e.groupId) || {}).name) || '' }));
+      .sort((a, b) => (grouped ? gOf(a) - gOf(b) : 0) || (opt.order === 'asc' ? 1 : -1) * ((a.ts - b.ts) || (a.i - b.i)))
+      .map(x => ({ ts: x.ts, i: x.i, e: x.e, gk: grouped ? gOf(x) : 0, grp: grouped ? '' : (((groups.find(g => g.id === x.e.groupId) || {}).name) || ''),
+        gName: grouped ? (gIdx.has(x.e.groupId) ? (groups[gIdx.get(x.e.groupId)].name || 'Без названия') : 'Без раздела') : '' }));
     const cardAtts = opt.withCard ? (card.attachments || []).filter(a => a && a.data) : [];
     const allAtts = [];
     const reg = (a, tag) => { const o = { a, tag }; allAtts.push(o); return o; };
     let n = 0;
     const first = blocks.length ? blocks.reduce((m, b) => ((b.ts - m.ts) || (b.i - m.i)) < 0 ? b : m) : null;
+    let secNo = 0, inSec = 0, prevGk = null;
     blocks.forEach(b => {
       b.n = ++n;
-      const tag = String(b.n).padStart(2, '0');
+      if (grouped) { if (b.gk !== prevGk) { secNo++; inSec = 0; prevGk = b.gk; b.secStart = true; } b.sec = secNo; b.label = secNo + '.' + (++inSec); }
+      else b.label = String(b.n) + '.';
+      const tag = grouped ? (b.sec + '-' + inSec) : String(b.n).padStart(2, '0');
       const own = [...(b.e.sessionAtts || []), ...(b.e.attachments || [])].filter(a => a && a.data);
       b.atts = [...own, ...(b === first ? cardAtts : [])].map(a => reg(a, tag));
     });
@@ -363,9 +390,13 @@ async function mcExportCardWordRun(card, opt) {
       const parts = mcRichToParts(e.text || e.sessionNote || '');
       const rtl = _isRTL(parts.map(x => x.t || '').join(''));
       const textXml = parts.map(x => x.br ? '<w:r><w:br/></w:r>' : mcDocRun(x.t, { ...x, rtl, size: 24 })).join('');
-      if (P.divider && b !== blocks[0]) body += mcDocPara('', { before: 160, after: 120, line: 120, divider: (P.divColor || '#B8892B').replace('#', '') });
+      if (grouped && b.secStart) { // золотая плашка раздела с прогрессом
+        const sb2 = blocks.filter(x => x.gk === b.gk), sd = sb2.filter(x => x.e.done).length, rg = _isRTL(b.gName);
+        body += '<w:p><w:pPr><w:keepNext/><w:pBdr><w:left w:val="single" w:sz="24" w:space="6" w:color="' + GOLD + '"/></w:pBdr><w:shd w:val="clear" w:color="auto" w:fill="F6EFD9"/>' + (rg ? '<w:bidi/>' : '') + '<w:spacing w:before="' + (b === blocks[0] ? 120 : 320) + '" w:after="120"/></w:pPr>' +
+          mcDocRun(b.sec + '. ' + b.gName, { b: true, size: 28, rtl: rg }) + mcDocRun('   · ' + sd + ' из ' + sb2.length + ' выполнено', { size: 18, color: '8A6A1F' }) + '</w:p>';
+      } else if (P.divider && b !== blocks[0]) body += mcDocPara('', { before: 160, after: 120, line: 120, divider: (P.divColor || '#B8892B').replace('#', '') });
       else body += mcDocPara('', { after: 0, line: 120 });
-      body += mcDocPara(mcDocRun(b.n + '.  ', { b: true, color: GOLD, size: 26, rtl }) + (P.checks ? checkbox(!!e.done) : (e.done ? mcDocRun('☑ ', { size: 24, rtl }) : '')) + textXml, { before: 60, after: 60, keep: true, bidi: rtl });
+      body += mcDocPara(mcDocRun(b.label + '  ', { b: true, color: GOLD, size: 26, rtl }) + (P.checks ? checkbox(!!e.done) : (e.done ? mcDocRun('☑ ', { size: 24, rtl }) : '')) + textXml, { before: 60, after: 60, keep: true, bidi: rtl });
       const dTxt = String(e.date || '');
       if (P.dates === 'show' && (dTxt || b.grp)) body += mcDocPara(mcDocRun(dTxt + (b.grp ? (dTxt ? '  ·  ' : '') + '▸ ' + b.grp : ''), { size: 18, color: '8A8A8A', rtl: _isRTL(b.grp) && !dTxt }), { keep: true, after: 80 });
       else if (P.dates === 'hidden' && dTxt && !b.grp) body += mcDocPara(mcDocRun(dTxt, { size: 18, color: '8A8A8A', vanish: true }), { keep: true, after: 80, vanish: true });

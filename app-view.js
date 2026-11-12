@@ -15,6 +15,50 @@ function viewToggleGroup(cardId, groupId) {
   openView(cardId);
 }
 // Рубрики (разделы) в просмотре: переименовать / удалить вместе с записями
+// ── Мультикарточка: файлы у каждой записи в разделе, по умолчанию свёрнуты (состояние не запоминается) ──
+let mcVfOpen = new Set(), mcVfAll = false;
+window._mcVfHTML = window._mcVfHTML || {};
+function mcVfReset() { mcVfOpen = new Set(); mcVfAll = false; }
+function mcVfAtts(e) { return [...(e.sessionAtts || []), ...(e.attachments || [])].filter(a => a && a.data); }
+function mcVfLabel(atts) {
+  const n = { p: 0, v: 0, a: 0, f: 0 };
+  atts.forEach(a => { const t = a.type || ''; if(t.startsWith('image/')) n.p++; else if(t.startsWith('video/')) n.v++; else if(t.startsWith('audio/')) n.a++; else n.f++; });
+  return [n.p ? '📷 ' + n.p : '', n.v ? '🎥 ' + n.v : '', n.a ? '🎙 ' + n.a : '', n.f ? '📎 ' + n.f : ''].filter(Boolean).join(' · ');
+}
+function mcVfBoxHTML(e) { // содержимое раскрытого блока (строится только при раскрытии)
+  const atts = mcVfAtts(e), tiles = mediaTilesOf(atts);
+  const auds = atts.filter(a => (a.type || '').startsWith('audio/'));
+  const files = atts.filter(a => { const t = a.type || ''; return !t.startsWith('image/') && !t.startsWith('video/') && !t.startsWith('audio/'); });
+  return (tiles.length ? mediaStripHTML(tiles, 'vf_' + e.id) : '') +
+    auds.map(a => `<audio controls src="${a.data}" style="width:100%;height:32px;margin-top:5px"></audio>`).join('') +
+    (files.length ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${files.map(f => `<a href="${f.data}" download="${esc(f.name || 'file')}" class="file-action" style="margin:0">📎${esc(f.name || 'файл')}</a>`).join('')}</div>` : '');
+}
+function mcVfFilesHTML(e) {
+  const atts = mcVfAtts(e); if(!atts.length) return '';
+  const on = mcVfAll || mcVfOpen.has(e.id);
+  return `<div class="mc-vf" data-eid="${e.id}" onclick="mcVfToggle('${e.id}')" style="display:inline-flex;align-items:center;gap:6px;margin:4px 0 4px 24px;padding:3px 10px;border-radius:12px;background:var(--s2);border:1px solid ${on ? 'var(--accent)' : 'var(--b1)'};color:${on ? 'var(--accent)' : 'var(--t2)'};font-size:12px;cursor:pointer;user-select:none">${mcVfLabel(atts)} <span class="mc-vf-ar">${on ? '▴' : '▾'}</span></div>
+    <div id="mc-vfb-${e.id}" style="margin:0 0 6px 24px;${on ? '' : 'display:none'}">${on ? mcVfBoxHTML(e) : ''}</div>`;
+}
+function mcVfToggle(eid, force) {
+  const box = document.getElementById('mc-vfb-' + eid), chip = document.querySelector('.mc-vf[data-eid="' + eid + '"]'); if(!box) return;
+  const on = force === undefined ? box.style.display === 'none' : force;
+  if(on && !box.innerHTML) {
+    const card = (cards || []).find(c => c.id === window._openViewId), e = card && (card.entries || []).find(x => x.id === eid);
+    if(e) box.innerHTML = mcVfBoxHTML(e);
+  }
+  box.style.display = on ? '' : 'none';
+  if(on) mcVfOpen.add(eid); else mcVfOpen.delete(eid);
+  if(chip) { chip.style.borderColor = on ? 'var(--accent)' : 'var(--b1)'; chip.style.color = on ? 'var(--accent)' : 'var(--t2)'; const ar = chip.querySelector('.mc-vf-ar'); if(ar) ar.textContent = on ? '▴' : '▾'; }
+}
+function mcVfToggleAll(cardId) {
+  mcVfAll = !mcVfAll; if(!mcVfAll) mcVfOpen = new Set();
+  if(mcVfAll) { // свёрнутые разделы тоже раскрываем, иначе файлов не видно
+    const card = (cards || []).find(c => c.id === cardId);
+    (card?.entryGroups || []).forEach(g => viewGroupState.set(g.id, true));
+  }
+  openView(cardId);
+}
+
 async function renameViewGroup(cardId, groupId) {
   const card = cards.find(c => c.id === cardId); if(!card) return;
   const g = (card.entryGroups||[]).find(x => x.id === groupId); if(!g) return;
@@ -55,6 +99,7 @@ async function addViewGroup(cardId) {
 function openView(id) {
   const card = cards.find(c=>c.id===id); if(!card) return;
   if((currentSpace?.type==='family'||currentSpace?.type==='group') && typeof updateMyPresenceCard==='function') updateMyPresenceCard(id, card.title);
+  if(window._openViewId !== id) mcVfReset(); // мультикарточка: файлы при каждом открытии свёрнуты
   window._openViewId = id;
   // открыли чат — убираем его пуш из системного трея и его попап в приложении
   try { window.mcClearNative?.(id, card.title); } catch(e) {}
@@ -368,15 +413,16 @@ const dateCol = textColor ? (_lt ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)') 
         return `<div style="border:1px solid ${gDone?'rgba(91,184,122,.55)':'var(--b1)'};border-radius:var(--rsm);margin-bottom:8px;overflow:hidden">
           <div onclick="viewToggleGroup('${id}','${g.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:${gDone?'rgba(91,184,122,.2)':'var(--s2)'};cursor:pointer">
             <span style="font-size:13px;font-weight:700;color:${gDone?'var(--green)':'var(--accent)'}">${gDone?'✓ ':''}${esc(g.name)||'Без названия'}</span>
-            <span style="display:flex;align-items:center;gap:8px"><button onclick="event.stopPropagation();renameViewGroup('${id}','${g.id}')" title="Переименовать" style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;padding:2px 4px">✎</button><button onclick="event.stopPropagation();deleteViewGroup('${id}','${g.id}')" title="Удалить рубрику" style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;padding:2px 4px">🗑</button><button onclick="event.stopPropagation();openAddEntry('${id}',null,false,'${g.id}')" style="background:rgba(232,197,106,.15);color:var(--accent);border:1px solid rgba(232,197,106,.3);border-radius:6px;padding:2px 10px;font-size:15px;line-height:1.3;cursor:pointer">＋</button><span style="font-size:11px;color:var(--t3)">${gEntries.length} ${expanded?'▲':'▼'}</span></span>
+            <span style="display:flex;align-items:center;gap:8px">${(()=>{ const _ga = gEntries.flatMap(mcVfAtts); return _ga.length ? `<span style="font-size:11px;color:var(--t3);white-space:nowrap">${mcVfLabel(_ga)}</span>` : ''; })()}<button onclick="event.stopPropagation();renameViewGroup('${id}','${g.id}')" title="Переименовать" style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;padding:2px 4px">✎</button><button onclick="event.stopPropagation();deleteViewGroup('${id}','${g.id}')" title="Удалить рубрику" style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;padding:2px 4px">🗑</button><button onclick="event.stopPropagation();openAddEntry('${id}',null,false,'${g.id}')" style="background:rgba(232,197,106,.15);color:var(--accent);border:1px solid rgba(232,197,106,.3);border-radius:6px;padding:2px 10px;font-size:15px;line-height:1.3;cursor:pointer">＋</button><span style="font-size:11px;color:var(--t3)">${gEntries.length} ${expanded?'▲':'▼'}</span></span>
           </div>
-          ${expanded ? `<div style="padding:0 12px">${gEntries.map(e=>e.text ? entryRowHTML(e,null) : _voiceRowG(e)).join('')}</div>` : ''}
+          ${expanded ? `<div style="padding:0 12px">${gEntries.map(e=>(e.text ? entryRowHTML(e,null) : _voiceRowG(e)) + mcVfFilesHTML(e)).join('')}</div>` : ''}
         </div>`;
       }).join('');
     } else {
       sessionsHTML = sessions.map((s,si) => isFamily ? stickerHTML(s,si) : plainSessionHTML(s,si)).join('');
     }
-    html+=`<div class="view-sec">${!isFamily?`<div class="view-lbl">Записи (${dc}/${entries.filter(e=>e.text||_vOk(e)).length})</div>`:''}${sessionsHTML}${(!isFamily&&entryGroups.length)?`<button onclick="addViewGroup('${id}')" style="width:100%;background:var(--s2);color:var(--accent);border:1px dashed rgba(232,197,106,.4);border-radius:var(--rsm);padding:10px;font-size:14px;cursor:pointer">＋ Новая рубрика</button>`:''}</div>`;
+    const _vfAny = !isFamily && entryGroups.length && entries.some(e => mcVfAtts(e).length);
+    html+=`<div class="view-sec">${!isFamily?`<div class="view-lbl" style="display:flex;align-items:center;gap:8px"><span style="flex:1">Записи (${dc}/${entries.filter(e=>e.text||_vOk(e)).length})</span>${_vfAny?`<button onclick="mcVfToggleAll('${id}')" style="text-transform:none;letter-spacing:0;background:${mcVfAll?'var(--accent)':'var(--s2)'};color:${mcVfAll?'#0f0f0f':'var(--t2)'};border:1px solid ${mcVfAll?'var(--accent)':'var(--b1)'};border-radius:12px;padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">${mcVfAll?'Свернуть файлы':'Развернуть все'}</button>`:''}</div>`:''}${sessionsHTML}${(!isFamily&&entryGroups.length)?`<button onclick="addViewGroup('${id}')" style="width:100%;background:var(--s2);color:var(--accent);border:1px dashed rgba(232,197,106,.4);border-radius:var(--rsm);padding:10px;font-size:14px;cursor:pointer">＋ Новая рубрика</button>`:''}</div>`;
   }
 
   if(useStack) html+=`<div class="view-sec"><div class="view-lbl">Фото и видео</div>${mediaStackHTML(_mt, 'mg_'+id+'_c')}</div>`;
