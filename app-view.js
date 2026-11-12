@@ -418,6 +418,9 @@ const dateCol = textColor ? (_lt ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)') 
           ${expanded ? `<div style="padding:0 12px">${gEntries.map(e=>(e.text ? entryRowHTML(e,null) : _voiceRowG(e)) + mcVfFilesHTML(e)).join('')}</div>` : ''}
         </div>`;
       }).join('');
+      // записи вне разделов (например, перенесённые раньше) — не прячем
+      const _ungr = entries.filter(e => !entryGroups.some(g => g.id === e.groupId) && (e.text || _vOk(e)));
+      if(_ungr.length) sessionsHTML += `<div style="border:1px dashed var(--b2);border-radius:var(--rsm);margin-bottom:8px;overflow:hidden"><div style="padding:10px 12px;background:var(--s2);font-size:13px;font-weight:700;color:var(--t2)">Без раздела <span style="font-weight:400;font-size:11px;color:var(--t3)">· ${_ungr.length}</span></div><div style="padding:0 12px">${_ungr.map(e => (e.text ? entryRowHTML(e,null) : _voiceRowG(e)) + mcVfFilesHTML(e)).join('')}</div></div>`;
     } else {
       sessionsHTML = sessions.map((s,si) => isFamily ? stickerHTML(s,si) : plainSessionHTML(s,si)).join('');
     }
@@ -1991,10 +1994,47 @@ function confirmBulkSelection(cardId) {
   moveEntry(cardId, {entryIds, groupIds: checkedGroupIds});
 }
 
+// ── Перенос в мультикарточку / из неё: выбор раздела, распаковка раздела ──
+let moveTargetGroup = null, moveSecUnpack = false, moveSecConvert = false;
+function mvSecReset() { moveTargetGroup = null; moveSecUnpack = false; moveSecConvert = false; }
+function mvSecUI(targetCard, spaceId) {
+  mvSecReset();
+  const sp = spaces.find(s => s.id === spaceId); if(sp && (sp.type === 'family' || sp.type === 'group')) return; // чаты — как раньше
+  const box = document.getElementById('move-confirm-block'); if(!box || !targetCard) return;
+  const tg = targetCard.entryGroups || [], singles = (moveSelection.entryIds || []).length > 0, secs = (moveSelection.groupIds || []).length > 0;
+  const chip = (id, name, on) => `<button type="button" data-mvg="${id}" onclick="mvSecPick(this)" style="background:${on ? 'rgba(232,197,106,.15)' : 'var(--s2)'};border:1px solid ${on ? 'var(--accent)' : 'var(--b1)'};color:${on ? 'var(--accent)' : 'var(--t1)'};border-radius:14px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit">${esc(name || 'Без названия')}</button>`;
+  let h = '';
+  if(tg.length && singles) {
+    moveTargetGroup = { id: tg[0].id };
+    h += `<div style="font-size:12px;color:var(--t3);margin:12px 0 6px">В какой раздел карточки «${esc(targetCard.title || '')}»</div>
+      <div id="mv-sec-chips" style="display:flex;flex-wrap:wrap;gap:6px">${tg.map((g, i) => chip(g.id, g.name, i === 0)).join('')}<button type="button" onclick="mvSecNew(this)" style="background:transparent;border:1px dashed var(--b2);color:var(--accent);border-radius:14px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit">＋ Новый раздел</button></div>`;
+  }
+  if(!tg.length && secs) {
+    moveSecUnpack = true;
+    const r = (v, t, d, on) => `<label style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;cursor:pointer;font-size:13px;color:var(--t1)"><input type="radio" name="mv-sec-mode" value="${v}"${on ? ' checked' : ''} onchange="mvSecMode(this.value)" style="margin-top:3px"><span>${t}<br><span style="font-size:11px;color:var(--t3)">${d}</span></span></label>`;
+    h += `<div style="font-size:12px;color:var(--t3);margin:12px 0 4px">Карточка «${esc(targetCard.title || '')}» без разделов</div>` +
+      r('unpack', 'Распаковать раздел в обычные записи', 'вид карточки не меняется', true) +
+      r('convert', 'Сделать карточку мультикарточкой', 'её прежние записи соберутся в раздел «Общее»', false);
+  }
+  if(h) box.insertAdjacentHTML('afterbegin', '<div id="move-sec-block">' + h + '</div>');
+}
+function mvSecPick(btn) {
+  moveTargetGroup = { ...(moveTargetGroup && moveTargetGroup.isNew && moveTargetGroup.id === btn.dataset.mvg ? moveTargetGroup : {}), id: btn.dataset.mvg };
+  document.querySelectorAll('#mv-sec-chips [data-mvg]').forEach(b => { const on = b === btn; b.style.background = on ? 'rgba(232,197,106,.15)' : 'var(--s2)'; b.style.borderColor = on ? 'var(--accent)' : 'var(--b1)'; b.style.color = on ? 'var(--accent)' : 'var(--t1)'; });
+}
+function mvSecNew(btn) {
+  const n = (prompt('Название нового раздела:') || '').trim(); if(!n) return;
+  const id = uid();
+  btn.insertAdjacentHTML('beforebegin', `<button type="button" data-mvg="${id}" onclick="mvSecPick(this)" style="background:var(--s2);border:1px solid var(--b1);color:var(--t1);border-radius:14px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit">${esc(n)}</button>`);
+  moveTargetGroup = { id, name: n, isNew: true };
+  mvSecPick(btn.previousElementSibling);
+}
+function mvSecMode(v) { moveSecUnpack = v === 'unpack'; moveSecConvert = v === 'convert'; }
+
 function moveEntry(cardId, selection) {
   const card = cards.find(c=>c.id===cardId); if(!card) return;
     moveSelection = typeof selection === 'string' ? {entryIds:[selection], groupIds:[]} : selection;
-  moveAssignedTo = null; moveAssignedCompletions = null; moveDeleteSource = false; moveTargetCard = null; moveSessionNote = '';
+  moveAssignedTo = null; moveAssignedCompletions = null; moveDeleteSource = false; moveTargetCard = null; moveSessionNote = ''; mvSecReset();
   const div = document.createElement('div');
   div.id = 'move-entry-dialog';
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
@@ -2146,11 +2186,11 @@ async function selectMoveCat(cardId, spaceId, catName, btn) {
   moveTargetCard = null;
   let targetCards = [];
   if(spaceId === currentSpaceId) {
-    targetCards = cards.filter(c=>c.category===catName && c.id!==cardId && c.status!=='done').map(c=>({id:c.id, title:c.title, chatParticipants:c.chatParticipants}));
+    targetCards = cards.filter(c=>c.category===catName && c.id!==cardId && c.status!=='done').map(c=>({id:c.id, title:c.title, chatParticipants:c.chatParticipants, entryGroups:c.entryGroups||[]}));
   } else {
     cardListEl.innerHTML = '<div style="font-size:13px;color:var(--t3)">Загрузка...</div>';
     try {
-      const {data} = await sb.from('cards').select('id,title,chatParticipants').eq('space_id', spaceId).eq('category', catName).neq('status','done');
+      const {data} = await sb.from('cards').select('id,title,chatParticipants,entryGroups').eq('space_id', spaceId).eq('category', catName).neq('status','done');
       targetCards = data||[];
     } catch(e) { cardListEl.innerHTML = '<div style="font-size:13px;color:var(--red)">Ошибка загрузки</div>'; return; }
   }
@@ -2172,6 +2212,7 @@ function selectMoveTarget(cardId, spaceId, idx, btn) {
   moveTargetCard = {id: targetCard.id, spaceId};
   const targetSpace = spaces.find(s=>s.id===spaceId);
   document.getElementById('move-confirm-block').innerHTML = `<button onclick="confirmMove('${cardId}')" style="width:100%;margin-top:10px;background:var(--accent);border:none;color:#0f0f0f;font-weight:700;border-radius:var(--rsm);padding:11px;cursor:pointer">Перенести</button>`;
+  mvSecUI(targetCard, spaceId); // мультикарточка: выбор раздела / распаковка
 }
 
 // ── Окно «Сроки сегодня» (по нажатию на пуш о нескольких записях) ──
@@ -2344,11 +2385,14 @@ async function collectMoveEntries(fromCard, targetSpaceId) {
   let isFirst = true;
 
   const sourceGroups = (fromCard.entryGroups||[]).filter(g => moveSelection.groupIds.includes(g.id));
+  const _mvUnpack = !_toChat && moveSecUnpack;            // раздел → обычные записи
+  const _mvTg = (!_toChat && moveTargetGroup) || null;     // отдельные записи → выбранный раздел цели
   sourceGroups.forEach(g => {
     const newId = uid();
     groupIdMap[g.id] = newId;
-    movedGroups.push({id: newId, name: g.name});
+    if(!_mvUnpack) movedGroups.push({id: newId, name: g.name});
   });
+  if(_mvTg && _mvTg.isNew) movedGroups.push({id: _mvTg.id, name: _mvTg.name});
   // Если переносим целый раздел и не ввели свой текст-обращение — используем название раздела как заголовок сообщения в чате
   const autoNote = (!moveSessionNote.trim() && sourceGroups.length) ? sourceGroups[0].name : '';
 
@@ -2368,7 +2412,7 @@ async function collectMoveEntries(fromCard, targetSpaceId) {
         sessionAtts: isFirst ? (e.sessionAtts||e.attachments||[]) : []
       } : {
         ...e, id: uid(),
-        groupId: fromSelectedGroup ? groupIdMap[e.groupId] : undefined,
+        groupId: fromSelectedGroup ? (_mvUnpack ? undefined : groupIdMap[e.groupId]) : (_mvTg ? _mvTg.id : undefined),
         sessionId: sessMap[_ssid],
         sessionCreator: e.sessionCreator || sessionCreator,
         sessionNote: isFirst ? (moveSessionNote.trim() || autoNote || e.sessionNote || null) : (e.sessionNote || null),
@@ -2406,6 +2450,7 @@ async function confirmMove(fromCardId) {
     if(moveTargetCard.spaceId === currentSpaceId) {
       const toCard = cards.find(c=>c.id===moveTargetCard.id);
       if(!toCard) { toast('Карточка не найдена', true); return; }
+      if(moveSecConvert && !(toCard.entryGroups||[]).length) { const _gid = uid(); toCard.entries = (toCard.entries||[]).map(x => x.groupId ? x : {...x, groupId: _gid}); toCard.entryGroups = [{id: _gid, name: 'Общее'}]; }
       toCard.entries = [...movedEntries, ...(toCard.entries||[])];
       toCard.entryGroups = [...(toCard.entryGroups||[]), ...movedGroups];
       toCard.deadline = ([...toCard.entries].filter(x=>!x.done&&x.deadline).map(x=>x.deadline).sort()[0]) || toCard.deadline || null;
@@ -2413,6 +2458,7 @@ async function confirmMove(fromCardId) {
     } else {
       const {data:toCardData} = await sb.from('cards').select('*').eq('id', moveTargetCard.id).single();
       if(!toCardData) { toast('Карточка не найдена', true); return; }
+      if(moveSecConvert && !(toCardData.entryGroups||[]).length) { const _gid = uid(); toCardData.entries = (toCardData.entries||[]).map(x => x.groupId ? x : {...x, groupId: _gid}); toCardData.entryGroups = [{id: _gid, name: 'Общее'}]; }
       const updatedEntries = [...movedEntries, ...(toCardData.entries||[])];
       const updatedGroups = [...(toCardData.entryGroups||[]), ...movedGroups];
       const _newDl = ([...updatedEntries].filter(x=>!x.done&&x.deadline).map(x=>x.deadline).sort()[0]) || toCardData.deadline || null;
@@ -2465,6 +2511,7 @@ async function createCardAndMove(fromCardId, spaceId, catName) {
   if(moveAssignGuard(spaceId, () => createCardAndMove(fromCardId, spaceId, catName))) return;
   const title = prompt('Название новой карточки:');
   if(!title) return;
+  mvSecReset(); // выбор раздела относился к другой (существующей) карточке
   const {entries: movedEntries, groups: movedGroups} = await collectMoveEntries(fromCard, spaceId);
   if(!movedEntries.length) { toast('Нечего переносить', true); return; }
   const targetSpace = spaces.find(s=>s.id===spaceId);
