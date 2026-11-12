@@ -158,11 +158,52 @@ function tryClose() {
 function checkDirty() { setSaveBtns(!!(document.getElementById('e-title').value.trim())); }
 function setSaveBtns(en) { ['save-btn','save-btn2','save-btn3'].forEach(id=>{const b=document.getElementById(id);if(b)b.disabled=!en;}); }
 
+// ── Похожие рубрики: «Дом» / «дом» / «Дома» / «Работа» и «Робота» не создаём дважды ──
+function catNorm(s) { return String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/[^\p{L}\p{N}]+/gu, ''); }
+function catLev(a, b) { // расстояние правки (сколько букв поменять/добавить/убрать)
+  if(Math.abs(a.length - b.length) > 2) return 9;
+  let p = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for(let i = 1; i <= a.length; i++) { const c = [i]; for(let j = 1; j <= b.length; j++) c[j] = Math.min(p[j] + 1, c[j - 1] + 1, p[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); p = c; }
+  return p[b.length];
+}
+function catFindSimilar(name, names) {
+  const n = catNorm(name); if(!n) return null;
+  let best = null, bestD = 99;
+  (names || []).forEach(x => {
+    const m = catNorm(x); if(!m) return;
+    let d = 99;
+    if(m === n) d = 0;
+    else if(Math.min(m.length, n.length) >= 3 && (m.startsWith(n) || n.startsWith(m)) && Math.abs(m.length - n.length) <= 3) d = 1; // «Дом» / «Дома», «Работа» / «Работа 2»
+    else if(Math.min(m.length, n.length) >= 4) { const l = catLev(m, n); if(l <= (Math.min(m.length, n.length) >= 7 ? 2 : 1)) d = 1 + l; } // опечатки
+    if(d < bestD) { bestD = d; best = x; }
+  });
+  return bestD < 99 ? best : null;
+}
+// окно «Похожая рубрика уже есть»: onUse — выбрать существующую, onCreate — всё равно создать новую
+function catSimilarAsk(newName, existing, onUse, onCreate) {
+  document.getElementById('cat-sim-ov')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'cat-sim-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;max-width:340px;width:100%;box-sizing:border-box">
+    <div style="font-size:16px;font-weight:700;margin-bottom:8px">Похожая рубрика уже есть</div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:12px;line-height:1.5">Вы вводите «<span dir="auto">${esc(newName)}</span>», а в кабинете уже есть:</div>
+    <div style="display:flex;align-items:center;gap:8px;background:var(--s2);border-radius:var(--rsm);padding:10px 12px;margin-bottom:16px;font-size:15px;font-weight:600" dir="auto">${esc(existing)}</div>
+    <button type="button" id="cs-use" style="width:100%;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px">Выбрать «${esc(existing)}»</button>
+    <div style="display:flex;gap:8px"><button type="button" id="cs-no" style="flex:1;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:10px;font-size:13px;cursor:pointer;font-family:inherit">Отмена</button>
+    <button type="button" id="cs-new" style="flex:1;background:none;border:1px solid var(--b1);color:var(--t1);border-radius:var(--rsm);padding:10px;font-size:13px;cursor:pointer;font-family:inherit">Всё равно создать</button></div>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#cs-use').onclick = () => { ov.remove(); onUse && onUse(existing); };
+  ov.querySelector('#cs-new').onclick = () => { ov.remove(); onCreate && onCreate(); };
+  ov.querySelector('#cs-no').onclick = () => ov.remove();
+}
+
 // Cat select
 function populateCatSel(sel) {
   const s=document.getElementById('e-cat');
   // Личный кабинет: подсказки готовых рубрик (создаются только если выбрать и сохранить)
-  const sug = (currentSpace?.type==='personal' ? ['Работа','Семья','Дом','Проекты'] : []).filter(n=>!cats.some(c=>c.name===n));
+  const sug = (currentSpace?.type==='personal' ? ['Работа','Семья','Дом','Проекты'] : []).filter(n=>!catFindSimilar(n, cats.map(c=>c.name)));
   s.innerHTML=cats.map(c=>`<option value="${c.name}"${c.name===sel?' selected':''}>${esc(c.name)}</option>`).join('')+sug.map(n=>`<option value="__sug:${n}">${n} (новая)</option>`).join('')+'<option value="__new">+ Новая рубрика</option>';
 }
 function onCatChange() { if(document.getElementById('e-cat').value==='__new'){document.getElementById('new-cat-box').style.display='flex';initPalette(); setTimeout(()=>{ const i=document.getElementById('e-new-cat'); if(i){ i.scrollIntoView({block:'center',behavior:'smooth'}); i.focus(); } }, 80);} }
@@ -176,9 +217,12 @@ function initPalette() {
   }).join('');
 }
 function pickColor(c,el) { newCatColor=c; document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('on')); el.classList.add('on'); }
-async function addCat() {
+async function addCat(force) {
   const nm=document.getElementById('e-new-cat').value.trim(); if(!nm)return;
-  if(cats.find(c=>c.name===nm))return;
+  const _useCat = name => { populateCatSel(name); document.getElementById('e-cat').value=name; document.getElementById('new-cat-box').style.display='none'; document.getElementById('e-new-cat').value=''; };
+  if(cats.find(c=>c.name===nm)) { _useCat(nm); toast('Такая рубрика уже есть — выбрана она'); return; }
+  const _sim = force ? null : catFindSimilar(nm, cats.map(c=>c.name));
+  if(_sim) { catSimilarAsk(nm, _sim, _useCat, () => addCat(true)); return; }
   const cat={name:nm,color:newCatColor};
   cats.push(cat); await dbAddCat(cat);
   populateCatSel(nm); document.getElementById('e-cat').value=nm;

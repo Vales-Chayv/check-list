@@ -2095,8 +2095,17 @@ function mvNewCat(cardId, spaceId) {
   d.querySelectorAll('[data-c]').forEach(sw => sw.onclick = () => { color = sw.dataset.c; d.querySelectorAll('[data-c]').forEach(x => x.classList.toggle('on', x === sw)); });
   d.querySelector('[data-x="0"]').onclick = () => d.remove();
   d.onclick = e => { if(e.target === d) d.remove(); };
-  const save = async () => {
+  const save = async (force) => {
     const nm = inp.value.trim(); if(!nm) { inp.focus(); return; }
+    // рубрики выбранного кабинета — из списка в окне переноса
+    const _btns = [...(document.querySelectorAll('#move-cat-list button') || [])].filter(b => b.id !== 'move-cat-new');
+    const _names = _btns.map(b => b.textContent.trim());
+    const _sim = force === true ? null : (typeof catFindSimilar === 'function' ? catFindSimilar(nm, _names) : null);
+    if(_sim) {
+      d.remove();
+      catSimilarAsk(nm, _sim, name => { const b = _btns.find(x => x.textContent.trim() === name); if(b) b.click(); }, () => save(true));
+      return;
+    }
     d.remove();
     try {
       if(spaceId === currentSpaceId) {
@@ -2117,7 +2126,7 @@ function mvNewCat(cardId, spaceId) {
     toast('✓ Рубрика «' + nm + '» создана');
     selectMoveCat(cardId, spaceId, nm, b);
   };
-  d.querySelector('[data-x="1"]').onclick = save;
+  d.querySelector('[data-x="1"]').onclick = () => save();
   inp.onkeydown = e => { if(e.key === 'Enter') save(); };
 }
 

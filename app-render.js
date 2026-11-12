@@ -692,14 +692,20 @@ function renderCats() {
   filterCats = filterCats.filter(n => cats.some(c => c.name === n));
   const bar = document.getElementById('cats');
   const all = filterCat==='all' && !filterCats.length;
-  let html = `<button class="cat-btn${all?' on':''}" style="${all?'border-color:rgba(255,255,255,.25)':''}" onclick="handleAllCatClick()">Все ▾</button>`;
+  if(!document.getElementById('cat-all-css')) { // «Все» стоит на месте, остальные рубрики уходят под неё при прокрутке
+    const st = document.createElement('style'); st.id = 'cat-all-css';
+    st.textContent = '#cats .cat-all{position:sticky;left:16px;z-index:3;background:var(--bg)}#cats .cat-all::before{content:"";position:absolute;top:-6px;bottom:-6px;left:-18px;width:18px;background:var(--bg)}#cats .cat-all::after{content:"";position:absolute;top:-2px;bottom:-2px;right:-15px;width:14px;background:linear-gradient(90deg,var(--bg),transparent);pointer-events:none}';
+    document.head.appendChild(st);
+  }
+  let html = `<button class="cat-btn cat-all${all?' on':''}" style="${all?'border-color:rgba(255,255,255,.25)':''}" onclick="handleAllCatClick()">Все ▾</button>`;
   if(view==='cards' && !(currentSpace?.type==='family'||currentSpace?.type==='group')) html += `<button class="cat-btn${filterNoDeadline?' on':''}" style="${filterNoDeadline?'background:rgba(232,197,106,.15);border-color:var(--accent);color:var(--accent)':''}" onclick="toggleNoDeadline()">📅✕ Без срока</button>`;
   cats.forEach((c,i) => {
     const col = c.color||'#888';
     const active = filterCat===c.name;
     const bg = active ? hex2rgba(col,.15) : 'transparent';
     const border = active ? hex2rgba(col,.5) : 'rgba(255,255,255,.08)';
-    html += `<button class="cat-btn${active?' on':''}" style="background:${bg};border-color:${border}" draggable="true"
+    const _canDrag = (currentSpace?.type==='family'||currentSpace?.type==='group'); // в личном кабинете рубрики не перетаскиваются (долгое нажатие — цвет/удаление — остаётся)
+    html += _canDrag ? `<button class="cat-btn${active?' on':''}" style="background:${bg};border-color:${border}" draggable="true"
       onclick="App.setCat(${i})"
       oncontextmenu="event.preventDefault();event.stopPropagation();openCatEdit(${i});return false"
       ondragstart="App.startCatDrag(${i})"
@@ -707,7 +713,13 @@ function renderCats() {
       ondrop="event.preventDefault();App.dropCat(${i})"
       ontouchstart="App.startCatHold(${i},this);App.touchStartCat(${i},event)"
       ontouchend="App.cancelCatHold();App.touchEndCat(event)"
-      ontouchmove="App.cancelCatHold();App.touchMoveCat(event)">
+      ontouchmove="App.cancelCatHold();App.touchMoveCat(event)">` : `<button class="cat-btn${active?' on':''}" style="background:${bg};border-color:${border}"
+      onclick="App.setCat(${i})"
+      oncontextmenu="event.preventDefault();event.stopPropagation();openCatEdit(${i});return false"
+      ontouchstart="App.startCatHold(${i},this)"
+      ontouchend="App.cancelCatHold()"
+      ontouchmove="App.cancelCatHold()">`;
+    html += `
     <span class="cat-dot" style="background:${col}"></span>${esc(c.name)}</button>`;
   });
   bar.innerHTML = html;
