@@ -816,7 +816,7 @@ function renderCats() {
   const all = filterCat==='all' && !filterCats.length;
   if(!document.getElementById('cat-all-css')) { // «Все» стоит на месте, остальные рубрики уходят под неё при прокрутке
     const st = document.createElement('style'); st.id = 'cat-all-css';
-    st.textContent = '#cats .cat-btn,#cats-dropdown .cat-btn{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}#cats .cat-all{position:sticky;left:16px;z-index:3;background:var(--bg)}#cats.cats-fade{-webkit-mask-image:linear-gradient(90deg,transparent 0,transparent 15px,#000 16px,#000 var(--all-r,80px),transparent var(--all-r,80px),#000 calc(var(--all-r,80px) + 30px));mask-image:linear-gradient(90deg,transparent 0,transparent 15px,#000 16px,#000 var(--all-r,80px),transparent var(--all-r,80px),#000 calc(var(--all-r,80px) + 30px))}';
+    st.textContent = '#cats .cat-btn,#cats-dropdown .cat-btn{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}#cats .cat-all{position:sticky;left:0;z-index:3;background:var(--bg);flex-shrink:0;box-shadow:0 0 0 6px var(--bg)}#cats.cats-fade{-webkit-mask-image:linear-gradient(90deg,transparent 0,transparent calc(var(--all-l,16px) - 1px),#000 var(--all-l,16px),#000 var(--all-r,80px),transparent var(--all-r,80px),#000 calc(var(--all-r,80px) + 30px));mask-image:linear-gradient(90deg,transparent 0,transparent calc(var(--all-l,16px) - 1px),#000 var(--all-l,16px),#000 var(--all-r,80px),transparent var(--all-r,80px),#000 calc(var(--all-r,80px) + 30px))}';
     document.head.appendChild(st);
   }
   const _sfN = sfPersonal() ? sfCount() : 0;
@@ -849,10 +849,10 @@ function renderCats() {
   });
   bar.innerHTML = html;
   // мягкое затухание: при прокрутке рубрики растворяются, не доходя до «Все» (в начале ленты маски нет)
-  const _ab = bar.querySelector('.cat-all');
-  if(_ab) bar.style.setProperty('--all-r', (_ab.offsetLeft + _ab.offsetWidth) + 'px');
-  if(!bar._fadeBound) { bar._fadeBound = true; bar.addEventListener('scroll', () => bar.classList.toggle('cats-fade', bar.scrollLeft > 2), { passive: true }); }
-  bar.classList.toggle('cats-fade', bar.scrollLeft > 2);
+  // правый край «Все» считаем по экрану (offsetLeft у закреплённой кнопки растёт вместе с прокруткой — из-за этого затухание уезжало вправо)
+  const _catsFade = () => { const ab = bar.querySelector('.cat-all'); if(ab) { const L = bar.getBoundingClientRect().left, q = ab.getBoundingClientRect(); bar.style.setProperty('--all-l', Math.round(q.left - L) + 'px'); bar.style.setProperty('--all-r', Math.round(q.right - L) + 'px'); } bar.classList.toggle('cats-fade', bar.scrollLeft > 2); };
+  if(!bar._fadeBound) { bar._fadeBound = true; bar.addEventListener('scroll', () => { if(bar._fadeFn) bar._fadeFn(); }, { passive: true }); }
+  bar._fadeFn = _catsFade; _catsFade();
   const strip = document.getElementById('cats-strip');
   if(strip) {
     if(_sfN && (sfS().type.length||sfS().dl.length||sfS().inn.length||sfS().st.length)) { strip.style.display = 'flex'; strip.innerHTML = `<span dir="auto" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Фильтр: ${esc(sfLabel())}</span><button onclick="sfReset()" style="flex-shrink:0;background:none;border:1px solid rgba(232,197,106,.4);color:var(--accent);border-radius:12px;padding:3px 10px;font-size:12px;cursor:pointer;font-family:inherit">Сбросить</button>`; }
