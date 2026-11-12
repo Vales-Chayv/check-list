@@ -1,5 +1,5 @@
 importScripts('sw-media.js');
-const CACHE = 'mc-v432';
+const CACHE = 'mc-v433';
 const APP_FILES = [
   '/check-list/',
   '/check-list/index.html',

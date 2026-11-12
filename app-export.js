@@ -96,8 +96,8 @@ async function mcLogoFromFile(file) {
   return c.toDataURL('image/png');
 }
 
-function mcExportCardWord(cardId) {
-  const card = (typeof cards !== 'undefined') && cards.find(c => c.id === cardId);
+function mcExportCardWord(cardId, ready) { // ready — готовая «карточка» (например, месяц из хранилища «Выполненных»)
+  const card = ready || ((typeof cards !== 'undefined') && cards.find(c => c.id === cardId));
   if (!card) return;
   if (typeof JSZip === 'undefined') { toast('Модуль архивов не загрузился. Проверь интернет и обнови страницу', true); return; }
   if (window._mcExporting || document.getElementById('mc-exp-ov')) return;
@@ -155,7 +155,7 @@ function mcExportCardWord(cardId) {
       return '<label style="display:flex;gap:9px;align-items:flex-start;padding:7px 6px;border-bottom:1px solid var(--b1);cursor:pointer;font-size:14px">' +
         '<input type="checkbox" data-id="' + _XE(x.e.id) + '"' + (checked.has(x.e.id) ? ' checked' : '') + ' style="margin-top:3px">' +
         '<span style="flex:1;min-width:0;word-break:break-word" dir="auto">' + (x.e.done ? '☑ ' : '') + _XE(plain(x.e)) + '</span>' +
-        '<span style="font-size:12px;color:var(--t3);white-space:nowrap">' + (grpName(x.e) ? '▸ ' + _XE(grpName(x.e)) + ' · ' : '') + _XE(x.e.date || '') + (na ? ' · 📎' + na : '') + '</span></label>';
+        '<span style="font-size:12px;color:var(--t3);white-space:nowrap;max-width:45%;overflow:hidden;text-overflow:ellipsis;flex-shrink:1">' + (grpName(x.e) ? '▸ ' + _XE(grpName(x.e)) + ' · ' : '') + _XE(x.e.date || '') + (na ? ' · 📎' + na : '') + '</span></label>';
     }).join('') || '<div style="padding:10px;color:var(--t3);font-size:13px">Записей нет</div>';
     box.querySelectorAll('input[data-id]').forEach(i => i.onchange = () => { i.checked ? checked.add(i.dataset.id) : checked.delete(i.dataset.id); count(); });
     count();
