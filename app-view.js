@@ -1938,15 +1938,16 @@ let moveAssignedTo = null, moveAssignedCompletions = null, moveDeleteSource = fa
 function openBulkTransferPicker(cardId) {
   const card = cards.find(c=>c.id===cardId); if(!card) return;
   const groups = card.entryGroups||[];
-  const entries = (card.entries||[]).filter(e=>e.text);
+  const entries = (card.entries||[]).filter(e=>e.text || (e.sessionAtts||[]).length || (e.attachments||[]).length); // и записи только с голосом/файлом
+  const _btTxt = e => e.text ? esc(stripTags(e.text)) : ([...(e.sessionAtts||[]), ...(e.attachments||[])].some(a => (a.type||'').startsWith('audio/')) ? '🎙 Голосовая запись' : '📎 Вложение') + (e.date ? ` <span style="color:var(--t3);font-size:11px">${esc(e.date)}</span>` : '');
   const div = document.createElement('div');
   div.id = 'bulk-transfer-ov';
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
   const groupBlocks = groups.map(g => {
     const gEntries = entries.filter(e=>e.groupId===g.id);
     const itemRows = gEntries.map(e => `<label style="display:flex;align-items:flex-start;gap:8px;padding:6px 0 6px 26px;cursor:pointer">
-        <input type="checkbox" class="bt-entry-cb bt-entry-in-group" data-entryid="${e.id}" data-groupid="${g.id}" style="margin-top:2px">
-        <div style="font-size:13px" dir="auto">${esc(stripTags(e.text))}</div>
+        <input type="checkbox" class="bt-entry-cb bt-entry-in-group" data-entryid="${e.id}" data-groupid="${g.id}" style="margin-top:2px" onchange="bulkCount()">
+        <div style="font-size:13px" dir="auto">${_btTxt(e)}</div>
       </label>`).join('');
     return `<div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 12px;margin-bottom:6px">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
@@ -1956,20 +1957,22 @@ function openBulkTransferPicker(cardId) {
       ${itemRows ? `<div style="margin-top:4px">${itemRows}</div>` : ''}
     </div>`;
   }).join('');
-  const ungrouped = entries.filter(e=>!e.groupId);
+  const ungrouped = entries.filter(e=>!groups.some(g=>g.id===e.groupId)); // и записи «Без раздела»
   const entryBlocks = ungrouped.map(e => `<label style="display:flex;align-items:flex-start;gap:8px;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 12px;cursor:pointer;margin-bottom:6px">
-      <input type="checkbox" class="bt-entry-cb" data-entryid="${e.id}" style="margin-top:2px">
-      <div style="font-size:13px" dir="auto">${esc(stripTags(e.text))}</div>
+      <input type="checkbox" class="bt-entry-cb" data-entryid="${e.id}" style="margin-top:2px" onchange="bulkCount()">
+      <div style="font-size:13px" dir="auto">${_btTxt(e)}</div>
     </label>`).join('');
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px 20px 16px;width:100%;max-width:420px;max-height:80vh;display:flex;flex-direction:column;box-sizing:border-box">
     <div style="font-size:16px;font-weight:700;margin-bottom:4px;flex-shrink:0">Что перенести?</div>
-    <div style="font-size:12px;color:var(--t3);margin-bottom:12px;flex-shrink:0">Отметьте «весь раздел» целиком или только нужные записи внутри</div>
+    <div style="font-size:12px;color:var(--t3);margin-bottom:8px;flex-shrink:0">Отметьте «весь раздел» целиком или только нужные записи внутри</div>
+    ${entries.length ? `<label style="display:flex;align-items:center;gap:8px;padding:9px 12px;margin-bottom:8px;border:1px solid rgba(232,197,106,.4);border-radius:var(--rsm);background:rgba(232,197,106,.08);cursor:pointer;flex-shrink:0"><input type="checkbox" id="bt-all" onchange="bulkSelectAll(this)"> <span style="font-size:14px;font-weight:700;color:var(--accent)">Выбрать все (${entries.length})</span></label>` : ''}
     <div style="flex:1;min-height:0;overflow-y:auto">
     ${groupBlocks}
     ${entryBlocks}
     ${!groups.length && !ungrouped.length ? '<div style="color:var(--t3);font-size:13px">Нет записей</div>' : ''}
     </div>
-    <div style="display:flex;gap:8px;margin-top:12px;flex-shrink:0">
+    <div id="bt-count" style="font-size:12px;color:var(--t3);margin-top:8px;flex-shrink:0">Выбрано: 0</div>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-shrink:0">
       <button onclick="document.getElementById('bulk-transfer-ov')?.remove()" style="flex:1;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;cursor:pointer">Отмена</button>
       <button onclick="confirmBulkSelection('${cardId}')" style="flex:1;background:var(--accent);border:none;color:#0f0f0f;font-weight:700;border-radius:var(--rsm);padding:11px;cursor:pointer">Далее →</button>
     </div>
@@ -1982,6 +1985,20 @@ function bulkToggleGroup(cb) {
     item.checked = cb.checked;
     item.disabled = cb.checked;
   });
+  bulkCount();
+}
+// «Выбрать все»: все разделы целиком и все записи вне разделов
+function bulkSelectAll(cb) {
+  const on = cb.checked; // запоминаем сразу: bulkCount по ходу пересчитывает саму галочку «Выбрать все»
+  document.querySelectorAll('#bulk-transfer-ov .bt-entry-cb:not(.bt-entry-in-group)').forEach(e => { e.checked = on; });
+  document.querySelectorAll('#bulk-transfer-ov .bt-group-cb').forEach(g => { g.checked = on; bulkToggleGroup(g); });
+  bulkCount();
+}
+function bulkCount() {
+  const ov = document.getElementById('bulk-transfer-ov'); if(!ov) return;
+  const all = ov.querySelectorAll('.bt-entry-cb'), on = ov.querySelectorAll('.bt-entry-cb:checked');
+  const c = document.getElementById('bt-count'); if(c) c.textContent = 'Выбрано: ' + on.length + ' из ' + all.length;
+  const a = document.getElementById('bt-all'); if(a) a.checked = all.length > 0 && on.length === all.length;
 }
 function confirmBulkSelection(cardId) {
   const checkedGroupIds = [...document.querySelectorAll('.bt-group-cb:checked')].map(cb=>cb.dataset.groupid);
@@ -2273,12 +2290,14 @@ async function selectMoveCat(cardId, spaceId, catName, btn) {
     } catch(e) { cardListEl.innerHTML = '<div style="font-size:13px;color:var(--red)">Ошибка загрузки</div>'; return; }
   }
   window._moveTargetCards = targetCards;
+  const _tSpM = spaces.find(s=>s.id===spaceId), _multiOk = !(_tSpM && (_tSpM.type==='family'||_tSpM.type==='group'));
+  const _newMultiBtn = _multiOk ? `<button onclick="createCardAndMove('${cardId}','${spaceId}','${esc(catName)}',true)" style="${_mvNewCss}">＋ Новая мультикарточка</button>` : '';
   const _newCardBtn = `<button onclick="createCardAndMove('${cardId}','${spaceId}','${esc(catName)}')" style="background:transparent;border:1px dashed var(--b2);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--accent);cursor:pointer;text-align:left;font-family:inherit">＋ Новая карточка…</button>`;
   cardListEl.innerHTML = targetCards.length
     ? `<div style="font-size:12px;color:var(--t3);margin-bottom:4px">Выбери карточку:</div>` +
-      targetCards.map((c,i)=>`<button onclick="selectMoveTarget('${cardId}','${spaceId}',${i},this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">${esc(c.title)}</button>`).join('') + _newCardBtn
+      targetCards.map((c,i)=>`<button onclick="selectMoveTarget('${cardId}','${spaceId}',${i},this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">${esc(c.title)}</button>`).join('') + _newCardBtn + _newMultiBtn
     : `<div style="font-size:13px;color:var(--t3);margin-bottom:8px">Нет карточек в этой рубрике</div>
-   <button onclick="createCardAndMove('${cardId}','${spaceId}','${esc(catName)}')" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:10px 14px;font-size:14px;font-weight:700;cursor:pointer;width:100%">＋ Создать карточку и перенести</button>`;
+   <button onclick="createCardAndMove('${cardId}','${spaceId}','${esc(catName)}')" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:10px 14px;font-size:14px;font-weight:700;cursor:pointer;width:100%">＋ Создать карточку и перенести</button>${_newMultiBtn ? '<div style="height:6px"></div>' + _newMultiBtn : ''}`;
   renderMoveAssignBlock(spaces.find(s=>s.id===spaceId)); // «Кому из группы» — для новой и для существующей карточки в групповом кабинете
   mvScrollTo(cardListEl);
 }
@@ -2588,13 +2607,20 @@ function askDeleteMoved(fromCardId, sel) {
   };
 }
 
-async function createCardAndMove(fromCardId, spaceId, catName) {
+async function createCardAndMove(fromCardId, spaceId, catName, multi) {
   const fromCard = cards.find(c=>c.id===fromCardId); if(!fromCard) return;
-  if(moveAssignGuard(spaceId, () => createCardAndMove(fromCardId, spaceId, catName))) return;
-  const title = prompt('Название новой карточки:');
+  if(moveAssignGuard(spaceId, () => createCardAndMove(fromCardId, spaceId, catName, multi))) return;
+  const title = prompt(multi ? 'Название новой мультикарточки:' : 'Название новой карточки:');
   if(!title) return;
+  // мультикарточка: отдельные записи ложатся в раздел (целые разделы остаются разделами)
+  let _mSec = null;
+  if(multi && (moveSelection.entryIds||[]).length) {
+    const sn = prompt('Раздел для перенесённых записей:', 'Общее'); if(sn === null) return;
+    _mSec = { id: uid(), name: sn.trim() || 'Общее' };
+  }
   mvSecReset(); // выбор раздела относился к другой (существующей) карточке
   const {entries: movedEntries, groups: movedGroups} = await collectMoveEntries(fromCard, spaceId);
+  if(_mSec) { movedEntries.forEach(e => { if(!e.groupId) e.groupId = _mSec.id; }); movedGroups.unshift(_mSec); }
   if(!movedEntries.length) { toast('Нечего переносить', true); return; }
   const targetSpace = spaces.find(s=>s.id===spaceId);
   const isChat = targetSpace?.type==='family' || targetSpace?.type==='group';
