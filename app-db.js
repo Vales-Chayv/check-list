@@ -112,7 +112,8 @@ async function _processSyncQueueInner() {
         const {error} = await sb.from('cards').delete().eq('id', op.data.id);
         if (error) throw error;
       } else if (op.type === 'insert_cat') {
-        const {error} = await sb.from('categories').insert(op.data);
+        const {catKey: _ck, ...catSrv} = op.data; // catKey — только локальный ключ, на сервере такого столбца нет
+        const {error} = await sb.from('categories').insert(catSrv);
         if (error && error.code !== '23505') throw error;
       } else if (op.type === 'insert_event') {
         const {error} = await sb.from('events').insert(op.data);
@@ -217,6 +218,19 @@ async function syncFromServer() {
     if(kr.data?.length) await local.putAll('categories', kr.data.map(c => ({...c, catKey: catKey(c.space_id, c.name)})));
     cards = cr.data||[];
     cats = kr.data || [];
+    // рубрики, которые не дошли до сервера: у невыполненных карточек есть рубрика, а в списке её нет → создаём заново
+    try {
+      const _fam = currentSpace?.type === 'family' || currentSpace?.type === 'group'; // только личные кабинеты
+      const _isChat = c => Array.isArray(c.chatParticipants) && c.chatParticipants.length > 0;
+      const _have = new Set(cats.map(c => c.name));
+      const _miss = _fam ? [] : [...new Set(cards.filter(c => c.status !== 'done' && c.category && !_isChat(c)).map(c => c.category))].filter(n => !_have.has(n));
+      if(_miss.length) {
+        const _pal = (typeof COLORS !== 'undefined' && COLORS.length) ? COLORS : ['#e8c56a','#5b9ee8','#5bb87a','#a07de8','#e88a3a','#e85bb0','#5bc8e8'];
+        const _used = new Set(cats.map(c => c.color));
+        for(const n of _miss) { const col = _pal.find(c => !_used.has(c)) || _pal[cats.length % _pal.length]; _used.add(col); const nc = {name: n, color: col}; cats.push(nc); await dbAddCat(nc); }
+        console.log('Восстановлены рубрики:', _miss);
+      }
+    } catch(_e) {}
     const todayStr = new Date().toISOString().slice(0,10);
 cards.forEach(c => { if(c.deadline===todayStr && !c.today) c.today = true; });
 applyCatsOrder(); setSyncDot('ok'); render(); startIntervalReminders();
@@ -359,8 +373,13 @@ async function dbAddCat(cat) {
   catWithSpace.catKey = catKey(catWithSpace.space_id, catWithSpace.name);
   await local.put('categories', catWithSpace);
   if (navigator.onLine) {
-    const {error}=await sb.from('categories').insert(catWithSpace);
-    if(error && error.code!=='23505') await queueOp({type:'insert_cat',data:catWithSpace});
+    const {catKey: _ck, ...catSrv} = catWithSpace; // catKey — только локальный ключ, на сервере такого столбца нет (иначе рубрика не сохраняется и пропадает)
+    const {error}=await sb.from('categories').insert(catSrv);
+    if(error && error.code!=='23505') {
+      console.log('dbAddCat error:', error.code, error.message);
+      if(typeof toast === 'function') toast('Рубрика «' + cat.name + '» не сохранилась на сервере: ' + (error.message || error.code), true);
+      await queueOp({type:'insert_cat',data:catWithSpace});
+    }
   } else { await queueOp({type:'insert_cat',data:catWithSpace}); }
 }
 

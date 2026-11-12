@@ -2113,7 +2113,8 @@ function mvNewCat(cardId, spaceId) {
       } else { // рубрика в другом кабинете — так же, как dbAddCat, но со своим space_id
         const cat = { name: nm, color, space_id: spaceId }; cat.catKey = catKey(spaceId, nm);
         try { await local.put('categories', cat); } catch(_) {}
-        if(navigator.onLine) { const { error } = await sb.from('categories').insert(cat); if(error && error.code !== '23505') await queueOp({ type: 'insert_cat', data: cat }); }
+        const { catKey: _ck, ...catSrv } = cat; // catKey — только локальный ключ, на сервере такого столбца нет
+        if(navigator.onLine) { const { error } = await sb.from('categories').insert(catSrv); if(error && error.code !== '23505') { toast('Рубрика «' + nm + '» не сохранилась на сервере: ' + (error.message || error.code), true); await queueOp({ type: 'insert_cat', data: cat }); } }
         else await queueOp({ type: 'insert_cat', data: cat });
       }
     } catch(e) { toast('Не удалось создать рубрику: ' + e.message, true); return; }

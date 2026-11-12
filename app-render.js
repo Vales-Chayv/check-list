@@ -694,7 +694,7 @@ function renderCats() {
   const all = filterCat==='all' && !filterCats.length;
   if(!document.getElementById('cat-all-css')) { // «Все» стоит на месте, остальные рубрики уходят под неё при прокрутке
     const st = document.createElement('style'); st.id = 'cat-all-css';
-    st.textContent = '#cats .cat-all{position:sticky;left:16px;z-index:3;background:var(--bg)}#cats .cat-all::before{content:"";position:absolute;top:-6px;bottom:-6px;left:-18px;width:18px;background:var(--bg)}#cats .cat-all::after{content:"";position:absolute;top:-2px;bottom:-2px;right:-15px;width:14px;background:linear-gradient(90deg,var(--bg),transparent);pointer-events:none}';
+    st.textContent = '#cats .cat-btn,#cats-dropdown .cat-btn{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}#cats .cat-all{position:sticky;left:16px;z-index:3;background:var(--bg)}#cats .cat-all::before{content:"";position:absolute;top:-6px;bottom:-6px;left:-18px;width:18px;background:var(--bg)}#cats .cat-all::after{content:"";position:absolute;top:-2px;bottom:-2px;right:-15px;width:14px;background:linear-gradient(90deg,var(--bg),transparent);pointer-events:none}';
     document.head.appendChild(st);
   }
   let html = `<button class="cat-btn cat-all${all?' on':''}" style="${all?'border-color:rgba(255,255,255,.25)':''}" onclick="handleAllCatClick()">Все ▾</button>`;
