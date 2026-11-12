@@ -601,7 +601,7 @@ async function openPinnedCard(id){
     else if(expanded && e.deltaY < 0 && deck.scrollTop <= 2){ deck.classList.remove('expanded'); renderPinDeck(); e.preventDefault(); }
   }, {passive:false});
 })();
-let filterNoDeadline = localStorage.getItem('mc_no_dl')==='1';
+let filterNoDeadline = false; // «Без срока» теперь условие умного фильтра (sfS().dl); старое значение mc_no_dl переносится в фильтр
 // Сворачиваемые группы в списках карточек (состояние помнится)
 function grpOpen(key) { return localStorage.getItem('mc_grp_' + key) !== '1'; }
 function toggleGrp(key) { localStorage.setItem('mc_grp_' + key, grpOpen(key) ? '1' : '0'); render(); }
@@ -629,6 +629,128 @@ function updateTabsForSpaceType() {
 }
 function cardHasNoDeadline(c){ return !c.deadline && (c.entries||[]).every(e=>!e.deadline); }
 function toggleNoDeadline(){ filterNoDeadline=!filterNoDeadline; localStorage.setItem('mc_no_dl', filterNoDeadline?'1':'0'); render(); }
+// ═══ Умный фильтр «Все ▾» (личные кабинеты): группы условий, внутри группы «или», между группами «и» ═══
+const SF_MAP = {};
+const SF_GROUPS = [
+  ['type', 'Тип карточки', [['plain', 'Обычные'], ['multi', '🗂 Мультикарточки']]],
+  ['dl', 'Срок', [['none', 'Без срока'], ['over', '⚠ Просрочено'], ['today', 'Сегодня'], ['week', 'На неделе']]],
+  ['inn', 'Внутри', [['files', '📷 С файлами'], ['voice', '🎙 С голосом'], ['flag', '🚩 Отмеченные']]],
+  ['st', 'Состояние', [['new', 'Новые'], ['prog', 'В процессе'], ['rem', '🔔 С напоминанием'], ['urg', '⚡ Срочные']]]
+];
+function sfPersonal() { return !(currentSpace?.type === 'family' || currentSpace?.type === 'group'); }
+function sfKey() { return currentSpaceId || 'personal'; }
+function sfS() {
+  const k = sfKey();
+  if(!SF_MAP[k]) {
+    let v = null; try { v = JSON.parse(localStorage.getItem('mc_sf_' + k) || 'null'); } catch(e) {}
+    SF_MAP[k] = { type: [], dl: [], inn: [], st: [], ...(v || {}) };
+    if(localStorage.getItem('mc_no_dl') === '1') { if(!SF_MAP[k].dl.includes('none')) SF_MAP[k].dl.push('none'); localStorage.setItem('mc_no_dl', '0'); sfSave(); } // перенос старой кнопки «Без срока»
+  }
+  return SF_MAP[k];
+}
+function sfSave() { try { localStorage.setItem('mc_sf_' + sfKey(), JSON.stringify(sfS())); } catch(e) {} }
+function sfSets() { try { return JSON.parse(localStorage.getItem('mc_sf_sets_' + sfKey()) || '[]') || []; } catch(e) { return []; } }
+function sfSetsSave(a) { try { localStorage.setItem('mc_sf_sets_' + sfKey(), JSON.stringify(a)); } catch(e) {} }
+function sfCount() { const f = sfS(); return f.type.length + f.dl.length + f.inn.length + f.st.length + filterCats.length; }
+function sfDays(d) { // сколько дней до даты (отрицательно — просрочено), по местному времени
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  const x = new Date(String(d).slice(0, 10) + 'T00:00:00'); return Math.round((x - t) / 86400000);
+}
+function sfNearDl(c) { return [c.deadline, ...(c.entries || []).filter(e => e && !e.done).map(e => e.deadline)].filter(Boolean).map(d => String(d).slice(0, 10)).sort()[0] || null; }
+function sfAtts(c) { return [...(c.attachments || []), ...(c.entries || []).flatMap(e => e ? [...(e.attachments || []), ...(e.sessionAtts || [])] : [])].filter(a => a && a.data); }
+function sfTest(g, v, c) {
+  if(g === 'type') return v === 'multi' ? !!(c.entryGroups || []).length : !(c.entryGroups || []).length;
+  if(g === 'dl') {
+    if(v === 'none') return cardHasNoDeadline(c);
+    const d = sfNearDl(c); if(!d) return false; const n = sfDays(d);
+    return v === 'over' ? n < 0 : v === 'today' ? n === 0 : (n >= 0 && n <= 7);
+  }
+  if(g === 'inn') {
+    if(v === 'flag') return (c.entries || []).some(e => e && e.flag);
+    const a = sfAtts(c);
+    return v === 'voice' ? a.some(x => (x.type || '').startsWith('audio/')) : a.some(x => !(x.type || '').startsWith('audio/'));
+  }
+  if(g === 'st') return v === 'new' ? c.status === 'new' : v === 'prog' ? c.status === 'in_progress' : v === 'rem' ? !!c.reminder?.enabled : (c.priority === 'urgent' || c.priority === 'high');
+  return true;
+}
+function sfMatch(c, skipGroup) {
+  if(!sfPersonal()) return true;
+  const f = sfS();
+  return SF_GROUPS.every(([g]) => g === skipGroup || !f[g].length || f[g].some(v => sfTest(g, v, c)));
+}
+function sfBase() { return applyMemberFilter(cards.filter(c => c.status !== 'done' && c.chatStatus !== 'closed')); }
+function sfLabel() { // «Мультикарточки · Без срока · Работа»
+  const f = sfS(), parts = [];
+  SF_GROUPS.forEach(([g, , items]) => items.forEach(([v, l]) => { if(f[g].includes(v)) parts.push(l.replace(/^\S+ (?=\S)/u, m => /[\p{L}]/u.test(m) ? m : '')); }));
+  return [...parts, ...filterCats].join(' · ');
+}
+function sfToggle(g, v) {
+  const f = sfS();
+  if(g === 'cat') { filterCat = 'all'; filterCats = filterCats.includes(v) ? filterCats.filter(x => x !== v) : [...filterCats, v]; }
+  else f[g] = f[g].includes(v) ? f[g].filter(x => x !== v) : [...f[g], v];
+  sfSave(); render(); sfPaint();
+}
+function sfReset() { const f = sfS(); f.type = []; f.dl = []; f.inn = []; f.st = []; filterCats = []; filterCat = 'all'; sfSave(); render(); sfPaint(); }
+function sfSaveSet() {
+  if(!sfCount()) { toast('Сначала выберите условия', true); return; }
+  const name = (prompt('Название набора:', sfLabel().slice(0, 40)) || '').trim(); if(!name) return;
+  const f = sfS(), sets = sfSets().filter(x => x.name !== name);
+  sets.push({ name, f: JSON.parse(JSON.stringify({ type: f.type, dl: f.dl, inn: f.inn, st: f.st })), cats: [...filterCats] });
+  sfSetsSave(sets); toast('⭐ Набор «' + name + '» сохранён'); render(); sfPaint();
+}
+function sfSetOn(x) { const f = sfS(); return ['type', 'dl', 'inn', 'st'].every(g => JSON.stringify([...f[g]].sort()) === JSON.stringify([...(x.f[g] || [])].sort())) && JSON.stringify([...filterCats].sort()) === JSON.stringify([...(x.cats || [])].sort()); }
+function sfApplySet(i) {
+  const x = sfSets()[i]; if(!x) return;
+  if(sfSetOn(x)) { sfReset(); return; } // повторное нажатие — снять набор
+  const f = sfS(); ['type', 'dl', 'inn', 'st'].forEach(g => { f[g] = [...(x.f[g] || [])]; });
+  filterCats = (x.cats || []).filter(n => cats.some(c => c.name === n)); filterCat = 'all';
+  sfSave(); render(); sfPaint();
+}
+function sfDelSet(i) { const a = sfSets(), x = a[i]; if(!x || !confirm('Удалить набор «' + x.name + '»?')) return; a.splice(i, 1); sfSetsSave(a); render(); sfPaint(); }
+function sfClose() { document.getElementById('sf-panel')?.remove(); }
+function sfOpen() {
+  if(document.getElementById('sf-panel')) { sfClose(); return; }
+  const p = document.createElement('div');
+  p.id = 'sf-panel';
+  p.style.cssText = 'position:fixed;z-index:2000;background:var(--s1);border:1px solid var(--b2);border-radius:14px;box-shadow:0 12px 32px rgba(0,0,0,.55);padding:12px;overflow-y:auto;box-sizing:border-box';
+  document.body.appendChild(p);
+  sfPaint();
+  setTimeout(() => document.addEventListener('click', function h(e) {
+    const pp = document.getElementById('sf-panel');
+    if(!pp) { document.removeEventListener('click', h, true); return; }
+    if(!pp.contains(e.target) && !e.target.closest('.cat-all')) { sfClose(); document.removeEventListener('click', h, true); }
+  }, true), 120);
+}
+function sfPaint() {
+  const p = document.getElementById('sf-panel'); if(!p) return;
+  const bar = document.getElementById('cats'), r = bar ? bar.getBoundingClientRect() : { left: 8, bottom: 120, width: innerWidth - 16 };
+  const top = Math.min(r.bottom + 4, innerHeight - 200);
+  p.style.top = top + 'px'; p.style.left = Math.max(8, r.left + 8) + 'px';
+  p.style.width = Math.min(Math.max(r.width - 16, 280), 460) + 'px'; p.style.maxHeight = (innerHeight - top - 12) + 'px';
+  const f = sfS(), base = sfBase();
+  const catOk = c => !filterCats.length || filterCats.includes(c.category);
+  const chip = (on, txt, n, fn) => `<button type="button" onclick="${fn}" style="display:inline-flex;align-items:center;gap:5px;margin:0 5px 6px 0;padding:5px 11px;border-radius:14px;font-size:12.5px;cursor:pointer;font-family:inherit;border:1px solid ${on ? 'var(--accent)' : 'var(--b1)'};background:${on ? 'rgba(232,197,106,.15)' : 'var(--s2)'};color:${on ? 'var(--accent)' : 'var(--t2)'};${!on && !n ? 'opacity:.45' : ''}">${txt} <span style="font-size:11px;opacity:.75">${n}</span></button>`;
+  const grp = t => `<div style="font-size:10.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin:8px 0 5px">${t}</div>`;
+  let h = '';
+  SF_GROUPS.forEach(([g, title, items]) => {
+    const others = base.filter(c => catOk(c) && sfMatch(c, g)); // счётчик: что получится с этой кнопкой при остальных условиях
+    h += grp(title) + items.map(([v, l]) => chip(f[g].includes(v), l, others.filter(c => sfTest(g, v, c)).length, `sfToggle('${g}','${v}')`)).join('');
+  });
+  if(cats.length) {
+    const others = base.filter(c => sfMatch(c));
+    h += grp('Рубрики') + cats.map(c => chip(filterCats.includes(c.name), `<span style="width:7px;height:7px;border-radius:50%;background:${c.color || '#888'};display:inline-block"></span>${esc(c.name)}`, others.filter(x => x.category === c.name).length, `sfToggle('cat',decodeURIComponent('${encodeURIComponent(c.name)}'))`)).join('');
+  }
+  const sets = sfSets();
+  if(sets.length) h += grp('⭐ Мои наборы') + sets.map((x, i) => `<span style="display:inline-flex;align-items:center;margin:0 5px 6px 0;border:1px solid ${sfSetOn(x) ? 'var(--accent)' : 'var(--b1)'};border-radius:14px;overflow:hidden"><button type="button" onclick="sfApplySet(${i})" style="background:${sfSetOn(x) ? 'rgba(232,197,106,.15)' : 'var(--s2)'};border:none;color:${sfSetOn(x) ? 'var(--accent)' : 'var(--t1)'};padding:5px 9px 5px 11px;font-size:12.5px;cursor:pointer;font-family:inherit">⭐ ${esc(x.name)}</button><button type="button" title="Удалить набор" onclick="sfDelSet(${i})" style="background:var(--s2);border:none;border-left:1px solid var(--b1);color:var(--t3);padding:5px 8px;font-size:11px;cursor:pointer">✕</button></span>`).join('');
+  const found = base.filter(c => catOk(c) && sfMatch(c)).length;
+  h += `<div style="display:flex;gap:6px;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--b1);flex-wrap:wrap">
+    <span style="flex:1;font-size:13px;color:var(--accent);white-space:nowrap">Найдено: ${found}</span>
+    <button type="button" onclick="sfSaveSet()" style="background:none;border:1px dashed var(--b2);color:var(--accent);border-radius:8px;padding:6px 9px;font-size:12px;cursor:pointer;font-family:inherit">⭐ Сохранить набор</button>
+    <button type="button" onclick="sfReset()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:8px;padding:6px 9px;font-size:12px;cursor:pointer;font-family:inherit">Сброс</button>
+    <button type="button" onclick="sfClose()" style="background:var(--accent);border:none;color:#0f0f0f;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Готово</button></div>`;
+  p.innerHTML = h;
+}
+
 // Выбор нескольких рубрик сразу (личные кабинеты)
 let filterCats = [];
 function catMatch(c) { return filterCats.length ? filterCats.includes(c.category) : (filterCat === 'all' || c.category === filterCat); }
@@ -697,8 +819,11 @@ function renderCats() {
     st.textContent = '#cats .cat-btn,#cats-dropdown .cat-btn{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}#cats .cat-all{position:sticky;left:16px;z-index:3;background:var(--bg)}#cats.cats-fade{-webkit-mask-image:linear-gradient(90deg,transparent 0,transparent 15px,#000 16px,#000 var(--all-r,80px),transparent var(--all-r,80px),#000 calc(var(--all-r,80px) + 30px));mask-image:linear-gradient(90deg,transparent 0,transparent 15px,#000 16px,#000 var(--all-r,80px),transparent var(--all-r,80px),#000 calc(var(--all-r,80px) + 30px))}';
     document.head.appendChild(st);
   }
-  let html = `<button class="cat-btn cat-all${all?' on':''}" style="${all?'border-color:rgba(255,255,255,.25)':''}" onclick="handleAllCatClick()">Все ▾</button>`;
-  if(view==='cards' && !(currentSpace?.type==='family'||currentSpace?.type==='group')) html += `<button class="cat-btn${filterNoDeadline?' on':''}" style="${filterNoDeadline?'background:rgba(232,197,106,.15);border-color:var(--accent);color:var(--accent)':''}" onclick="toggleNoDeadline()">📅✕ Без срока</button>`;
+  const _sfN = sfPersonal() ? sfCount() : 0;
+  let html = _sfN
+    ? `<button class="cat-btn cat-all on" style="background:var(--accent);border-color:var(--accent);color:#0f0f0f;font-weight:700" onclick="handleAllCatClick()">Фильтр · ${_sfN} ▾</button>`
+    : `<button class="cat-btn cat-all${all?' on':''}" style="${all?'border-color:rgba(255,255,255,.25)':''}" onclick="handleAllCatClick()">Все ▾</button>`;
+  if(sfPersonal()) sfSets().forEach((x, i) => { const on = sfSetOn(x); html += `<button class="cat-btn${on?' on':''}" style="${on?'background:rgba(232,197,106,.15);border-color:var(--accent);color:var(--accent)':''}" onclick="sfApplySet(${i})">⭐ ${esc(x.name)}</button>`; });
   cats.forEach((c,i) => {
     const col = c.color||'#888';
     const active = filterCat===c.name;
@@ -730,7 +855,8 @@ function renderCats() {
   bar.classList.toggle('cats-fade', bar.scrollLeft > 2);
   const strip = document.getElementById('cats-strip');
   if(strip) {
-    if(filterCats.length) { strip.style.display = 'flex'; strip.innerHTML = `<span dir="auto" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Рубрики: ${filterCats.map(esc).join(', ')}</span><button onclick="catMultiClear()" style="flex-shrink:0;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:14px;padding:3px 10px;font-size:12px;cursor:pointer;font-family:inherit">Отменить выбор</button>`; }
+    if(_sfN && (sfS().type.length||sfS().dl.length||sfS().inn.length||sfS().st.length)) { strip.style.display = 'flex'; strip.innerHTML = `<span dir="auto" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Фильтр: ${esc(sfLabel())}</span><button onclick="sfReset()" style="flex-shrink:0;background:none;border:1px solid rgba(232,197,106,.4);color:var(--accent);border-radius:12px;padding:3px 10px;font-size:12px;cursor:pointer;font-family:inherit">Сбросить</button>`; }
+    else if(filterCats.length) { strip.style.display = 'flex'; strip.innerHTML = `<span dir="auto" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Рубрики: ${filterCats.map(esc).join(', ')}</span><button onclick="catMultiClear()" style="flex-shrink:0;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:14px;padding:3px 10px;font-size:12px;cursor:pointer;font-family:inherit">Отменить выбор</button>`; }
     else { strip.style.display = 'none'; strip.innerHTML = ''; }
   }
 }
@@ -747,9 +873,9 @@ function renderMain() {
 function renderCards() {
   const el=document.getElementById('scroll');
   const PO={urgent:0,high:1,normal:2};
- const filtered=applyMemberFilter(cards.filter(c=>c.status!=='done'&&catMatch(c)&&(!filterNoDeadline||cardHasNoDeadline(c))&&(filterClosed ? c.chatStatus==='closed' : c.chatStatus!=='closed')));
+ const filtered=applyMemberFilter(cards.filter(c=>c.status!=='done'&&catMatch(c)&&sfMatch(c)&&(filterClosed ? c.chatStatus==='closed' : c.chatStatus!=='closed')));
   const isChatSpace = currentSpace?.type==='family' || currentSpace?.type==='group';
-  if(!filtered.length){el.innerHTML=emptyHTML(filterClosed?'Нет закрытых чатов':filterNoDeadline?'Нет карточек без срока':isChatSpace?'Нет чатов':'Нет карточек', filterClosed?'Закрытые чаты появятся здесь':filterNoDeadline?'Все карточки имеют дату':isChatSpace?'Создать первый чат':'Создай первую карточку');return;}
+  if(!filtered.length){el.innerHTML=emptyHTML(filterClosed?'Нет закрытых чатов':(sfPersonal()&&sfCount())?'Нет карточек по фильтру':isChatSpace?'Нет чатов':'Нет карточек', filterClosed?'Закрытые чаты появятся здесь':(sfPersonal()&&sfCount())?'Измените условия в «Фильтр ▾» или нажмите «Сбросить»':isChatSpace?'Создать первый чат':'Создай первую карточку');return;}
 
   // Separate urgent/high from normal
   const priority=filtered.filter(c=>c.priority==='urgent'||c.priority==='high')
@@ -1166,6 +1292,7 @@ let imgScale=1, imgLastDist=0;
   viewer.addEventListener('click',e=>{if(e.target===viewer)closeImgViewer();});
 })();
 function handleAllCatClick() {
+  if(sfPersonal()) { if(filterCat !== 'all') { App.setCat(-1); return; } sfOpen(); return; } // личный кабинет: умный фильтр
   if(filterCat === 'all') {
     toggleCatsDropdown();
   } else {
