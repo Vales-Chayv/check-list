@@ -2592,7 +2592,20 @@ function askDeleteMoved(fromCardId, sel) {
     </div></div>`;
   document.body.appendChild(ov);
   ov.querySelector('#dm-no').onclick = () => ov.remove();
-  ov.querySelector('#dm-yes').onclick = async () => {
+  ov.querySelector('#dm-yes').onclick = () => {
+    // второй вопрос: защита от случайного (инстинктивного) нажатия — кнопки меняются местами, 0,8 с неактивны
+    ov.firstElementChild.innerHTML = `<div style="font-size:16px;font-weight:700;margin-bottom:6px">Вы уверены?</div>
+      <div style="font-size:13px;color:var(--t2);margin-bottom:16px">Записи (${n}) будут удалены из этой карточки. Копия уже лежит в новом месте.</div>
+      <div style="display:flex;gap:8px">
+        <button type="button" id="dm-sure" disabled style="flex:1;background:rgba(232,96,96,.12);border:1px solid rgba(232,96,96,.4);color:var(--red);border-radius:var(--rsm);padding:11px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;opacity:.4">Да, удалить</button>
+        <button type="button" id="dm-keep" disabled style="flex:1;background:var(--s2);border:1px solid var(--b1);color:var(--t1);border-radius:var(--rsm);padding:11px;font-size:14px;cursor:pointer;font-family:inherit;opacity:.4">Нет, оставить</button>
+      </div>`;
+    const sure = ov.querySelector('#dm-sure'), keep = ov.querySelector('#dm-keep');
+    setTimeout(() => { [sure, keep].forEach(b => { b.disabled = false; b.style.opacity = ''; }); }, 800);
+    keep.onclick = () => ov.remove();
+    sure.onclick = () => doDelete();
+  };
+  const doDelete = async () => {
     ov.remove();
     const c = cards.find(x => x.id === fromCardId); if(!c) return;
     const prevSel = moveSelection, prevDel = moveDeleteSource;
