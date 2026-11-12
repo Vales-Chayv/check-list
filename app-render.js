@@ -694,7 +694,7 @@ function renderCats() {
   const all = filterCat==='all' && !filterCats.length;
   if(!document.getElementById('cat-all-css')) { // «Все» стоит на месте, остальные рубрики уходят под неё при прокрутке
     const st = document.createElement('style'); st.id = 'cat-all-css';
-    st.textContent = '#cats .cat-btn,#cats-dropdown .cat-btn{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}#cats .cat-all{position:sticky;left:16px;z-index:3;background:var(--bg)}#cats .cat-all::before{content:"";position:absolute;top:-6px;bottom:-6px;left:-18px;width:18px;background:var(--bg)}#cats .cat-all::after{content:"";position:absolute;top:-2px;bottom:-2px;right:-15px;width:14px;background:linear-gradient(90deg,var(--bg),transparent);pointer-events:none}';
+    st.textContent = '#cats .cat-btn,#cats-dropdown .cat-btn{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}#cats .cat-all{position:sticky;left:16px;z-index:3;background:var(--bg)}#cats.cats-fade{-webkit-mask-image:linear-gradient(90deg,transparent 0,transparent 15px,#000 16px,#000 var(--all-r,80px),transparent var(--all-r,80px),#000 calc(var(--all-r,80px) + 30px));mask-image:linear-gradient(90deg,transparent 0,transparent 15px,#000 16px,#000 var(--all-r,80px),transparent var(--all-r,80px),#000 calc(var(--all-r,80px) + 30px))}';
     document.head.appendChild(st);
   }
   let html = `<button class="cat-btn cat-all${all?' on':''}" style="${all?'border-color:rgba(255,255,255,.25)':''}" onclick="handleAllCatClick()">Все ▾</button>`;
@@ -723,6 +723,11 @@ function renderCats() {
     <span class="cat-dot" style="background:${col}"></span>${esc(c.name)}</button>`;
   });
   bar.innerHTML = html;
+  // мягкое затухание: при прокрутке рубрики растворяются, не доходя до «Все» (в начале ленты маски нет)
+  const _ab = bar.querySelector('.cat-all');
+  if(_ab) bar.style.setProperty('--all-r', (_ab.offsetLeft + _ab.offsetWidth) + 'px');
+  if(!bar._fadeBound) { bar._fadeBound = true; bar.addEventListener('scroll', () => bar.classList.toggle('cats-fade', bar.scrollLeft > 2), { passive: true }); }
+  bar.classList.toggle('cats-fade', bar.scrollLeft > 2);
   const strip = document.getElementById('cats-strip');
   if(strip) {
     if(filterCats.length) { strip.style.display = 'flex'; strip.innerHTML = `<span dir="auto" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Рубрики: ${filterCats.map(esc).join(', ')}</span><button onclick="catMultiClear()" style="flex-shrink:0;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:14px;padding:3px 10px;font-size:12px;cursor:pointer;font-family:inherit">Отменить выбор</button>`; }
