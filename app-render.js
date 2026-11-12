@@ -710,6 +710,7 @@ function sfDelSet(i) { const a = sfSets(), x = a[i]; if(!x || !confirm('Удал
 function sfClose() { document.getElementById('sf-panel')?.remove(); }
 function sfOpen() {
   if(document.getElementById('sf-panel')) { sfClose(); return; }
+  sfMulti = false;
   const p = document.createElement('div');
   p.id = 'sf-panel';
   p.style.cssText = 'position:fixed;z-index:2000;background:var(--s1);border:1px solid var(--b2);border-radius:14px;box-shadow:0 12px 32px rgba(0,0,0,.55);padding:12px;overflow-y:auto;box-sizing:border-box';
@@ -729,6 +730,11 @@ function sfPaint() {
   p.style.width = Math.min(Math.max(r.width - 16, 280), 460) + 'px'; p.style.maxHeight = (innerHeight - top - 12) + 'px';
   const f = sfS(), base = sfBase();
   const catOk = c => !filterCats.length || filterCats.includes(c.category);
+  const tab = sfTab();
+  const tb = (k, t) => `<button type="button" onclick="sfSetTab('${k}')" style="flex:1;padding:8px 6px;font-size:13px;cursor:pointer;font-family:inherit;border:1px solid ${tab === k ? 'var(--accent)' : 'var(--b1)'};background:${tab === k ? 'var(--accent)' : 'var(--s2)'};color:${tab === k ? '#0f0f0f' : 'var(--t2)'};font-weight:${tab === k ? 700 : 400};border-radius:${k === 'cats' ? '9px 0 0 9px' : '0 9px 9px 0'}">${t}</button>`;
+  const _fN = sfCount() - filterCats.length;
+  const head = `<div style="display:flex;margin-bottom:10px">${tb('cats', '📂 Рубрики')}${tb('filter', '🎛 Фильтр' + (_fN ? ' · ' + _fN : ''))}</div>`;
+  if(tab === 'cats') { p.innerHTML = head + sfCatsHtml(base); sfCatsSearch(); return; }
   const chip = (on, txt, n, fn) => `<button type="button" onclick="${fn}" style="display:inline-flex;align-items:center;gap:5px;margin:0 5px 6px 0;padding:5px 11px;border-radius:14px;font-size:12.5px;cursor:pointer;font-family:inherit;border:1px solid ${on ? 'var(--accent)' : 'var(--b1)'};background:${on ? 'rgba(232,197,106,.15)' : 'var(--s2)'};color:${on ? 'var(--accent)' : 'var(--t2)'};${!on && !n ? 'opacity:.45' : ''}">${txt} <span style="font-size:11px;opacity:.75">${n}</span></button>`;
   const grp = t => `<div style="font-size:10.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin:8px 0 5px">${t}</div>`;
   let h = '';
@@ -736,10 +742,7 @@ function sfPaint() {
     const others = base.filter(c => catOk(c) && sfMatch(c, g)); // счётчик: что получится с этой кнопкой при остальных условиях
     h += grp(title) + items.map(([v, l]) => chip(f[g].includes(v), l, others.filter(c => sfTest(g, v, c)).length, `sfToggle('${g}','${v}')`)).join('');
   });
-  if(cats.length) {
-    const others = base.filter(c => sfMatch(c));
-    h += grp('Рубрики') + cats.map(c => chip(filterCats.includes(c.name), `<span style="width:7px;height:7px;border-radius:50%;background:${c.color || '#888'};display:inline-block"></span>${esc(c.name)}`, others.filter(x => x.category === c.name).length, `sfToggle('cat',decodeURIComponent('${encodeURIComponent(c.name)}'))`)).join('');
-  }
+  if(filterCats.length) h += grp('Рубрики') + `<div style="font-size:12.5px;color:var(--t2);margin-bottom:6px">${filterCats.map(esc).join(' · ')} <button type="button" onclick="sfSetTab('cats')" style="background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;font-family:inherit;padding:0 4px">изменить</button></div>`;
   const sets = sfSets();
   if(sets.length) h += grp('⭐ Мои наборы') + sets.map((x, i) => `<span style="display:inline-flex;align-items:center;margin:0 5px 6px 0;border:1px solid ${sfSetOn(x) ? 'var(--accent)' : 'var(--b1)'};border-radius:14px;overflow:hidden"><button type="button" onclick="sfApplySet(${i})" style="background:${sfSetOn(x) ? 'rgba(232,197,106,.15)' : 'var(--s2)'};border:none;color:${sfSetOn(x) ? 'var(--accent)' : 'var(--t1)'};padding:5px 9px 5px 11px;font-size:12.5px;cursor:pointer;font-family:inherit">⭐ ${esc(x.name)}</button><button type="button" title="Удалить набор" onclick="sfDelSet(${i})" style="background:var(--s2);border:none;border-left:1px solid var(--b1);color:var(--t3);padding:5px 8px;font-size:11px;cursor:pointer">✕</button></span>`).join('');
   const found = base.filter(c => catOk(c) && sfMatch(c)).length;
@@ -748,7 +751,43 @@ function sfPaint() {
     <button type="button" onclick="sfSaveSet()" style="background:none;border:1px dashed var(--b2);color:var(--accent);border-radius:8px;padding:6px 9px;font-size:12px;cursor:pointer;font-family:inherit">⭐ Сохранить набор</button>
     <button type="button" onclick="sfReset()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:8px;padding:6px 9px;font-size:12px;cursor:pointer;font-family:inherit">Сброс</button>
     <button type="button" onclick="sfClose()" style="background:var(--accent);border:none;color:#0f0f0f;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Готово</button></div>`;
-  p.innerHTML = h;
+  p.innerHTML = head + h;
+}
+// Вкладка «Рубрики» в окне «Все ▾»: прежний список рубрик + поиск и счётчики
+let sfMulti = false;
+function sfTab() { try { return localStorage.getItem('mc_sf_tab') === 'filter' ? 'filter' : 'cats'; } catch(e) { return 'cats'; } }
+function sfSetTab(k) { try { localStorage.setItem('mc_sf_tab', k); } catch(e) {} sfMulti = false; sfPaint(); }
+function sfCatsHtml(base) {
+  const shown = base.filter(c => sfMatch(c)); // счётчики — с учётом включённого фильтра
+  const all = filterCat === 'all' && !filterCats.length;
+  const row = (on, col, name, n, fn, extra) => `<button type="button" class="sf-cat-row" data-n="${esc(String(name).toLowerCase())}" onclick="${fn}" style="display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:9px 10px;margin-bottom:4px;border-radius:9px;font-size:13px;cursor:pointer;font-family:inherit;color:var(--t1);border:1px solid ${on ? hex2rgba(col || '#5b9ee8', .5) : 'rgba(255,255,255,.08)'};background:${on ? hex2rgba(col || '#5b9ee8', .15) : 'transparent'}">${extra || ''}${col ? `<span style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0"></span>` : ''}<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(name)}</span><span style="font-size:11px;color:var(--t3)">${n}</span></button>`;
+  let h = '';
+  if(cats.length > 5) h += `<input id="sf-cat-q" type="search" placeholder="🔍 Найти рубрику…" oninput="sfCatsSearch()" style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:8px 10px;border-radius:9px;border:1px solid var(--b1);background:var(--s2);color:var(--t1);font-size:13px;font-family:inherit">`;
+  if(sfMulti) {
+    h += cats.map(c => `<label class="sf-cat-row" data-n="${esc(c.name.toLowerCase())}" style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:4px;border-radius:9px;border:1px solid rgba(255,255,255,.08);cursor:pointer;font-size:13px"><input type="checkbox" class="sf-multi-cb" value="${esc(c.name)}" ${filterCats.includes(c.name) ? 'checked' : ''}><span style="width:8px;height:8px;border-radius:50%;background:${c.color || '#888'};flex-shrink:0"></span><span style="flex:1">${esc(c.name)}</span><span style="font-size:11px;color:var(--t3)">${shown.filter(x => x.category === c.name).length}</span></label>`).join('');
+    h += `<div style="display:flex;gap:6px;margin-top:8px"><button type="button" onclick="sfMultiApply()" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:8px;padding:8px;font-weight:700;cursor:pointer;font-family:inherit">Применить</button><button type="button" onclick="sfMultiSet(false)" style="background:var(--s2);color:var(--t2);border:1px solid var(--b1);border-radius:8px;padding:8px 12px;cursor:pointer;font-family:inherit">Отмена</button></div>`;
+    return h;
+  }
+  h += row(all, '', 'Все рубрики', shown.length, 'sfPickCat(-1)').replace('class="sf-cat-row"', 'class="sf-cat-row" data-all="1"');
+  h += cats.map((c, i) => row(filterCat === c.name || filterCats.includes(c.name), c.color || '#888', c.name, shown.filter(x => x.category === c.name).length, `sfPickCat(${i})`)).join('');
+  h += `<div id="sf-cat-none" style="display:none;font-size:12.5px;color:var(--t3);padding:6px 10px">Ничего не найдено</div>`;
+  h += `<button type="button" onclick="sfMultiSet(true)" style="display:block;width:100%;text-align:left;margin-top:6px;padding:9px 10px;border-radius:9px;border:1px solid rgba(255,255,255,.08);background:transparent;color:var(--accent);font-size:13px;cursor:pointer;font-family:inherit">☑ Несколько рубрик…</button>`;
+  return h;
+}
+function sfCatsSearch() {
+  const q = (document.getElementById('sf-cat-q')?.value || '').trim().toLowerCase();
+  let vis = 0;
+  document.querySelectorAll('#sf-panel .sf-cat-row').forEach(r => {
+    const show = !q || (!r.dataset.all && r.dataset.n.includes(q)); // при поиске «Все рубрики» прячем
+    r.style.display = show ? 'flex' : 'none'; if(show) vis++;
+  });
+  const none = document.getElementById('sf-cat-none'); if(none) none.style.display = q && !vis ? '' : 'none';
+}
+function sfMultiSet(v) { sfMulti = v; sfPaint(); }
+function sfPickCat(i) { sfClose(); App.setCat(i); }
+function sfMultiApply() {
+  filterCats = [...document.querySelectorAll('#sf-panel .sf-multi-cb:checked')].map(x => x.value);
+  filterCat = 'all'; sfMulti = false; sfClose(); render();
 }
 
 // Выбор нескольких рубрик сразу (личные кабинеты)
@@ -1292,7 +1331,7 @@ let imgScale=1, imgLastDist=0;
   viewer.addEventListener('click',e=>{if(e.target===viewer)closeImgViewer();});
 })();
 function handleAllCatClick() {
-  if(sfPersonal()) { if(filterCat !== 'all') { App.setCat(-1); return; } sfOpen(); return; } // личный кабинет: умный фильтр
+  if(sfPersonal()) { if(filterCat !== 'all') { App.setCat(-1); return; } sfOpen(); return; } // личный кабинет: окно «Рубрики | Фильтр»
   if(filterCat === 'all') {
     toggleCatsDropdown();
   } else {
