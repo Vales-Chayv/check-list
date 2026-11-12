@@ -2031,6 +2031,79 @@ function mvSecNew(btn) {
 }
 function mvSecMode(v) { moveSecUnpack = v === 'unpack'; moveSecConvert = v === 'convert'; }
 
+// ── Окно переноса: автопрокрутка к следующему выбору и «＋ Новый кабинет / ＋ Новая рубрика» ──
+function mvScrollTo(target) {
+  setTimeout(() => {
+    const el = typeof target === 'string' ? document.getElementById(target) : target;
+    const box = document.querySelector('#move-entry-dialog > div'); if(!el || !box || !el.offsetParent) return;
+    box.scrollTo({ top: box.scrollTop + el.getBoundingClientRect().top - box.getBoundingClientRect().top - 10, behavior: 'smooth' });
+  }, 60);
+}
+const _mvBtnCss = 'background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit';
+const _mvNewCss = 'background:transparent;border:1px dashed var(--b2);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--accent);cursor:pointer;text-align:left;font-family:inherit';
+function mvNewSpace(cardId) {
+  const dlg = document.getElementById('move-entry-dialog'), ov = document.getElementById('create-space-ov');
+  if(!dlg || !ov || typeof openCreateSpace !== 'function') return;
+  const before = new Set(spaces.map(s => s.id)), z = ov.style.zIndex;
+  ov.style.zIndex = '2100'; dlg.style.display = 'none'; // окно переноса прячем, пока создаётся кабинет («назад» закроет окно создания)
+  openCreateSpace();
+  const t = setInterval(() => {
+    const created = spaces.find(s => !before.has(s.id)), open = ov.classList.contains('on');
+    if(open && !created) return;
+    clearInterval(t); ov.style.zIndex = z;
+    if(!document.body.contains(dlg)) return;
+    dlg.style.display = 'flex';
+    if(!created) return;
+    const list = document.getElementById('move-space-list'), plus = document.getElementById('move-space-new');
+    const b = document.createElement('button');
+    b.style.cssText = _mvBtnCss; b.textContent = (created.type === 'family' ? '👨‍👩‍👧' : '🗂️') + ' ' + created.name;
+    b.setAttribute('onclick', `selectMoveSpace('${cardId}','${created.id}',this)`); // как у остальных кнопок: подсветка сбрасывается по [onclick*=selectMoveSpace]
+    if(list && plus) list.insertBefore(b, plus);
+    selectMoveSpace(cardId, created.id, b);
+  }, 300);
+}
+function mvNewCat(cardId, spaceId) {
+  const pal = (typeof COLORS !== 'undefined' && COLORS.length) ? COLORS : ['#e8c56a','#e8a63a','#e86060','#e85bb0','#c05be8','#a07de8','#5b9ee8','#5bc8e8','#5be8d0','#5bb87a','#8ee85b','#c8e85b'];
+  let color = pal[0];
+  const d = document.createElement('div');
+  d.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
+  d.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:18px;max-width:360px;width:100%;box-sizing:border-box">
+    <div style="font-size:16px;font-weight:700;margin-bottom:12px">Новая рубрика</div>
+    <input id="mv-cat-name" dir="auto" placeholder="Название рубрики" style="width:100%;box-sizing:border-box;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 12px;font-size:15px;color:var(--t1);font-family:inherit">
+    <div style="font-size:12px;color:var(--t3);margin:12px 0 6px">Цвет</div>
+    <div class="pal" id="mv-cat-pal">${pal.map((c, i) => `<div class="swatch${i ? '' : ' on'}" data-c="${c}" style="background:${c}"></div>`).join('')}</div>
+    <div style="display:flex;gap:8px;margin-top:16px"><button type="button" class="btn-s" style="flex:1" data-x="0">Отмена</button><button type="button" class="btn-p" style="flex:1" data-x="1">Создать</button></div></div>`;
+  document.body.appendChild(d);
+  const inp = d.querySelector('#mv-cat-name'); setTimeout(() => inp.focus(), 60);
+  d.querySelectorAll('[data-c]').forEach(sw => sw.onclick = () => { color = sw.dataset.c; d.querySelectorAll('[data-c]').forEach(x => x.classList.toggle('on', x === sw)); });
+  d.querySelector('[data-x="0"]').onclick = () => d.remove();
+  d.onclick = e => { if(e.target === d) d.remove(); };
+  const save = async () => {
+    const nm = inp.value.trim(); if(!nm) { inp.focus(); return; }
+    d.remove();
+    try {
+      if(spaceId === currentSpaceId) {
+        if(!cats.some(c => c.name === nm)) { const cat = { name: nm, color }; cats.push(cat); await dbAddCat(cat); if(typeof renderCats === 'function') renderCats(); }
+      } else { // рубрика в другом кабинете — так же, как dbAddCat, но со своим space_id
+        const cat = { name: nm, color, space_id: spaceId }; cat.catKey = catKey(spaceId, nm);
+        try { await local.put('categories', cat); } catch(_) {}
+        if(navigator.onLine) { const { error } = await sb.from('categories').insert(cat); if(error && error.code !== '23505') await queueOp({ type: 'insert_cat', data: cat }); }
+        else await queueOp({ type: 'insert_cat', data: cat });
+      }
+    } catch(e) { toast('Не удалось создать рубрику: ' + e.message, true); return; }
+    const list = document.getElementById('move-cat-list'), plus = document.getElementById('move-cat-new'); if(!list) return;
+    list.querySelectorAll('div').forEach(x => { if(/Нет рубрик/.test(x.textContent)) x.remove(); });
+    const b = document.createElement('button');
+    b.style.cssText = _mvBtnCss; b.innerHTML = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:6px"></span>${esc(nm)}`;
+    b.onclick = () => selectMoveCat(cardId, spaceId, nm, b);
+    if(plus) list.insertBefore(b, plus); else list.appendChild(b);
+    toast('✓ Рубрика «' + nm + '» создана');
+    selectMoveCat(cardId, spaceId, nm, b);
+  };
+  d.querySelector('[data-x="1"]').onclick = save;
+  inp.onkeydown = e => { if(e.key === 'Enter') save(); };
+}
+
 function moveEntry(cardId, selection) {
   const card = cards.find(c=>c.id===cardId); if(!card) return;
     moveSelection = typeof selection === 'string' ? {entryIds:[selection], groupIds:[]} : selection;
@@ -2057,11 +2130,12 @@ function moveEntry(cardId, selection) {
     ${(!_curFam && _chatGroups.length) ? `<label style="display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:13px;color:var(--t1);cursor:pointer"><input type="checkbox" id="me-to-chat" onchange="mecToggleChat(this.checked)"> Отправить в чат группы</label>` : ''}
     <div id="me-normal">
     <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Кабинет</div>
-    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
+    <div id="move-space-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
       <button onclick="selectMoveSpace('${cardId}','${currentSpaceId}',this)" style="background:var(--s2);border:1px solid var(--accent);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--accent);cursor:pointer;text-align:left;font-family:inherit">📂 Текущий кабинет</button>
       ${spaceList}
+      <button id="move-space-new" onclick="mvNewSpace('${cardId}')" style="${_mvNewCss}">＋ Новый кабинет</button>
     </div>
-    <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Рубрика</div>
+    <div id="move-cat-lbl" style="font-size:13px;color:var(--t2);margin-bottom:8px">Рубрика</div>
     <div style="display:flex;flex-direction:column;gap:6px" id="move-cat-list"></div>
     <div id="move-assign-block"></div>
     <div id="move-card-list" style="margin-top:12px;display:flex;flex-direction:column;gap:6px"></div>
@@ -2175,6 +2249,10 @@ async function selectMoveSpace(cardId, spaceId, btn) {
         : '<div style="font-size:13px;color:var(--t3)">Нет рубрик</div>';
     } catch(e) { catListEl.innerHTML = '<div style="font-size:13px;color:var(--red)">Ошибка загрузки</div>'; }
   }
+  if(document.getElementById('move-cat-list') === catListEl) {
+    catListEl.insertAdjacentHTML('beforeend', `<button id="move-cat-new" onclick="mvNewCat('${cardId}','${spaceId}')" style="${_mvNewCss}">＋ Новая рубрика</button>`);
+    mvScrollTo('move-cat-lbl');
+  }
 }
 
 async function selectMoveCat(cardId, spaceId, catName, btn) {
@@ -2202,6 +2280,7 @@ async function selectMoveCat(cardId, spaceId, catName, btn) {
     : `<div style="font-size:13px;color:var(--t3);margin-bottom:8px">Нет карточек в этой рубрике</div>
    <button onclick="createCardAndMove('${cardId}','${spaceId}','${esc(catName)}')" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:10px 14px;font-size:14px;font-weight:700;cursor:pointer;width:100%">＋ Создать карточку и перенести</button>`;
   renderMoveAssignBlock(spaces.find(s=>s.id===spaceId)); // «Кому из группы» — для новой и для существующей карточки в групповом кабинете
+  mvScrollTo(cardListEl);
 }
 
 function selectMoveTarget(cardId, spaceId, idx, btn) {
@@ -2213,6 +2292,7 @@ function selectMoveTarget(cardId, spaceId, idx, btn) {
   const targetSpace = spaces.find(s=>s.id===spaceId);
   document.getElementById('move-confirm-block').innerHTML = `<button onclick="confirmMove('${cardId}')" style="width:100%;margin-top:10px;background:var(--accent);border:none;color:#0f0f0f;font-weight:700;border-radius:var(--rsm);padding:11px;cursor:pointer">Перенести</button>`;
   mvSecUI(targetCard, spaceId); // мультикарточка: выбор раздела / распаковка
+  mvScrollTo('move-confirm-block');
 }
 
 // ── Окно «Сроки сегодня» (по нажатию на пуш о нескольких записях) ──
@@ -2309,6 +2389,7 @@ async function mecSelectGroup(cardId, spaceId, btn) {
     list = (data||[]).filter(c => Array.isArray(c.chatParticipants) && c.chatStatus !== 'closed' && c.status !== 'done');
   } catch(e) { box.innerHTML = '<div style="font-size:13px;color:var(--red)">Ошибка загрузки</div>'; return; }
   _mecChats = list;
+  mvScrollTo(box);
   const card = cards.find(c=>c.id===cardId);
   box.innerHTML = `<div style="font-size:13px;color:var(--t2);margin:4px 0 2px">Чат</div>` +
     list.map((c,i)=>`<button onclick="mecPick('${cardId}',${i},this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">${esc(c.title)}</button>`).join('') +
@@ -2321,6 +2402,7 @@ function mecPick(cardId, idx, btn) {
   renderMoveAssignBlock(spaces.find(s=>s.id===_mecSpace));
   document.getElementById('mec-confirm').innerHTML = `<div style="background:rgba(232,197,106,.12);border:1px solid rgba(232,197,106,.3);color:var(--accent);border-radius:var(--rsm);padding:9px 11px;font-size:12px;line-height:1.5;margin-top:10px">Все участники чата увидят эти записи.</div>
     <button onclick="mecSend('${cardId}')" style="width:100%;margin-top:10px;background:var(--accent);border:none;color:#0f0f0f;font-weight:700;border-radius:var(--rsm);padding:11px;cursor:pointer">Отправить в чат</button>`;
+  mvScrollTo('mec-confirm');
 }
 async function mecSend(cardId) {
   const fromCard = cards.find(c=>c.id===cardId);
