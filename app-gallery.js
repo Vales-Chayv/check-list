@@ -239,7 +239,7 @@
       await mcVaultFreeBacked(); await loadLocal(); renderBody(); fillSettings();
       toast('Освобождено: ' + fmtMB(b.bytes));
     };
-    $('gal-lim').onchange = e => { const c = cfg(); c.capMB = +e.target.value; saveCfg(c); fillSettings(); };
+    $('gal-lim').onchange = e => { const c = cfg(); c.capMB = +e.target.value; saveCfg(c); fillSettings(); if(window.mcCapCheck) mcCapCheck(c.capMB); }; // хватит ли места под выбранный лимит
     $('gal-clear').onclick = async () => {
       try {
         toast('Проверяю облако…');

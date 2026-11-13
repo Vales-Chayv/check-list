@@ -66,11 +66,12 @@ uploadToStorage = async function(file, cardId, entryId) {
   if(_tm) clearInterval(_tm);
   if(_vid) window.mcNativeStatus(null);
   if(att && typeof att === 'object' && !att.ts) att.ts = Date.now(); // время загрузки: нужно для галереи
-  try { if(att && att.data && MC_ATT_RE.test(String(att.data))) mcCacheOwn(String(att.data), file).catch(() => {}); } catch(e) {}
   try { if(_capId && att && att.data && MC_ATT_RE.test(String(att.data))) { _mcCapPend.delete(_capKey); mcVaultLink(_capId, String(att.data)).catch(() => {}); } } catch(e) {}
-  try { // у отправителя файл уже есть: отмечаем получение сразу
+  try { // у отправителя файл уже есть: кладём его на устройство и только после этого отмечаем «получено»
     const p = att && mcPathOf(att.data);
-    if(p && typeof currentUser !== 'undefined' && currentUser && currentUser.id) sb.from('attachment_receipts').upsert([{ path: p, user_id: currentUser.id }], { onConflict: 'path,user_id', ignoreDuplicates: true }).then(() => {}, () => {});
+    if(p) mcCacheOwn(String(att.data), file).then(() => {
+      if(typeof currentUser !== 'undefined' && currentUser && currentUser.id) sb.from('attachment_receipts').upsert([{ path: p, user_id: currentUser.id }], { onConflict: 'path,user_id', ignoreDuplicates: true }).then(() => {}, () => {});
+    }, e => { if(mcIsQuota(e)) mcNoSpace('«' + (file.name || 'файл') + '» не сохранён здесь'); }); // не поместился — отметку не ставим: облако его не сотрёт
   } catch(e) {}
   return att;
 };
@@ -283,6 +284,7 @@ async function mcCacheOwn(url, file) {
   t.objectStore('files').put({ url, blob: file, type: file.type || 'application/octet-stream' });
   t.objectStore('idx').put({ url, size: file.size, t: Date.now(), a: Date.now(), rep: true });
   t.objectStore('idx').delete('__ev__' + url);
+  await _mcTx(t); // ошибка записи (в том числе «нет места») доходит до вызвавшего
 }
 
 // ═══════════════════════════════════════════
@@ -445,7 +447,7 @@ async function mcCapFlow(kind, file, deliver) {
     }
     if(mode === 'orig') { // оригинал — то, что снято камерой, до правок
       try { _mcCapPend.set(mcCapKey(file), await mcVaultPut(raw, kind)); }
-      catch(e) { try { toast('Не удалось сохранить оригинал на устройстве (нет места?). Отправляю только копию.', true); } catch(_) {} }
+      catch(e) { if(mcIsQuota(e)) { try { mcNoSpace('оригинал не сохранён'); } catch(_) {} } else try { toast('Не удалось сохранить оригинал на устройстве. Отправляю только копию.', true); } catch(_) {} }
     }
   } catch(e) {}
   deliver(file);
@@ -720,6 +722,104 @@ async function mcBackupRemind() {
 }
 setTimeout(mcBackupRemind, 30000);
 setInterval(mcBackupRemind, 3600000);
+
+
+// ═══════════════════════════════════════════
+//  НЕХВАТКА МЕСТА НА УСТРОЙСТВЕ
+//  Браузер не сообщает, сколько на диске свободно: его «квота» — это 60% всего диска. Поэтому места
+//  не хватает только по факту — при записи. Тогда свой файл остаётся в облаке (отметка «получено» не ставится)
+//  и показывается предупреждение.
+// ═══════════════════════════════════════════
+const mcIsQuota = e => !!e && (e.name === 'QuotaExceededError' || e.code === 22 || /quota/i.test(String(e.message || e)));
+function mcNoSpace(where) {
+  window._mcNoSpace = Date.now();
+  mcWarnOnce('nospace', '🔴 На устройстве не хватает места: ' + (where || 'файл не сохранён здесь') + '. Он остаётся в облаке. Освободите место на телефоне или компьютере, сделайте резервную копию (Галерея ⚙ → «Резерв») или уменьшите лимит. Подробно: ⚙ Настройки → «📊 Память».');
+}
+// проверка выбранного лимита: сколько места браузер вообще разрешает приложению
+async function mcCapCheck(capMB) {
+  try {
+    const e = await navigator.storage.estimate(), u = await mcMediaUsage();
+    const room = e.quota - (e.usage - u.bytes); // сколько может занять кэш вместе с тем, что уже лежит
+    if(capMB * 1048576 > room) {
+      alert('Браузер разрешает приложению занять не больше ' + mcFmtMB(Math.max(0, room)) + ' на этом устройстве, а выбран лимит ' + (capMB >= 1024 ? capMB / 1024 + ' ГБ' : capMB + ' МБ') + '.\n\nЛимит сохранён, но заполнится он не полностью. Когда место кончится, файлы останутся в облаке, а приложение предупредит.');
+      return false;
+    }
+    if(capMB >= 1024) toast('Лимит ' + capMB / 1024 + ' ГБ. Свободное место на диске браузер не сообщает: если его не хватит, приложение предупредит, а файлы останутся в облаке.');
+    return true;
+  } catch(e) { return true; }
+}
+window.mcCapCheck = mcCapCheck;
+
+// ═══════════════════════════════════════════
+//  📊 ПАМЯТЬ: где и сколько хранится (устройство, облако, резерв) и где смотреть самой
+//  Облако считает функция mc_usage() в базе (файл memory-usage.sql). Трафик за месяц знает только панель Supabase.
+// ═══════════════════════════════════════════
+const MC_FREE = { files: 1024 * 1048576, db: 500 * 1048576 }; // бесплатный тариф Supabase
+async function mcMemoryData() {
+  const r = { cfg: mcGalCfg() };
+  try { r.cache = await mcMediaUsage(); } catch(e) {}
+  try { r.vault = await mcVaultStats(); } catch(e) {}
+  try { r.backed = await mcVaultBacked(); } catch(e) {}
+  try { const e = await navigator.storage.estimate(); r.est = { usage: e.usage, quota: e.quota }; } catch(e) {}
+  try { r.persist = navigator.storage.persisted ? await navigator.storage.persisted() : null; } catch(e) {}
+  try { if(typeof local !== 'undefined') { const c = await local.getAll('cards'); r.texts = { n: c.length, bytes: new Blob([JSON.stringify(c)]).size }; } } catch(e) {}
+  r.bk = mcBkGet('mc_bk_last');
+  try {
+    if(navigator.onLine && typeof sb !== 'undefined') { const { data, error } = await sb.rpc('mc_usage'); if(error) throw error; r.cloud = data; }
+  } catch(e) { r.cloudErr = /mc_usage|function|PGRST202|404/i.test(String((e && (e.code || e.message)) || e)) ? 'nofn' : 'net'; }
+  return r;
+}
+async function mcMemoryOpen() {
+  let ov = document.getElementById('mc-mem-ov'); if(ov) ov.remove();
+  ov = document.createElement('div'); ov.id = 'mc-mem-ov';
+  ov.setAttribute('style', 'position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:14px;box-sizing:border-box;font-family:inherit'); // строкой: так окно закрывает общий «назад»
+  ov.onclick = e => { if(e.target === ov) ov.remove(); };
+  ov.innerHTML = '<div style="background:var(--s1);color:var(--t1);border:1px solid var(--b1);border-radius:14px;padding:30px;font-size:14px">Считаю…</div>';
+  document.body.appendChild(ov);
+  mcMemoryPaint(await mcMemoryData());
+}
+window.mcMemoryOpen = mcMemoryOpen;
+function mcMemoryPaint(d) {
+  const ov = document.getElementById('mc-mem-ov'); if(!ov) return;
+  const E = mcBkEsc, F = b => b == null ? '—' : b >= 1073741824 ? (b / 1073741824).toFixed(1).replace('.', ',') + ' ГБ' : mcFmtMB(b);
+  const bar = (used, cap, col) => { const p = cap ? Math.min(1, used / cap) : 0; return '<div style="height:8px;border-radius:5px;background:var(--s2);overflow:hidden;margin:4px 0 9px"><i style="display:block;height:100%;width:' + Math.max(p > 0 ? 2 : 0, Math.round(p * 100)) + '%;background:' + (p >= .95 ? '#e06060' : p >= .8 ? '#e88a3a' : col) + '"></i></div>'; };
+  const line = (ic, name, val, note) => '<div style="display:flex;gap:8px;align-items:baseline;font-size:13.5px"><span>' + ic + ' ' + name + '</span><span style="margin-left:auto;white-space:nowrap">' + val + '</span></div>' + (note ? '<div style="font-size:11.5px;color:var(--t3);margin:1px 0 8px;line-height:1.4">' + note + '</div>' : '');
+  const lb = t => '<div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 7px">' + t + '</div>';
+  const btn = 'background:var(--s2);color:var(--t1);border:1px solid var(--b1);border-radius:8px;padding:7px 11px;font-size:12.5px;cursor:pointer;font-family:inherit';
+  const cap = d.cfg.capMB * 1048576, c = d.cache || {}, v = d.vault || {}, cl = d.cloud;
+  let h = '<div style="padding:16px 18px 4px;font-size:17px;font-weight:700">📊 Память</div><div style="overflow:auto;min-height:0;padding:0 18px 8px">';
+  if(window._mcNoSpace && Date.now() - window._mcNoSpace < 864e5) h += '<div style="margin:8px 0;padding:8px 10px;border-radius:10px;border:1px solid #e06060;font-size:12.5px;line-height:1.5">🔴 Сегодня на этом устройстве не хватило места для файла. Он остался в облаке. Освободите место на устройстве, сделайте резерв или уменьшите лимит.</div>';
+  h += lb('Это устройство');
+  h += line('🗂', 'Кэш просмотра', F(c.bytes) + ' из ' + F(cap), (c.files || 0) + ' файлов' + (c.pinned ? ' · 📌 ' + c.pinned + ' закреплено (последние копии, не вытесняются)' : '') + '. Сжатые копии из карточек и чатов. При лимите старое вытесняется само, если копия есть в облаке.') + bar(c.bytes || 0, cap, '#e8c56a');
+  h += '<div style="display:flex;gap:8px;align-items:center;font-size:12.5px;margin:-2px 0 10px">Лимит кэша <select id="mem-cap" style="background:var(--s2);color:var(--t1);border:1px solid var(--b1);border-radius:6px;padding:4px">' + [300, 500, 1024, 2048].map(m => '<option value="' + m + '"' + (m === d.cfg.capMB ? ' selected' : '') + '>' + (m >= 1024 ? m / 1024 + ' ГБ' : m + ' МБ') + '</option>').join('') + '</select></div>';
+  h += line('💎', 'Оригиналы', F(v.bytes || 0), (v.count || 0) + ' файлов. Снятое камерой приложения в полном качестве. Само не удаляется' + (v.bytes >= 1536 * 1048576 ? ' — <b style="color:#e88a3a">много, сделайте резерв и освободите место</b>' : '') + '.');
+  if(d.texts) h += line('📝', 'Тексты карточек', F(d.texts.bytes), d.texts.n + ' карточек для работы без интернета.');
+  if(d.est) h += line('🧮', 'Всего занято приложением', F(d.est.usage), 'Браузер разрешает приложению до ' + F(d.est.quota) + ' (это 60% всего диска). Сколько на диске свободно на самом деле, браузер не сообщает: смотрите в настройках устройства.' + (d.persist === false ? ' <b style="color:#e88a3a">Браузер может сам очистить данные при нехватке места</b> — установите приложение на экран или сделайте резерв.' : d.persist ? ' Хранилище защищено от автоочистки браузером.' : ''));
+  h += lb('Облако (Supabase, бесплатный тариф)');
+  if(cl) {
+    h += line('☁', 'Файлы', F(cl.files_bytes) + ' из 1 ГБ', (cl.files_count || 0) + ' файлов. Временные копии: удаляются, когда все получили, и не позже 60 дней.' + (cl.my_bytes != null ? ' Ваших: ' + F(cl.my_bytes) + '.' : '')) + bar(cl.files_bytes || 0, MC_FREE.files, '#5b9ee8');
+    h += line('🗄', 'База (тексты)', F(cl.db_bytes) + ' из 500 МБ', 'Карточки, записи, рубрики, история, события.') + bar(cl.db_bytes || 0, MC_FREE.db, '#5b9ee8');
+  } else h += '<div style="font-size:12.5px;color:var(--t3);line-height:1.5;margin-bottom:6px">' + (d.cloudErr === 'nofn' ? 'Объём облака пока не виден: в Supabase нужно один раз выполнить файл <b>memory-usage.sql</b> (SQL Editor → Run).' : 'Нет связи с облаком — объём покажется, когда появится интернет.') + '</div>';
+  h += line('⇅', 'Трафик за месяц', 'до 5 ГБ', 'Сколько скачано из облака, знает только панель Supabase: Organization → Usage.');
+  h += lb('Резерв');
+  h += line('🛡', 'Последняя копия', d.bk ? new Date(d.bk.ts).toLocaleDateString('ru') + ' · ' + d.bk.files + ' файлов' : 'ещё не делали');
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 4px"><button id="mem-bk" style="' + btn + '">🛡 Сделать резерв</button>' + (d.backed && d.backed.count ? '<button id="mem-free" style="' + btn + '">Освободить ' + F(d.backed.bytes) + ' (оригиналы в резерве)</button>' : '') + '</div>';
+  h += '<details style="margin-top:12px;border-top:1px solid var(--b1);padding-top:9px"><summary style="cursor:pointer;font-size:13.5px;font-weight:600">Где смотреть самой</summary><div style="font-size:12.5px;color:var(--t2);line-height:1.6;margin-top:6px">' +
+    '<b>Телефон (APK):</b> Настройки Android → Приложения → Мои карточки → Хранилище. Свободное место — Настройки → Память.<br>' +
+    '<b>Chrome (телефон и ПК):</b> Настройки → Конфиденциальность → Настройки сайтов → Данные сайтов → адрес приложения. На ПК ещё F12 → Application → Storage.<br>' +
+    '<b>Облако:</b> supabase.com → проект → Storage → attachments (файлы); Database (размер базы); Organization → Usage (трафик, место, лимиты).<br>' +
+    '<b>Резерв:</b> папка «Мои карточки — резерв ДАТА» там, куда вы его сохранили.</div></details>';
+  h += '</div><div style="padding:10px 18px 14px;border-top:1px solid var(--b1);text-align:right"><button id="mem-x" style="' + btn + ';background:var(--accent);color:#0f0f0f;border:none;font-weight:700;padding:9px 18px">Закрыть</button></div>';
+  ov.innerHTML = '<div style="background:var(--s1);color:var(--t1);border:1px solid var(--b1);border-radius:14px;width:min(460px,100%);max-height:92vh;display:flex;flex-direction:column;box-sizing:border-box">' + h + '</div>';
+  const $ = id => ov.querySelector('#' + id);
+  $('mem-x').onclick = () => ov.remove();
+  $('mem-cap').onchange = async e => { const cfg = mcGalCfg(); cfg.capMB = +e.target.value; try { localStorage.setItem('mc_gal_cfg', JSON.stringify(cfg)); } catch(_) {} mcApplyCap(); await mcCapCheck(cfg.capMB); mcMemoryPaint(await mcMemoryData()); };
+  $('mem-bk').onclick = () => { ov.remove(); mcBackupStart(); };
+  const fr = $('mem-free'); if(fr) fr.onclick = async () => {
+    if(!confirm('Удалить с устройства ' + d.backed.count + ' оригинал(ов) (' + F(d.backed.bytes) + '), которые попали в резервную копию?\n\nСначала убедитесь, что файлы резерва лежат в нужном месте. Сжатые копии в карточках останутся.')) return;
+    await mcVaultFreeBacked(); toast('Освобождено: ' + F(d.backed.bytes)); mcMemoryPaint(await mcMemoryData());
+  };
+}
 
 // ===== Камера: снимок и запись ролика =====
 // Телефон: родная камера Android (input capture). ПК: своё окно с веб-камерой.
