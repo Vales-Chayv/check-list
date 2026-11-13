@@ -368,6 +368,150 @@ function renderLobbyDone(){ // хранилище по всем личным к�
   dnPaint('l');
 }
 function dnOpenCard(id){ closeLobbyDone(); window._backTo = 'openLobbyDone'; clOpenCard(id); }
+// ═══ 🖨 Список на печать: дела из всех личных кабинетов → PDF (через печать) или Word ═══
+const PR_K = [['today', '⭐ Задачи на сегодня'], ['dl', '⏰ Срок сегодня и просрочено'], ['rem', '🔔 С напоминанием'], ['star', '🌟 Записи со звёздочкой ⭐'], ['flag', '🚩 Отмеченные записи'], ['week', '📅 Сроки на 7 дней вперёд']];
+const PR = { cats: new Set(['today', 'dl', 'flag']), cabs: new Set(), lay: 'cab', box: true, ents: true, data: [] };
+try { const s = JSON.parse(localStorage.getItem('mc_pr') || 'null'); if(s) { PR.cats = new Set(s.cats || []); PR.lay = s.lay || 'cab'; PR.box = s.box !== false; PR.ents = s.ents !== false; } } catch(e) {}
+function prSave() { try { localStorage.setItem('mc_pr', JSON.stringify({ cats: [...PR.cats], lay: PR.lay, box: PR.box, ents: PR.ents })); } catch(e) {} }
+function prPlain(h) { const d = document.createElement('div'); d.innerHTML = (typeof sanitizeRich === 'function') ? sanitizeRich(h || '') : String(h || ''); return (d.textContent || '').replace(/\s+/g, ' ').trim(); }
+function prEText(e) { return prPlain(e.text || e.sessionNote || ''); }
+function prItems(k, list) { // пункты одной группы: {kind:'c'|'e', c, e, text, date, done, sub}
+  const out = [], open = c => c.status !== 'done' && !(Array.isArray(c.chatParticipants) && c.chatParticipants.length);
+  const openEnts = c => (c.entries || []).filter(e => e && !e.done && prEText(e));
+  const card = c => ({ kind: 'c', c, text: c.title || 'Без названия', date: sfNearDl(c), done: false, sub: openEnts(c).map(prEText) });
+  const ent = (c, e) => ({ kind: 'e', c, e, text: prEText(e), date: e.deadline ? String(e.deadline).slice(0, 10) : null, done: !!e.done, sub: [] });
+  list.forEach(c => {
+    if(!open(c) && k !== 'flag') return;
+    if(k === 'today') { const d = sfNearDl(c); if(c.today || (d && sfDays(d) < 0)) out.push(card(c)); }
+    else if(k === 'rem') { if(c.reminder && c.reminder.enabled) out.push(card(c)); }
+    else if(k === 'star') (c.entries || []).forEach(e => { if(e && e.inTasks && !e.done && prEText(e)) out.push(ent(c, e)); });
+    else if(k === 'flag') { if(Array.isArray(c.chatParticipants) && c.chatParticipants.length) return; (c.entries || []).forEach(e => { if(e && e.flag && prEText(e)) out.push(ent(c, e)); }); }
+    else if(k === 'dl' || k === 'week') {
+      const ok = d => { if(!d) return false; const n = sfDays(d); return k === 'dl' ? n <= 0 : n >= 1 && n <= 7; };
+      const es = (c.entries || []).filter(e => e && !e.done && e.deadline && prEText(e));
+      es.forEach(e => { if(ok(e.deadline)) out.push(ent(c, e)); });
+      if(!es.length && ok(c.deadline)) out.push(card(c)); // срок у самой карточки (у записей сроков нет)
+    }
+  });
+  return out.sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || String(a.text).localeCompare(String(b.text), 'ru'));
+}
+function prCards() { return PR.data.filter(c => !PR.cabs.size || PR.cabs.has(c.space_id)); }
+function prSections() { // [{name, items}]
+  const list = prCards();
+  if(PR.lay === 'one') { // одним списком: без повторов, у пункта значки групп
+    const map = new Map();
+    PR_K.filter(k => PR.cats.has(k[0])).forEach(k => prItems(k[0], list).forEach(it => {
+      const key = it.kind + ':' + it.c.id + ':' + (it.e ? it.e.id : '');
+      if(!map.has(key)) map.set(key, Object.assign({ tags: [] }, it));
+      map.get(key).tags.push(k[1].split(' ')[0]);
+    }));
+    return [{ name: '', items: [...map.values()].sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999')) }];
+  }
+  return PR_K.filter(k => PR.cats.has(k[0])).map(k => ({ name: k[1], items: prItems(k[0], list) })).filter(s => s.items.length);
+}
+async function openPrintList() {
+  let ov = document.getElementById('pr-ov'); if(ov) ov.remove();
+  ov = document.createElement('div'); ov.id = 'pr-ov';
+  ov.setAttribute('style', 'position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:14px;box-sizing:border-box;font-family:inherit'); // строкой: так её находит общий «назад»
+  ov.onclick = e => { if(e.target === ov) ov.remove(); };
+  ov.innerHTML = '<div style="background:var(--s1);color:var(--t1);border:1px solid var(--b1);border-radius:14px;padding:30px;font-size:14px">Загрузка…</div>';
+  document.body.appendChild(ov);
+  PR.data = await _lobbyLoad();
+  const ids = new Set(PR.data.map(c => c.space_id));
+  PR.cabs = new Set([...PR.cabs].filter(id => ids.has(id)));
+  prPaint();
+}
+function prSet(f, v) { PR[f] = v; prSave(); prPaint(); }
+function prCat(k) { PR.cats.has(k) ? PR.cats.delete(k) : PR.cats.add(k); prSave(); prPaint(); }
+function prCab(id) { if(id === 'all') PR.cabs.clear(); else PR.cabs.has(id) ? PR.cabs.delete(id) : PR.cabs.add(id); prPaint(); }
+function prPaint() {
+  const ov = document.getElementById('pr-ov'); if(!ov) return;
+  const list = prCards(), secs = prSections(), n = secs.reduce((s, x) => s + x.items.length, 0);
+  const ids = [...new Set(PR.data.map(c => c.space_id))].sort((a, b) => _spName(a).localeCompare(_spName(b), 'ru'));
+  const lb = t => `<div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin:12px 0 6px">${t}</div>`;
+  const row = (on, label, cnt, fn) => `<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:5px;border-radius:9px;border:1px solid ${on ? 'var(--accent)' : 'var(--b1)'};background:${on ? 'rgba(232,197,106,.08)' : 'transparent'};cursor:pointer;font-size:13.5px"><input type="checkbox" ${on ? 'checked' : ''} onchange="${fn}" style="accent-color:var(--accent)">${label}${cnt != null ? `<span style="margin-left:auto;color:var(--t3);font-size:12px">${cnt}</span>` : ''}</label>`;
+  const lays = [['cab', 'По кабинетам'], ['date', 'По сроку'], ['one', 'Одним списком']];
+  const btn = 'border-radius:8px;padding:9px 14px;font-size:14px;cursor:pointer;font-family:inherit';
+  ov.innerHTML = `<div style="background:var(--s1);color:var(--t1);border:1px solid var(--b1);border-radius:14px;width:min(460px,100%);max-height:92vh;display:flex;flex-direction:column;box-sizing:border-box">
+    <div style="padding:16px 18px 6px;font-size:17px;font-weight:700">🖨 Список на печать</div>
+    <div style="overflow:auto;min-height:0;padding:0 18px 4px">
+      ${lb('Что включить')}${PR_K.map(k => row(PR.cats.has(k[0]), k[1], prItems(k[0], list).length, `prCat('${k[0]}')`)).join('')}
+      ${ids.length > 1 ? lb('Кабинеты') + `<div style="display:flex;flex-wrap:wrap;gap:6px">${_chipH('🗂️ Все', !PR.cabs.size, "prCab('all')")}${ids.map(id => _chipH(esc(_spName(id)), PR.cabs.has(id), `prCab('${id}')`)).join('')}</div>` : ''}
+      ${lb('Как разложить')}<div style="display:flex;flex-wrap:wrap;gap:6px">${lays.map(l => _chipH(l[1], PR.lay === l[0], `prSet('lay','${l[0]}')`)).join('')}</div>
+      <div style="height:8px"></div>
+      ${row(PR.box, 'Квадратик ☐ для отметки ручкой', null, 'prSet(\'box\',this.checked)')}
+      ${row(PR.ents, 'Записи внутри карточки', null, 'prSet(\'ents\',this.checked)')}
+    </div>
+    <div style="padding:12px 18px 16px;display:flex;gap:8px;align-items:center;border-top:1px solid var(--b1)">
+      <span style="flex:1;font-size:13px;color:${n ? 'var(--accent)' : 'var(--t3)'}">Пунктов: ${n}</span>
+      <button onclick="document.getElementById('pr-ov').remove()" style="${btn};background:var(--s2);color:var(--t1);border:1px solid var(--b1)">Отмена</button>
+      <button onclick="prWord()" ${n ? '' : 'disabled'} style="${btn};background:var(--s2);color:var(--t1);border:1px solid var(--b1);opacity:${n ? 1 : .4}">📄 Word</button>
+      <button onclick="prPrint()" ${n ? '' : 'disabled'} style="${btn};background:var(--accent);color:#0f0f0f;border:none;font-weight:700;opacity:${n ? 1 : .4}">🖨 PDF</button>
+    </div></div>`;
+}
+function prMeta(it, withCab) { return [it.kind === 'e' ? it.c.title || 'Без названия' : '', withCab ? _spName(it.c.space_id) : '', it.c.category || ''].filter(Boolean).join(' · '); }
+function prDate(d) { if(!d) return ''; const n = sfDays(d); return (n < 0 ? 'просрочено · ' : n === 0 ? 'сегодня · ' : '') + d.slice(8, 10) + '.' + d.slice(5, 7); }
+function prGroupsOf(sec) { // внутри раздела: по кабинетам или подряд
+  if(PR.lay !== 'cab') return [{ name: '', items: sec.items }];
+  const by = new Map(); sec.items.forEach(it => { if(!by.has(it.c.space_id)) by.set(it.c.space_id, []); by.get(it.c.space_id).push(it); });
+  return [...by.keys()].sort((a, b) => _spName(a).localeCompare(_spName(b), 'ru')).map(id => ({ name: _spName(id), items: by.get(id) }));
+}
+function prHtml() {
+  const secs = prSections(), d = new Date(), wd = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'][d.getDay()];
+  const X = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const box = done => PR.box ? `<span class="bx">${done ? '✓' : ''}</span>` : '';
+  let h = '';
+  secs.forEach(s => {
+    if(s.name) h += `<h2>${X(s.name)} <small>${s.items.length}</small></h2>`;
+    prGroupsOf(s).forEach(g => {
+      if(g.name) h += `<h3>🗂️ ${X(g.name)}</h3>`;
+      g.items.forEach(it => {
+        const dt = prDate(it.date), late = it.date && sfDays(it.date) < 0;
+        h += `<div class="it">${box(it.done)}<div class="tx"><div class="t" dir="auto">${it.kind === 'c' ? '<b>' + X(it.text) + '</b>' : X(it.text)}${it.tags ? ' <span class="tg">' + it.tags.join(' ') + '</span>' : ''}</div><div class="m" dir="auto">${X(prMeta(it, PR.lay !== 'cab'))}</div>` +
+          (PR.ents && it.sub && it.sub.length ? it.sub.map(t => `<div class="sb">${PR.box ? '<span class="bx s"></span>' : '• '}<span dir="auto">${X(t)}</span></div>`).join('') : '') +
+          `</div>${dt ? `<div class="d${late ? ' late' : ''}">${X(dt)}</div>` : ''}</div>`;
+      });
+    });
+  });
+  return `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>Список дел ${d.toLocaleDateString('ru')}</title><style>
+    @page{size:A4;margin:14mm 14mm 16mm}*{box-sizing:border-box}body{font-family:Arial,'Segoe UI',sans-serif;color:#222;font-size:11.5pt;margin:0}
+    .hd{display:flex;align-items:baseline;border-bottom:2px solid #B8892B;padding-bottom:5px;margin-bottom:6px}.hd b{font-size:16pt}.hd span{margin-left:auto;color:#888;font-size:10pt}
+    h2{font-size:12.5pt;color:#8A6A1F;background:#F6EFD9;border-left:4px solid #B8892B;padding:4px 8px;margin:14px 0 6px;break-after:avoid}h2 small{color:#a08850;font-weight:400;font-size:9.5pt}
+    h3{font-size:10.5pt;color:#555;margin:9px 0 4px;break-after:avoid}
+    .it{display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid #eee;break-inside:avoid}.tx{flex:1;min-width:0}.m{color:#888;font-size:9pt;margin-top:1px}
+    .bx{width:12px;height:12px;border:1.5px solid #444;display:inline-flex;align-items:center;justify-content:center;font-size:9pt;flex-shrink:0;margin-top:3px}.bx.s{width:10px;height:10px;margin:0 6px 0 0;vertical-align:-1px}
+    .sb{font-size:10pt;color:#333;margin:3px 0 0 6px}.d{color:#666;font-size:9.5pt;white-space:nowrap}.d.late{color:#c0392b;font-weight:700}.tg{font-size:9pt}
+    .ft{margin-top:14px;color:#aaa;font-size:8.5pt;border-top:1px solid #ddd;padding-top:4px}
+  </style></head><body><div class="hd"><b>Список дел</b><span>${d.toLocaleDateString('ru')} · ${wd}</span></div>${h || '<p>Пусто</p>'}<div class="ft">Мои карточки · ${secs.reduce((s, x) => s + x.items.length, 0)} пунктов</div></body></html>`;
+}
+function prPrint() {
+  if(typeof window.isNativeApp === 'function' && window.isNativeApp()) { // в APK печать страницы пока не работает: нужен плагин при пересборке
+    toast('В приложении на телефоне печать появится после обновления APK. Сейчас сохраните список в Word', true); return;
+  }
+  const f = document.createElement('iframe');
+  f.setAttribute('style', 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden');
+  document.body.appendChild(f);
+  f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch(e) { toast('Не удалось открыть печать', true); } setTimeout(() => f.remove(), 60000); };
+  f.srcdoc = prHtml();
+}
+function prWord() {
+  if(typeof mcExportCardWord !== 'function') { toast('Модуль Word не загрузился. Обновите страницу', true); return; }
+  const X = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const groups = [], entries = []; let i = 0;
+  prSections().forEach((s, si) => prGroupsOf(s).forEach((g, gi) => {
+    const gid = 'pr' + si + '_' + gi, nm = [s.name, g.name].filter(Boolean).join(' · ');
+    if(nm) groups.push({ id: gid, name: nm });
+    g.items.forEach(it => {
+      const dt = prDate(it.date), meta = prMeta(it, PR.lay !== 'cab');
+      let t = (it.kind === 'c' ? '<b>' + X(it.text) + '</b>' : X(it.text)) + (it.tags ? ' ' + it.tags.join(' ') : '') + (meta || dt ? '<br><i>' + X([meta, dt].filter(Boolean).join(' · ')) + '</i>' : '');
+      if(PR.ents && it.sub && it.sub.length) t += it.sub.map(x => '<br>☐ ' + X(x)).join('');
+      entries.push({ id: 'pr' + String(++i).padStart(5, '0'), text: t, done: it.done, groupId: nm ? gid : undefined });
+    });
+  }));
+  const d = new Date().toLocaleDateString('ru');
+  document.getElementById('pr-ov')?.remove();
+  mcExportCardWord(null, { id: 'pr-' + Date.now(), title: 'Список дел · ' + d, entries, entryGroups: groups, attachments: [], status: 'new', noProgress: true });
+}
 function impOpenCard(id){
   closeImportant();
   window._backTo = 'openImportant'; // из карточки вернёмся в это окно

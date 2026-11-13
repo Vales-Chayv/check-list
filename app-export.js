@@ -394,15 +394,16 @@ async function mcExportCardWordRun(card, opt) {
       if (grouped && b.secStart) { // золотая плашка раздела с прогрессом
         const sb2 = blocks.filter(x => x.gk === b.gk), sd = sb2.filter(x => x.e.done).length, rg = _isRTL(b.gName);
         body += '<w:p><w:pPr><w:keepNext/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="2"/></w:numPr><w:pBdr><w:left w:val="single" w:sz="24" w:space="6" w:color="' + GOLD + '"/></w:pBdr><w:shd w:val="clear" w:color="auto" w:fill="F6EFD9"/>' + (rg ? '<w:bidi/>' : '') + '<w:spacing w:before="' + (b === blocks[0] ? 120 : 320) + '" w:after="120"/></w:pPr>' +
-          mcDocRun(b.gName, { b: true, size: 28, rtl: rg }) + mcDocRun('   · ' + sd + ' из ' + sb2.length + ' выполнено', { size: 18, color: '8A6A1F' }) + '</w:p>';
+          mcDocRun(b.gName, { b: true, size: 28, rtl: rg }) + (card.noProgress ? '' : mcDocRun('   · ' + sd + ' из ' + sb2.length + ' выполнено', { size: 18, color: '8A6A1F' })) + '</w:p>';
       } else if (P.divider && b !== blocks[0]) body += mcDocPara('', { before: 160, after: 120, line: 120, divider: (P.divColor || '#B8892B').replace('#', '') });
       else body += mcDocPara('', { after: 0, line: 120 });
-      body += mcDocPara((P.checks ? checkbox(!!e.done) : (e.done ? mcDocRun('☑ ', { size: 24, rtl }) : '')) + textXml, { before: 60, after: 60, keep: true, bidi: rtl, num: grouped ? { id: 2, lvl: 1 } : { id: 1, lvl: 0 } });
+      const _dt0 = String(e.date || ''), _keep = (P.dates !== 'none' && !!_dt0) || !!b.grp || b.atts.length > 0; // запись держится только со своей датой и файлами, а не со следующим разделом: иначе документ «склеивается» и уезжает на новую страницу
+      body += mcDocPara((P.checks ? checkbox(!!e.done) : (e.done ? mcDocRun('☑ ', { size: 24, rtl }) : '')) + textXml, { before: 60, after: 60, keep: _keep, bidi: rtl, num: grouped ? { id: 2, lvl: 1 } : { id: 1, lvl: 0 } });
       const dTxt = String(e.date || '');
-      if (P.dates === 'show' && (dTxt || b.grp)) body += mcDocPara(mcDocRun(dTxt + (b.grp ? (dTxt ? '  ·  ' : '') + '▸ ' + b.grp : ''), { size: 18, color: '8A8A8A', rtl: _isRTL(b.grp) && !dTxt }), { keep: true, after: 80 });
-      else if (P.dates === 'hidden' && dTxt && !b.grp) body += mcDocPara(mcDocRun(dTxt, { size: 18, color: '8A8A8A', vanish: true }), { keep: true, after: 80, vanish: true });
-      else if (P.dates === 'hidden' && b.grp) body += mcDocPara(mcDocRun(dTxt + '  ·  ', { size: 18, color: '8A8A8A', vanish: true }) + mcDocRun('▸ ' + b.grp, { size: 18, color: '8A8A8A' }), { keep: true, after: 80 });
-      else if (b.grp) body += mcDocPara(mcDocRun('▸ ' + b.grp, { size: 18, color: '8A8A8A', rtl: _isRTL(b.grp) }), { keep: true, after: 80 });
+      if (P.dates === 'show' && (dTxt || b.grp)) body += mcDocPara(mcDocRun(dTxt + (b.grp ? (dTxt ? '  ·  ' : '') + '▸ ' + b.grp : ''), { size: 18, color: '8A8A8A', rtl: _isRTL(b.grp) && !dTxt }), { keep: b.atts.length > 0, after: 80 });
+      else if (P.dates === 'hidden' && dTxt && !b.grp) body += mcDocPara(mcDocRun(dTxt, { size: 18, color: '8A8A8A', vanish: true }), { keep: b.atts.length > 0, after: 80, vanish: true });
+      else if (P.dates === 'hidden' && b.grp) body += mcDocPara(mcDocRun(dTxt + '  ·  ', { size: 18, color: '8A8A8A', vanish: true }) + mcDocRun('▸ ' + b.grp, { size: 18, color: '8A8A8A' }), { keep: b.atts.length > 0, after: 80 });
+      else if (b.grp) body += mcDocPara(mcDocRun('▸ ' + b.grp, { size: 18, color: '8A8A8A', rtl: _isRTL(b.grp) }), { keep: b.atts.length > 0, after: 80 });
       if (b.atts.length) body += attXml(b.atts);
     });
     if (P.signs) {
