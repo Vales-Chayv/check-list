@@ -151,21 +151,22 @@
     opt = opt || {};
     if (busy) return say('Идёт другая операция с архивом', true);
     if (!window.mcXfer || !window.mcXfer.ZipOut) return say('Модуль передачи не загрузился. Обновите страницу', true);
-    const list = (typeof cards !== 'undefined' ? cards : []).filter(c => c && c.id);
+    const list = (opt.list || (typeof cards !== 'undefined' ? cards : [])).filter(c => c && c.id);   // opt.list — карточки из нескольких кабинетов (лобби «Готово»)
     if (!list.length) return say('В этом кабинете нет карточек', true);
-    const single = preIds && preIds.length === 1;
+    const many = !!opt.many;
+    const single = preIds && preIds.length === 1 && !many;
     const isDone = c => c && c.status === 'done';
     const sel = new Set(preIds && preIds.length ? preIds : opt.done ? list.filter(isDone).map(c => c.id) : list.map(c => c.id));
     const ov = openOv(head(single ? '📦 Карточка в ZIP' : '📦 Выгрузить в ZIP') +
-      '<div style="padding:0 18px 6px;font-size:13px;color:var(--t3);line-height:1.5">' + (single ? 'Один ZIP: карточка со всеми записями и файлами.' : 'Один ZIP: выбранные карточки (включая чаты) со всеми записями. Кабинет: «' + X((typeof currentSpace !== 'undefined' && currentSpace && currentSpace.name) || 'Личный') + '».') + '</div>' +
-      (single ? '' : '<div style="padding:4px 18px;display:flex;gap:6px;flex-wrap:wrap"><button data-q="all" style="' + BS + '">Все</button><button data-q="done" style="' + BS + '">Только выполненные</button><button data-q="none" style="' + BS + '">Ничего</button><button id="arc-imp" style="' + BS + ';margin-left:auto">📥 Загрузить из ZIP</button></div><div id="arc-list" style="padding:6px 12px;overflow:auto;min-height:0;max-height:300px"></div>') +
+      '<div style="padding:0 18px 6px;font-size:13px;color:var(--t3);line-height:1.5">' + (single ? 'Один ZIP: карточка со всеми записями и файлами.' : many ? 'Один ZIP: ' + X(opt.title || 'выбранные карточки') + '. Снимите галочки с лишних. Файлы в архиве разложены по папкам кабинетов.' : 'Один ZIP: выбранные карточки (включая чаты) со всеми записями. Кабинет: «' + X((typeof currentSpace !== 'undefined' && currentSpace && currentSpace.name) || 'Личный') + '».') + '</div>' +
+      (single ? '' : '<div style="padding:4px 18px;display:flex;gap:6px;flex-wrap:wrap"><button data-q="all" style="' + BS + '">Все</button>' + (many ? '' : '<button data-q="done" style="' + BS + '">Только выполненные</button>') + '<button data-q="none" style="' + BS + '">Ничего</button>' + (many ? '' : '<button id="arc-imp" style="' + BS + ';margin-left:auto">📥 Загрузить из ZIP</button>') + '</div><div id="arc-list" style="padding:6px 12px;overflow:auto;min-height:0;max-height:300px"></div>') +
       '<label style="padding:8px 18px;font-size:14px;display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="arc-files" checked> Вместе с файлами (фото, ролики, голос)</label>' +
       foot('<span id="arc-cnt" style="margin-right:auto;font-size:13px;color:var(--t3)"></span><button id="arc-x" style="' + BS + '">Отмена</button><button id="arc-go" style="' + BP + '">Выгрузить</button>'));
     const $ = s => ov.querySelector(s);
     const cnt = () => { $('#arc-cnt').textContent = 'Карточек: ' + sel.size + ' из ' + list.length; };
     function render() {
       const box = $('#arc-list'); if (!box) return cnt();
-      box.innerHTML = list.map(c => '<label style="display:flex;gap:9px;align-items:flex-start;padding:7px 6px;border-bottom:1px solid var(--b1);cursor:pointer;font-size:14px"><input type="checkbox" data-id="' + X(c.id) + '"' + (sel.has(c.id) ? ' checked' : '') + ' style="margin-top:3px"><span style="flex:1;min-width:0;word-break:break-word" dir="auto">' + X(c.title || '(без названия)') + '<br><span style="font-size:12px;color:var(--t3)">' + X(cardInfo(c)) + '</span></span></label>').join('');
+      box.innerHTML = list.map(c => '<label style="display:flex;gap:9px;align-items:flex-start;padding:7px 6px;border-bottom:1px solid var(--b1);cursor:pointer;font-size:14px"><input type="checkbox" data-id="' + X(c.id) + '"' + (sel.has(c.id) ? ' checked' : '') + ' style="margin-top:3px"><span style="flex:1;min-width:0;word-break:break-word" dir="auto">' + X(c.title || '(без названия)') + '<br><span style="font-size:12px;color:var(--t3)">' + (opt.cabName ? '🗂️ ' + X(opt.cabName(c)) + ' · ' : '') + X(cardInfo(c)) + '</span></span></label>').join('');
       box.querySelectorAll('input[data-id]').forEach(i => i.onchange = () => { i.checked ? sel.add(i.dataset.id) : sel.delete(i.dataset.id); cnt(); });
       cnt();
     }
@@ -177,18 +178,20 @@
       if (!sel.size) return say('Выберите хотя бы одну карточку', true);
       const chosen = list.filter(c => sel.has(c.id));
       const withFiles = $('#arc-files').checked;
-      runExport(chosen, withFiles, single ? safe('Карточка_' + (chosen[0].title || 'без названия'), 50) : null);
+      runExport(chosen, withFiles, single ? safe('Карточка_' + (chosen[0].title || 'без названия'), 50) : many ? safe(opt.title || 'Выполненные', 50) : null, opt);
     };
     render();
   }
 
-  async function runExport(chosen, withFiles, nameBase) {
+  async function runExport(chosen, withFiles, nameBase, opt) {
+    opt = opt || {};
+    const cabOf = opt.cabName ? (c => safe(opt.cabName(c) || 'Кабинет', 40)) : null;   // папка кабинета в архиве
     if (busy) return;
     busy = true; cancelled = false; work(true);
     const BaseZip = window.mcXfer.ZipOut, fsSink = window.mcXfer.fsSink;
     // в ZipOut имена «выравниваются» (слэш → _): нам нужны папки, поэтому имя берём как есть (оно уже уникальное и очищенное)
     class ArcZip extends BaseZip { uniq(n) { this.names.add(String(n).toLowerCase()); return n; } }
-    const spaceName = (typeof currentSpace !== 'undefined' && currentSpace && currentSpace.name) || 'Личный';
+    const spaceName = cabOf ? 'Все личные кабинеты' : (typeof currentSpace !== 'undefined' && currentSpace && currentSpace.name) || 'Личный';
     const fname = (nameBase || safe('Карточки_' + spaceName, 50)) + '_' + ymd() + '.zip';
     let sink = null, mem = null, writer = null, ok = false;
     try {
@@ -204,11 +207,13 @@
       const putJson = async (name, obj) => { const u = enc.encode(JSON.stringify(obj)); await zip.begin(name, u.length, Date.now()); await zip.data(u); await zip.end(); };
 
       // 1. копия карточек и список файлов
-      const out = chosen.map(c => { const o = {}; COLS.forEach(k => { if (c[k] !== undefined && k !== 'space_id') o[k] = clone(c[k]); }); return o; });
+      const out = chosen.map(c => { const o = {}; COLS.forEach(k => { if (c[k] !== undefined && k !== 'space_id') o[k] = clone(c[k]); }); if (cabOf) o.cabinet = opt.cabName(c); return o; });
       const jobs = [];
-      out.forEach(c => {
-        (c.attachments || []).forEach(a => a && jobs.push(a));
-        (c.entries || []).forEach(e => { if (e) attLists(e).forEach(([, l]) => (l || []).forEach(a => a && jobs.push(a))); });
+      out.forEach((c, ci) => {
+        const dir = cabOf ? cabOf(chosen[ci]) + '/' : '';
+        const push = a => { if (a) { jobs.push(a); if (dir) a._dir = dir; } };
+        (c.attachments || []).forEach(push);
+        (c.entries || []).forEach(e => { if (e) attLists(e).forEach(([, l]) => (l || []).forEach(push)); });
       });
       // 2. файлы
       const byUrl = new Map(); let n = 0, done = 0, total = 0, miss = 0, bytes = 0;
@@ -225,7 +230,7 @@
           if (!blob) { byUrl.set(a.data, null); a.missing = true; miss++; continue; }
           bytes += blob.size;
           if (mem && bytes > MOBILE_MAX) throw new Error('Архив слишком большой для этого устройства (больше ' + mb(MOBILE_MAX) + '). Выгрузите без файлов или частями, либо на компьютере.');
-          const nm = 'files/' + String(++n).padStart(4, '0') + '_' + safe(a.name || 'file', 80);
+          const nm = (a._dir || '') + 'files/' + String(++n).padStart(4, '0') + '_' + safe(a.name || 'file', 80);
           await zip.begin(nm, blob.size, a.ts || Date.now());
           for (let i = 0; i < blob.size; i += BLK) { await zip.data(new Uint8Array(await blob.slice(i, i + BLK).arrayBuffer())); if (cancelled) throw new Error('cancel'); }
           await zip.end();
@@ -233,11 +238,11 @@
         }
       }
       // 3. служебные файлы
-      jobs.forEach(a => { delete a.data; delete a.pending; delete a.pendId; delete a.offline; });
+      jobs.forEach(a => { delete a.data; delete a.pending; delete a.pendId; delete a.offline; delete a._dir; });
       const catNames = new Set(out.map(c => c.category).filter(Boolean));
-      const catList = ((typeof cats !== 'undefined' ? cats : []) || []).filter(c => c && catNames.has(c.name)).map(c => ({ name: c.name, color: c.color }));
+      const catList = opt.catList || ((typeof cats !== 'undefined' ? cats : []) || []).filter(c => c && catNames.has(c.name)).map(c => ({ name: c.name, color: c.color }));
       upd('Записываю карточки…', 1);
-      await putJson('about.json', { app: 'Мои карточки', format: FORMAT, created: new Date().toISOString(), cabinet: { id: (typeof currentSpaceId !== 'undefined' && currentSpaceId) || 'personal', name: spaceName, type: (typeof currentSpace !== 'undefined' && currentSpace && currentSpace.type) || 'personal' }, cards: out.length, files: n, filesIncluded: !!withFiles, missingFiles: miss, by: (typeof currentUser !== 'undefined' && currentUser && currentUser.display_name) || '' });
+      await putJson('about.json', { app: 'Мои карточки', format: FORMAT, created: new Date().toISOString(), cabinet: cabOf ? { id: 'many', name: spaceName, type: 'personal', list: [...new Set(out.map(c => c.cabinet))] } : { id: (typeof currentSpaceId !== 'undefined' && currentSpaceId) || 'personal', name: spaceName, type: (typeof currentSpace !== 'undefined' && currentSpace && currentSpace.type) || 'personal' }, cards: out.length, files: n, filesIncluded: !!withFiles, missingFiles: miss, by: (typeof currentUser !== 'undefined' && currentUser && currentUser.display_name) || '' });
       await putJson('categories.json', catList);
       await putJson('cards.json', out);
       await zip.finish();

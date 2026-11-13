@@ -354,20 +354,18 @@ async function openLobbyDone(){
 function closeLobbyDone(){ document.getElementById('dn-ov').classList.remove('on'); }
 function dnToggleCab(id){ if(id==='all') _dnSel.clear(); else if(_dnSel.has(id)) _dnSel.delete(id); else _dnSel.add(id); renderLobbyDone(); }
 function dnToggleMore(id){ if(_dnOpen.has(id)) _dnOpen.delete(id); else _dnOpen.add(id); renderLobbyDone(); }
-function renderLobbyDone(){
+function renderLobbyDone(){ // хранилище по всем личным кабинетам (как «Выполненные» в кабинете)
   const all = window._dnCards||[];
   const ids = [...new Set(all.map(c=>c.space_id))];
   _dnSel = new Set([..._dnSel].filter(id=>ids.includes(id)));
-  document.getElementById('dn-chips').innerHTML = ids.length>1 ? _chipH('🗂️ Все кабинеты', !_dnSel.size, "dnToggleCab('all')") + ids.map(id=>_chipH(esc(_spName(id))+' · '+all.filter(c=>c.space_id===id).length, _dnSel.has(id), `dnToggleCab('${id}')`)).join('') : '';
+  document.getElementById('dn-chips').innerHTML = ids.length>1 ? _chipH('🗂️ Все кабинеты · '+all.length, !_dnSel.size, "dnToggleCab('all')") + ids.map(id=>_chipH(esc(_spName(id))+' · '+all.filter(c=>c.space_id===id).length, _dnSel.has(id), `dnToggleCab('${id}')`)).join('') : '';
   const el = document.getElementById('dn-list');
-  const shownIds = ids.filter(id => !_dnSel.size || _dnSel.has(id));
-  if(!shownIds.length){ el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Пока нет выполненных карточек</div>'; return; }
-  const total = shownIds.reduce((n,id)=>n+all.filter(c=>c.space_id===id).length, 0);
-  el.innerHTML = `<div style="font-size:12px;color:var(--t3);margin:0 2px 10px">Всего выполнено: ${total} · кабинетов: ${shownIds.length}</div>` + shownIds.map(id => {
-    const list = all.filter(c=>c.space_id===id).sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
-    const open = _dnOpen.has(id), part = open ? list : list.slice(0,5);
-    return `<div style="font-size:12px;font-weight:700;color:var(--accent);margin:12px 2px 6px">🗂️ ${esc(_spName(id))} <span style="color:var(--t3);font-weight:400">· ${list.length}</span></div>` + part.map(c => { const col = _colOf(c); return `<div onclick="dnOpenCard('${c.id}')" style="background:${hex2rgba(col,.09)};border:1px solid ${hex2rgba(col,.2)};border-radius:var(--rsm);padding:9px 12px;margin-bottom:6px;cursor:pointer;opacity:.85"><div dir="auto" style="font-size:14px;color:${col}">✓ ${esc(c.title||'Без названия')}</div><div style="font-size:11px;color:var(--t3);margin-top:2px">${c.category?esc(c.category)+' · ':''}${esc(String(c.created_at||'').slice(0,10))}</div></div>`; }).join('') + (list.length>5 ? `<div onclick="dnToggleMore('${id}')" style="font-size:12px;color:var(--t2);text-align:center;padding:6px;cursor:pointer">${open?'Свернуть ▴':'Показать все ('+list.length+') ▾'}</div>` : '');
-  }).join('');
+  if(!all.length){ el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:30px">Пока нет выполненных карточек</div>'; return; }
+  const v = dnView();
+  const sb2 = (k, t) => `<button type="button" onclick="dnSetView('${k}')" style="flex:1;padding:7px 6px;font-size:12.5px;cursor:pointer;font-family:inherit;border:1px solid ${v===k?'var(--accent)':'var(--b1)'};background:${v===k?'var(--accent)':'var(--s2)'};color:${v===k?'#0f0f0f':'var(--t2)'};font-weight:${v===k?700:400};border-radius:${k==='date'?'9px 0 0 9px':'0 9px 9px 0'}">${t}</button>`;
+  const eb = 'background:var(--s2);color:var(--t1);border:1px solid var(--b1);border-radius:9px;padding:7px 10px;font-size:12.5px;cursor:pointer;font-family:inherit;white-space:nowrap';
+  el.innerHTML = `<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px"><div style="display:flex;flex:1;min-width:0">${sb2('date','📅 По датам')}${sb2('cab','🗂️ Кабинеты')}</div><button onclick="dnxOpen('zip')" title="Выгрузить в ZIP" style="${eb}">📦 ZIP</button><button onclick="dnxOpen('word')" title="Выгрузить в Word" style="${eb}">📄 Word</button></div>` + dnControls('l', dnAll('l'));
+  dnPaint('l');
 }
 function dnOpenCard(id){ closeLobbyDone(); window._backTo = 'openLobbyDone'; clOpenCard(id); }
 function impOpenCard(id){
@@ -1064,10 +1062,13 @@ function renderChecklist() {
 }
 
 // ═══ «Выполненные» → хранилище: Год → Месяц → День, тепловая карта, поиск, период, рубрика, тип ═══
-const DN = { q: '', period: 'all', cat: '', type: '', year: null, open: null };
+// Два места: 'c' — вкладка «Выполненные» в кабинете (#scroll), 'l' — окно «🏁 Готово» в лобби (#dn-list, все личные кабинеты)
+const DN = { q: '', period: 'all', cat: '', type: '', year: null, open: null, pre: 'dn' };
+const DNL = { q: '', period: 'all', cat: '', type: '', year: null, open: null, openC: null, pre: 'dnl', view: null };
 const DN_MON = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 const DN_MON_G = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
 const DN_WD = ['вс','пн','вт','ср','чт','пт','сб'];
+function dnS(x) { return x === 'l' ? DNL : DN; }
 function dnPad(n) { return String(n).padStart(2, '0'); }
 function dnToday() { const d = new Date(); return d.getFullYear() + '-' + dnPad(d.getMonth() + 1) + '-' + dnPad(d.getDate()); }
 function dnParseHist(s) { // «12 нояб., 14:30» (без года) или ISO → {m, d} / {y, m, d}
@@ -1100,88 +1101,123 @@ function dnDoneDate(c) { // день перехода в «Готово»: по�
   c._dnK = (c.history || []).length + '|' + c.created_at; c._dnD = res;
   return res;
 }
-function dnAll() { return applyMemberFilter(cards.filter(c => c.status === 'done')); }
+function dnLobbyBase() { return (window._dnCards || []).filter(c => c.status === 'done'); }
+function dnAll(x) {
+  if(x === 'l') return dnLobbyBase().filter(c => !_dnSel.size || _dnSel.has(c.space_id));
+  return applyMemberFilter(cards.filter(c => c.status === 'done'));
+}
 function dnText(c) { return [c.title, c.body, c.category, ...(c.entries || []).map(e => e ? (e.text || '') + ' ' + (e.sessionNote || '') : '')].join(' ').toLowerCase(); }
-function dnPeriodOk(d) {
-  const t = dnToday();
-  if(DN.period === 'year') return d.slice(0, 4) === t.slice(0, 4);
-  if(DN.period === 'month') return d.slice(0, 7) === t.slice(0, 7);
-  if(DN.period === 'last') return d.slice(0, 4) === String(+t.slice(0, 4) - 1);
-  if(DN.period === '30') { const x = new Date(); x.setDate(x.getDate() - 30); return d >= x.getFullYear() + '-' + dnPad(x.getMonth() + 1) + '-' + dnPad(x.getDate()); }
+function dnPeriodOk(d, S) {
+  S = S || DN; const t = dnToday();
+  if(S.period === 'year') return d.slice(0, 4) === t.slice(0, 4);
+  if(S.period === 'month') return d.slice(0, 7) === t.slice(0, 7);
+  if(S.period === 'last') return d.slice(0, 4) === String(+t.slice(0, 4) - 1);
+  if(S.period === '30') { const x = new Date(); x.setDate(x.getDate() - 30); return d >= x.getFullYear() + '-' + dnPad(x.getMonth() + 1) + '-' + dnPad(x.getDate()); }
   return true;
 }
-function dnFiltered(skipPeriod) {
-  const q = DN.q.trim().toLowerCase();
-  return dnAll().filter(c => (!DN.cat || (c.category || '') === DN.cat) &&
-    (!DN.type || (DN.type === 'multi' ? !!(c.entryGroups || []).length : !(c.entryGroups || []).length)) &&
-    (!q || dnText(c).includes(q)) && (skipPeriod || dnPeriodOk(dnDoneDate(c))));
+function dnCatTypeOk(c, S) { return (!S.cat || (c.category || '') === S.cat) && (!S.type || (S.type === 'multi' ? !!(c.entryGroups || []).length : !(c.entryGroups || []).length)); }
+function dnFiltered(skipPeriod, x) {
+  const S = dnS(x), q = S.q.trim().toLowerCase();
+  return dnAll(x).filter(c => dnCatTypeOk(c, S) && (!q || dnText(c).includes(q)) && (skipPeriod || dnPeriodOk(dnDoneDate(c), S)));
 }
-function dnFiltersOn() { return !!(DN.q.trim() || DN.cat || DN.type || DN.period !== 'all'); }
+function dnFiltersOn(x) { const S = dnS(x); return !!(S.q.trim() || S.cat || S.type || S.period !== 'all'); }
+function dnControls(x, all) { // поиск, период, рубрика, тип + места для карты и списка
+  const S = dnS(x), P = S.pre;
+  const sel = 'background:var(--s2);color:var(--t1);border:1px solid var(--b1);border-radius:9px;padding:7px 8px;font-size:13px;font-family:inherit;min-width:0;flex:1';
+  const catNames = [...new Set(all.map(c => c.category || ''))].filter(Boolean).sort((a, b) => a.localeCompare(b, 'ru'));
+  if(S.cat && !catNames.includes(S.cat)) S.cat = '';
+  const o = (v, t, cur) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(t)}</option>`;
+  return `<input id="${P}-q" type="search" value="${esc(S.q)}" placeholder="🔍 Поиск по названию и записям" oninput="dnS('${x}').q=this.value;dnPaint('${x}')" style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:9px 12px;border-radius:10px;border:1px solid var(--b1);background:var(--s2);color:var(--t1);font-size:14px;font-family:inherit">
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <select onchange="dnS('${x}').period=this.value;dnPaint('${x}')" style="${sel}" title="Период">${o('all','Всё время',S.period)}${o('30','30 дней',S.period)}${o('month','Этот месяц',S.period)}${o('year','Этот год',S.period)}${o('last','Прошлый год',S.period)}</select>
+      <select onchange="dnS('${x}').cat=this.value;dnPaint('${x}')" style="${sel}" title="Рубрика">${o('','Все рубрики',S.cat)}${catNames.map(n => o(n, n, S.cat)).join('')}</select>
+      <select onchange="dnS('${x}').type=this.value;dnPaint('${x}')" style="${sel}" title="Тип">${o('','Любой тип',S.type)}${o('plain','Обычные',S.type)}${o('multi','Мультикарточки',S.type)}</select>
+    </div>
+    <div id="${P}-heat"></div><div id="${P}-body"></div>`;
+}
 function renderDone() {
   const el = document.getElementById('scroll');
   const bar = document.getElementById('cats'), strip = document.getElementById('cats-strip');
   if(bar) bar.style.display = 'none'; if(strip) strip.style.display = 'none'; // в хранилище лента рубрик не нужна
-  const all = dnAll();
+  const all = dnAll('c');
   if(!all.length) { el.innerHTML = emptyHTML('Нет выполненных', 'Карточки со статусом «Готово» появятся здесь'); return; }
   if(!DN.year) DN.year = +dnToday().slice(0, 4);
-  const sel = 'background:var(--s2);color:var(--t1);border:1px solid var(--b1);border-radius:9px;padding:7px 8px;font-size:13px;font-family:inherit;min-width:0;flex:1';
-  const catNames = [...new Set(all.map(c => c.category || ''))].filter(Boolean).sort((a, b) => a.localeCompare(b, 'ru'));
-  if(DN.cat && !catNames.includes(DN.cat)) DN.cat = '';
-  const o = (v, t, cur) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(t)}</option>`;
-  el.innerHTML = `<div id="dn-wrap" style="padding:2px 0 10px">
-    <input id="dn-q" type="search" value="${esc(DN.q)}" placeholder="🔍 Поиск по названию и записям" oninput="DN.q=this.value;dnPaint()" style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:9px 12px;border-radius:10px;border:1px solid var(--b1);background:var(--s2);color:var(--t1);font-size:14px;font-family:inherit">
-    <div style="display:flex;gap:6px;margin-bottom:10px">
-      <select onchange="DN.period=this.value;dnPaint()" style="${sel}" title="Период">${o('all','Всё время',DN.period)}${o('30','30 дней',DN.period)}${o('month','Этот месяц',DN.period)}${o('year','Этот год',DN.period)}${o('last','Прошлый год',DN.period)}</select>
-      <select onchange="DN.cat=this.value;dnPaint()" style="${sel}" title="Рубрика">${o('','Все рубрики',DN.cat)}${catNames.map(n => o(n, n, DN.cat)).join('')}</select>
-      <select onchange="DN.type=this.value;dnPaint()" style="${sel}" title="Тип">${o('','Любой тип',DN.type)}${o('plain','Обычные',DN.type)}${o('multi','Мультикарточки',DN.type)}</select>
-    </div>
-    <div id="dn-heat"></div><div id="dn-body"></div></div>`;
-  dnPaint();
+  el.innerHTML = `<div id="dn-wrap" style="padding:2px 0 10px">${dnControls('c', all)}</div>`;
+  dnPaint('c');
 }
 function dnGroups(list) { // {год: {месяц: {день: [карточки]}}}
   const g = {};
   list.forEach(c => { const d = dnDoneDate(c), y = d.slice(0, 4), m = d.slice(5, 7); ((g[y] = g[y] || {})[m] = g[y][m] || {}); (g[y][m][d] = g[y][m][d] || []).push(c); });
   return g;
 }
-function dnPaint() {
-  const body = document.getElementById('dn-body'); if(!body) return;
-  const list = dnFiltered(false), g = dnGroups(list);
-  const years = Object.keys(g).sort((a, b) => b.localeCompare(a));
-  if(!DN.open) { DN.open = new Set(); if(years[0]) { DN.open.add(years[0]); const m = Object.keys(g[years[0]]).sort().pop(); DN.open.add(years[0] + '-' + m); } }
-  const force = dnFiltersOn(); // при поиске и фильтрах всё найденное раскрыто
-  const isOpen = k => force || DN.open.has(k);
+function dnCardH(x, c, showCab) {
+  if(x !== 'l') return cardHTML(c, true);
+  const col = _colOf(c);
+  return `<div onclick="dnOpenCard('${c.id}')" style="background:${hex2rgba(col,.09)};border:1px solid ${hex2rgba(col,.2)};border-radius:var(--rsm);padding:9px 12px;margin:0 0 6px 14px;cursor:pointer"><div dir="auto" style="font-size:14px;color:${col}">✓ ${esc(c.title||'Без названия')}${(c.entryGroups||[]).length ? ' <span style="font-size:11px;color:var(--accent)">· мульти</span>' : ''}</div><div style="font-size:11px;color:var(--t3);margin-top:2px">${showCab ? '🗂️ ' + esc(_spName(c.space_id)) + (c.category ? ' · ' : '') : ''}${c.category ? esc(c.category) : ''}</div></div>`;
+}
+function dnDaysH(x, days, showCab) {
+  return Object.keys(days).sort((a, b) => b.localeCompare(a)).map(d => {
+    const dt = new Date(d + 'T12:00:00'), m = +d.slice(5, 7);
+    return `<div id="${dnS(x).pre}-d-${d}" class="date-lbl" style="margin:10px 0 6px 14px">${+d.slice(8)} ${DN_MON_G[m - 1]}, ${DN_WD[dt.getDay()]}</div>` +
+      days[d].sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))).map(c => dnCardH(x, c, showCab)).join('');
+  }).join('');
+}
+function dnPaint(x) {
+  x = x || 'c';
+  const S = dnS(x), P = S.pre, body = document.getElementById(P + '-body'); if(!body) return;
+  const list = dnFiltered(false, x);
+  const force = dnFiltersOn(x); // при поиске и фильтрах всё найденное раскрыто
   const cnt = o => Object.values(o).reduce((s, v) => s + (Array.isArray(v) ? v.length : cnt(v)), 0);
   const btn = 'background:var(--s2);color:var(--t1);border:1px solid var(--b1);border-radius:8px;padding:4px 9px;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap';
+  const mBox = (id, onTog, open, label, n, extra, color) => `<div id="${id}" style="display:flex;align-items:center;gap:6px;margin:4px 0 4px 10px;padding:8px 10px;border-radius:10px;background:var(--s1);border:1px solid var(--b1)">
+    <div onclick="${onTog}" style="flex:1;cursor:pointer;font-size:14.5px;font-weight:600;min-width:0${color ? ';color:' + color : ''}"><span style="display:inline-block;width:14px;color:var(--t3);font-size:11px">${open ? '▾' : '▸'}</span>${label} <span style="font-weight:400;color:var(--t3);font-size:12.5px">· ${n}</span></div>${extra || ''}</div>`;
   let h = '';
-  if(!years.length) h = `<div style="text-align:center;color:var(--t3);font-size:14px;padding:30px 10px">Ничего не найдено${force ? `<br><button onclick="dnReset()" style="${btn};margin-top:10px">Сбросить фильтры</button>` : ''}</div>`;
-  years.forEach(y => {
-    const yo = isOpen(y);
-    h += `<div onclick="dnToggle('${y}')" style="display:flex;align-items:center;gap:8px;padding:10px 4px 6px;cursor:pointer;font-size:17px;font-weight:700"><span style="width:14px;color:var(--t3);font-size:12px">${yo ? '▾' : '▸'}</span>${y}<span style="font-size:13px;font-weight:400;color:var(--t3)">· ${cnt(g[y])}</span></div>`;
-    if(!yo) return;
-    Object.keys(g[y]).sort((a, b) => b.localeCompare(a)).forEach(m => {
-      const k = y + '-' + m, mo = isOpen(k), n = cnt(g[y][m]);
-      h += `<div id="dn-m-${k}" style="display:flex;align-items:center;gap:6px;margin:4px 0 4px 10px;padding:8px 10px;border-radius:10px;background:var(--s1);border:1px solid var(--b1)">
-        <div onclick="dnToggle('${k}')" style="flex:1;cursor:pointer;font-size:14.5px;font-weight:600;min-width:0"><span style="display:inline-block;width:14px;color:var(--t3);font-size:11px">${mo ? '▾' : '▸'}</span>${DN_MON[+m - 1]} <span style="font-weight:400;color:var(--t3);font-size:12.5px">· ${n}</span></div>
-        <button onclick="dnZip('${k}')" title="Карточки месяца в ZIP" style="${btn}">📦 ZIP</button><button onclick="dnWord('${k}')" title="Месяц одним документом Word" style="${btn}">📄 Word</button></div>`;
-      if(!mo) return;
-      Object.keys(g[y][m]).sort((a, b) => b.localeCompare(a)).forEach(d => {
-        const dt = new Date(d + 'T12:00:00');
-        h += `<div id="dn-d-${d}" class="date-lbl" style="margin:10px 0 6px 14px">${+d.slice(8)} ${DN_MON_G[+m - 1]}, ${DN_WD[dt.getDay()]}</div>`;
-        h += g[y][m][d].sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))).map(c => cardHTML(c, true)).join('');
+  if(!list.length) h = `<div style="text-align:center;color:var(--t3);font-size:14px;padding:30px 10px">Ничего не найдено${force ? `<br><button onclick="dnReset('${x}')" style="${btn};margin-top:10px">Сбросить фильтры</button>` : ''}</div>`;
+  else if(x === 'l' && dnView() === 'cab') { // По кабинетам: Кабинет → Месяц → День
+    const by = {}; list.forEach(c => (by[c.space_id] = by[c.space_id] || []).push(c));
+    const ids = Object.keys(by).sort((a, b) => _spName(a).localeCompare(_spName(b), 'ru'));
+    if(!S.openC) { S.openC = new Set(); if(ids[0]) { S.openC.add('C:' + ids[0]); const last = by[ids[0]].map(dnDoneDate).sort().pop(); S.openC.add('C:' + ids[0] + '|' + last.slice(0, 7)); } }
+    const isO = k => force || S.openC.has(k);
+    ids.forEach(sid => {
+      const k = 'C:' + sid, op = isO(k), sp = (spaces || []).find(s => s.id === sid);
+      h += mBox(P + '-c-' + sid, `dnToggle('l','${k}')`, op, '🗂️ ' + esc(_spName(sid)), by[sid].length, '', sp && sp.color ? sp.color : '').replace('margin:4px 0 4px 10px', 'margin:6px 0 4px 0');
+      if(!op) return;
+      const ms = {}; by[sid].forEach(c => { const d = dnDoneDate(c); ((ms[d.slice(0, 7)] = ms[d.slice(0, 7)] || {})[d] = ms[d.slice(0, 7)][d] || []).push(c); });
+      Object.keys(ms).sort((a, b) => b.localeCompare(a)).forEach(ym => {
+        const k2 = k + '|' + ym, o2 = isO(k2);
+        h += `<div onclick="dnToggle('l','${k2}')" style="margin:6px 0 2px 12px;cursor:pointer;font-size:13.5px;font-weight:600"><span style="display:inline-block;width:14px;color:var(--t3);font-size:11px">${o2 ? '▾' : '▸'}</span>${DN_MON[+ym.slice(5) - 1]} ${ym.slice(0, 4)} <span style="font-weight:400;color:var(--t3);font-size:12px">· ${cnt(ms[ym])}</span></div>`;
+        if(o2) h += dnDaysH(x, ms[ym], false);
       });
     });
-  });
+  } else { // По датам: Год → Месяц → День
+    const g = dnGroups(list), years = Object.keys(g).sort((a, b) => b.localeCompare(a));
+    if(!S.open) { S.open = new Set(); if(years[0]) { S.open.add(years[0]); const m = Object.keys(g[years[0]]).sort().pop(); S.open.add(years[0] + '-' + m); } }
+    const isOpen = k => force || S.open.has(k);
+    years.forEach(y => {
+      const yo = isOpen(y);
+      h += `<div onclick="dnToggle('${x}','${y}')" style="display:flex;align-items:center;gap:8px;padding:10px 4px 6px;cursor:pointer;font-size:17px;font-weight:700"><span style="width:14px;color:var(--t3);font-size:12px">${yo ? '▾' : '▸'}</span>${y}<span style="font-size:13px;font-weight:400;color:var(--t3)">· ${cnt(g[y])}</span></div>`;
+      if(!yo) return;
+      Object.keys(g[y]).sort((a, b) => b.localeCompare(a)).forEach(m => {
+        const k = y + '-' + m, mo = isOpen(k);
+        const extra = x === 'c' ? `<button onclick="dnZip('${k}')" title="Карточки месяца в ZIP" style="${btn}">📦 ZIP</button><button onclick="dnWord('${k}')" title="Месяц одним документом Word" style="${btn}">📄 Word</button>` : '';
+        h += mBox(P + '-m-' + k, `dnToggle('${x}','${k}')`, mo, DN_MON[+m - 1], cnt(g[y][m]), extra);
+        if(mo) h += dnDaysH(x, g[y][m], x === 'l');
+      });
+    });
+  }
   body.innerHTML = h;
-  dnHeat();
+  dnHeat(x);
 }
-function dnHeat() { // тепловая карта года: строки — месяцы, клетки — дни
-  const el = document.getElementById('dn-heat'); if(!el) return;
-  const y = DN.year, per = {};
-  dnFiltered(true).forEach(c => { const d = dnDoneDate(c); if(+d.slice(0, 4) === y) per[d] = (per[d] || 0) + 1; });
+function dnHeat(x) { // тепловая карта года: строки — месяцы, клетки — дни
+  x = x || 'c';
+  const S = dnS(x), el = document.getElementById(S.pre + '-heat'); if(!el) return;
+  if(!S.year) S.year = +dnToday().slice(0, 4);
+  const y = S.year, per = {};
+  dnFiltered(true, x).forEach(c => { const d = dnDoneDate(c); if(+d.slice(0, 4) === y) per[d] = (per[d] || 0) + 1; });
   const total = Object.values(per).reduce((a, b) => a + b, 0), mx = Math.max(1, ...Object.values(per));
-  const years = [...new Set(dnAll().map(c => +dnDoneDate(c).slice(0, 4)))];
+  const years = [...new Set(dnAll(x).map(c => +dnDoneDate(c).slice(0, 4)))];
   const minY = Math.min(y, ...years), maxY = Math.max(+dnToday().slice(0, 4), ...years);
-  const nav = (dy, on) => `<button ${on ? `onclick="DN.year+=${dy};dnHeat()"` : 'disabled'} style="background:none;border:1px solid var(--b1);color:${on ? 'var(--t1)' : 'var(--b2)'};border-radius:7px;padding:2px 9px;cursor:${on ? 'pointer' : 'default'};font-family:inherit">${dy < 0 ? '◀' : '▶'}</button>`;
+  const nav = (dy, on) => `<button ${on ? `onclick="dnS('${x}').year+=${dy};dnHeat('${x}')"` : 'disabled'} style="background:none;border:1px solid var(--b1);color:${on ? 'var(--t1)' : 'var(--b2)'};border-radius:7px;padding:2px 9px;cursor:${on ? 'pointer' : 'default'};font-family:inherit">${dy < 0 ? '◀' : '▶'}</button>`;
   let h = `<div style="background:var(--s1);border:1px solid var(--b1);border-radius:12px;padding:10px 10px 8px;margin-bottom:6px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">${nav(-1, y > minY)}<b style="font-size:14px">${y}</b>${nav(1, y < maxY)}<span style="margin-left:auto;font-size:12.5px;color:var(--t3)">выполнено: <b style="color:var(--accent)">${total}</b></span></div>`;
   for(let m = 1; m <= 12; m++) {
@@ -1190,47 +1226,150 @@ function dnHeat() { // тепловая карта года: строки — м
     for(let d = 1; d <= 31; d++) {
       if(d > days) { cells += '<i></i>'; continue; }
       const ds = y + '-' + dnPad(m) + '-' + dnPad(d), n = per[ds] || 0;
-      cells += n ? `<i title="${d} ${DN_MON_G[m - 1]}: ${n}" onclick="dnGoDay('${ds}')" style="background:rgba(232,197,106,${(.3 + .7 * n / mx).toFixed(2)});cursor:pointer"></i>` : '<i style="background:var(--s2)"></i>';
+      cells += n ? `<i title="${d} ${DN_MON_G[m - 1]}: ${n}" onclick="dnGoDay('${ds}','${x}')" style="background:rgba(232,197,106,${(.3 + .7 * n / mx).toFixed(2)});cursor:pointer"></i>` : '<i style="background:var(--s2)"></i>';
     }
-    h += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px"><span onclick="dnGoMonth('${y}-${dnPad(m)}')" style="width:26px;font-size:10px;color:var(--t3);cursor:pointer;flex-shrink:0">${DN_MON[m - 1].slice(0, 3).toLowerCase()}</span><div class="dn-row" style="flex:1;display:grid;grid-template-columns:repeat(31,1fr);gap:2px">${cells}</div></div>`;
+    h += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px"><span onclick="dnGoMonth('${y}-${dnPad(m)}','${x}')" style="width:26px;font-size:10px;color:var(--t3);cursor:pointer;flex-shrink:0">${DN_MON[m - 1].slice(0, 3).toLowerCase()}</span><div class="dn-row" style="flex:1;display:grid;grid-template-columns:repeat(31,1fr);gap:2px">${cells}</div></div>`;
   }
   h += `<style>.dn-row i{display:block;aspect-ratio:1;border-radius:2px;max-height:12px}</style></div>`;
   el.innerHTML = h;
 }
-function dnToggle(k) { if(!DN.open) DN.open = new Set(); DN.open.has(k) ? DN.open.delete(k) : DN.open.add(k); dnPaint(); }
-function dnGoMonth(k) {
-  if(!DN.open) DN.open = new Set();
-  DN.open.add(k.slice(0, 4)); DN.open.add(k); dnPaint();
-  const el = document.getElementById('dn-m-' + k);
+function dnToggle(x, k) { // dnToggle('2026-11') — старый вызов (кабинет)
+  if(k === undefined) { k = x; x = 'c'; }
+  const S = dnS(x), cab = String(k).startsWith('C:'), key = cab ? 'openC' : 'open';
+  if(!S[key]) S[key] = new Set();
+  S[key].has(k) ? S[key].delete(k) : S[key].add(k); dnPaint(x);
+}
+function dnGoMonth(k, x) {
+  x = x || 'c'; const S = dnS(x);
+  if(x === 'l' && dnView() === 'cab') dnSetView('date');
+  if(!S.open) S.open = new Set();
+  S.open.add(k.slice(0, 4)); S.open.add(k); dnPaint(x);
+  const el = document.getElementById(S.pre + '-m-' + k);
   if(el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); else toast('В этом месяце ничего нет');
 }
-function dnGoDay(ds) {
-  if(DN.period !== 'all' && !dnPeriodOk(ds)) DN.period = 'all';
-  if(!DN.open) DN.open = new Set();
-  DN.open.add(ds.slice(0, 4)); DN.open.add(ds.slice(0, 7));
-  if(document.getElementById('dn-wrap')) renderDone(); // перерисовать вместе со списками (период мог смениться)
-  const el = document.getElementById('dn-d-' + ds); if(el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+function dnGoDay(ds, x) {
+  x = x || 'c'; const S = dnS(x);
+  if(x === 'l' && dnView() === 'cab') dnView('date', true);
+  if(S.period !== 'all' && !dnPeriodOk(ds, S)) S.period = 'all';
+  if(!S.open) S.open = new Set();
+  S.open.add(ds.slice(0, 4)); S.open.add(ds.slice(0, 7));
+  if(x === 'l') renderLobbyDone(); else if(document.getElementById('dn-wrap')) renderDone(); // перерисовать вместе со списками (период мог смениться)
+  const el = document.getElementById(S.pre + '-d-' + ds); if(el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
-function dnReset() { DN.q = ''; DN.period = 'all'; DN.cat = ''; DN.type = ''; renderDone(); }
-function dnMonthCards(k) { return dnFiltered(false).filter(c => dnDoneDate(c).slice(0, 7) === k).sort((a, b) => dnDoneDate(a).localeCompare(dnDoneDate(b))); }
+function dnReset(x) { const S = dnS(x); S.q = ''; S.period = 'all'; S.cat = ''; S.type = ''; if(x === 'l') renderLobbyDone(); else renderDone(); }
+function dnMonthCards(k) { return dnFiltered(false, 'c').filter(c => dnDoneDate(c).slice(0, 7) === k).sort((a, b) => dnDoneDate(a).localeCompare(dnDoneDate(b))); }
 function dnZip(k) {
   const ids = dnMonthCards(k).map(c => c.id); if(!ids.length) return;
   if(!window.mcArchive || !window.mcArchive.exportDialog) { toast('Модуль ZIP не загрузился. Обновите страницу', true); return; }
   window.mcArchive.exportDialog(ids);
 }
 function dnWord(k) { // месяц одним документом: каждая карточка — раздел
-  const list = dnMonthCards(k); if(!list.length) return;
+  dnWordList(dnMonthCards(k), 'Выполненные · ' + DN_MON[+k.slice(5) - 1] + ' ' + k.slice(0, 4), false);
+}
+function dnWordList(list, title, withCab) {
+  if(!list.length) return;
   if(typeof mcExportCardWord !== 'function') { toast('Модуль Word не загрузился. Обновите страницу', true); return; }
   const groups = [], entries = [];
   list.forEach(c => {
     const d = dnDoneDate(c), gid = 'dn_' + c.id;
-    groups.push({ id: gid, name: (c.title || '(без названия)') + ' · ' + (+d.slice(8)) + ' ' + DN_MON_G[+d.slice(5, 7) - 1] + (c.category ? ' · ' + c.category : '') });
+    groups.push({ id: gid, name: (c.title || '(без названия)') + ' · ' + (+d.slice(8)) + ' ' + DN_MON_G[+d.slice(5, 7) - 1] + (withCab && d.slice(0, 4) !== dnToday().slice(0, 4) ? ' ' + d.slice(0, 4) : '') + (withCab ? ' · ' + _spName(c.space_id) : '') + (c.category ? ' · ' + c.category : '') });
     const ca = (c.attachments || []).filter(a => a && a.data);
     if(ca.length || c.body) entries.push({ id: c.id, text: c.body ? String(c.body) : '📎 Вложения карточки', attachments: ca, groupId: gid, done: true });
     (c.entries || []).forEach(e => { if(e) entries.push(Object.assign({}, e, { groupId: gid })); });
   });
-  const title = 'Выполненные · ' + DN_MON[+k.slice(5) - 1] + ' ' + k.slice(0, 4);
-  mcExportCardWord(null, { id: 'dn-' + k, title, entries, entryGroups: groups, attachments: [], status: 'done' });
+  mcExportCardWord(null, { id: 'dn-' + Date.now(), title, entries, entryGroups: groups, attachments: [], status: 'done' });
+}
+
+// ── Лобби «🏁 Готово»: вид «По датам / По кабинетам» (запоминается) ──
+function dnView(v, quiet) {
+  if(v) { DNL.view = v; try { localStorage.setItem('mc_dn_view', v); } catch(e) {} return v; }
+  if(!DNL.view) { try { DNL.view = localStorage.getItem('mc_dn_view') === 'cab' ? 'cab' : 'date'; } catch(e) { DNL.view = 'date'; } }
+  return DNL.view;
+}
+function dnSetView(v) { dnView(v); renderLobbyDone(); }
+
+// ── Окно «⬇ Выгрузка» из лобби: формат, что выгрузить, кабинеты ──
+const DNX = { fmt: 'zip', k: 'all', y: '', m: '', d: '', p1: '', p2: '', cabs: null, useF: true };
+function dnxBase() { return dnLobbyBase().filter(c => !DNX.cabs.size || DNX.cabs.has(c.space_id)); }
+function dnxList() {
+  let l;
+  if(DNX.k === 's') { const scr = new Set(dnFiltered(false, 'l').map(c => c.id)); l = dnxBase().filter(c => scr.has(c.id)); }
+  else {
+    l = dnxBase().filter(c => {
+      const d = dnDoneDate(c);
+      if(DNX.k === 'y') return d.slice(0, 4) === DNX.y;
+      if(DNX.k === 'm') return d.slice(0, 7) === DNX.m;
+      if(DNX.k === 'd') return d === DNX.d;
+      if(DNX.k === 'p') return (!DNX.p1 || d >= DNX.p1) && (!DNX.p2 || d <= DNX.p2);
+      return true;
+    });
+    if(DNX.useF) l = l.filter(c => dnCatTypeOk(c, DNL));
+  }
+  return l.sort((a, b) => dnDoneDate(a).localeCompare(dnDoneDate(b)) || String(a.title || '').localeCompare(String(b.title || ''), 'ru'));
+}
+function dnxOpen(fmt) {
+  const base = dnLobbyBase(); if(!base.length) { toast('Нет выполненных карточек', true); return; }
+  const dates = base.map(dnDoneDate).sort();
+  DNX.fmt = fmt; DNX.cabs = new Set(_dnSel);
+  if(!DNX.y) DNX.y = dates[dates.length - 1].slice(0, 4);
+  if(!DNX.m) DNX.m = dates[dates.length - 1].slice(0, 7);
+  if(!DNX.d) DNX.d = dates[dates.length - 1];
+  if(!DNX.p1) { DNX.p1 = dnToday().slice(0, 8) + '01'; DNX.p2 = dnToday(); }
+  let ov = document.getElementById('dnx-ov'); if(ov) ov.remove();
+  ov = document.createElement('div'); ov.id = 'dnx-ov';
+  ov.setAttribute('style', 'position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:14px;box-sizing:border-box;font-family:inherit'); // строкой: так её находит общий «назад»
+  ov.onclick = e => { if(e.target === ov) dnxClose(); };
+  document.body.appendChild(ov);
+  dnxPaint();
+}
+function dnxClose() { const ov = document.getElementById('dnx-ov'); if(ov) ov.remove(); }
+function dnxSet(f, v) { DNX[f] = v; dnxPaint(); }
+function dnxCab(id) { if(id === 'all') DNX.cabs.clear(); else DNX.cabs.has(id) ? DNX.cabs.delete(id) : DNX.cabs.add(id); dnxPaint(); }
+function dnxPaint() {
+  const ov = document.getElementById('dnx-ov'); if(!ov) return;
+  const base = dnLobbyBase(), dates = base.map(dnDoneDate);
+  const years = [...new Set(dates.map(d => d.slice(0, 4)))].sort().reverse(), months = [...new Set(dates.map(d => d.slice(0, 7)))].sort().reverse();
+  const list = dnxList(), ncab = new Set(list.map(c => c.space_id)).size;
+  const inp = 'margin-left:auto;background:var(--s2);border:1px solid var(--b1);color:var(--t1);border-radius:7px;padding:4px 6px;font-size:12.5px;font-family:inherit;max-width:58%';
+  const opt = (k, label, ctl) => `<div onclick="if(event.target.tagName!=='SELECT'&&event.target.tagName!=='INPUT')dnxSet('k','${k}')" style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:9px 10px;margin-bottom:5px;border-radius:9px;cursor:pointer;border:1px solid ${DNX.k === k ? 'var(--accent)' : 'var(--b1)'};background:${DNX.k === k ? 'rgba(232,197,106,.08)' : 'transparent'};font-size:13.5px"><span style="width:13px;height:13px;border-radius:50%;flex-shrink:0;border:2px solid ${DNX.k === k ? 'var(--accent)' : 'var(--b2)'};background:${DNX.k === k ? 'radial-gradient(var(--accent) 45%,transparent 50%)' : 'none'}"></span>${label}${ctl || ''}</div>`;
+  const seg = (f, t) => `<button type="button" onclick="dnxSet('fmt','${f}')" style="flex:1;padding:8px;font-size:13.5px;cursor:pointer;font-family:inherit;border:1px solid ${DNX.fmt === f ? 'var(--accent)' : 'var(--b1)'};background:${DNX.fmt === f ? 'var(--accent)' : 'var(--s2)'};color:${DNX.fmt === f ? '#0f0f0f' : 'var(--t2)'};font-weight:${DNX.fmt === f ? 700 : 400};border-radius:${f === 'zip' ? '9px 0 0 9px' : '0 9px 9px 0'}">${t}</button>`;
+  const ids = [...new Set(base.map(c => c.space_id))].sort((a, b) => _spName(a).localeCompare(_spName(b), 'ru'));
+  const lb = t => `<div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin:10px 0 6px">${t}</div>`;
+  ov.innerHTML = `<div style="background:var(--s1);color:var(--t1);border:1px solid var(--b1);border-radius:14px;width:min(460px,100%);max-height:92vh;display:flex;flex-direction:column;box-sizing:border-box">
+    <div style="padding:16px 18px 8px;font-size:17px;font-weight:700">⬇ Выгрузка</div>
+    <div style="overflow:auto;min-height:0;padding:0 18px 4px">
+      <div style="display:flex">${seg('zip', '📦 ZIP')}${seg('word', '📄 Word')}</div>
+      ${lb('Что выгрузить')}
+      ${opt('all', 'Весь срок')}
+      ${opt('y', 'Год', `<select onchange="DNX.y=this.value;DNX.k='y';dnxPaint()" style="${inp}">${years.map(v => `<option${v === DNX.y ? ' selected' : ''}>${v}</option>`).join('')}</select>`)}
+      ${opt('m', 'Месяц', `<select onchange="DNX.m=this.value;DNX.k='m';dnxPaint()" style="${inp}">${months.map(v => `<option value="${v}"${v === DNX.m ? ' selected' : ''}>${DN_MON[+v.slice(5) - 1]} ${v.slice(0, 4)}</option>`).join('')}</select>`)}
+      ${opt('d', 'День', `<input type="date" value="${DNX.d}" onchange="DNX.d=this.value;DNX.k='d';dnxPaint()" style="${inp}">`)}
+      ${opt('p', 'Период', `<span style="flex-basis:100%;display:flex;gap:6px;align-items:center;padding-left:21px;box-sizing:border-box"><span style="font-size:12px;color:var(--t3)">с</span><input type="date" value="${DNX.p1}" onchange="DNX.p1=this.value;DNX.k='p';dnxPaint()" style="${inp};margin-left:0;max-width:none;flex:1;min-width:0"><span style="font-size:12px;color:var(--t3)">по</span><input type="date" value="${DNX.p2}" onchange="DNX.p2=this.value;DNX.k='p';dnxPaint()" style="${inp};margin-left:0;max-width:none;flex:1;min-width:0"></span>`)}
+      ${opt('s', 'Что сейчас на экране <span style="font-size:11px;color:var(--t3)">(поиск и фильтры)</span>')}
+      ${ids.length > 1 ? lb('Кабинеты') + `<div style="display:flex;flex-wrap:wrap;gap:6px">${_chipH('🗂️ Все', !DNX.cabs.size, "dnxCab('all')")}${ids.map(id => _chipH(esc(_spName(id)), DNX.cabs.has(id), `dnxCab('${id}')`)).join('')}</div>` : ''}
+      ${DNX.k !== 's' ? `<label style="display:flex;gap:8px;align-items:center;margin:10px 0 4px;font-size:13px;cursor:pointer"><input type="checkbox" ${DNX.useF ? 'checked' : ''} onchange="dnxSet('useF',this.checked)"> Учитывать рубрику и тип из фильтров${DNL.cat || DNL.type ? ` <span style="color:var(--t3);font-size:12px">(${esc([DNL.cat, DNL.type === 'multi' ? 'мульти' : DNL.type === 'plain' ? 'обычные' : ''].filter(Boolean).join(', '))})</span>` : ' <span style="color:var(--t3);font-size:12px">(сейчас не выбраны)</span>'}</label>` : ''}
+      <div style="font-size:12px;color:var(--t3);margin:8px 0 6px;line-height:1.5">${DNX.fmt === 'zip' ? 'Дальше откроется список карточек с галочками. В архиве — папка на каждый кабинет.' : 'Дальше откроется обычное окно Word: записи и оформление. Каждая карточка — раздел.'}</div>
+    </div>
+    <div style="padding:12px 18px 16px;display:flex;gap:8px;align-items:center;border-top:1px solid var(--b1)">
+      <span style="flex:1;font-size:13px;color:${list.length ? 'var(--accent)' : 'var(--t3)'}">Карточек: ${list.length}${ncab > 1 ? ' · кабинетов: ' + ncab : ''}</span>
+      <button onclick="dnxClose()" style="background:var(--s2);color:var(--t1);border:1px solid var(--b1);border-radius:8px;padding:9px 14px;font-size:14px;cursor:pointer;font-family:inherit">Отмена</button>
+      <button onclick="dnxGo()" ${list.length ? '' : 'disabled'} style="background:var(--accent);color:#0f0f0f;border:none;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;opacity:${list.length ? 1 : .4}">Дальше</button>
+    </div></div>`;
+}
+function dnxTitle() {
+  const t = DNX.k === 'y' ? DNX.y : DNX.k === 'm' ? DN_MON[+DNX.m.slice(5) - 1] + ' ' + DNX.m.slice(0, 4) : DNX.k === 'd' ? DNX.d.split('-').reverse().join('.') :
+    DNX.k === 'p' ? (DNX.p1 || '…').split('-').reverse().join('.') + '–' + (DNX.p2 || '…').split('-').reverse().join('.') : DNX.k === 's' ? 'выборка' : 'весь срок';
+  return 'Выполненные · ' + t;
+}
+function dnxGo() {
+  const list = dnxList(); if(!list.length) return;
+  const title = dnxTitle(), fmt = DNX.fmt;
+  dnxClose();
+  if(fmt === 'word') { dnWordList(list, title, true); return; }
+  if(!window.mcArchive || !window.mcArchive.exportDialog) { toast('Модуль ZIP не загрузился. Обновите страницу', true); return; }
+  const cc = window._clCatColors || {}, seen = new Set(), catList = [];
+  list.forEach(c => { const k = c.space_id + '||' + (c.category || ''); if(c.category && !seen.has(k)) { seen.add(k); catList.push({ name: c.category, color: cc[k] || '#e8c56a', cabinet: _spName(c.space_id) }); } });
+  window.mcArchive.exportDialog(list.map(c => c.id), { list, cabName: c => _spName(c.space_id), catList, title, many: true });
 }
 
 function emptyHTML(h,p) {
