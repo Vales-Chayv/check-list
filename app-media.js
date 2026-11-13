@@ -751,7 +751,7 @@ async function mcCapCheck(capMB) {
 window.mcCapCheck = mcCapCheck;
 
 // ═══════════════════════════════════════════
-//  📊 ПАМЯТЬ: где и сколько хранится (устройство, облако, резерв) и где смотреть самой
+//  📊 ПАМЯТЬ: где и сколько хранится (устройство, облако, резерв) и где это посмотреть
 //  Облако считает функция mc_usage() в базе (файл memory-usage.sql). Трафик за месяц знает только панель Supabase.
 // ═══════════════════════════════════════════
 const MC_FREE = { files: 1024 * 1048576, db: 500 * 1048576 }; // бесплатный тариф Supabase
@@ -804,7 +804,7 @@ function mcMemoryPaint(d) {
   h += lb('Резерв');
   h += line('🛡', 'Последняя копия', d.bk ? new Date(d.bk.ts).toLocaleDateString('ru') + ' · ' + d.bk.files + ' файлов' : 'ещё не делали');
   h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 4px"><button id="mem-bk" style="' + btn + '">🛡 Сделать резерв</button>' + (d.backed && d.backed.count ? '<button id="mem-free" style="' + btn + '">Освободить ' + F(d.backed.bytes) + ' (оригиналы в резерве)</button>' : '') + '</div>';
-  h += '<details style="margin-top:12px;border-top:1px solid var(--b1);padding-top:9px"><summary style="cursor:pointer;font-size:13.5px;font-weight:600">Где смотреть самой</summary><div style="font-size:12.5px;color:var(--t2);line-height:1.6;margin-top:6px">' +
+  h += '<details style="margin-top:12px;border-top:1px solid var(--b1);padding-top:9px"><summary style="cursor:pointer;font-size:13.5px;font-weight:600">Где это посмотреть</summary><div style="font-size:12.5px;color:var(--t2);line-height:1.6;margin-top:6px">' +
     '<b>Телефон (APK):</b> Настройки Android → Приложения → Мои карточки → Хранилище. Свободное место — Настройки → Память.<br>' +
     '<b>Chrome (телефон и ПК):</b> Настройки → Конфиденциальность → Настройки сайтов → Данные сайтов → адрес приложения. На ПК ещё F12 → Application → Storage.<br>' +
     '<b>Облако:</b> supabase.com → проект → Storage → attachments (файлы); Database (размер базы); Organization → Usage (трафик, место, лимиты).<br>' +
