@@ -77,16 +77,68 @@ function mcExportEntries(card) {
   let last = 0; list.forEach(x => { if (x.ts == null) x.ts = last; else last = x.ts; });
   return list;
 }
-// настройки оформления (хранятся на этом устройстве)
+// ═══ Настройки Word в облаке (таблица word_settings, файл word-settings.sql) ═══
+// Одна строка на пользователя: data = { v, profile: {логотип, студия, слоган, сайт, автор, переключатели}, templates, defaults, values }.
+// Локальная копия — localStorage 'mc_word_cfg' { data, ts, dirty }: работает без интернета, при связи сверяется с облаком (кто новее — тот и прав).
+let _mcWord = null, _mcWordPulled = 0, _mcWordTimer = null;
+function mcWordLocal() {
+  if (_mcWord) return _mcWord;
+  try { _mcWord = JSON.parse(localStorage.getItem('mc_word_cfg') || 'null'); } catch (e) { _mcWord = null; }
+  if (!_mcWord || !_mcWord.data) { // перенос со старого места хранения (только это устройство)
+    let old = null; try { old = JSON.parse(localStorage.getItem('mc_exp_prefs') || 'null'); } catch (e) {}
+    _mcWord = { data: { v: 1, profile: old || {}, templates: [], defaults: {}, values: {} }, ts: old ? Date.now() : 0, dirty: !!old };
+    mcWordStore();
+  }
+  return _mcWord;
+}
+function mcWordStore() { try { localStorage.setItem('mc_word_cfg', JSON.stringify(_mcWord)); } catch (e) { toast('Не удалось сохранить настройки Word на устройстве (логотип слишком большой?)', true); } }
+async function mcWordUid() {
+  try { const { data } = await sb.auth.getSession(); if (data && data.session && data.session.user) return data.session.user.id; } catch (e) {}
+  return null;
+}
+async function mcWordPull() { // забрать из облака; если здесь новее — отправить
+  const L = mcWordLocal();
+  if (typeof sb === 'undefined' || !navigator.onLine) return false;
+  const uid = await mcWordUid(); if (!uid) return false;
+  try {
+    const { data, error } = await sb.from('word_settings').select('data,updated_at').eq('user_id', uid).maybeSingle();
+    if (error) throw error;
+    _mcWordPulled = Date.now();
+    const rts = data ? Date.parse(data.updated_at) || 0 : 0;
+    if (data && (!L.dirty || rts > L.ts)) { _mcWord = { data: data.data || {}, ts: rts, dirty: false }; mcWordStore(); return true; }
+    if (L.dirty || !data) await mcWordPush();
+    return false;
+  } catch (e) { console.log('word_settings:', (e && e.message) || e); return false; }
+}
+async function mcWordPush() {
+  const L = mcWordLocal();
+  if (typeof sb === 'undefined' || !navigator.onLine) return;
+  const uid = await mcWordUid(); if (!uid) return;
+  const ts = new Date(L.ts || Date.now()).toISOString();
+  try {
+    const { error } = await sb.from('word_settings').upsert({ user_id: uid, data: L.data, updated_at: ts }, { onConflict: 'user_id' });
+    if (error) throw error;
+    L.dirty = false; mcWordStore();
+  } catch (e) { console.log('word_settings push:', (e && e.message) || e); }
+}
+function mcWordSave(mut) { // изменить настройки: mut(data); сразу локально, в облако — через 1,5 с
+  const L = mcWordLocal();
+  mut(L.data); L.ts = Date.now(); L.dirty = true; mcWordStore();
+  clearTimeout(_mcWordTimer); _mcWordTimer = setTimeout(mcWordPush, 1500);
+}
+window.addEventListener('online', () => { if (mcWordLocal().dirty) mcWordPush(); });
+setTimeout(function tryPull() { if (typeof currentUser !== 'undefined' && currentUser) mcWordPull(); else setTimeout(tryPull, 5000); }, 4000);
+
+// настройки оформления (логотип, студия, переключатели) — из облачных настроек Word
 function mcExpPrefsLoad() {
   let p = {};
-  try { p = JSON.parse(localStorage.getItem('mc_exp_prefs') || '{}') || {}; } catch (e) {}
+  try { p = JSON.parse(JSON.stringify(mcWordLocal().data.profile || {})); } catch (e) {}
   const r = Object.assign({ logo: '', studio: '', slogan: '', site: '', author: '', names: 'show', dates: 'show', divider: true, divColor: '#B8892B', checks: true, signs: false }, p);
   if (p.showNames === false && !p.names) r.names = 'none'; // старое сохранённое значение
   delete r.showNames;
   return r;
 }
-function mcExpPrefsSave(p) { try { localStorage.setItem('mc_exp_prefs', JSON.stringify(p)); } catch (e) { toast('Не удалось сохранить оформление (логотип слишком большой?)', true); } }
+function mcExpPrefsSave(p) { mcWordSave(d => { d.profile = Object.assign({}, p); }); }
 // логотип → маленький PNG (с прозрачностью) в виде data URL
 async function mcLogoFromFile(file) {
   const bmp = await createImageBitmap(file);
@@ -97,7 +149,13 @@ async function mcLogoFromFile(file) {
   return c.toDataURL('image/png');
 }
 
-function mcExportCardWord(cardId, ready) { // ready — готовая «карточка» (например, месяц из хранилища «Выполненных»)
+function mcExportCardWord(cardId, ready, _fresh) { // ready — готовая «карточка» (например, месяц из хранилища «Выполненных»)
+  if (!_fresh && navigator.onLine && Date.now() - _mcWordPulled > 60000) { // сначала свежие настройки из облака (не дольше 2,5 с)
+    if (window._mcExporting || document.getElementById('mc-exp-ov')) return;
+    toast('Загружаю настройки Word…');
+    Promise.race([mcWordPull(), new Promise(r => setTimeout(r, 2500))]).finally(() => mcExportCardWord(cardId, ready, true));
+    return;
+  }
   const card = ready || ((typeof cards !== 'undefined') && cards.find(c => c.id === cardId));
   if (!card) return;
   if (typeof JSZip === 'undefined') { toast('Модуль архивов не загрузился. Проверь интернет и обнови страницу', true); return; }
