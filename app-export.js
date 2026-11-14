@@ -165,7 +165,7 @@ const WT_F = { // поля таблицы под заголовком: a — з�
   issues: ['a', 'Замечаний', 'ליקויים', 'Issues'], items: ['a', 'Позиций', 'פריטים', 'Items'], period: ['a', 'Период', 'תקופה', 'Period'],
   stages: ['a', 'Этапов', 'שלבים', 'Stages'], progress: ['a', 'Готово', 'הושלם', 'Completed'], cab: ['a', 'Кабинет', 'תיק', 'Workspace'], rub: ['a', 'Рубрика', 'קטגוריה', 'Category']
 };
-const WT_R = { exe: ['Исполнитель', 'מבצע', 'Prepared by'], cli: ['Заказчик', 'מזמין', 'Client'], sup: ['Технадзор', 'מפקח', 'Site supervisor'], con: ['Подрядчик', 'קבלן', 'Contractor'], arch: ['Архитектор / дизайнер', 'אדריכל / מעצב', 'Architect / designer'], appr: ['Утверждаю', 'מאשר', 'Approved by'] };
+const WT_R = { exe: ['Исполнитель', 'מבצע', 'Performed by'], cli: ['Заказчик', 'מזמין', 'Client'], sup: ['Технадзор', 'מפקח', 'Site supervisor'], con: ['Подрядчик', 'קבלן', 'Contractor'], arch: ['Архитектор / дизайнер', 'אדריכל / מעצב', 'Architect / designer'], appr: ['Утверждаю', 'מאשר', 'Approved by'] };
 const WT_LI = { ru: 1, he: 2, en: 3 };
 const wtFieldLabel = (f, lang) => f.label || (WT_F[f.k] ? WT_F[f.k][WT_LI[lang] || 1] : f.k);
 const wtRoleLabel = (r, lang) => typeof r === 'object' ? r.label : (WT_R[r] ? WT_R[r][(WT_LI[lang] || 1) - 1] : r);
@@ -236,8 +236,9 @@ function mcExportCardWord(cardId, ready, _fresh) { // ready — готовая �
   if (!list.length && !cardAttCount) { toast('В карточке нет записей и вложений', true); return; }
   const P = mcExpPrefsLoad();
   if (!P.author && typeof currentUser !== 'undefined' && currentUser && currentUser.display_name) P.author = currentUser.display_name;
-  const space = card.space_id || (typeof currentSpaceId !== 'undefined' && currentSpaceId) || 'personal';
-  const spName = ((typeof spaces !== 'undefined' ? spaces : []).find(s => s.id === space) || {}).name || 'Личный';
+  const lobbyList = !!ready && !card.space_id; // общий список из лобби «Готово» или «Печать»: записи из разных кабинетов
+  const space = lobbyList ? '__lobby' : (card.space_id || (typeof currentSpaceId !== 'undefined' && currentSpaceId) || 'personal');
+  const spName = lobbyList ? 'Лобби' : (((typeof spaces !== 'undefined' ? spaces : []).find(s => s.id === space) || {}).name || 'Личный');
   const W = mcWordLocal().data;
   const vals = Object.assign({}, (W.values || {})[space] || {}); // вписанное вручную для этого кабинета
   const over = {}; // правка авто-значений только для этой выгрузки
@@ -260,7 +261,7 @@ function mcExportCardWord(cardId, ready, _fresh) { // ready — готовая �
     '<div style="padding:4px 18px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="mc-exp-tpl" style="' + is + ';flex:1;min-width:200px;width:auto"></select><div id="mc-exp-lang" style="min-width:210px"></div></div>' +
     '<div id="mc-exp-tabs" style="padding:8px 18px 0;display:flex;gap:5px;flex-wrap:wrap"></div>' +
     '<div id="mc-exp-pane" style="overflow:auto;flex:1;min-height:0;padding:4px 18px 8px"></div>' +
-    '<div style="padding:8px 18px;border-top:1px solid var(--b1);font-size:12.5px;display:flex;gap:12px;flex-wrap:wrap;align-items:center"><span style="color:var(--t3)">По умолчанию:</span>' +
+    '<div style="padding:8px 18px;border-top:1px solid var(--b1);font-size:12.5px;display:' + (lobbyList ? 'none' : 'flex') + ';gap:12px;flex-wrap:wrap;align-items:center"><span style="color:var(--t3)">По умолчанию:</span>' +
       '<label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="mc-exp-dcab"> для кабинета «' + _XE(spName) + '»</label>' +
       (card.category ? '<label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="mc-exp-drub"> для рубрики «' + _XE(card.category) + '»</label>' : '') + '</div>' +
     '<div style="padding:8px 18px 14px;display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap"><span id="mc-exp-cnt" style="margin-right:auto;font-size:13px;color:var(--t3)"></span>' +
