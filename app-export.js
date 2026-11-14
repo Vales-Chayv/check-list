@@ -572,20 +572,29 @@ async function mcExportCardWordRun(card, opt) {
           const bmp = await createImageBitmap(await mcFetchBlob(P.logo));
           const cy = 720000, cx = Math.round(cy * bmp.width / bmp.height);
           const bin = await (await fetch(P.logo)).arrayBuffer();
-          logoXml = mcDocPara(drawing(addMedia(bin, 'png'), Math.min(cx, 2160000), cy, 'logo'), { after: 0 });
+          logoXml = mcDocPara(drawing(addMedia(bin, 'png'), Math.min(cx, 2160000), cy, 'logo'), { after: HH.logo === 'center' ? 80 : 0, jc: HH.logo === 'center' ? 'center' : null });
           lw = Math.min(cx, 2160000) / 635 + 200;
           if (bmp.close) bmp.close();
         } catch (e) {}
       }
       lw = Math.round(lw);
-      const rw = siteHead ? 2900 : 0, mw = TW - lw - rw;
-      const bb = '<w:tcBorders><w:bottom w:val="single" w:sz="6" w:space="0" w:color="DDDDDD"/></w:tcBorders>';
-      const mid = (P.studio ? mcDocPara(mcDocRun(P.studio.toUpperCase(), { b: true, size: 24 }), { after: 0, bidi: _isRTL(P.studio) }) : '') + (P.slogan ? mcDocPara(mcDocRun(P.slogan, { size: 17, color: '777777', rtl: _isRTL(P.slogan) }), { after: 0, bidi: _isRTL(P.slogan) }) : '') || mcDocPara('', { after: 0 });
-      let cells = '';
-      if (lw) cells += cell(logoXml, lw, { borders: bb });
-      cells += cell(mid, mw, { borders: bb });
-      if (rw) cells += cell(mcDocPara(mcDocRun(P.site, { size: 17, color: '777777' }), { after: 0, jc: 'right' }), rw, { borders: bb });
-      body += '<w:tbl><w:tblPr><w:tblW w:w="' + TW + '" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid>' + (lw ? '<w:gridCol w:w="' + lw + '"/>' : '') + '<w:gridCol w:w="' + mw + '"/>' + (rw ? '<w:gridCol w:w="' + rw + '"/>' : '') + '</w:tblGrid><w:tr>' + cells + '</w:tr></w:tbl>';
+      const RH = LG === 'he';
+      if (HH.logo === 'center') { // логотип, студия, слоган и контакты одной колонкой по центру
+        body += logoXml;
+        if (P.studio) body += mcDocPara(mcDocRun(P.studio.toUpperCase(), { b: true, size: 24, rtl: _isRTL(P.studio) }), { after: 0, jc: 'center', bidi: _isRTL(P.studio) });
+        if (P.slogan) body += mcDocPara(mcDocRun(P.slogan, { size: 17, color: '777777', rtl: _isRTL(P.slogan) }), { after: 0, jc: 'center', bidi: _isRTL(P.slogan) });
+        if (siteHead) body += mcDocPara(mcDocRun(P.site, { size: 17, color: '777777' }), { before: 40, after: 0, jc: 'center' });
+        if (!HH.gold) body += mcDocPara('', { after: 0, line: 120, divider: 'DDDDDD' });
+      } else {
+        const rw = siteHead ? 2900 : 0, mw = TW - lw - rw;
+        const bb = '<w:tcBorders><w:bottom w:val="single" w:sz="6" w:space="0" w:color="DDDDDD"/></w:tcBorders>';
+        const mid = (P.studio ? mcDocPara(mcDocRun(P.studio.toUpperCase(), { b: true, size: 24, rtl: _isRTL(P.studio) }), { after: 0, bidi: RH || _isRTL(P.studio) }) : '') + (P.slogan ? mcDocPara(mcDocRun(P.slogan, { size: 17, color: '777777', rtl: _isRTL(P.slogan) }), { after: 0, bidi: RH || _isRTL(P.slogan) }) : '') || mcDocPara('', { after: 0 });
+        let cells = '';
+        if (lw) cells += cell(logoXml, lw, { borders: bb });
+        cells += cell(mid, mw, { borders: bb });
+        if (rw) cells += cell(mcDocPara(mcDocRun(P.site, { size: 17, color: '777777' }), { after: 0, jc: 'right', bidi: RH }), rw, { borders: bb }); // в иврите таблица зеркальная: логотип справа, контакты слева
+        body += '<w:tbl><w:tblPr><w:tblW w:w="' + TW + '" w:type="dxa"/>' + (RH ? '<w:bidiVisual/>' : '') + '<w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid>' + (lw ? '<w:gridCol w:w="' + lw + '"/>' : '') + '<w:gridCol w:w="' + mw + '"/>' + (rw ? '<w:gridCol w:w="' + rw + '"/>' : '') + '</w:tblGrid><w:tr>' + cells + '</w:tr></w:tbl>';
+      }
     }
     if (hasHead && HH.gold) body += mcDocPara('', { after: 0, line: 120, divider: GOLD });
     if (opt.docTitle) body += mcDocPara(mcDocRun(opt.docTitle, { b: true, size: 40 }), { before: 240, after: 120, bidi: _isRTL(opt.docTitle) || LG === 'he' });
@@ -603,17 +612,17 @@ async function mcExportCardWordRun(card, opt) {
     let trs = '';
     for (let i = 0; i < pairs.length; i += 2) {
       const a = pairs[i], b2 = pairs[i + 1];
-      const mk = (pr, lw2, vw) => cell(mcDocPara(mcDocRun(pr[0], { b: true, size: 19, rtl: LG === 'he' }), { after: 0, bidi: LG === 'he' }), lw2, { borders: bAll, fill: 'F6EFD9' }) + cell(mcDocPara(mcDocRun(pr[1], { size: 20, rtl: _isRTL(pr[1]) }), { after: 0, bidi: _isRTL(pr[1]) }), vw, { borders: bAll });
+      const mk = (pr, lw2, vw) => cell(mcDocPara(mcDocRun(pr[0], { b: true, size: 19, rtl: LG === 'he' }), { after: 0, bidi: LG === 'he' }), lw2, { borders: bAll, fill: 'F6EFD9' }) + cell(mcDocPara(mcDocRun(pr[1], { size: 20, rtl: _isRTL(pr[1]) }), { after: 0, bidi: LG === 'he' || _isRTL(pr[1]) }), vw, { borders: bAll });
       trs += '<w:tr>' + (b2 ? mk(a, 1500, 3453) + mk(b2, 1500, 3453) : mk(a, 1500, 3453) + cell(mcDocPara('', { after: 0 }), 4953, { borders: bAll })) + '</w:tr>';
     }
-    if (trs) body += '<w:tbl><w:tblPr><w:tblW w:w="' + TW + '" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="60" w:type="dxa"/><w:left w:w="100" w:type="dxa"/><w:bottom w:w="60" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="1500"/><w:gridCol w:w="3453"/><w:gridCol w:w="1500"/><w:gridCol w:w="3453"/></w:tblGrid>' + trs + '</w:tbl>';
+    if (trs) body += '<w:tbl><w:tblPr><w:tblW w:w="' + TW + '" w:type="dxa"/>' + (LG === 'he' ? '<w:bidiVisual/>' : '') + '<w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="60" w:type="dxa"/><w:left w:w="100" w:type="dxa"/><w:bottom w:w="60" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="1500"/><w:gridCol w:w="3453"/><w:gridCol w:w="1500"/><w:gridCol w:w="3453"/></w:tblGrid>' + trs + '</w:tbl>';
     body += mcDocPara('', { after: 40 });
     if (card.body) {
       const parts = mcRichToParts(card.body); const rtl = _isRTL(parts.map(x => x.t || '').join(''));
       body += mcDocPara(parts.map(x => x.br ? '<w:r><w:br/></w:r>' : mcDocRun(x.t, { ...x, rtl })).join(''), { bidi: rtl, after: 120 });
     }
     if (cardAttObjs.length) {
-      body += mcDocPara(mcDocRun(LL.att, { b: true, size: 26 }), { before: 160, keep: true });
+      body += mcDocPara(mcDocRun(LL.att, { b: true, size: 26, rtl: LG === 'he' }), { before: 160, keep: true, bidi: LG === 'he' });
       body += attXml(cardAttObjs);
     }
     blocks.forEach(b => {
@@ -622,7 +631,7 @@ async function mcExportCardWordRun(card, opt) {
       const rtl = _isRTL(parts.map(x => x.t || '').join(''));
       const textXml = parts.map(x => x.br ? '<w:r><w:br/></w:r>' : mcDocRun(x.t, { ...x, rtl, size: 24 })).join('');
       if (grouped && b.secStart) { // золотая плашка раздела с прогрессом
-        const sb2 = blocks.filter(x => x.gk === b.gk), sd = sb2.filter(x => x.e.done).length, rg = _isRTL(b.gName);
+        const sb2 = blocks.filter(x => x.gk === b.gk), sd = sb2.filter(x => x.e.done).length, rg = _isRTL(b.gName) || LG === 'he';
         body += '<w:p><w:pPr><w:keepNext/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="2"/></w:numPr><w:pBdr><w:left w:val="single" w:sz="24" w:space="6" w:color="' + GOLD + '"/></w:pBdr><w:shd w:val="clear" w:color="auto" w:fill="F6EFD9"/>' + (rg ? '<w:bidi/>' : '') + '<w:spacing w:before="' + (b === blocks[0] ? 120 : 320) + '" w:after="120"/></w:pPr>' +
           mcDocRun(b.gName, { b: true, size: 28, rtl: rg }) + (card.noProgress ? '' : mcDocRun('   · ' + LL.prog.replace('{d}', sd).replace('{n}', sb2.length), { size: 18, color: '8A6A1F' })) + '</w:p>';
       } else if (P.divider && b !== blocks[0]) body += mcDocPara('', { before: 160, after: 120, line: 120, divider: (P.divColor || '#B8892B').replace('#', '') });
@@ -630,12 +639,12 @@ async function mcExportCardWordRun(card, opt) {
       const _dt0 = String(e.date || ''), _keep = (P.dates !== 'none' && !!_dt0) || !!b.grp || b.atts.length > 0; // запись держится только со своей датой и файлами, а не со следующим разделом: иначе документ «склеивается» и уезжает на новую страницу
       const MK = TT ? TT.mark : (P.checks ? 'chk' : 'old');
       const markXml = MK === 'chk' ? checkbox(!!e.done) : MK === 'fix' || MK === 'buy' ? mcDocRun((e.done ? '✔ ' : '○ ') + LL[MK][e.done ? 0 : 1] + ' ', { b: true, size: 18, color: e.done ? '2E7D32' : 'B8892B', rtl }) + mcDocRun(' ', { size: 24 }) : MK === 'old' && e.done ? mcDocRun('☑ ', { size: 24, rtl }) : '';
-      body += mcDocPara(markXml + textXml, { before: 60, after: 60, keep: _keep, bidi: rtl, num: grouped ? { id: 2, lvl: 1 } : { id: 1, lvl: 0 } });
-      const dTxt = String(e.date || '');
-      if (P.dates === 'show' && (dTxt || b.grp)) body += mcDocPara(mcDocRun(dTxt + (b.grp ? (dTxt ? '  ·  ' : '') + '▸ ' + b.grp : ''), { size: 18, color: '8A8A8A', rtl: _isRTL(b.grp) && !dTxt }), { keep: b.atts.length > 0, after: 80 });
-      else if (P.dates === 'hidden' && dTxt && !b.grp) body += mcDocPara(mcDocRun(dTxt, { size: 18, color: '8A8A8A', vanish: true }), { keep: b.atts.length > 0, after: 80, vanish: true });
-      else if (P.dates === 'hidden' && b.grp) body += mcDocPara(mcDocRun(dTxt + '  ·  ', { size: 18, color: '8A8A8A', vanish: true }) + mcDocRun('▸ ' + b.grp, { size: 18, color: '8A8A8A' }), { keep: b.atts.length > 0, after: 80 });
-      else if (b.grp) body += mcDocPara(mcDocRun('▸ ' + b.grp, { size: 18, color: '8A8A8A', rtl: _isRTL(b.grp) }), { keep: b.atts.length > 0, after: 80 });
+      body += mcDocPara(markXml + textXml, { before: 60, after: 60, keep: _keep, bidi: rtl || LG === 'he', num: grouped ? { id: 2, lvl: 1 } : { id: 1, lvl: 0 } });
+      const dTxt = LG === 'he' && e.date ? '\u200E' + e.date + '\u200E' : String(e.date || ''); // метка «слева направо»: в иврите дата не переставляется
+      if (P.dates === 'show' && (dTxt || b.grp)) body += mcDocPara(mcDocRun(dTxt + (b.grp ? (dTxt ? '  ·  ' : '') + '▸ ' + b.grp : ''), { size: 18, color: '8A8A8A', rtl: _isRTL(b.grp) && !dTxt }), { bidi: LG === 'he', keep: b.atts.length > 0, after: 80 });
+      else if (P.dates === 'hidden' && dTxt && !b.grp) body += mcDocPara(mcDocRun(dTxt, { size: 18, color: '8A8A8A', vanish: true }), { bidi: LG === 'he', keep: b.atts.length > 0, after: 80, vanish: true });
+      else if (P.dates === 'hidden' && b.grp) body += mcDocPara(mcDocRun(dTxt + '  ·  ', { size: 18, color: '8A8A8A', vanish: true }) + mcDocRun('▸ ' + b.grp, { size: 18, color: '8A8A8A' }), { bidi: LG === 'he', keep: b.atts.length > 0, after: 80 });
+      else if (b.grp) body += mcDocPara(mcDocRun('▸ ' + b.grp, { size: 18, color: '8A8A8A', rtl: _isRTL(b.grp) }), { bidi: LG === 'he', keep: b.atts.length > 0, after: 80 });
       if (b.atts.length) body += attXml(b.atts);
     });
     const SG = TT ? (TT.sigs || []).slice(0, 3).map(r => wtRoleLabel(r, LG)) : (P.signs ? ['Подпись исполнителя', 'Подпись заказчика'] : []);
@@ -648,17 +657,25 @@ async function mcExportCardWordRun(card, opt) {
       body += '<w:tbl><w:tblPr><w:tblW w:w="' + TW + '" w:type="dxa"/><w:tblLayout w:type="fixed"/>' + (rtlS ? '<w:bidiVisual/>' : '') + '</w:tblPr><w:tblGrid>' + cols + '</w:tblGrid><w:tr><w:trPr><w:cantSplit/></w:trPr>' + SG.map((t, i) => (i ? cell(mcDocPara('', { after: 0 }), gap) : '') + sg(t)).join('') + '</w:tr></w:tbl>';
     }
     const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="w14"';
+    const thinTxt = hasHead ? [P.studio, opt.docTitle].filter(Boolean).join('  ·  ') : ''; // тонкая строка на 2-й и следующих страницах
     const docXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ' + NS + '><w:body>' + body +
-      '<w:sectPr><w:footerReference w:type="default" r:id="rId2"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1000" w:right="1000" w:bottom="1000" w:left="1000" w:header="500" w:footer="500" w:gutter="0"/></w:sectPr></w:body></w:document>';
+      '<w:sectPr>' + (thinTxt ? '<w:headerReference w:type="default" r:id="rId5"/><w:headerReference w:type="first" r:id="rId4"/><w:footerReference w:type="first" r:id="rId6"/>' : '') + '<w:footerReference w:type="default" r:id="rId2"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1000" w:right="1000" w:bottom="1000" w:left="1000" w:header="500" w:footer="500" w:gutter="0"/>' + (thinTxt ? '<w:titlePg/>' : '') + (LG === 'he' ? '<w:bidi/>' : '') + '</w:sectPr></w:body></w:document>';
     const footTxt = HH.contacts === 'none' ? '' : [P.studio, siteFoot ? P.site : ''].filter(Boolean).join('  ·  ');
     const fr = '<w:rPr><w:color w:val="888888"/><w:sz w:val="16"/></w:rPr>';
     const fT = t => t ? '<w:r>' + fr + '<w:t xml:space="preserve">' + _XE(t) + '</w:t></w:r>' : '';
     const fF = ins => '<w:r>' + fr + '<w:fldChar w:fldCharType="begin"/></w:r><w:r>' + fr + '<w:instrText xml:space="preserve"> ' + ins + ' </w:instrText></w:r><w:r>' + fr + '<w:fldChar w:fldCharType="separate"/></w:r><w:r>' + fr + '<w:t>1</w:t></w:r><w:r>' + fr + '<w:fldChar w:fldCharType="end"/></w:r>';
     const pageXml = HH.page === 'no' ? '' : HH.page === 'pof' ? LL.page.split(/(\{p\}|\{n\})/).map(x => x === '{p}' ? fF('PAGE') : x === '{n}' ? fF('NUMPAGES') : fT(x)).join('') : fF('PAGE');
     const confTxt = HH.conf ? (HH.confText || LL.conf) : '';
-    const footXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:pBdr><w:top w:val="single" w:sz="4" w:space="6" w:color="DDDDDD"/></w:pBdr><w:tabs><w:tab w:val="right" w:pos="' + TW + '"/></w:tabs></w:pPr>' +
-      fT(footTxt) + '<w:r>' + fr + '<w:tab/></w:r>' + pageXml + '</w:p>' +
-      (confTxt ? '<w:p><w:pPr>' + (_isRTL(confTxt) ? '<w:bidi/>' : '') + '<w:spacing w:before="40" w:after="0"/><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:i/><w:color w:val="999999"/><w:sz w:val="14"/>' + (_isRTL(confTxt) ? '<w:rtl/>' : '') + '</w:rPr><w:t xml:space="preserve">' + _XE(confTxt) + '</w:t></w:r></w:p>' : '') + '</w:ftr>';
+    const RF = LG === 'he', fp = (inner, jc) => '<w:p><w:pPr>' + (RF ? '<w:bidi/>' : '') + '<w:spacing w:before="60" w:after="0"/><w:jc w:val="' + jc + '"/></w:pPr>' + inner + '</w:p>';
+    const ftb = '<w:tcBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="DDDDDD"/></w:tcBorders>';
+    const fc = (inner, w) => '<w:tc><w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/>' + ftb + '</w:tcPr>' + inner + '</w:tc>';
+    const footXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' + // в иврите зеркально: контакты справа, номер слева
+      '<w:tbl><w:tblPr><w:tblW w:w="' + TW + '" w:type="dxa"/>' + (RF ? '<w:bidiVisual/>' : '') + '<w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="6906"/><w:gridCol w:w="3000"/></w:tblGrid><w:tr>' +
+      fc(fp(fT(footTxt), 'left'), 6906) + fc(fp(pageXml.replace(/<w:rPr>/g, RF ? '<w:rPr><w:rtl/>' : '<w:rPr>'), 'right'), 3000) + '</w:tr></w:tbl>' +
+      (confTxt ? '<w:p><w:pPr>' + (RF || _isRTL(confTxt) ? '<w:bidi/>' : '') + '<w:spacing w:before="40" w:after="0"/><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:i/><w:color w:val="999999"/><w:sz w:val="14"/>' + (_isRTL(confTxt) ? '<w:rtl/>' : '') + '</w:rPr><w:t xml:space="preserve">' + _XE(confTxt) + '</w:t></w:r></w:p>' : '<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/></w:pPr></w:p>') + '</w:ftr>';
+    const hdr = inner => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' + inner + '</w:hdr>';
+    const head1Xml = hdr('<w:p><w:pPr><w:spacing w:after="0"/></w:pPr></w:p>');
+    const head2Xml = hdr('<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="4" w:color="' + (HH.gold ? GOLD : 'DDDDDD') + '"/></w:pBdr>' + (RF || _isRTL(thinTxt) ? '<w:bidi/>' : '') + '<w:spacing w:after="0"/></w:pPr><w:r><w:rPr><w:color w:val="888888"/><w:sz w:val="16"/>' + (_isRTL(thinTxt) ? '<w:rtl/>' : '') + '</w:rPr><w:t xml:space="preserve">' + _XE(thinTxt) + '</w:t></w:r></w:p>');
     const stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial" w:eastAsia="Arial"/><w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="ru-RU" w:bidi="he-IL"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>';
     // нумерация Word: 1 — обычная карточка «1.», 2 — мультикарточка: раздел «1.», запись «1.1»
     const lvl = (i, fmt, rpr) => '<w:lvl w:ilvl="' + i + '"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="' + fmt + '"/><w:lvlJc w:val="left"/><w:suff w:val="space"/><w:pPr><w:ind w:left="0" w:firstLine="0"/></w:pPr><w:rPr>' + rpr + '</w:rPr></w:lvl>';
@@ -667,12 +684,12 @@ async function mcExportCardWordRun(card, opt) {
       '<w:abstractNum w:abstractNumId="0"><w:multiLevelType w:val="singleLevel"/>' + lvl(0, '%1.', gold) + '</w:abstractNum>' +
       '<w:abstractNum w:abstractNumId="1"><w:multiLevelType w:val="multilevel"/>' + lvl(0, '%1.', '<w:b/><w:bCs/><w:sz w:val="28"/><w:szCs w:val="28"/>') + lvl(1, '%1.%2', gold) + '</w:abstractNum>' +
       '<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num><w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num></w:numbering>';
-    const docRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>' + rels.join('') + '</Relationships>';
-    const ct = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpg" ContentType="image/jpeg"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/></Types>';
+    const docRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>' + (thinTxt ? '<Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/><Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header2.xml"/><Relationship Id="rId6" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer2.xml"/>' : '') + rels.join('') + '</Relationships>';
+    const ct = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpg" ContentType="image/jpeg"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>' + (thinTxt ? '<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/header2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>' : '') + '</Types>';
     const topRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>';
     const dz = new JSZip();
     dz.file('[Content_Types].xml', ct); dz.file('_rels/.rels', topRels);
-    dz.file('word/document.xml', docXml); dz.file('word/styles.xml', stylesXml); dz.file('word/footer1.xml', footXml); dz.file('word/numbering.xml', numXml); dz.file('word/_rels/document.xml.rels', docRels);
+    dz.file('word/document.xml', docXml); dz.file('word/styles.xml', stylesXml); dz.file('word/footer1.xml', footXml); if (thinTxt) { dz.file('word/header1.xml', head1Xml); dz.file('word/header2.xml', head2Xml); dz.file('word/footer2.xml', footXml); } dz.file('word/numbering.xml', numXml); dz.file('word/_rels/document.xml.rels', docRels);
     media.forEach(m => dz.file('word/media/' + m.name, m.buf));
     const docBytes = await dz.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
     root.file(folder + '.docx', docBytes);
