@@ -149,6 +149,77 @@ async function mcLogoFromFile(file) {
   return c.toDataURL('image/png');
 }
 
+// ═══ Шаблоны Word: 7 готовых + свои; язык, поля, шапка и подвал, подписи (решения А–Е, 13 ноября) ═══
+const WT_L = { // текст шаблона на трёх языках (записи не переводятся)
+  ru: { n: 'Русский', page: 'Стр. {p} из {n}', conf: 'Документ конфиденциален. Копирование и передача без согласия автора запрещены.', fio: 'ФИО', fix: ['Устранено', 'Не устранено'], buy: ['Куплено', 'Купить'], prog: '{d} из {n} выполнено', att: 'Вложения карточки', nosec: 'Без раздела', unav: 'файл недоступен (удалён из облака или нет сети)', cmp: ['Фото', 'Видео', 'Голосовое', 'Файл'], of: 'из', res: 'устранено', bought: 'куплено' },
+  he: { n: 'עברית', page: 'עמ׳ {p} מתוך {n}', conf: 'מסמך חסוי. אין להעתיק או להעביר ללא אישור המחבר.', fio: 'שם מלא', fix: ['תוקן', 'לא תוקן'], buy: ['נקנה', 'לקנות'], prog: '{d} מתוך {n} בוצעו', att: 'קבצים מצורפים לכרטיס', nosec: 'ללא חלק', unav: 'הקובץ לא זמין', cmp: ['תמונה', 'וידאו', 'הקלטה', 'קובץ'], of: 'מתוך', res: 'תוקנו', bought: 'נקנו' },
+  en: { n: 'English', page: 'Page {p} of {n}', conf: 'Confidential. Do not copy or share without the author\'s permission.', fio: 'Name', fix: ['Resolved', 'Open'], buy: ['Bought', 'To buy'], prog: '{d} of {n} done', att: 'Card attachments', nosec: 'No section', unav: 'file unavailable', cmp: ['Photo', 'Video', 'Voice', 'File'], of: 'of', res: 'resolved', bought: 'bought' }
+};
+const WT_F = { // поля таблицы под заголовком: a — заполняется само, m — вручную (запоминается для кабинета)
+  obj: ['m', 'Объект', 'פרויקט', 'Project'], addr: ['m', 'Адрес', 'כתובת', 'Address'], cust: ['m', 'Заказчик', 'מזמין', 'Client'],
+  contr: ['m', 'Подрядчик', 'קבלן', 'Contractor'], stage: ['m', 'Этап работ', 'שלב עבודה', 'Work stage'], deadline: ['m', 'Срок устранения', 'מועד לתיקון', 'Fix by'],
+  budget: ['m', 'Бюджет', 'תקציב', 'Budget'], supp: ['m', 'Поставщик', 'ספק', 'Supplier'], place: ['m', 'Место', 'מקום', 'Place'],
+  part: ['m', 'Участники', 'משתתפים', 'Participants'], next: ['m', 'Следующая встреча', 'פגישה הבאה', 'Next meeting'],
+  date: ['a', 'Дата', 'תאריך', 'Date'], author: ['a', 'Составил(а)', 'נערך ע״י', 'Prepared by'], count: ['a', 'Записей', 'רשומות', 'Entries'],
+  visit: ['a', 'Дата визита', 'תאריך ביקור', 'Visit date'], meetdate: ['a', 'Дата встречи', 'תאריך פגישה', 'Meeting date'],
+  issues: ['a', 'Замечаний', 'ליקויים', 'Issues'], items: ['a', 'Позиций', 'פריטים', 'Items'], period: ['a', 'Период', 'תקופה', 'Period'],
+  stages: ['a', 'Этапов', 'שלבים', 'Stages'], progress: ['a', 'Готово', 'הושלם', 'Completed'], cab: ['a', 'Кабинет', 'תיק', 'Workspace'], rub: ['a', 'Рубрика', 'קטגוריה', 'Category']
+};
+const WT_R = { exe: ['Исполнитель', 'מבצע', 'Prepared by'], cli: ['Заказчик', 'מזמין', 'Client'], sup: ['Технадзор', 'מפקח', 'Site supervisor'], con: ['Подрядчик', 'קבלן', 'Contractor'], arch: ['Архитектор / дизайнер', 'אדריכל / מעצב', 'Architect / designer'], appr: ['Утверждаю', 'מאשר', 'Approved by'] };
+const WT_LI = { ru: 1, he: 2, en: 3 };
+const wtFieldLabel = (f, lang) => f.label || (WT_F[f.k] ? WT_F[f.k][WT_LI[lang] || 1] : f.k);
+const wtRoleLabel = (r, lang) => typeof r === 'object' ? r.label : (WT_R[r] ? WT_R[r][(WT_LI[lang] || 1) - 1] : r);
+const wtH = (logo, contacts, gold, page, conf) => ({ logo, contacts, gold, page, conf, confText: '' });
+const wtF = ks => ks.map(k => ({ k }));
+const WT_BUILT = [
+  { id: 'visit', name: 'Отчёт о визите на объект', title: { ru: 'Отчёт о визите на объект', he: 'דו״ח ביקור באתר', en: 'Site visit report' }, fields: wtF(['obj', 'addr', 'cust', 'visit', 'date', 'author', 'count']), mark: 'chk', sigs: ['exe', 'cli'], head: wtH('left', 'both', true, 'pof', false) },
+  { id: 'tech', name: 'Акт технадзора', title: { ru: 'Акт технадзора', he: 'פרוטוקול פיקוח', en: 'Site supervision report' }, fields: wtF(['obj', 'addr', 'contr', 'stage', 'deadline', 'date', 'author', 'issues']), mark: 'fix', sigs: ['sup', 'con', 'cli'], head: wtH('left', 'head', true, 'pof', true) },
+  { id: 'buy', name: 'Список закупок', title: { ru: 'Список закупок', he: 'רשימת רכש', en: 'Purchase list' }, fields: wtF(['obj', 'budget', 'supp', 'date', 'author', 'items']), mark: 'buy', sigs: [], head: wtH('left', 'foot', false, 'p', false) },
+  { id: 'meet', name: 'Протокол встречи', title: { ru: 'Протокол встречи', he: 'פרוטוקול פגישה', en: 'Meeting minutes' }, fields: wtF(['meetdate', 'place', 'part', 'next', 'author']), mark: 'none', sigs: ['exe', 'cli'], head: wtH('center', 'foot', true, 'pof', true) },
+  { id: 'progress', name: 'Отчёт о ходе проекта', title: { ru: 'Отчёт о ходе проекта', he: 'דו״ח התקדמות פרויקט', en: 'Project progress report' }, fields: wtF(['obj', 'cust', 'period', 'stages', 'progress', 'date', 'author']), mark: 'chk', sigs: ['exe'], head: wtH('center', 'head', true, 'pof', false) },
+  { id: 'clean', name: 'Чистый лист', title: { ru: '', he: '', en: '' }, fields: [], mark: 'none', sigs: [], head: wtH('none', 'none', false, 'pof', false) },
+  { id: 'blank', name: 'Свой шаблон с нуля', title: { ru: '', he: '', en: '' }, fields: wtF(['date', 'author']), mark: 'chk', sigs: [], head: wtH('left', 'both', true, 'pof', false) }
+];
+function wtEntryDefaults(P) { return { names: P.names || 'show', dates: P.dates || 'show', divider: P.divider !== false, divColor: P.divColor || '#B8892B' }; }
+function wtList() { // готовые (с сохранёнными изменениями) + свои
+  const d = mcWordLocal().data, over = d.over || {}, P = d.profile || {};
+  const built = WT_BUILT.map(t => Object.assign({ lang: 'ru' }, JSON.parse(JSON.stringify(t)), { ent: wtEntryDefaults(P) }, over[t.id] ? JSON.parse(JSON.stringify(over[t.id])) : {}, { id: t.id, builtin: true }));
+  return built.concat((d.templates || []).map(t => JSON.parse(JSON.stringify(t))));
+}
+function wtPickDefault(card, space) {
+  const d = mcWordLocal().data, df = d.defaults || {}, ids = new Set(wtList().map(t => t.id));
+  const r = (df.rub || {})[space + '||' + (card.category || '')], c = (df.cab || {})[space];
+  if (card.category && r && ids.has(r)) return r;
+  if (c && ids.has(c)) return c;
+  return ids.has(d.last) ? d.last : 'visit';
+}
+const wtPad = x => String(x).padStart(2, '0');
+function wtFmtDate(dt, lang) { return wtPad(dt.getDate()) + (lang === 'ru' ? '.' : '/') + wtPad(dt.getMonth() + 1) + (lang === 'ru' ? '.' : '/') + dt.getFullYear(); }
+function wtEntryDate(e) { // дата записи: из id (время создания) или из текста «12 нояб., 14:30»
+  const t = mcEntryTs(e); if (t) return new Date(t);
+  const m = /(\d{1,2})\s+([а-яё]{3})/i.exec(e.date || ''); if (!m) return null;
+  const k = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'].findIndex(x => m[2].toLowerCase().startsWith(x.slice(0, 3)));
+  if (k < 0) return null; const n = new Date(), d = new Date(n.getFullYear(), k, +m[1]); if (d > n) d.setFullYear(d.getFullYear() - 1); return d;
+}
+function wtAutoVal(k, ctx) { // ctx: {lang, P, card, sel:[entries], sections, space}
+  const L = WT_L[ctx.lang], ds = ctx.sel.map(wtEntryDate).filter(Boolean).sort((a, b) => a - b);
+  const done = ctx.sel.filter(e => e.done).length, n = ctx.sel.length;
+  switch (k) {
+    case 'date': return wtFmtDate(new Date(), ctx.lang);
+    case 'author': return ctx.P.author || '';
+    case 'count': return String(n);
+    case 'visit': case 'meetdate': return ds.length ? wtFmtDate(ds[0], ctx.lang) : '';
+    case 'issues': return n ? n + ', ' + L.res + ': ' + done : '';
+    case 'items': return n ? n + ', ' + L.bought + ': ' + done : '';
+    case 'period': return ds.length ? wtFmtDate(ds[0], ctx.lang) + (ds.length > 1 && +ds[ds.length - 1] !== +ds[0] ? ' – ' + wtFmtDate(ds[ds.length - 1], ctx.lang) : '') : '';
+    case 'stages': return ctx.sections ? String(ctx.sections) : '';
+    case 'progress': return n ? done + ' ' + L.of + ' ' + n : '';
+    case 'cab': { const sp = (typeof spaces !== 'undefined' ? spaces : []).find(s => s.id === ctx.space); return sp ? sp.name || '' : ''; }
+    case 'rub': return ctx.card.category || '';
+  }
+  return '';
+}
+
 function mcExportCardWord(cardId, ready, _fresh) { // ready — готовая «карточка» (например, месяц из хранилища «Выполненных»)
   if (!_fresh && navigator.onLine && Date.now() - _mcWordPulled > 60000) { // сначала свежие настройки из облака (не дольше 2,5 с)
     if (window._mcExporting || document.getElementById('mc-exp-ov')) return;
@@ -158,57 +229,109 @@ function mcExportCardWord(cardId, ready, _fresh) { // ready — готовая �
   }
   const card = ready || ((typeof cards !== 'undefined') && cards.find(c => c.id === cardId));
   if (!card) return;
-  if (typeof JSZip === 'undefined') { toast('Модуль архивов не загрузился. Проверь интернет и обнови страницу', true); return; }
+  if (typeof JSZip === 'undefined') { toast('Модуль архивов не загрузился. Проверьте интернет и обновите страницу', true); return; }
   if (window._mcExporting || document.getElementById('mc-exp-ov')) return;
   const list = mcExportEntries(card);
   const cardAttCount = (card.attachments || []).filter(a => a && a.data).length;
   if (!list.length && !cardAttCount) { toast('В карточке нет записей и вложений', true); return; }
   const P = mcExpPrefsLoad();
   if (!P.author && typeof currentUser !== 'undefined' && currentUser && currentUser.display_name) P.author = currentUser.display_name;
+  const space = card.space_id || (typeof currentSpaceId !== 'undefined' && currentSpaceId) || 'personal';
+  const spName = ((typeof spaces !== 'undefined' ? spaces : []).find(s => s.id === space) || {}).name || 'Личный';
+  const W = mcWordLocal().data;
+  const vals = Object.assign({}, (W.values || {})[space] || {}); // вписанное вручную для этого кабинета
+  const over = {}; // правка авто-значений только для этой выгрузки
+  let T = wtList().find(t => t.id === wtPickDefault(card, space)) || wtList()[0];
+  let lang = T.lang || 'ru', tab = 'ent';
+  let docTitle = card.title || '';
   const checked = new Set(list.map(x => x.e.id));
   let order = 'asc';
+  const GR = card.entryGroups || [];
+  const grpName = e => ((GR.find(g => g.id === e.groupId) || {}).name) || '';
   const ov = document.createElement('div');
   ov.id = 'mc-exp-ov';
   ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:14px;box-sizing:border-box;font-family:inherit';
   const bs = 'background:var(--s2);color:var(--t1);border:1px solid var(--b1);border-radius:8px;padding:7px 11px;font-size:13px;cursor:pointer;font-family:inherit';
   const is = 'background:var(--s2);color:var(--t1);border:1px solid var(--b1);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;width:100%;box-sizing:border-box';
-  const lab = t => '<div style="font-size:12px;color:var(--t3);margin:8px 0 3px">' + t + '</div>';
-  const chk = (id, t, on) => '<label style="display:flex;gap:8px;align-items:center;font-size:14px;padding:4px 0;cursor:pointer"><input type="checkbox" id="' + id + '"' + (on ? ' checked' : '') + '> ' + t + '</label>';
-  ov.innerHTML = '<div style="background:var(--s1);color:var(--t1);border:1px solid var(--b1);border-radius:14px;width:min(580px,100%);max-height:92vh;display:flex;flex-direction:column;box-sizing:border-box">' +
-    '<div style="padding:16px 18px 6px;font-size:17px;font-weight:700">📄 Выгрузка в Word</div>' +
-    '<div style="overflow:auto;flex:1;min-height:0">' +
-    '<div style="padding:0 18px 6px;font-size:13px;color:var(--t3)">Выбери записи. Вместе с документом скачается папка files с фото, роликами и голосовыми.</div>' +
-    '<div style="padding:4px 18px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
-      '<button data-q="all" style="' + bs + '">Все</button><button data-q="none" style="' + bs + '">Ничего</button>' +
-      '<button data-q="done" style="' + bs + '">Только ☑ отмеченные</button><button data-q="open" style="' + bs + '">Только без отметки</button>' +
-      '<select id="mc-exp-ord" style="' + bs + '"><option value="asc">Сначала старые</option><option value="desc">Сначала новые</option></select></div>' +
-    ((card.entryGroups || []).length ? '<div style="padding:4px 18px 0;font-size:12px;color:var(--t3)">Разделы (нажми, чтобы выбрать или снять все записи раздела):</div><div id="mc-exp-grp" style="padding:4px 18px;display:flex;gap:6px;flex-wrap:wrap"></div>' : '') +
-    '<div id="mc-exp-list" style="padding:6px 12px;max-height:230px;overflow:auto"></div>' +
-    (cardAttCount ? '<label style="padding:6px 18px;font-size:14px;display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="mc-exp-card" checked> Вложения самой карточки (' + cardAttCount + ')</label>' : '') +
-    '<details style="margin:6px 18px 4px;border-top:1px solid var(--b1);padding-top:8px"' + (P.studio || P.logo ? '' : ' open') + '><summary style="cursor:pointer;font-size:14px;font-weight:600">🎨 Оформление документа</summary>' +
-      lab('Логотип (запоминается на этом устройстве)') +
-      '<div style="display:flex;gap:8px;align-items:center"><img id="mc-exp-logo-img" style="height:40px;max-width:120px;object-fit:contain;display:none;background:#fff;border-radius:6px;padding:2px"><button id="mc-exp-logo-btn" style="' + bs + '">Выбрать файл…</button><button id="mc-exp-logo-del" style="' + bs + ';display:none">Убрать</button><input type="file" id="mc-exp-logo-file" accept="image/*" style="display:none"></div>' +
-      lab('Название студии или компании') + '<input id="mc-exp-studio" style="' + is + '" value="' + _XE(P.studio) + '">' +
-      lab('Слоган (необязательно)') + '<input id="mc-exp-slogan" style="' + is + '" value="' + _XE(P.slogan) + '">' +
-      lab('Сайт или контакты (справа в шапке и в нижнем колонтитуле)') + '<input id="mc-exp-site" style="' + is + '" value="' + _XE(P.site) + '">' +
-      lab('Название документа') + '<input id="mc-exp-title" style="' + is + '" value="' + _XE(card.title || '') + '">' +
-      lab('Объект (необязательно)') + '<input id="mc-exp-object" style="' + is + '">' +
-      lab('Составил(а)') + '<input id="mc-exp-author" style="' + is + '" value="' + _XE(P.author) + '">' +
-      '<div style="margin-top:8px">' + lab('Названия файлов под фото') + '<select id="mc-exp-names" style="' + is + '"><option value="show"' + (P.names === 'show' ? ' selected' : '') + '>Показывать</option><option value="none"' + (P.names === 'none' ? ' selected' : '') + '>Не показывать (компактно)</option><option value="hidden"' + (P.names === 'hidden' ? ' selected' : '') + '>Скрытый текст: показывать в Word кнопкой ¶</option></select><div style="height:6px"></div>' +
-      lab('Дата и время над фото') + '<select id="mc-exp-dates" style="' + is + '"><option value="show"' + (P.dates === 'show' ? ' selected' : '') + '>Показывать</option><option value="none"' + (P.dates === 'none' ? ' selected' : '') + '>Не показывать</option><option value="hidden"' + (P.dates === 'hidden' ? ' selected' : '') + '>Скрытый текст (кнопка ¶ в Word)</option></select><div style="height:6px"></div>' +
-      '<div style="display:flex;gap:10px;align-items:center;padding:4px 0"><label style="display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer"><input type="checkbox" id="mc-exp-div"' + (P.divider ? ' checked' : '') + '> Разделитель между записями, цвет:</label><input type="color" id="mc-exp-divc" value="' + _XE(P.divColor || '#B8892B') + '" style="width:44px;height:30px;border:1px solid var(--b1);border-radius:6px;background:var(--s2);padding:2px;cursor:pointer"></div>' +
-      chk('mc-exp-checks', 'Галочка «выполнено» возле каждой записи', P.checks) +
-      chk('mc-exp-signs', 'Строки для подписей в конце', P.signs) + '</div></details>' +
-    '</div>' +
-    '<div style="padding:12px 18px 16px;display:flex;gap:8px;justify-content:flex-end;align-items:center;border-top:1px solid var(--b1)"><span id="mc-exp-cnt" style="margin-right:auto;font-size:13px;color:var(--t3)"></span>' +
-      '<button id="mc-exp-x" style="' + bs + ';padding:10px 16px;font-size:14px">Отмена</button>' +
+  const lab = t => '<div style="font-size:12px;color:var(--t3);margin:10px 0 4px">' + t + '</div>';
+  const seg = (name, cur, opts) => '<div style="display:flex;border-radius:8px;overflow:hidden;flex-wrap:wrap">' + opts.map((o, i) => '<button data-seg="' + name + '" data-v="' + o[0] + '" style="flex:1;padding:7px 6px;font-size:12.5px;cursor:pointer;font-family:inherit;border:1px solid ' + (cur === o[0] ? 'var(--accent)' : 'var(--b1)') + ';background:' + (cur === o[0] ? 'var(--accent)' : 'var(--s2)') + ';color:' + (cur === o[0] ? '#0f0f0f' : 'var(--t2)') + ';font-weight:' + (cur === o[0] ? 700 : 400) + '">' + o[1] + '</button>').join('') + '</div>';
+  ov.innerHTML = '<div style="background:var(--s1);color:var(--t1);border:1px solid var(--b1);border-radius:14px;width:min(600px,100%);max-height:94vh;display:flex;flex-direction:column;box-sizing:border-box">' +
+    '<div style="padding:14px 18px 4px;font-size:17px;font-weight:700">📄 Выгрузка в Word</div>' +
+    '<div style="padding:4px 18px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="mc-exp-tpl" style="' + is + ';flex:1;min-width:200px;width:auto"></select><div id="mc-exp-lang" style="min-width:210px"></div></div>' +
+    '<div id="mc-exp-tabs" style="padding:8px 18px 0;display:flex;gap:5px;flex-wrap:wrap"></div>' +
+    '<div id="mc-exp-pane" style="overflow:auto;flex:1;min-height:0;padding:4px 18px 8px"></div>' +
+    '<div style="padding:8px 18px;border-top:1px solid var(--b1);font-size:12.5px;display:flex;gap:12px;flex-wrap:wrap;align-items:center"><span style="color:var(--t3)">По умолчанию:</span>' +
+      '<label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="mc-exp-dcab"> для кабинета «' + _XE(spName) + '»</label>' +
+      (card.category ? '<label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="mc-exp-drub"> для рубрики «' + _XE(card.category) + '»</label>' : '') + '</div>' +
+    '<div style="padding:8px 18px 14px;display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap"><span id="mc-exp-cnt" style="margin-right:auto;font-size:13px;color:var(--t3)"></span>' +
+      '<button id="mc-exp-save" style="' + bs + '">💾 Сохранить шаблон</button><button id="mc-exp-saveas" style="' + bs + '">⭐ Как новый</button>' +
+      '<button id="mc-exp-x" style="' + bs + ';padding:10px 14px;font-size:14px">Отмена</button>' +
       '<button id="mc-exp-go" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Выгрузить</button></div></div>';
   document.body.appendChild(ov);
   const $ = id => ov.querySelector('#' + id);
   const sorted = () => list.slice().sort((a, b) => (order === 'asc' ? 1 : -1) * ((a.ts - b.ts) || (a.i - b.i)));
   const plain = e => { const t = mcRichToParts(e.text || e.sessionNote || '').map(x => x.br ? ' ' : (x.t || '')).join('').trim(); return t.length > 70 ? t.slice(0, 68) + '…' : (t || '(без текста)'); };
-  function render() {
-    const box = $('mc-exp-list');
+  const ctx = () => ({ lang, P, card, space, sel: list.filter(x => checked.has(x.e.id)).map(x => x.e), sections: GR.length ? new Set(list.filter(x => checked.has(x.e.id)).map(x => GR.some(g => g.id === x.e.groupId) ? x.e.groupId : '__none')).size : 0 });
+  function head() {
+    const L = wtList();
+    $('mc-exp-tpl').innerHTML = '<optgroup label="Шаблоны">' + L.filter(t => t.builtin).map(t => '<option value="' + t.id + '"' + (t.id === T.id ? ' selected' : '') + '>' + _XE(t.name) + '</option>').join('') + '</optgroup>' +
+      (L.some(t => !t.builtin) ? '<optgroup label="Мои шаблоны">' + L.filter(t => !t.builtin).map(t => '<option value="' + t.id + '"' + (t.id === T.id ? ' selected' : '') + '>⭐ ' + _XE(t.name) + '</option>').join('') + '</optgroup>' : '');
+    $('mc-exp-lang').innerHTML = seg('lang', lang, [['ru', 'Русский'], ['he', 'עברית'], ['en', 'English']]);
+    const tabs = [['ent', 'Записи'], ['fld', 'Поля'], ['hd', 'Шапка и подвал'], ['sig', 'Подписи']];
+    $('mc-exp-tabs').innerHTML = tabs.map(t => '<button data-tab="' + t[0] + '" style="' + bs + (tab === t[0] ? ';background:var(--accent);color:#0f0f0f;border-color:var(--accent);font-weight:700' : '') + '">' + t[1] + '</button>').join('');
+    const df = W.defaults || {};
+    $('mc-exp-dcab').checked = (df.cab || {})[space] === T.id;
+    if ($('mc-exp-drub')) $('mc-exp-drub').checked = (df.rub || {})[space + '||' + card.category] === T.id;
+    $('mc-exp-save').textContent = T.builtin ? '💾 Сохранить изменения' : '💾 Сохранить шаблон';
+  }
+  function pane() {
+    const p = $('mc-exp-pane'), E = T.ent, H = T.head;
+    if (tab === 'ent') {
+      p.innerHTML = '<div style="font-size:12.5px;color:var(--t3);margin:6px 0">Вместе с документом скачается папка files с фото, роликами и голосовыми. Текст записей не переводится.</div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button data-q="all" style="' + bs + '">Все</button><button data-q="none" style="' + bs + '">Ничего</button><button data-q="done" style="' + bs + '">Только ☑ отмеченные</button><button data-q="open" style="' + bs + '">Только без отметки</button>' +
+        '<select id="mc-exp-ord" style="' + bs + '"><option value="asc"' + (order === 'asc' ? ' selected' : '') + '>Сначала старые</option><option value="desc"' + (order === 'desc' ? ' selected' : '') + '>Сначала новые</option></select></div>' +
+        (GR.length ? '<div style="font-size:12px;color:var(--t3);margin-top:6px">Разделы (нажмите, чтобы выбрать или снять все записи раздела):</div><div id="mc-exp-grp" style="padding:4px 0;display:flex;gap:6px;flex-wrap:wrap"></div>' : '') +
+        '<div id="mc-exp-list" style="max-height:210px;overflow:auto;margin-top:4px"></div>' +
+        (cardAttCount ? '<label style="padding:6px 0;font-size:14px;display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="mc-exp-card"' + (T._wc === false ? '' : ' checked') + '> Вложения самой карточки (' + cardAttCount + ')</label>' : '') +
+        lab('Отметка у записи') + seg('mark', T.mark, [['chk', '☑ / ☐'], ['fix', WT_L[lang].fix.join(' / ')], ['buy', WT_L[lang].buy.join(' / ')], ['none', 'Без отметки']]) +
+        lab('Дата и время записи') + seg('dates', E.dates, [['show', 'Показывать'], ['none', 'Нет'], ['hidden', 'Скрыто (¶ в Word)']]) +
+        lab('Названия файлов под фото') + seg('names', E.names, [['show', 'Показывать'], ['none', 'Нет'], ['hidden', 'Скрыто (¶ в Word)']]) +
+        '<div style="display:flex;gap:10px;align-items:center;padding:8px 0 2px"><label style="display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer"><input type="checkbox" id="mc-exp-div"' + (E.divider ? ' checked' : '') + '> Разделитель между записями, цвет:</label><input type="color" id="mc-exp-divc" value="' + _XE(E.divColor || '#B8892B') + '" style="width:44px;height:30px;border:1px solid var(--b1);border-radius:6px;background:var(--s2);padding:2px;cursor:pointer"></div>';
+      renderList();
+    } else if (tab === 'fld') {
+      const c = ctx();
+      p.innerHTML = lab('Название документа') + '<input id="mc-exp-title" style="' + is + '" value="' + _XE(docTitle) + '" dir="auto">' +
+        '<div style="font-size:12px;color:var(--t3);margin:10px 0 4px;line-height:1.5"><span style="color:#8fb8e8">Синие</span> поля заполняются сами — значение можно поправить для этой выгрузки. <span style="color:var(--accent)">Жёлтые</span> вписываются вручную и запоминаются для кабинета «' + _XE(spName) + '». Пустое поле в документ не попадает.</div>' +
+        T.fields.map((f, i) => {
+          const auto = !f.label && WT_F[f.k] && WT_F[f.k][0] === 'a';
+          const v = auto ? (over[f.k] != null ? over[f.k] : wtAutoVal(f.k, c)) : (vals[f.k] || '');
+          return '<div style="display:flex;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid var(--b1)"><span style="width:130px;font-size:13px;color:' + (auto ? '#8fb8e8' : 'var(--accent)') + '">' + _XE(wtFieldLabel(f, lang)) + '</span>' +
+            '<input data-fld="' + i + '" style="' + is + ';flex:1;padding:6px 8px" value="' + _XE(v) + '" placeholder="' + (auto ? 'заполнится само' : 'вписать') + '" dir="auto">' +
+            '<button data-up="' + i + '" title="Выше" style="' + bs + ';padding:5px 8px">↑</button><button data-rm="' + i + '" title="Убрать поле" style="' + bs + ';padding:5px 8px;color:#e06060">✕</button></div>';
+        }).join('') +
+        lab('Добавить поле') + '<div style="display:flex;gap:6px"><select id="mc-exp-addf" style="' + is + ';flex:1"><option value="">＋ выбрать…</option>' + Object.keys(WT_F).filter(k => !T.fields.some(f => f.k === k && !f.label)).map(k => '<option value="' + k + '">' + _XE(WT_F[k][1]) + (WT_F[k][0] === 'a' ? ' (само)' : '') + '</option>').join('') + '</select><button id="mc-exp-addc" style="' + bs + '">＋ Своё поле</button></div>';
+    } else if (tab === 'hd') {
+      p.innerHTML = lab('Логотип') + '<div style="display:flex;gap:8px;align-items:center"><img id="mc-exp-logo-img" style="height:40px;max-width:120px;object-fit:contain;display:none;background:#fff;border-radius:6px;padding:2px"><button id="mc-exp-logo-btn" style="' + bs + '">Выбрать файл…</button><button id="mc-exp-logo-del" style="' + bs + ';display:none">Убрать</button><input type="file" id="mc-exp-logo-file" accept="image/*" style="display:none"></div>' +
+        lab('Название студии или компании') + '<input id="mc-exp-studio" style="' + is + '" value="' + _XE(P.studio) + '" dir="auto">' +
+        lab('Слоган') + '<input id="mc-exp-slogan" style="' + is + '" value="' + _XE(P.slogan) + '" dir="auto">' +
+        lab('Сайт или контакты') + '<input id="mc-exp-site" style="' + is + '" value="' + _XE(P.site) + '">' +
+        lab('Составил(а)') + '<input id="mc-exp-author" style="' + is + '" value="' + _XE(P.author) + '" dir="auto">' +
+        '<div style="font-size:12px;color:var(--t3);margin:4px 0 0">Логотип, студия, слоган, контакты и автор общие для всех шаблонов. Ниже — вид этого шаблона.</div>' +
+        lab('Шапка (на 1-й странице; на следующих — тонкая строка «студия · название»)') + seg('logo', H.logo, [['left', 'Логотип слева'], ['center', 'По центру'], ['none', 'Без шапки']]) +
+        lab('Контакты') + seg('contacts', H.contacts, [['head', 'В шапке'], ['foot', 'В подвале'], ['both', 'И там, и там'], ['none', 'Нигде']]) +
+        '<label style="display:flex;gap:8px;align-items:center;font-size:14px;padding:8px 0 0;cursor:pointer"><input type="checkbox" id="mc-exp-gold"' + (H.gold ? ' checked' : '') + '> Золотая линия под шапкой</label>' +
+        lab('Номер страницы') + seg('page', H.page, [['pof', WT_L[lang].page.replace('{p}', '1').replace('{n}', '3')], ['p', '1'], ['no', 'Без номера']]) +
+        '<label style="display:flex;gap:8px;align-items:center;font-size:14px;padding:8px 0 0;cursor:pointer"><input type="checkbox" id="mc-exp-conf"' + (H.conf ? ' checked' : '') + '> Строка о конфиденциальности в подвале</label>' +
+        '<input id="mc-exp-conft" style="' + is + ';margin-top:6px' + (H.conf ? '' : ';display:none') + '" value="' + _XE(H.confText || '') + '" placeholder="' + _XE(WT_L[lang].conf) + '" dir="auto">';
+      showLogo();
+    } else if (tab === 'sig') {
+      p.innerHTML = '<div style="font-size:12.5px;color:var(--t3);margin:6px 0">Подписи в конце документа: роль и строка «' + WT_L[lang].fio + ': ________» для имени от руки. До трёх подписей.</div>' +
+        (T.sigs.length ? T.sigs.map((r, i) => '<div style="display:flex;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--b1)"><span style="flex:1;font-size:14px" dir="auto">' + _XE(wtRoleLabel(r, lang)) + '</span><button data-srm="' + i + '" style="' + bs + ';padding:5px 8px;color:#e06060">✕</button></div>').join('') : '<div style="font-size:13px;color:var(--t3);padding:6px 0">Подписей нет</div>') +
+        (T.sigs.length < 3 ? lab('Добавить подпись') + '<div style="display:flex;gap:6px"><select id="mc-exp-adds" style="' + is + ';flex:1"><option value="">＋ выбрать…</option>' + Object.keys(WT_R).filter(k => !T.sigs.includes(k)).map(k => '<option value="' + k + '">' + _XE(WT_R[k][0]) + '</option>').join('') + '</select><button id="mc-exp-addsc" style="' + bs + '">＋ Своя роль</button></div>' : '');
+    }
+  }
+  function renderList() {
+    const box = $('mc-exp-list'); if (!box) return;
     box.innerHTML = sorted().map(x => {
       const na = (x.e.sessionAtts || []).length + (x.e.attachments || []).length;
       return '<label style="display:flex;gap:9px;align-items:flex-start;padding:7px 6px;border-bottom:1px solid var(--b1);cursor:pointer;font-size:14px">' +
@@ -216,13 +339,9 @@ function mcExportCardWord(cardId, ready, _fresh) { // ready — готовая �
         '<span style="flex:1;min-width:0;word-break:break-word" dir="auto">' + (x.e.done ? '☑ ' : '') + _XE(plain(x.e)) + '</span>' +
         '<span style="font-size:12px;color:var(--t3);white-space:nowrap;max-width:45%;overflow:hidden;text-overflow:ellipsis;flex-shrink:1">' + (grpName(x.e) ? '▸ ' + _XE(grpName(x.e)) + ' · ' : '') + _XE(x.e.date || '') + (na ? ' · 📎' + na : '') + '</span></label>';
     }).join('') || '<div style="padding:10px;color:var(--t3);font-size:13px">Записей нет</div>';
-    box.querySelectorAll('input[data-id]').forEach(i => i.onchange = () => { i.checked ? checked.add(i.dataset.id) : checked.delete(i.dataset.id); count(); });
     count();
   }
   function count() { $('mc-exp-cnt').textContent = 'Записей: ' + checked.size + ' из ' + list.length; paintGrp(); }
-  // мультикарточка: кнопка раздела выбирает/снимает все его записи
-  const GR = card.entryGroups || [];
-  const grpName = e => ((GR.find(g => g.id === e.groupId) || {}).name) || '';
   function paintGrp() {
     const box = $('mc-exp-grp'); if (!box) return;
     const keys = [...GR.map(g => g.id), ...(list.some(x => !GR.some(g => g.id === x.e.groupId)) ? ['__none'] : [])];
@@ -232,44 +351,91 @@ function mcExportCardWord(cardId, ready, _fresh) { // ready — готовая �
       const nm = k === '__none' ? 'Без раздела' : (((GR.find(g => g.id === k) || {}).name) || 'Без названия');
       return '<button data-grp="' + _XE(k) + '" style="' + bs + (all ? ';background:var(--accent);color:#0f0f0f;border-color:var(--accent)' : on ? ';border-color:var(--accent);color:var(--accent)' : '') + '">' + _XE(nm) + ' · ' + on + '/' + its.length + '</button>';
     }).join('');
-    box.querySelectorAll('[data-grp]').forEach(b => b.onclick = () => {
-      const k = b.dataset.grp, its = list.filter(x => k === '__none' ? !GR.some(g => g.id === x.e.groupId) : x.e.groupId === k);
-      const all = its.every(x => checked.has(x.e.id));
-      its.forEach(x => all ? checked.delete(x.e.id) : checked.add(x.e.id));
-      render();
+  }
+  function showLogo() { const im = $('mc-exp-logo-img'); if (!im) return; if (P.logo) { im.src = P.logo; im.style.display = ''; $('mc-exp-logo-del').style.display = ''; } else { im.style.display = 'none'; $('mc-exp-logo-del').style.display = 'none'; } }
+  function grab() { // забрать введённое на открытой вкладке
+    const v = id => $(id) ? $(id).value : null;
+    if ($('mc-exp-title')) docTitle = v('mc-exp-title');
+    if ($('mc-exp-studio')) Object.assign(P, { studio: v('mc-exp-studio').trim(), slogan: v('mc-exp-slogan').trim(), site: v('mc-exp-site').trim(), author: v('mc-exp-author').trim() });
+    if ($('mc-exp-div')) Object.assign(T.ent, { divider: $('mc-exp-div').checked, divColor: v('mc-exp-divc') });
+    if ($('mc-exp-card')) T._wc = $('mc-exp-card').checked;
+    if ($('mc-exp-gold')) Object.assign(T.head, { gold: $('mc-exp-gold').checked, conf: $('mc-exp-conf').checked, confText: v('mc-exp-conft').trim() });
+    ov.querySelectorAll('[data-fld]').forEach(inp => {
+      const f = T.fields[+inp.dataset.fld]; if (!f) return;
+      const auto = !f.label && WT_F[f.k] && WT_F[f.k][0] === 'a';
+      if (auto) { const a = wtAutoVal(f.k, ctx()); if (inp.value !== a) over[f.k] = inp.value; else delete over[f.k]; }
+      else vals[f.k] = inp.value.trim();
     });
   }
-  function showLogo() { const im = $('mc-exp-logo-img'); if (P.logo) { im.src = P.logo; im.style.display = ''; $('mc-exp-logo-del').style.display = ''; } else { im.style.display = 'none'; $('mc-exp-logo-del').style.display = 'none'; } }
-  showLogo();
-  $('mc-exp-logo-btn').onclick = () => $('mc-exp-logo-file').click();
-  $('mc-exp-logo-file').onchange = async e => {
-    const f = e.target.files && e.target.files[0]; if (!f) return;
-    try { P.logo = await mcLogoFromFile(f); showLogo(); } catch (err) { toast('Не удалось прочитать картинку логотипа', true); }
-  };
-  $('mc-exp-logo-del').onclick = () => { P.logo = ''; showLogo(); };
-  ov.querySelectorAll('[data-q]').forEach(b => b.onclick = () => {
-    const q = b.dataset.q; checked.clear();
-    list.forEach(x => { if (q === 'all' || (q === 'done' && x.e.done) || (q === 'open' && !x.e.done)) checked.add(x.e.id); });
-    render();
+  const redraw = () => { head(); pane(); };
+  ov.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b || !ov.contains(b)) return;
+    if (b.dataset.tab) { grab(); tab = b.dataset.tab; redraw(); return; }
+    if (b.dataset.seg) {
+      grab(); const k = b.dataset.seg, v = b.dataset.v;
+      if (k === 'lang') lang = v; else if (k === 'mark') T.mark = v; else if (k === 'dates' || k === 'names') T.ent[k] = v; else T.head[k] = v;
+      redraw(); return;
+    }
+    if (b.dataset.q) { const q = b.dataset.q; checked.clear(); list.forEach(x => { if (q === 'all' || (q === 'done' && x.e.done) || (q === 'open' && !x.e.done)) checked.add(x.e.id); }); renderList(); return; }
+    if (b.dataset.grp) {
+      const k = b.dataset.grp, its = list.filter(x => k === '__none' ? !GR.some(g => g.id === x.e.groupId) : x.e.groupId === k);
+      const all = its.every(x => checked.has(x.e.id)); its.forEach(x => all ? checked.delete(x.e.id) : checked.add(x.e.id)); renderList(); return;
+    }
+    if (b.dataset.rm != null) { grab(); T.fields.splice(+b.dataset.rm, 1); pane(); return; }
+    if (b.dataset.up != null) { grab(); const i = +b.dataset.up; if (i > 0) { const t = T.fields[i]; T.fields[i] = T.fields[i - 1]; T.fields[i - 1] = t; } pane(); return; }
+    if (b.dataset.srm != null) { T.sigs.splice(+b.dataset.srm, 1); pane(); return; }
+    if (b.id === 'mc-exp-addc') { grab(); const n = prompt('Название своего поля (например, «№ договора»)'); if (n && n.trim()) { T.fields.push({ k: 'c' + Date.now().toString(36), label: n.trim() }); pane(); } return; }
+    if (b.id === 'mc-exp-addsc') { const n = prompt('Своя роль для подписи (например, «Дизайнер проекта»)'); if (n && n.trim() && T.sigs.length < 3) { T.sigs.push({ label: n.trim() }); pane(); } return; }
+    if (b.id === 'mc-exp-logo-btn') { $('mc-exp-logo-file').click(); return; }
+    if (b.id === 'mc-exp-logo-del') { P.logo = ''; showLogo(); return; }
   });
-  $('mc-exp-ord').onchange = e => { order = e.target.value; render(); };
+  ov.addEventListener('change', async e => {
+    const t = e.target;
+    if (t.dataset && t.dataset.id) { t.checked ? checked.add(t.dataset.id) : checked.delete(t.dataset.id); count(); return; }
+    if (t.id === 'mc-exp-tpl') { grab(); T = wtList().find(x => x.id === t.value) || T; lang = T.lang || lang; if (!docTitle || docTitle === card.title) docTitle = card.title || ''; redraw(); return; }
+    if (t.id === 'mc-exp-ord') { order = t.value; renderList(); return; }
+    if (t.id === 'mc-exp-addf' && t.value) { grab(); T.fields.push({ k: t.value }); pane(); return; }
+    if (t.id === 'mc-exp-adds' && t.value) { T.sigs.push(t.value); pane(); return; }
+    if (t.id === 'mc-exp-conf') { $('mc-exp-conft').style.display = t.checked ? '' : 'none'; return; }
+    if (t.id === 'mc-exp-logo-file') { const f = t.files && t.files[0]; if (!f) return; try { P.logo = await mcLogoFromFile(f); showLogo(); } catch (err) { toast('Не удалось прочитать картинку логотипа', true); } return; }
+    if (t.id === 'mc-exp-dcab' || t.id === 'mc-exp-drub') {
+      const cab = t.id === 'mc-exp-dcab', key = cab ? space : space + '||' + card.category, on = t.checked, id = T.id;
+      mcWordSave(d => { d.defaults = d.defaults || {}; const m = d.defaults[cab ? 'cab' : 'rub'] = d.defaults[cab ? 'cab' : 'rub'] || {}; if (on) m[key] = id; else if (m[key] === id) delete m[key]; });
+      toast(on ? '«' + T.name + '» будет открываться ' + (cab ? 'в кабинете «' + spName + '»' : 'для рубрики «' + card.category + '»') : 'Шаблон по умолчанию снят');
+    }
+  });
+  const pack = () => { const t = JSON.parse(JSON.stringify(T)); t.lang = lang; delete t._wc; delete t.builtin; return t; };
+  $('mc-exp-save').onclick = () => {
+    grab(); const t = pack();
+    if (T.builtin) mcWordSave(d => { d.over = d.over || {}; d.over[T.id] = { lang: t.lang, fields: t.fields, mark: t.mark, sigs: t.sigs, head: t.head, ent: t.ent }; });
+    else mcWordSave(d => { d.templates = (d.templates || []).map(x => x.id === T.id ? t : x); });
+    toast('Шаблон «' + T.name + '» сохранён');
+  };
+  $('mc-exp-saveas').onclick = () => {
+    grab(); const nm = prompt('Название нового шаблона', T.builtin ? T.name + ' (мой)' : T.name + ' — копия'); if (!nm || !nm.trim()) return;
+    const t = pack(); t.id = 'my' + Date.now().toString(36); t.name = nm.trim();
+    mcWordSave(d => { d.templates = (d.templates || []).concat([t]); });
+    T = wtList().find(x => x.id === t.id); redraw(); toast('Сохранён новый шаблон «' + t.name + '»');
+  };
   const close = () => { document.removeEventListener('keydown', onKey, true); ov.remove(); };
   const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
   document.addEventListener('keydown', onKey, true);
   $('mc-exp-x').onclick = close;
   ov.addEventListener('mousedown', e => { if (e.target === ov) close(); });
   $('mc-exp-go').onclick = () => {
-    const wc = $('mc-exp-card') ? $('mc-exp-card').checked : false;
-    if (!checked.size && !wc) { toast('Выбери хотя бы одну запись', true); return; }
-    const v = id => $(id).value.trim();
-    Object.assign(P, { studio: v('mc-exp-studio'), slogan: v('mc-exp-slogan'), site: v('mc-exp-site'), author: v('mc-exp-author'),
-      names: $('mc-exp-names').value, dates: $('mc-exp-dates').value, divider: $('mc-exp-div').checked, divColor: $('mc-exp-divc').value, checks: $('mc-exp-checks').checked, signs: $('mc-exp-signs').checked });
-    mcExpPrefsSave(P);
-    const ids = new Set(checked); const docTitle = v('mc-exp-title') || card.title || 'Карточка', object = v('mc-exp-object');
+    grab();
+    const wc = cardAttCount ? T._wc !== false : false;
+    if (!checked.size && !wc) { toast('Выберите хотя бы одну запись', true); return; }
+    const c = ctx(), fv = {};
+    T.fields.forEach(f => { const auto = !f.label && WT_F[f.k] && WT_F[f.k][0] === 'a'; fv[f.k] = auto ? (over[f.k] != null ? over[f.k] : wtAutoVal(f.k, c)) : (vals[f.k] || ''); });
+    mcExpPrefsSave(Object.assign({}, P, { names: T.ent.names, dates: T.ent.dates, divider: T.ent.divider, divColor: T.ent.divColor }));
+    mcWordSave(d => { d.values = d.values || {}; d.values[space] = Object.assign({}, vals); d.last = T.id; });
+    const ids = new Set(checked), title = (docTitle || '').trim() || (T.title && T.title[lang]) || card.title || 'Карточка';
+    const PP = Object.assign({}, P, T.ent);
     close();
-    mcExportCardWordRun(card, { ids, order, withCard: wc, P, docTitle, object });
+    mcExportCardWordRun(card, { ids, order, withCard: wc, P: PP, docTitle: title, T: pack(), lang, fv });
   };
-  render();
+  redraw();
 }
 
 async function mcExportCardWordRun(card, opt) {
@@ -396,7 +562,9 @@ async function mcExportCardWordRun(card, opt) {
     const TW = 9906;
     let body = '';
     // шапка
-    const hasHead = P.logo || P.studio || P.slogan || P.site;
+    const TT = opt.T || null, HH = TT ? TT.head : { logo: 'left', contacts: 'both', gold: false, page: 'p' }, LG = opt.lang || 'ru', LL = WT_L[LG] || WT_L.ru;
+    const siteHead = P.site && (HH.contacts === 'head' || HH.contacts === 'both'), siteFoot = P.site && (HH.contacts === 'foot' || HH.contacts === 'both');
+    const hasHead = HH.logo !== 'none' && (P.logo || P.studio || P.slogan || siteHead);
     if (hasHead) {
       let lw = 0, logoXml = '';
       if (P.logo) {
@@ -410,7 +578,7 @@ async function mcExportCardWordRun(card, opt) {
         } catch (e) {}
       }
       lw = Math.round(lw);
-      const rw = P.site ? 2900 : 0, mw = TW - lw - rw;
+      const rw = siteHead ? 2900 : 0, mw = TW - lw - rw;
       const bb = '<w:tcBorders><w:bottom w:val="single" w:sz="6" w:space="0" w:color="DDDDDD"/></w:tcBorders>';
       const mid = (P.studio ? mcDocPara(mcDocRun(P.studio.toUpperCase(), { b: true, size: 24 }), { after: 0, bidi: _isRTL(P.studio) }) : '') + (P.slogan ? mcDocPara(mcDocRun(P.slogan, { size: 17, color: '777777', rtl: _isRTL(P.slogan) }), { after: 0, bidi: _isRTL(P.slogan) }) : '') || mcDocPara('', { after: 0 });
       let cells = '';
@@ -419,29 +587,33 @@ async function mcExportCardWordRun(card, opt) {
       if (rw) cells += cell(mcDocPara(mcDocRun(P.site, { size: 17, color: '777777' }), { after: 0, jc: 'right' }), rw, { borders: bb });
       body += '<w:tbl><w:tblPr><w:tblW w:w="' + TW + '" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid>' + (lw ? '<w:gridCol w:w="' + lw + '"/>' : '') + '<w:gridCol w:w="' + mw + '"/>' + (rw ? '<w:gridCol w:w="' + rw + '"/>' : '') + '</w:tblGrid><w:tr>' + cells + '</w:tr></w:tbl>';
     }
-    body += mcDocPara(mcDocRun(opt.docTitle, { b: true, size: 40 }), { before: 240, after: 120, bidi: _isRTL(opt.docTitle) });
+    if (hasHead && HH.gold) body += mcDocPara('', { after: 0, line: 120, divider: GOLD });
+    if (opt.docTitle) body += mcDocPara(mcDocRun(opt.docTitle, { b: true, size: 40 }), { before: 240, after: 120, bidi: _isRTL(opt.docTitle) || LG === 'he' });
     // таблица данных
-    const d = new Date(), p2 = x => String(x).padStart(2, '0');
-    const pairs = [];
-    if (opt.object) pairs.push(['Объект', opt.object]);
-    pairs.push(['Дата', p2(d.getDate()) + '.' + p2(d.getMonth() + 1) + '.' + d.getFullYear()]);
-    if (P.author) pairs.push(['Составил(а)', P.author]);
-    pairs.push(['Записей', String(n)]);
+    const pairs = []; // поля шаблона: пустые в документ не попадают
+    if (TT) TT.fields.forEach(f => { const v = String((opt.fv || {})[f.k] || '').trim(); if (v) pairs.push([wtFieldLabel(f, LG), v]); });
+    else {
+      const d = new Date(), p2 = x => String(x).padStart(2, '0');
+      if (opt.object) pairs.push(['Объект', opt.object]);
+      pairs.push(['Дата', p2(d.getDate()) + '.' + p2(d.getMonth() + 1) + '.' + d.getFullYear()]);
+      if (P.author) pairs.push(['Составил(а)', P.author]);
+      pairs.push(['Записей', String(n)]);
+    }
     const bAll = '<w:tcBorders>' + ['top', 'left', 'bottom', 'right'].map(s => '<w:' + s + ' w:val="single" w:sz="4" w:space="0" w:color="DDDDDD"/>').join('') + '</w:tcBorders>';
     let trs = '';
     for (let i = 0; i < pairs.length; i += 2) {
       const a = pairs[i], b2 = pairs[i + 1];
-      const mk = (pr, lw2, vw) => cell(mcDocPara(mcDocRun(pr[0], { b: true, size: 19 }), { after: 0 }), lw2, { borders: bAll, fill: 'F6EFD9' }) + cell(mcDocPara(mcDocRun(pr[1], { size: 20, rtl: _isRTL(pr[1]) }), { after: 0, bidi: _isRTL(pr[1]) }), vw, { borders: bAll });
+      const mk = (pr, lw2, vw) => cell(mcDocPara(mcDocRun(pr[0], { b: true, size: 19, rtl: LG === 'he' }), { after: 0, bidi: LG === 'he' }), lw2, { borders: bAll, fill: 'F6EFD9' }) + cell(mcDocPara(mcDocRun(pr[1], { size: 20, rtl: _isRTL(pr[1]) }), { after: 0, bidi: _isRTL(pr[1]) }), vw, { borders: bAll });
       trs += '<w:tr>' + (b2 ? mk(a, 1500, 3453) + mk(b2, 1500, 3453) : mk(a, 1500, 3453) + cell(mcDocPara('', { after: 0 }), 4953, { borders: bAll })) + '</w:tr>';
     }
-    body += '<w:tbl><w:tblPr><w:tblW w:w="' + TW + '" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="60" w:type="dxa"/><w:left w:w="100" w:type="dxa"/><w:bottom w:w="60" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="1500"/><w:gridCol w:w="3453"/><w:gridCol w:w="1500"/><w:gridCol w:w="3453"/></w:tblGrid>' + trs + '</w:tbl>';
+    if (trs) body += '<w:tbl><w:tblPr><w:tblW w:w="' + TW + '" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="60" w:type="dxa"/><w:left w:w="100" w:type="dxa"/><w:bottom w:w="60" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="1500"/><w:gridCol w:w="3453"/><w:gridCol w:w="1500"/><w:gridCol w:w="3453"/></w:tblGrid>' + trs + '</w:tbl>';
     body += mcDocPara('', { after: 40 });
     if (card.body) {
       const parts = mcRichToParts(card.body); const rtl = _isRTL(parts.map(x => x.t || '').join(''));
       body += mcDocPara(parts.map(x => x.br ? '<w:r><w:br/></w:r>' : mcDocRun(x.t, { ...x, rtl })).join(''), { bidi: rtl, after: 120 });
     }
     if (cardAttObjs.length) {
-      body += mcDocPara(mcDocRun('Вложения карточки', { b: true, size: 26 }), { before: 160, keep: true });
+      body += mcDocPara(mcDocRun(LL.att, { b: true, size: 26 }), { before: 160, keep: true });
       body += attXml(cardAttObjs);
     }
     blocks.forEach(b => {
@@ -452,11 +624,13 @@ async function mcExportCardWordRun(card, opt) {
       if (grouped && b.secStart) { // золотая плашка раздела с прогрессом
         const sb2 = blocks.filter(x => x.gk === b.gk), sd = sb2.filter(x => x.e.done).length, rg = _isRTL(b.gName);
         body += '<w:p><w:pPr><w:keepNext/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="2"/></w:numPr><w:pBdr><w:left w:val="single" w:sz="24" w:space="6" w:color="' + GOLD + '"/></w:pBdr><w:shd w:val="clear" w:color="auto" w:fill="F6EFD9"/>' + (rg ? '<w:bidi/>' : '') + '<w:spacing w:before="' + (b === blocks[0] ? 120 : 320) + '" w:after="120"/></w:pPr>' +
-          mcDocRun(b.gName, { b: true, size: 28, rtl: rg }) + (card.noProgress ? '' : mcDocRun('   · ' + sd + ' из ' + sb2.length + ' выполнено', { size: 18, color: '8A6A1F' })) + '</w:p>';
+          mcDocRun(b.gName, { b: true, size: 28, rtl: rg }) + (card.noProgress ? '' : mcDocRun('   · ' + LL.prog.replace('{d}', sd).replace('{n}', sb2.length), { size: 18, color: '8A6A1F' })) + '</w:p>';
       } else if (P.divider && b !== blocks[0]) body += mcDocPara('', { before: 160, after: 120, line: 120, divider: (P.divColor || '#B8892B').replace('#', '') });
       else body += mcDocPara('', { after: 0, line: 120 });
       const _dt0 = String(e.date || ''), _keep = (P.dates !== 'none' && !!_dt0) || !!b.grp || b.atts.length > 0; // запись держится только со своей датой и файлами, а не со следующим разделом: иначе документ «склеивается» и уезжает на новую страницу
-      body += mcDocPara((P.checks ? checkbox(!!e.done) : (e.done ? mcDocRun('☑ ', { size: 24, rtl }) : '')) + textXml, { before: 60, after: 60, keep: _keep, bidi: rtl, num: grouped ? { id: 2, lvl: 1 } : { id: 1, lvl: 0 } });
+      const MK = TT ? TT.mark : (P.checks ? 'chk' : 'old');
+      const markXml = MK === 'chk' ? checkbox(!!e.done) : MK === 'fix' || MK === 'buy' ? mcDocRun((e.done ? '✔ ' : '○ ') + LL[MK][e.done ? 0 : 1] + ' ', { b: true, size: 18, color: e.done ? '2E7D32' : 'B8892B', rtl }) + mcDocRun(' ', { size: 24 }) : MK === 'old' && e.done ? mcDocRun('☑ ', { size: 24, rtl }) : '';
+      body += mcDocPara(markXml + textXml, { before: 60, after: 60, keep: _keep, bidi: rtl, num: grouped ? { id: 2, lvl: 1 } : { id: 1, lvl: 0 } });
       const dTxt = String(e.date || '');
       if (P.dates === 'show' && (dTxt || b.grp)) body += mcDocPara(mcDocRun(dTxt + (b.grp ? (dTxt ? '  ·  ' : '') + '▸ ' + b.grp : ''), { size: 18, color: '8A8A8A', rtl: _isRTL(b.grp) && !dTxt }), { keep: b.atts.length > 0, after: 80 });
       else if (P.dates === 'hidden' && dTxt && !b.grp) body += mcDocPara(mcDocRun(dTxt, { size: 18, color: '8A8A8A', vanish: true }), { keep: b.atts.length > 0, after: 80, vanish: true });
@@ -464,19 +638,27 @@ async function mcExportCardWordRun(card, opt) {
       else if (b.grp) body += mcDocPara(mcDocRun('▸ ' + b.grp, { size: 18, color: '8A8A8A', rtl: _isRTL(b.grp) }), { keep: b.atts.length > 0, after: 80 });
       if (b.atts.length) body += attXml(b.atts);
     });
-    if (P.signs) {
+    const SG = TT ? (TT.sigs || []).slice(0, 3).map(r => wtRoleLabel(r, LG)) : (P.signs ? ['Подпись исполнителя', 'Подпись заказчика'] : []);
+    if (SG.length) { // подписи: роль, строка для подписи и «ФИО: ____» (без даты)
+      const gap = 500, cw = Math.floor((TW - gap * (SG.length - 1)) / SG.length), rtlS = LG === 'he';
       const top = '<w:tcBorders><w:top w:val="single" w:sz="6" w:space="0" w:color="999999"/></w:tcBorders>';
-      const sg = t => cell(mcDocPara(mcDocRun(t, { size: 17, color: '666666' }), { after: 0 }), 4400, { borders: top, v: 'top' });
+      const sg = t => cell(mcDocPara(mcDocRun(t, { b: true, size: 18, color: '555555', rtl: rtlS || _isRTL(t) }), { after: 120, bidi: rtlS || _isRTL(t) }) + mcDocPara(mcDocRun(LL.fio + ': ____________________', { size: 17, color: '777777', rtl: rtlS }), { after: 0, bidi: rtlS }), cw, { borders: top, v: 'top' });
       body += mcDocPara('', { before: 700, after: 0, keep: true });
-      body += '<w:tbl><w:tblPr><w:tblW w:w="' + TW + '" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="4400"/><w:gridCol w:w="1106"/><w:gridCol w:w="4400"/></w:tblGrid><w:tr>' + sg('Подпись исполнителя') + cell(mcDocPara('', { after: 0 }), 1106) + sg('Подпись заказчика') + '</w:tr></w:tbl>';
+      const cols = SG.map((t, i) => (i ? '<w:gridCol w:w="' + gap + '"/>' : '') + '<w:gridCol w:w="' + cw + '"/>').join('');
+      body += '<w:tbl><w:tblPr><w:tblW w:w="' + TW + '" w:type="dxa"/><w:tblLayout w:type="fixed"/>' + (rtlS ? '<w:bidiVisual/>' : '') + '</w:tblPr><w:tblGrid>' + cols + '</w:tblGrid><w:tr><w:trPr><w:cantSplit/></w:trPr>' + SG.map((t, i) => (i ? cell(mcDocPara('', { after: 0 }), gap) : '') + sg(t)).join('') + '</w:tr></w:tbl>';
     }
     const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="w14"';
     const docXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ' + NS + '><w:body>' + body +
       '<w:sectPr><w:footerReference w:type="default" r:id="rId2"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1000" w:right="1000" w:bottom="1000" w:left="1000" w:header="500" w:footer="500" w:gutter="0"/></w:sectPr></w:body></w:document>';
-    const footTxt = [P.studio, P.site].filter(Boolean).join('  ·  ');
+    const footTxt = HH.contacts === 'none' ? '' : [P.studio, siteFoot ? P.site : ''].filter(Boolean).join('  ·  ');
+    const fr = '<w:rPr><w:color w:val="888888"/><w:sz w:val="16"/></w:rPr>';
+    const fT = t => t ? '<w:r>' + fr + '<w:t xml:space="preserve">' + _XE(t) + '</w:t></w:r>' : '';
+    const fF = ins => '<w:r>' + fr + '<w:fldChar w:fldCharType="begin"/></w:r><w:r>' + fr + '<w:instrText xml:space="preserve"> ' + ins + ' </w:instrText></w:r><w:r>' + fr + '<w:fldChar w:fldCharType="separate"/></w:r><w:r>' + fr + '<w:t>1</w:t></w:r><w:r>' + fr + '<w:fldChar w:fldCharType="end"/></w:r>';
+    const pageXml = HH.page === 'no' ? '' : HH.page === 'pof' ? LL.page.split(/(\{p\}|\{n\})/).map(x => x === '{p}' ? fF('PAGE') : x === '{n}' ? fF('NUMPAGES') : fT(x)).join('') : fF('PAGE');
+    const confTxt = HH.conf ? (HH.confText || LL.conf) : '';
     const footXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:pBdr><w:top w:val="single" w:sz="4" w:space="6" w:color="DDDDDD"/></w:pBdr><w:tabs><w:tab w:val="right" w:pos="' + TW + '"/></w:tabs></w:pPr>' +
-      '<w:r><w:rPr><w:color w:val="888888"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">' + _XE(footTxt) + '</w:t></w:r><w:r><w:rPr><w:color w:val="888888"/><w:sz w:val="16"/></w:rPr><w:tab/></w:r>' +
-      '<w:r><w:rPr><w:color w:val="888888"/><w:sz w:val="16"/></w:rPr><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:rPr><w:color w:val="888888"/><w:sz w:val="16"/></w:rPr><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:rPr><w:color w:val="888888"/><w:sz w:val="16"/></w:rPr><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:rPr><w:color w:val="888888"/><w:sz w:val="16"/></w:rPr><w:t>1</w:t></w:r><w:r><w:rPr><w:color w:val="888888"/><w:sz w:val="16"/></w:rPr><w:fldChar w:fldCharType="end"/></w:r></w:p></w:ftr>';
+      fT(footTxt) + '<w:r>' + fr + '<w:tab/></w:r>' + pageXml + '</w:p>' +
+      (confTxt ? '<w:p><w:pPr>' + (_isRTL(confTxt) ? '<w:bidi/>' : '') + '<w:spacing w:before="40" w:after="0"/><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:i/><w:color w:val="999999"/><w:sz w:val="14"/>' + (_isRTL(confTxt) ? '<w:rtl/>' : '') + '</w:rPr><w:t xml:space="preserve">' + _XE(confTxt) + '</w:t></w:r></w:p>' : '') + '</w:ftr>';
     const stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial" w:eastAsia="Arial"/><w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="ru-RU" w:bidi="he-IL"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>';
     // нумерация Word: 1 — обычная карточка «1.», 2 — мультикарточка: раздел «1.», запись «1.1»
     const lvl = (i, fmt, rpr) => '<w:lvl w:ilvl="' + i + '"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="' + fmt + '"/><w:lvlJc w:val="left"/><w:suff w:val="space"/><w:pPr><w:ind w:left="0" w:firstLine="0"/></w:pPr><w:rPr>' + rpr + '</w:rPr></w:lvl>';
