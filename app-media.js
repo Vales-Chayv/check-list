@@ -37,6 +37,7 @@ async function mcPrepareFile(file) {
   const kind = t.startsWith('video/') ? 'video' : t.startsWith('audio/') ? 'audio' : t.startsWith('image/') ? 'image' : 'other';
   const lim = MC_LIMITS[kind];
   if(file.size > lim) {
+    if(kind === 'video' || kind === 'audio') { const e = new Error('file_big_local'); e.big = true; e.file = file; throw e; } // большой ролик/аудио остаётся на устройстве (см. «Большие файлы на устройстве»)
     const mb = Math.round(lim / MC_MB);
     const names = { video: 'Ролик', audio: 'Аудио', image: 'Фото', other: 'Файл' };
     setTimeout(() => { try { toast(names[kind] + ' слишком большой: максимум ' + mb + ' МБ', true); } catch(_) {} }, 400);
@@ -49,7 +50,8 @@ async function mcPrepareFile(file) {
 const mcOrigUpload = uploadToStorage;
 uploadToStorage = async function(file, cardId, entryId) {
   const _capKey = mcCapKey(file), _capId = _mcCapPend.get(_capKey); // если это снимок из камеры приложения — у него есть оригинал в 💎
-  file = await mcPrepareFile(file);
+  try { file = await mcPrepareFile(file); }
+  catch(e) { if(e && e.big) return await mcBigStore(e.file); throw e; } // больше лимита: в облако не отправляем, храним здесь
   const _vid = (file.type || '').startsWith('video/') && typeof window.mcNativeStatus === 'function';
   const _t0 = Date.now();
   const _say = () => window.mcNativeStatus('⬆ Отправляю ролик (' + (file.size / MC_MB).toFixed(1) + ' МБ)… ' + Math.round((Date.now() - _t0) / 1000) + ' с');
@@ -688,7 +690,7 @@ async function mcVaultMark(ids, ts) {
   await _mcTx(t);
 }
 async function mcVaultBacked() {
-  const m = (await mcVaultMeta()).filter(x => x.bk);
+  const m = (await mcVaultMeta()).filter(x => x.bk && x.kind !== 'big'); // большие файлы не освобождаем: на устройстве у них единственная копия
   return { count: m.length, bytes: m.reduce((s, x) => s + (x.size || 0), 0), ids: m.map(x => x.id) };
 }
 async function mcVaultFreeBacked() { // удаляет оригиналы, которые попали в резервную копию
@@ -975,3 +977,211 @@ function mcCamOpen(kind, onFile, onFail) {
   $('mc-cam-x').onclick = close;
   start('');
 }
+
+
+// ═══════════════════════════════════════════
+//  БОЛЬШИЕ ФАЙЛЫ НА УСТРОЙСТВЕ (15 ноября)
+//  Ролик или аудио больше лимита не уходит в облако: лежит в хранилище оригиналов 💎 на этом устройстве (kind 'big').
+//  В записи — обычное вложение с адресом «mcbig:<id>» и типом application/x-mc-big (везде рисуется как файл 📎),
+//  ниже такая ссылка превращается в плитку, а нажатие открывает окно с кнопками по устройству.
+//  fetch('mcbig:…') отдаёт файл из хранилища — так его берут ZIP, резерв, Word.
+//  На компьютер — через «📤 Отправить на компьютер»: принятый файл ложится и в хранилище компьютера.
+// ═══════════════════════════════════════════
+const MC_BIG_TYPE = 'application/x-mc-big';
+const _mcBigHave = new Set(); // адреса больших файлов, которые есть на этом устройстве
+function mcDevId() { try { let d = localStorage.getItem('mc_dev_id'); if(!d) { d = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); localStorage.setItem('mc_dev_id', d); } return d; } catch(e) { return 'd'; } }
+function mcDevName() {
+  const nat = typeof window.isNativeApp === 'function' && window.isNativeApp();
+  if(nat) return 'Телефон (приложение)';
+  return /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || '') ? 'Телефон' : 'Компьютер';
+}
+const mcBigMB = b => { const m = (b || 0) / MC_MB; return (m >= 1024 ? (m / 1024).toFixed(1).replace('.', ',') + ' ГБ' : (m < 10 ? m.toFixed(1).replace('.', ',') : Math.round(m)) + ' МБ'); };
+window.mcBigHas = url => _mcBigHave.has(url);
+async function mcBigLoadHave() {
+  try { (await mcVaultMeta()).forEach(m => { if(m.kind === 'big' && m.url) _mcBigHave.add(m.url); }); } catch(e) {}
+  mcBigDecorate(true);
+}
+async function mcBigBlob(url) { // файл из хранилища по адресу «mcbig:…» или null
+  try {
+    const db = await mcVaultDb();
+    const m = await _mcIdb(db.transaction('meta').objectStore('meta').index('url').get(url));
+    return m ? await _mcVaultFile(db, m.id, m) : null;
+  } catch(e) { return null; }
+}
+window.mcBigBlob = mcBigBlob;
+async function mcBigStore(file) { // вызывает обёртка загрузки вместо отправки в облако
+  let id;
+  try { id = await mcVaultPut(file, 'big'); }
+  catch(e) {
+    if(mcIsQuota(e)) mcNoSpace('«' + (file.name || 'файл') + '» (' + mcBigMB(file.size) + ') не поместился');
+    else setTimeout(() => { try { toast('Не удалось сохранить большой файл на устройстве', true); } catch(_) {} }, 300);
+    throw new Error('file_too_big');
+  }
+  const url = 'mcbig:' + id;
+  await mcVaultLink(id, url);
+  _mcBigHave.add(url);
+  const me = (typeof currentUser !== 'undefined' && currentUser) || {};
+  const who = localStorage.getItem('mc_current_member') || me.display_name || '';
+  setTimeout(() => { try { toast('Файл большой (' + mcBigMB(file.size) + '): хранится только на этом устройстве, в облако не отправляется'); } catch(_) {} }, 300);
+  return {
+    id: (typeof uid === 'function' ? uid() : id), name: file.name || ((file.type || '').startsWith('video/') ? 'video.mp4' : 'audio'),
+    type: MC_BIG_TYPE, size: file.size, data: url, ts: Date.now(),
+    big: { type: file.type || '', dev: mcDevId(), devName: mcDevName(), by: me.id || null, byName: who }
+  };
+}
+// принятый на компьютере большой файл кладём в хранилище под тем же адресом — плитка здесь станет «Открыть»
+async function mcBigImport(url, blob, name) {
+  if(!url || String(url).indexOf('mcbig:') !== 0 || _mcBigHave.has(url)) return;
+  const f = new File([blob], name || 'file', { type: blob.type || '' });
+  const id = await mcVaultPut(f, 'big');
+  await mcVaultLink(id, url);
+  _mcBigHave.add(url);
+  mcBigDecorate(true);
+  try { toast('«' + (name || 'файл') + '» теперь есть и в карточке на этом компьютере'); } catch(e) {}
+}
+window.mcBigImport = mcBigImport;
+
+// fetch('mcbig:…') — файл из хранилища (ZIP-архив, резерв, Word берут вложения через fetch)
+(function () {
+  const f0 = window.fetch && window.fetch.bind(window);
+  if(!f0 || window._mcBigFetch) return; window._mcBigFetch = true;
+  window.fetch = async function (input, init) {
+    const u = typeof input === 'string' ? input : (input && input.url) || '';
+    if(String(u).indexOf('mcbig:') === 0) {
+      const b = await mcBigBlob(u);
+      return b ? new Response(b, { status: 200, headers: { 'Content-Type': b.type || 'application/octet-stream' } }) : new Response('', { status: 404 });
+    }
+    return f0(input, init);
+  };
+})();
+
+// поиск вложения по адресу: открытые карточки, затем копии на устройстве
+async function mcBigFind(url) {
+  const hit = list => { for(const c of (list || [])) { for(const a of (c.attachments || [])) if(a && a.data === url) return a; for(const e of (c.entries || [])) for(const k of ['attachments', 'sessionAtts']) for(const a of ((e && e[k]) || [])) if(a && a.data === url) return a; } return null; };
+  let a = hit(typeof cards !== 'undefined' ? cards : []);
+  if(!a) { try { a = hit(await local.getAll('cards')); } catch(e) {} }
+  return a;
+}
+
+// ── ссылка 📎 на большой файл → плитка ──
+(function () {
+  const st = document.createElement('style');
+  st.textContent = 'a.mc-big{display:inline-flex !important;align-items:center;gap:8px;max-width:100%;box-sizing:border-box;border-color:rgba(232,197,106,.45) !important;color:var(--t1) !important;text-decoration:none;padding:7px 11px !important}' +
+    'a.mc-big .mcb-i{font-size:20px;flex-shrink:0}a.mc-big .mcb-t{display:flex;flex-direction:column;min-width:0;line-height:1.3}a.mc-big .mcb-n{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}a.mc-big .mcb-w{font-size:11px;color:var(--t3)}a.mc-big.here .mcb-w{color:var(--accent)}';
+  document.head.appendChild(st);
+})();
+let _mcBigT = null;
+function mcBigDecorate(all) {
+  const sel = all ? 'a[href^="mcbig:"]' : 'a[href^="mcbig:"]:not([data-mcb])';
+  document.querySelectorAll(sel).forEach(a => {
+    const url = a.getAttribute('href'), here = _mcBigHave.has(url);
+    if(a.dataset.mcb === (here ? '1' : '0')) return;
+    a.dataset.mcb = here ? '1' : '0';
+    if(!a.dataset.nm) a.dataset.nm = (a.getAttribute('download') || a.textContent || '').replace(/^(?:📎|📄|\s)+|\s*⬇$/g, '').trim();
+    a.removeAttribute('download'); a.removeAttribute('target');
+    a.classList.add('mc-big'); a.classList.toggle('here', here);
+    a.innerHTML = '<span class="mcb-i">🎞</span><span class="mcb-t"><span class="mcb-n"></span><span class="mcb-w">' + (here ? 'Большой файл · на этом устройстве' : 'Большой файл · на другом устройстве') + '</span></span>';
+    a.querySelector('.mcb-n').textContent = a.dataset.nm || 'файл';
+    mcBigFind(url).then(att => {
+      if(!att) return;
+      const vid = /^video/.test((att.big && att.big.type) || '');
+      a.querySelector('.mcb-i').textContent = vid ? '🎞' : '🎤';
+      a.querySelector('.mcb-n').textContent = (att.name || 'файл') + ' · ' + mcBigMB(att.size);
+      if(!here && att.big && att.big.devName) a.querySelector('.mcb-w').textContent = 'Большой файл · на устройстве «' + att.big.devName + '»';
+    });
+  });
+}
+new MutationObserver(() => { if(!document.querySelector('a[href^="mcbig:"]:not([data-mcb])')) return; clearTimeout(_mcBigT); _mcBigT = setTimeout(() => mcBigDecorate(false), 60); }).observe(document.documentElement, { childList: true, subtree: true });
+document.addEventListener('click', e => {
+  const a = e.target && e.target.closest && e.target.closest('a[href^="mcbig:"]'); if(!a) return;
+  e.preventDefault(); e.stopPropagation();
+  mcBigOpen(a.getAttribute('href'));
+}, true);
+
+// ── окно большого файла ──
+async function mcBigOpen(url, att) {
+  att = att || await mcBigFind(url) || { name: 'файл', size: 0, big: {} };
+  const big = att.big || {}, here = _mcBigHave.has(url) || !!(await mcBigBlob(url).then(b => { if(b) _mcBigHave.add(url); return b; }));
+  const vid = /^video/.test(big.type || ''), me = (typeof currentUser !== 'undefined' && currentUser) || {};
+  const mine = !big.by || big.by === me.id;
+  const phoneHere = (typeof window.isNativeApp === 'function' && window.isNativeApp()) || /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || '');
+  document.getElementById('mc-big-ov')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'mc-big-ov';
+  ov.setAttribute('style', 'position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:16px'); // строкой: «Назад» закрывает окно
+  const bs = 'display:block;width:100%;margin-top:8px;padding:11px;border-radius:var(--rsm);font-size:14px;cursor:pointer;font-family:inherit;border:1px solid var(--b1);background:var(--s1);color:var(--t1);text-align:left';
+  let where, btns = '';
+  if(here) {
+    where = 'Хранится на этом устройстве · в облако не отправлялся';
+    btns = `<button data-a="open" style="${bs};background:var(--accent);color:#0f0f0f;font-weight:700;border-color:var(--accent)">▶ Открыть</button>` +
+      `<button data-a="save" style="${bs}">⬇ Сохранить на устройство</button>` +
+      (phoneHere && window.mcXferSend ? `<button data-a="send" style="${bs}">⇄ Передать на компьютер</button>` : '');
+  } else if(mine) {
+    where = 'Файл на устройстве «' + (big.devName || 'другое устройство') + '». На этом устройстве его нет.';
+    btns = `<button data-a="how" style="${bs}">📥 Как получить</button>`;
+  } else {
+    where = 'Большой файл у автора записи' + (big.byName ? ' (' + big.byName + ')' : '') + ', в облако не отправлялся.';
+    btns = `<button data-a="ask" style="${bs}">💬 Попросить файл</button>`;
+  }
+  ov.innerHTML = `<div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:18px;width:100%;max-width:380px">
+    <div style="display:flex;gap:10px;align-items:center"><span style="font-size:30px">${vid ? '🎞' : '🎤'}</span><div style="flex:1;min-width:0"><div class="mcb-name" style="font-size:15px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div><div style="font-size:12px;color:var(--t3)">${mcBigMB(att.size)}</div></div>
+    <button data-a="x" style="background:var(--s1);border:none;color:var(--t2);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:15px;flex-shrink:0">✕</button></div>
+    <div class="mcb-where" style="font-size:13px;color:var(--t2);margin:10px 0 2px;line-height:1.5"></div>${btns}
+    <div class="mcb-note" style="font-size:12.5px;color:var(--t2);margin-top:10px;line-height:1.5"></div></div>`;
+  ov.querySelector('.mcb-name').textContent = att.name || 'файл';
+  ov.querySelector('.mcb-where').textContent = where;
+  const note = t => { ov.querySelector('.mcb-note').textContent = t; };
+  const close = () => ov.remove();
+  ov.addEventListener('click', async e => {
+    if(e.target === ov) { close(); return; }
+    const b = e.target.closest('[data-a]'); if(!b) return;
+    const a = b.dataset.a;
+    if(a === 'x') { close(); return; }
+    if(a === 'how') {
+      note('1) На этом компьютере откройте «📥 Принять с телефона». 2) На телефоне откройте эту запись, нажмите на большой файл → «⇄ Передать на компьютер». Файл придёт напрямую, без облака, и появится в этой карточке.');
+      if(window.mcXferReceive && !ov.querySelector('[data-a="recv"]')) b.insertAdjacentHTML('afterend', `<button data-a="recv" style="${bs};background:var(--accent);color:#0f0f0f;font-weight:700;border-color:var(--accent)">📥 Принять с телефона</button>`);
+      return;
+    }
+    if(a === 'recv') { close(); window.mcXferReceive(); return; }
+    if(a === 'ask') {
+      const txt = 'Пришли, пожалуйста, файл «' + (att.name || 'файл') + '» (' + mcBigMB(att.size) + ')';
+      const inp = document.getElementById('chat-quick-input');
+      if(inp && inp.offsetParent !== null) { inp.value = txt; inp.dispatchEvent(new Event('input', { bubbles: true })); close(); inp.focus(); toast('Текст просьбы в строке сообщения: нажмите «Отправить»'); }
+      else { try { await navigator.clipboard.writeText(txt); toast('Текст просьбы скопирован: вставьте его в чат'); } catch(_) { note(txt); } }
+      return;
+    }
+    const f = await mcBigBlob(url);
+    if(!f) { note('Файл на этом устройстве не найден.'); return; }
+    if(a === 'open') {
+      const u = URL.createObjectURL(f);
+      setTimeout(() => { try { URL.revokeObjectURL(u); } catch(_) {} }, 30 * 60000);
+      close();
+      if(vid && typeof openVideoViewer === 'function') { openVideoViewer(u); return; }
+      document.getElementById('gal-audio-ov')?.remove();
+      const d = document.createElement('div');
+      d.id = 'gal-audio-ov';
+      d.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:2600;display:flex;align-items:center;justify-content:center;padding:20px';
+      d.innerHTML = vid ? '<video controls autoplay playsinline style="max-width:96vw;max-height:88vh"></video>' : '<audio controls autoplay style="width:min(420px,100%)"></audio>';
+      d.firstElementChild.src = u;
+      d.onclick = ev => { if(ev.target === d) d.remove(); };
+      document.body.appendChild(d);
+      return;
+    }
+    if(a === 'save') {
+      const nm = att.name || f.name || 'file';
+      if(typeof window.isNativeApp === 'function' && window.isNativeApp() && typeof mcNativeShareFile === 'function') { if(await mcNativeShareFile(f, nm.replace(/[^a-zA-Z0-9._-]/g, '_'), nm)) return; }
+      const l = document.createElement('a'); l.href = URL.createObjectURL(f); l.download = nm;
+      document.body.appendChild(l); l.click(); l.remove();
+      setTimeout(() => { try { URL.revokeObjectURL(l.href); } catch(_) {} }, 60000);
+      return;
+    }
+    if(a === 'send') {
+      const s = new File([f], att.name || f.name || 'file', { type: big.type || f.type || '' });
+      try { s.mcBig = url; } catch(_) {} // метка: компьютер положит файл и в карточку
+      close(); window.mcXferSend([s]);
+    }
+  });
+  document.body.appendChild(ov);
+}
+window.mcBigOpen = mcBigOpen;
+setTimeout(mcBigLoadHave, 500);

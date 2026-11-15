@@ -301,7 +301,7 @@
       await this.hub.send({
         type: 'offer', to: this.target.dev, sid: this.sid, resume: !!resume, name: this.hub.name,
         sdp: { type: pc.localDescription.type, sdp: pc.localDescription.sdp },
-        files: this.files.map(f => ({ n: f.name, s: f.size, m: f.mt })), total: this.total,
+        files: this.files.map(f => ({ n: f.name, s: f.size, m: f.mt, b: (f.file && f.file.mcBig) || undefined, t: (f.file && f.file.mcBig && f.file.type) || undefined })), total: this.total, // b — большой файл из карточки: компьютер положит его и в карточку
         ice: this.mode === 'relay' ? this.relay : null
       });
       let a;
@@ -493,7 +493,11 @@
       if (!s.open || !f || s.pos.off + u8.length > f.s) return this.bad('лишние данные');
       s.handled += u8.length; s.pos.off += u8.length;
       this.enq(async () => { await s.zip.data(u8); s.written += u8.length; });
-      if (s.pos.off === f.s) { this.enq(() => s.zip.end()); s.open = false; s.pos = { i: s.pos.i + 1, off: 0 }; }
+      if (f.b) { s.big = s.big || {}; (s.big[s.pos.i] = s.big[s.pos.i] || []).push(u8); } // большой файл из карточки: собираем и для карточки на этом компьютере
+      if (s.pos.off === f.s) {
+        if (f.b && s.big && s.big[s.pos.i]) { const parts = s.big[s.pos.i], fb = f; delete s.big[s.pos.i]; this.enq(async () => { try { if (window.mcBigImport) await window.mcBigImport(fb.b, new Blob(parts, { type: fb.t || '' }), fb.n); } catch (e) {} }); }
+        this.enq(() => s.zip.end()); s.open = false; s.pos = { i: s.pos.i + 1, off: 0 };
+      }
     }
     tickSpeed() {
       const s = this.s; if (!s) return;
@@ -745,10 +749,11 @@
   }
 
   // ───────── вход ─────────
-  async function openSend() {
+  async function openSend(preset) { // preset — готовые файлы (например, большой файл из карточки)
     if (ov) closeOv(true);
     role = 'tx'; picked = []; sender = null; chosen = null; peers = [];
     ensureOv('📤 Отправить на компьютер'); paint(true);
+    if (Array.isArray(preset) && preset.length) addFiles(preset);
     try {
       hub = makeHub('tx', p => { if (sender) sender.onSig(p); }, list => {
         peers = list;

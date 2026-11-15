@@ -100,8 +100,8 @@
         if(!a || !a.data || seen.has(a.data)) return;
         seen.add(a.data);
         const t = a.type || '';
-        const kind = t.startsWith('image/') ? 'img' : t.startsWith('video/') ? 'vid' : t.startsWith('audio/') ? 'aud' : 'doc';
-        out.push({ url: a.data, name: a.name || '', kind, size: a.size || 0, ts: a.ts || parseEntryDate(ds) || base, space: c.space_id || 'personal', spaceName: spaceName(c.space_id), cardId: c.id, cardTitle: c.title || '' });
+        const kind = t.startsWith('image/') ? 'img' : t.startsWith('video/') ? 'vid' : t.startsWith('audio/') ? 'aud' : t === 'application/x-mc-big' ? 'big' : 'doc';
+        out.push({ url: a.data, name: a.name || '', kind, att: kind === 'big' ? a : null, bigVid: kind === 'big' && /^video/.test((a.big && a.big.type) || ''), size: a.size || 0, ts: a.ts || parseEntryDate(ds) || base, space: c.space_id || 'personal', spaceName: spaceName(c.space_id), cardId: c.id, cardTitle: c.title || '' });
       };
       (c.attachments || []).forEach(a => push(a, ''));
       (c.entries || []).forEach(e => { (e.attachments || []).forEach(a => push(a, e.date)); (e.sessionAtts || []).forEach(a => push(a, e.date)); });
@@ -298,7 +298,7 @@
     $('gal-f2').innerHTML = `<span class="gal-ch${G.space === 'all' ? ' on' : ''}" data-s="all">Все кабинеты</span>` + names.map(n => `<span class="gal-ch${G.space === n[0] ? ' on' : ''}" data-s="${X(n[0])}">${X(n[1])}</span>`).join('');
   }
   function filtered() {
-    return G.items.map((it, i) => ({ it, i })).filter(o => (G.type === 'all' || (G.type === 'doc' ? (o.it.kind === 'doc' || o.it.kind === 'aud') : o.it.kind === G.type)) && (G.space === 'all' || o.it.space === G.space));
+    return G.items.map((it, i) => ({ it, i })).filter(o => (G.type === 'all' || (G.type === 'doc' ? (o.it.kind === 'doc' || o.it.kind === 'aud' || (o.it.kind === 'big' && !o.it.bigVid)) : G.type === 'vid' ? (o.it.kind === 'vid' || (o.it.kind === 'big' && o.it.bigVid)) : o.it.kind === G.type)) && (G.space === 'all' || o.it.space === G.space));
   }
   function renderBody() {
     const L = filtered();
@@ -311,11 +311,12 @@
     part.forEach(o => {
       const it = o.it, lab = dayLabel(it.ts);
       if(lab !== cur) { if(cur !== null) h += '</div>'; cur = lab; h += `<div class="gal-dt">${X(lab)}</div><div class="gal-g">`; }
-      const cl = !isLocal(it) && it.kind !== 'img';
-      const cls = 'gal-t' + (G.picked.has(o.i) ? ' on' : '') + (cl ? ' cl' : '') + ((it.kind === 'doc' || it.kind === 'aud') ? ' doc' : '');
+      const cl = !isLocal(it) && it.kind !== 'img' && it.kind !== 'big';
+      const cls = 'gal-t' + (G.picked.has(o.i) ? ' on' : '') + (cl ? ' cl' : '') + ((it.kind === 'doc' || it.kind === 'aud' || it.kind === 'big') ? ' doc' : '');
       let inner;
       if(it.kind === 'img') inner = `<img src="${X(it.url)}" loading="lazy" alt="">`;
       else if(it.kind === 'vid') inner = `<video src="${X(it.url)}#t=0.1" preload="metadata" muted playsinline></video><i>▶</i>`;
+      else if(it.kind === 'big') inner = `<b>${it.bigVid ? '🎞' : '🎤'}</b>${X(it.name || 'файл')}<br><span style="font-size:10px;color:var(--t3)">${window.mcBigHas && window.mcBigHas(it.url) ? 'на этом устройстве' : 'на другом устройстве'}</span>`;
       else inner = `<b>${it.kind === 'aud' ? '🎤' : '📄'}</b>${X(it.name || (it.kind === 'aud' ? 'запись' : 'файл'))}`;
       h += `<div class="${cls}" data-i="${o.i}">${inner}${cl ? '<button class="gal-dl" data-dl="' + o.i + '" aria-label="Скачать на устройство"><span>' + CLOUD + '</span></button>' : ''}${G.orig.has(it.url) ? '<u class="gal-or" title="Оригинал на этом устройстве">💎</u>' : ''}<span class="gal-sel"></span></div>`;
     });
@@ -360,6 +361,7 @@
     if(!it) return;
     if(it.kind === 'img') { openImgDirect(it.url); return; }
     if(it.kind === 'vid') { openVideoViewer(it.url); return; }
+    if(it.kind === 'big') { if(window.mcBigOpen) window.mcBigOpen(it.url, it.att); return; } // большой файл: окно с кнопками по устройству
     try {
       toast('Открываю…');
       const blob = await fetchBlob(it.url);
