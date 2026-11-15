@@ -740,17 +740,19 @@ const firstDay = new Date(y, m, 1);
     cardMap[d].push(c);
   });
 
-  let html = `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-bottom:4px">`;
+  const _ph = calIsPhone(), _mkey = y + '-' + m, _rows = Math.ceil((startDow + lastDay.getDate()) / 7);
+  if(_calExp.key !== _mkey) _calExp = { key: _mkey, row: -1, col: -1 }; // другой месяц — всё свёрнуто
+  let html = `<div id="cal-mhead" style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-bottom:4px">`;
   order.forEach(dw => {
     html += `<div style="text-align:center;font-size:11px;color:${calIsWeekend(dw)?'var(--t2)':'var(--t3)'};font-weight:${calIsWeekend(dw)?700:400};padding:4px 0">${CAL_DAYS_RU[dw]}</div>`;
   });
   html += '</div>';
 
-  html += `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px">`;
+  html += `<div id="cal-mgrid" data-rows="${_rows}" style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px">`;
 
   // Empty cells before first day
   for(let i = 0; i < startDow; i++) {
-    html += `<div style="min-height:72px;background:var(--s2);border-radius:4px;opacity:.3"></div>`;
+    html += `<div class="cal-mc" data-r="0" data-c="${i}" style="min-height:72px;background:var(--s2);border-radius:4px;opacity:.3"></div>`;
   }
 
  for(let d = 1; d <= lastDay.getDate(); d++) {
@@ -765,19 +767,21 @@ const firstDay = new Date(y, m, 1);
     let border = isToday ? '1px solid var(--accent)' : '1px solid transparent';
     if(hasUrgent) border = '1px solid var(--red)';
 
-    html += `<div style="min-height:72px;background:${bg};border-radius:6px;border:${border};padding:4px;cursor:pointer" onclick="calDayClick('${dateStr}',event)">
-      <div style="font-size:12px;font-weight:${isToday?'700':'400'};color:${isToday?'var(--accent)':hasUrgent?'var(--red)':'var(--t2)'};margin-bottom:3px">${d}</div>`;
+    const _ix = startDow + d - 1;
+    html += `<div class="cal-mc" data-r="${Math.floor(_ix / 7)}" data-c="${_ix % 7}" style="min-height:72px;background:${bg};border-radius:6px;border:${border};padding:4px;cursor:pointer" onclick="calDayClick('${dateStr}',event)">
+      <div style="font-size:12px;font-weight:${isToday?'700':'400'};color:${isToday?'var(--accent)':hasUrgent?'var(--red)':'var(--t2)'};margin-bottom:3px">${d}</div><div class="cal-mi">`;
     html += calHolHtml(dateStr, 'sm');
     html += calEvtHtml(dateStr, 'sm');
 
-    dayCards.slice(0,3).forEach(c => {
+    dayCards.slice(0, _ph ? dayCards.length : 3).forEach(c => { // на телефоне — все: свёрнутая клетка сама покажет «первое + N»
       const col = calColor(c);
       const isUrgent = c.priority==='urgent';
       const isHigh = c.priority==='high';
       html += `<div onclick="event.stopPropagation();showCalPopup('${c.id}',event,'${c._eid||''}')" style="${c._done?'opacity:.45;text-decoration:line-through;':''}font-size:10px;background:${hex2rgba(col,.2)};border-left:2px solid ${isUrgent?'var(--red)':isHigh?'var(--accent)':col};border-radius:3px;padding:2px 4px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--t1);cursor:pointer">${isUrgent?'🔥':isHigh?'⚡':''}${esc(c.title)}</div>`;
     });
 
-    if(dayCards.length > 3) {
+    html += '</div>'; // .cal-mi
+    if(!_ph && dayCards.length > 3) {
       html += `<div style="font-size:10px;color:var(--t3);text-align:center">+${dayCards.length-3}</div>`;
     }
 
@@ -786,7 +790,94 @@ const firstDay = new Date(y, m, 1);
 
   html += '</div>';
   document.getElementById('cal-body').innerHTML = html;
+  calMonthLayout();
 }
+
+// ═══════════════════════════════════════════
+//  МЕСЯЦ НА ТЕЛЕФОНЕ (15 ноября): все недели видны, клетки одной высоты,
+//  в свёрнутой клетке — число, первое событие и «+N».
+//  Тянуть по дню вниз — неделя раскрывается за пальцем (остальные сжимаются, высота месяца та же);
+//  тянуть вбок — расширяется столбец этого дня недели. Свернуть: нажать на строку дней недели
+//  или протянуть раскрытую неделю вверх / раскрытый столбец снова вбок. На ПК (≥900 px) всё как раньше.
+// ═══════════════════════════════════════════
+const CAL_ROW = 64, CAL_ROW_MIN = 34, CAL_COL_MAX = 4;
+let _calExp = { key: '', row: -1, col: -1 };
+const calIsPhone = () => window.innerWidth < 900;
+(function () {
+  if(document.getElementById('cal-mc-css')) return;
+  const st = document.createElement('style'); st.id = 'cal-mc-css';
+  st.textContent = '@media (max-width:899px){#cal-mgrid{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}#cal-mgrid .cal-mc{min-height:0 !important;overflow:hidden;box-sizing:border-box}#cal-mhead{cursor:pointer}' +
+    '.cal-more{font-size:10px;color:var(--t3);text-align:center;line-height:1.2}#cal-mgrid .cal-mi>*{max-width:100%;box-sizing:border-box}#cal-mgrid .cal-mi>*:not(.cal-open *){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}';
+  document.head.appendChild(st);
+})();
+function calMonthLayout(rowPx, colFr) {
+  const g = document.getElementById('cal-mgrid'), h = document.getElementById('cal-mhead');
+  if(!g) return;
+  if(!calIsPhone()) { g.style.gridTemplateRows = ''; g.style.gridTemplateColumns = ''; if(h) h.style.gridTemplateColumns = ''; g.querySelectorAll('.cal-mc').forEach(c => { c.querySelectorAll('.cal-mi>*').forEach(x => x.style.display = ''); c.querySelector('.cal-more')?.remove(); c.classList.remove('cal-open'); }); return; }
+  const R = +g.dataset.rows || 5, E = _calExp;
+  const maxRow = R * CAL_ROW - (R - 1) * CAL_ROW_MIN;
+  const hx = E.row < 0 ? CAL_ROW : Math.max(CAL_ROW, Math.min(maxRow, rowPx || maxRow)), ho = R > 1 ? (R * CAL_ROW - hx) / (R - 1) : CAL_ROW; // высота месяца не меняется: раскрытая неделя растёт, остальные сжимаются
+  const rows = [...Array(R)].map((_, r) => E.row < 0 ? CAL_ROW : r === E.row ? hx : ho);
+  g.style.gridTemplateRows = rows.map(x => x + 'px').join(' ');
+  const cols = [...Array(7)].map((_, c) => c === E.col ? Math.max(1, Math.min(CAL_COL_MAX, colFr || CAL_COL_MAX)) + 'fr' : '1fr').map(x => 'minmax(0,' + x + ')').join(' ');
+  g.style.gridTemplateColumns = cols; if(h) h.style.gridTemplateColumns = cols;
+  g.querySelectorAll('.cal-mc').forEach(c => {
+    const open = (+c.dataset.r === E.row) || (+c.dataset.c === E.col);
+    c.classList.toggle('cal-open', open);
+    const items = [...c.querySelectorAll('.cal-mi>*')];
+    const vis = open ? items.length : (E.row >= 0 && rows[+c.dataset.r] < 48 ? 0 : 1); // сжатые недели — только число
+    items.forEach((x, i) => { x.style.display = i < vis ? '' : 'none'; });
+    let m = c.querySelector('.cal-more'); const n = items.length - vis;
+    if(n > 0) { if(!m) { m = document.createElement('div'); m.className = 'cal-more'; c.appendChild(m); } m.textContent = '+' + n; }
+    else if(m) m.remove();
+  });
+}
+function calMonthCollapse() { _calExp.row = -1; _calExp.col = -1; calMonthLayout(); }
+(function () {
+  let d = null, eat = false;
+  document.addEventListener('pointerdown', e => {
+    if(!calIsPhone()) return;
+    const c = e.target.closest && e.target.closest('#cal-mgrid .cal-mc'); if(!c) return;
+    const g = document.getElementById('cal-mgrid');
+    d = { x: e.clientX, y: e.clientY, r: +c.dataset.r, c: +c.dataset.c, mode: '', h0: 0, f0: 1 };
+    const rows = (g.style.gridTemplateRows || '').split(' ').map(parseFloat);
+    d.h0 = _calExp.row === d.r ? (rows[d.r] || CAL_ROW) : CAL_ROW;
+    d.f0 = _calExp.col === d.c ? CAL_COL_MAX : 1;
+  }, true);
+  document.addEventListener('pointermove', e => {
+    if(!d) return;
+    const dx = e.clientX - d.x, dy = e.clientY - d.y;
+    if(!d.mode) {
+      if(Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx)) d.mode = 'row';
+      else if(Math.abs(dx) > 10) d.mode = 'col';
+      else return;
+      if(d.mode === 'row') { if(_calExp.row !== d.r) d.h0 = CAL_ROW; _calExp.row = d.r; _calExp.col = -1; }
+      else { _calExp.col = d.c; _calExp.row = -1; }
+    }
+    if(d.mode === 'row') calMonthLayout(d.h0 + dy);
+    else calMonthLayout(null, d.f0 === 1 ? 1 + Math.abs(dx) / 30 : Math.max(1, CAL_COL_MAX - Math.abs(dx) / 30));
+  }, true);
+  const up = () => {
+    if(!d) return;
+    const m = d.mode, g = document.getElementById('cal-mgrid'); d = null;
+    if(!m) return; // обычное нажатие — откроется день, как раньше
+    eat = true; setTimeout(() => { eat = false; }, 350);
+    if(m === 'row') {
+      const h = parseFloat(((g && g.style.gridTemplateRows) || '').split(' ')[_calExp.row]) || 0;
+      if(h < CAL_ROW + 40) calMonthCollapse(); else calMonthLayout();
+    } else {
+      const frs = (((g && g.style.gridTemplateColumns) || '').match(/[\d.]+fr/g) || []).map(parseFloat), fr = frs[_calExp.col] || 1;
+      if(fr < 1.8) calMonthCollapse(); else calMonthLayout();
+    }
+  };
+  document.addEventListener('pointerup', up, true);
+  document.addEventListener('pointercancel', up, true);
+  document.addEventListener('click', e => { // после перетаскивания «щелчок» не открывает день
+    if(eat) { eat = false; if(e.target.closest && e.target.closest('#cal-mgrid')) { e.stopPropagation(); e.preventDefault(); return; } }
+    if(calIsPhone() && e.target.closest && e.target.closest('#cal-mhead') && (_calExp.row >= 0 || _calExp.col >= 0)) calMonthCollapse();
+  }, true);
+  window.addEventListener('resize', () => { if(document.getElementById('cal-mgrid')) calMonthLayout(); });
+})();
 
 function renderCalWeek() {
   const dow = calDate.getDay();
