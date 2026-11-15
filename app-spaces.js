@@ -363,7 +363,7 @@ function membersWord(n) {
 // Чтобы добавить новый вид кабинета в фильтр — допиши сюда одну строку: id, список type из базы и название кнопки.
 // icon и tag — обозначение вида на карточке; round — форма значка (круг / скруглённый квадрат).
 const SPACE_TYPES = [
-  {id:'group',    keys:['family','group'], label:'Групповые', tag:'Групповой', icon:'👥', round:'50%'},
+  {id:'group',    keys:['family','group'], label:'Чаты', tag:'Кабинет чатов', icon:'💬', round:'50%'}, // бывший «Групповой»
   {id:'personal', keys:['personal'],       label:'Личные',    tag:'Личный',    icon:'👤', round:'16px'}
 ];
 const LOBBY_SORTS = [['recent','Недавние'], ['unread','Непрочитанные'], ['name','По имени'], ['mine','Мой порядок']];
@@ -1013,7 +1013,7 @@ function openPhoneRequiredModal(onSaved) {
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1002;display:flex;align-items:center;justify-content:center;padding:20px';
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:22px;max-width:360px;width:100%">
     <div style="font-size:16px;font-weight:700;margin-bottom:8px">📱 Нужен номер телефона</div>
-    <div style="font-size:13px;color:var(--t2);margin-bottom:14px">Для групповых кабинетов нужен телефон — по нему тебя смогут находить и приглашать другие участники.</div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:14px">Для кабинетов чатов нужен телефон — по нему тебя смогут находить и приглашать другие участники.</div>
     <div style="display:flex;gap:6px;margin-bottom:6px">
       <span style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 12px;font-size:14px;color:var(--t2)">+972</span>
       <input id="phone-required-inp" type="tel" placeholder="501234567" dir="ltr" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px;font-size:14px;color:var(--t1);font-family:inherit;box-sizing:border-box">
@@ -1613,3 +1613,53 @@ async function saveSpaceName(id) {
     toast('✓ Сохранено');
   } catch(e) { toast('Ошибка: '+e.message, true); }
 }
+
+// ═══════════════════════════════════════════
+//  СПИСОК КАБИНЕТОВ БЕЗ ПЕРЕЗАПУСКА (15 ноября)
+//  Слушатель в app-db.js ловит только изменения кабинетов (UPDATE). Новый кабинет, созданный на другом
+//  устройстве или куда добавили, раньше появлялся только после полного перезапуска.
+//  Теперь: подписка на новые кабинеты (INSERT) + перечитывание списка при возврате в приложение и раз в минуту в лобби.
+// ═══════════════════════════════════════════
+let _mcSpRefT = 0, _mcSpRefBusy = false, _mcSpInsCh = null;
+async function mcRefreshSpaces(force) {
+  if(_mcSpRefBusy || !navigator.onLine || typeof sb === 'undefined' || typeof currentUser === 'undefined' || !currentUser) return;
+  if(!force && Date.now() - _mcSpRefT < 15000) return;
+  _mcSpRefBusy = true; _mcSpRefT = Date.now();
+  try {
+    const joinedIds = JSON.parse(localStorage.getItem('mc_joined_spaces') || '[]');
+    const q = withReq => sb.from('spaces').select('*').order('created_at').or(
+      `owner_id.eq.${currentUser.id}${joinedIds.length ? ',id.in.(' + joinedIds.join(',') + ')' : ''},members_auth.cs.[{"user_id":"${currentUser.id}"}],pendingInvites.cs.[{"user_id":"${currentUser.id}"}]` +
+      (withReq ? `,joinRequests.cs.[{"user_id":"${currentUser.id}"}]` : ''));
+    let { data, error } = await q(true);
+    if(error) ({ data, error } = await q(false)); // как в initSpaces: колонки joinRequests может не быть
+    if(error || !Array.isArray(data)) return;
+    let added = 0, changed = false;
+    data.forEach(n => {
+      const i = spaces.findIndex(s => s.id === n.id);
+      if(i === -1) { spaces.push(n); added++; changed = true; }
+      else if(JSON.stringify(spaces[i]) !== JSON.stringify({ ...spaces[i], ...n })) { Object.assign(spaces[i], n); changed = true; } // тот же объект: currentSpace остаётся живым
+    });
+    if(!changed) return;
+    try { localStorage.setItem('mc_spaces', JSON.stringify(spaces)); } catch(e) {}
+    const lobby = document.getElementById('space-selector');
+    if(lobby && lobby.style.display !== 'none' && typeof renderSpacesList === 'function') renderSpacesList();
+    if(added && typeof toast === 'function') toast(added === 1 ? '✓ Появился новый кабинет' : '✓ Новых кабинетов: ' + added);
+  } catch(e) {} finally { _mcSpRefBusy = false; }
+}
+function mcSpacesInsertWatch() {
+  if(_mcSpInsCh || typeof sb === 'undefined' || typeof currentUser === 'undefined' || !currentUser) return;
+  try {
+    _mcSpInsCh = sb.channel('spaces:insert-watch')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'spaces' }, () => setTimeout(() => mcRefreshSpaces(true), 800))
+      .subscribe();
+  } catch(e) { _mcSpInsCh = null; }
+}
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') mcRefreshSpaces(false); });
+window.addEventListener('focus', () => mcRefreshSpaces(false));
+document.addEventListener('resume', () => mcRefreshSpaces(true));
+setInterval(() => {
+  mcSpacesInsertWatch();
+  const lobby = document.getElementById('space-selector');
+  if(document.visibilityState === 'visible' && lobby && lobby.style.display !== 'none') mcRefreshSpaces(false);
+}, 60000);
+setTimeout(mcSpacesInsertWatch, 5000);

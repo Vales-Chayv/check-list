@@ -410,7 +410,7 @@
       </div>
         <div class="fld"><label>Имя</label><input id="auth-name" placeholder="Имя" dir="auto" onkeydown="if(event.key==='Enter')document.getElementById('auth-surname').focus()"></div>
       <div class="fld"><label>Фамилия</label><input id="auth-surname" placeholder="Фамилия" dir="auto" onkeydown="if(event.key==='Enter')document.getElementById('auth-phone').focus()"></div>
-      <div class="fld"><label>Телефон (нужен только для групповых кабинетов)</label>
+      <div class="fld"><label>Телефон (нужен только для кабинетов чатов)</label>
         <div style="display:flex;gap:6px">
           <span style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:0 12px;display:flex;align-items:center;font-size:14px;color:var(--t2)">+972</span>
           <input id="auth-phone" type="tel" placeholder="501234567" dir="ltr" style="flex:1" onkeydown="if(event.key==='Enter')document.getElementById('auth-login').focus()">
@@ -507,7 +507,7 @@
    <div id="lobby-panel-b">
     <div id="lobby-b-tabs" style="display:flex;gap:6px;margin-bottom:12px">
       <button id="lobby-tab-all" class="lobby-b-tab" onclick="setLobbyBTab('all')">Все</button>
-      <button id="lobby-tab-group" class="lobby-b-tab active" onclick="setLobbyBTab('group')">👥 Групповые</button>
+      <button id="lobby-tab-group" class="lobby-b-tab active" onclick="setLobbyBTab('group')">💬 Чаты</button>
       <button id="lobby-tab-personal" class="lobby-b-tab" onclick="setLobbyBTab('personal')">⭐ Личные</button>
     </div>
     <div id="lobby-b-personal" style="display:none;flex-direction:column;width:100%">
@@ -747,7 +747,7 @@
         <label>Тип</label>
            <select id="new-space-type" onchange="document.getElementById('members-section').style.display=this.value==='family'?'flex':'none'; if(this.value==='family')renderNewSpaceContacts()">
           <option value="personal">🗂️ Личный</option>
-          <option value="family">👥 Групповой</option>
+          <option value="family">💬 Кабинет чатов</option>
         </select>
       </div>
       <div class="fld"><label>Название</label><input id="new-space-name" placeholder="Например: Наша семья" dir="auto"></div>
