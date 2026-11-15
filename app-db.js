@@ -427,7 +427,7 @@ function handleRealtimeSpace(payload) {
     localStorage.setItem('mc_spaces', JSON.stringify(spaces));
     if(typeof renderSpacesList === 'function' && document.getElementById('space-selector')?.style.display !== 'none') renderSpacesList();
     const invite = n.pendingInvites.find(p=>p.user_id===myId);
-    if(typeof showChatNotice === 'function') showChatNotice('👋 Приглашение в группу', `${invite.invitedBy} зовёт тебя в «${n.name}»`, null);
+    if(typeof showChatNotice === 'function') showChatNotice('👋 Приглашение в общий кабинет', `${invite.invitedBy} зовёт тебя в «${n.name}»`, null);
   }
   const idx = spaces.findIndex(s => s.id === n.id);
   if(idx === -1) return; // кабинет не в моём списке — не моё дело
@@ -438,7 +438,7 @@ function handleRealtimeSpace(payload) {
   if(n.status === 'closed' && !wasClosed) {
     if(currentSpaceId === n.id) { currentSpace = spaces[idx]; render(); }
     if(typeof renderSpacesList === 'function' && document.getElementById('space-selector')?.style.display !== 'none') renderSpacesList();
-    if(typeof showChatNotice === 'function') showChatNotice('🔒 Группа закрыта', `«${n.name}» закрыта и перемещена в архив`, null);
+    if(typeof showChatNotice === 'function') showChatNotice('🔒 Общий кабинет закрыт', `«${n.name}» закрыт и перемещён в архив`, null);
   }
   // Участник вышел из группы — живой попап владельцу
   if(n.owner_id === myId && Array.isArray(previousMembers) && Array.isArray(n.members) && n.members.length < previousMembers.length) {

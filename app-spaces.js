@@ -547,7 +547,7 @@ function spaceRowHTML(s) {
       <div onclick="onSpaceClick('${s.id}')" style="display:flex;align-items:center;gap:14px;flex:1;min-width:0;cursor:pointer">
         <div class="sp-av" style="background:${spaceColor(s)}${tp ? ';border-radius:' + tp.round : ''}">${esc(spaceInitials(s.name))}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:17px;font-weight:700;display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span dir="auto" style="overflow-wrap:anywhere">${esc(s.name)}</span>${s.password?'<span style="font-size:13px;opacity:.55">🔒</span>':''}${isClosed?'<span style="font-size:11px;color:var(--t3);font-weight:400">(закрыта)</span>':''}${unread}</div>
+          <div style="font-size:17px;font-weight:700;display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span dir="auto" style="overflow-wrap:anywhere">${esc(s.name)}</span>${s.password?'<span style="font-size:13px;opacity:.55">🔒</span>':''}${isClosed?'<span style="font-size:11px;color:var(--t3);font-weight:400">(закрыт)</span>':''}${unread}</div>
           <div style="font-size:12px;color:var(--t3);margin-top:3px">${sub}</div>
         </div>
       </div>
@@ -662,7 +662,7 @@ async function closeGroupSpace(id) {
   localStorage.setItem('mc_spaces', JSON.stringify(spaces));
   renderSpacesList();
     const closedTitle = '🔒 Общий кабинет закрыт';
-  const closedBody = `«${space.name}» закрыта и перемещена в архив`;
+  const closedBody = `«${space.name}» закрыт и перемещён в архив`;
   if(typeof showChatNotice === 'function') showChatNotice(closedTitle, closedBody, null);
   if(typeof logEvent === 'function') logEvent(id, space.name, 'group_closed', 'закрыл(а) общий кабинет', null);
   const authIds = (space.members_auth||[]).map(m=>m.user_id).filter(Boolean);
