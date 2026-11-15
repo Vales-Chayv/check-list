@@ -1000,6 +1000,7 @@ window.mcBigHas = url => _mcBigHave.has(url);
 async function mcBigLoadHave() {
   try { (await mcVaultMeta()).forEach(m => { if(m.kind === 'big' && m.url) _mcBigHave.add(m.url); }); } catch(e) {}
   mcBigDecorate(true);
+  try { if(_mcBigHave.size && typeof render === 'function') render(); } catch(e) {} // значки «на этом устройстве» на карточках
 }
 async function mcBigBlob(url) { // файл из хранилища по адресу «mcbig:…» или null
   try {
@@ -1185,3 +1186,79 @@ async function mcBigOpen(url, att) {
 }
 window.mcBigOpen = mcBigOpen;
 setTimeout(mcBigLoadHave, 500);
+
+// ═══════════════════════════════════════════
+//  БОЛЬШИЕ ФАЙЛЫ: ПОМЕТКИ НА ДРУГИХ УСТРОЙСТВАХ (15 ноября)
+//  1) значок на карточке в списке (mcBigBadge — вызывает cardHTML в app-render.js);
+//  2) устройство, где добавили большой файл, пишет заметку в облачные настройки пользователя (word_settings, data.bigNew),
+//     другое устройство раз в минуту их проверяет и один раз показывает сообщение. Только самому пользователю.
+// ═══════════════════════════════════════════
+function mcBigOfCard(card) {
+  const out = [];
+  const add = a => { if(a && a.type === MC_BIG_TYPE && a.data) out.push(a); };
+  ((card && card.attachments) || []).forEach(add);
+  ((card && card.entries) || []).forEach(e => { if(e) ['attachments', 'sessionAtts'].forEach(k => ((e[k]) || []).forEach(add)); });
+  return out;
+}
+function mcBigBadge(card) {
+  const L = mcBigOfCard(card); if(!L.length) return '';
+  const away = L.filter(a => !_mcBigHave.has(a.data));
+  const n = L.length, word = n === 1 ? 'большой файл' : n + (n < 5 ? ' больших файла' : ' больших файлов');
+  if(!away.length) return '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,.06);color:var(--t2)">🎞 ' + word + ' · на этом устройстве</span>';
+  const devs = [...new Set(away.map(a => (a.big && a.big.devName) || 'другом устройстве'))];
+  const where = devs.length === 1 ? (/^Телефон/.test(devs[0]) ? 'на телефоне' : /^Компьютер/.test(devs[0]) ? 'на компьютере' : 'на ' + devs[0]) : 'на других устройствах';
+  return '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(232,197,106,.16);color:var(--accent)">🎞 ' + word + ' · ' + esc(where) + '</span>';
+}
+window.mcBigBadge = mcBigBadge;
+const _mcBigLS = (k, v) => { try { if(v === undefined) return JSON.parse(localStorage.getItem(k) || '[]'); localStorage.setItem(k, JSON.stringify(v.slice(-200))); } catch(e) { return []; } };
+// это устройство: новые большие файлы в карточках → заметка в облако
+async function mcBigAnnounce() {
+  if(typeof cards === 'undefined' || typeof mcWordSave !== 'function') return;
+  const me = (typeof currentUser !== 'undefined' && currentUser) || {}; if(!me.id) return;
+  const sent = new Set(_mcBigLS('mc_big_sent')), dev = mcDevId(), add = [];
+  cards.forEach(c => mcBigOfCard(c).forEach(a => {
+    const b = a.big || {};
+    if(b.dev !== dev || b.by !== me.id || sent.has(a.data) || !_mcBigHave.has(a.data)) return;
+    add.push({ url: a.data, name: a.name || 'файл', size: a.size || 0, vid: /^video/.test(b.type || ''), cardId: c.id, cardTitle: c.title || '', spaceId: c.space_id || null, dev, devName: b.devName || mcDevName(), ts: Date.now() });
+  }));
+  if(!add.length) return;
+  try { if(navigator.onLine && typeof mcWordPull === 'function') await Promise.race([mcWordPull(), new Promise(r => setTimeout(r, 3000))]); } catch(e) {} // сначала свежая копия, чтобы не затереть чужие правки
+  mcWordSave(d => { const old = (d.bigNew || []).filter(x => x && Date.now() - (x.ts || 0) < 30 * 864e5 && !add.some(y => y.url === x.url)); d.bigNew = old.concat(add).slice(-40); });
+  _mcBigLS('mc_big_sent', [...sent, ...add.map(x => x.url)]);
+}
+// другое устройство: проверить заметки и показать сообщение
+async function mcBigNotice() {
+  if(document.hidden || typeof mcWordLocal !== 'function') return;
+  const me = (typeof currentUser !== 'undefined' && currentUser) || {}; if(!me.id) return;
+  try { if(navigator.onLine && typeof mcWordPull === 'function') await mcWordPull(); } catch(e) {}
+  const seen = new Set(_mcBigLS('mc_big_seen')), dev = mcDevId();
+  const list = ((mcWordLocal().data || {}).bigNew || []).filter(x => x && x.url && x.dev !== dev && !_mcBigHave.has(x.url) && !seen.has(x.url));
+  const box = document.getElementById('mc-bignote');
+  if(!list.length) { if(box) box.remove(); return; }
+  const x = list[list.length - 1];
+  if(box && box.dataset.url === x.url) return;
+  if(box) box.remove();
+  const el = document.createElement('div');
+  el.id = 'mc-bignote'; el.dataset.url = x.url;
+  el.setAttribute('style', 'position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:1460;width:min(440px,calc(100vw - 20px));background:var(--s2);border:1px solid var(--accent);border-radius:var(--r);padding:12px 14px;box-shadow:0 6px 24px rgba(0,0,0,.5);font-size:13.5px;color:var(--t1);line-height:1.45');
+  const phone = /^Телефон/.test(x.devName || '');
+  el.innerHTML = '<div class="t"></div><div style="display:flex;gap:6px;margin-top:9px"><button data-a="o" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Открыть карточку</button><button data-a="x" style="background:var(--s1);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:8px 12px;font-size:13px;cursor:pointer;font-family:inherit">Понятно</button></div>';
+  el.querySelector('.t').textContent = (phone ? '📱 На телефоне' : '💻 На компьютере') + ' добавлен большой файл «' + x.name + '» (' + mcBigMB(x.size) + ')' + (x.cardTitle ? ' — карточка «' + x.cardTitle + '»' : '') + (list.length > 1 ? ' · ещё ' + (list.length - 1) : '');
+  el.addEventListener('click', async e => {
+    const b = e.target.closest('[data-a]'); if(!b) return;
+    _mcBigLS('mc_big_seen', [..._mcBigLS('mc_big_seen'), x.url]);
+    el.remove();
+    if(b.dataset.a === 'o' && x.cardId) {
+      try {
+        if(x.spaceId && typeof currentSpaceId !== 'undefined' && x.spaceId !== currentSpaceId && typeof setCurrentSpace === 'function') { await setCurrentSpace(x.spaceId, true); setTimeout(() => { if(typeof openView === 'function') openView(x.cardId); }, 600); }
+        else if(typeof openView === 'function') openView(x.cardId);
+      } catch(_) {}
+    }
+    setTimeout(mcBigNotice, 400); // следующий, если есть
+  });
+  document.body.appendChild(el);
+}
+setInterval(() => { mcBigAnnounce(); }, 15000);
+setInterval(() => { mcBigNotice(); }, 60000);
+setTimeout(() => { mcBigAnnounce(); mcBigNotice(); }, 8000);
+document.addEventListener('visibilitychange', () => { if(!document.hidden) setTimeout(mcBigNotice, 1500); });
