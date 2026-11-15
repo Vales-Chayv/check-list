@@ -536,6 +536,7 @@ new MutationObserver(() => {
   document.addEventListener('scroll', function(e){
     if(!e.target || !e.target.classList || !e.target.classList.contains('sheet')) return;
     if(Date.now() < (window._mcAutoScroll||0)) return;
+    if(window.innerWidth >= 900 && !window.matchMedia('(pointer:coarse)').matches) return; // ПК с мышью: кнопки не прячутся; телефон — как раньше
     document.body.classList.add('sheet-scrolling');
     clearTimeout(t);
     t = setTimeout(()=>document.body.classList.remove('sheet-scrolling'), 600);
