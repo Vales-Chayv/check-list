@@ -614,8 +614,50 @@ function renderLobbyTasksList(){
   `).join('');
 }
 function openPinStrip(){ document.getElementById('pin-strip-ov').classList.add('on'); document.getElementById('pin-tab')?.classList.add('shifted'); }
-function closePinStrip(){ document.getElementById('pin-strip-ov').classList.remove('on'); document.getElementById('pin-tab')?.classList.remove('shifted'); closePinPopup(); }
+function closePinStrip(){ document.getElementById('pin-strip-ov').classList.remove('on'); document.getElementById('pin-tab')?.classList.remove('shifted'); if(typeof pinStripSetWidth === 'function') pinStripSetWidth(0); closePinPopup(); }
 function togglePinStrip(){ const s=document.getElementById('pin-strip-ov'); if(s.classList.contains('on')) closePinStrip(); else { s.classList.add('on'); document.getElementById('pin-tab')?.classList.add('shifted'); } }
+// Полоска «Закреплённые»: когда кнопки не помещаются в одну колонку, язычок можно тянуть вправо — полоска идёт за пальцем;
+// отпустили дальше середины — раскрывается на всю ширину (те же кнопки сеткой), иначе возвращается к одной колонке. Обратно — тянуть влево.
+const PIN_COL = 64, PIN_TAB = 14;
+function pinStripFull(){ const st = document.getElementById('pin-strip'); return !!st && (st.classList.contains('wide') || st.scrollHeight > st.clientHeight + 2); }
+function pinStripSetWidth(w, drag){ // w: 0 — сброс к обычной колонке, иначе ширина в пикселях
+  const st = document.getElementById('pin-strip'), tab = document.getElementById('pin-tab');
+  if(!st || !tab) return;
+  st.classList.toggle('dragging', !!drag); tab.classList.toggle('dragging', !!drag);
+  if(!w){ st.style.width = ''; st.classList.remove('wide'); tab.style.transform = ''; return; }
+  st.style.width = w + 'px';
+  st.classList.toggle('wide', w > PIN_COL + 20);
+  tab.style.transform = 'translate(' + (w - PIN_TAB) + 'px,-50%) scaleX(-1)';
+}
+(function pinStripDrag(){
+  const tab = document.getElementById('pin-tab');
+  if(!tab) return;
+  let x0 = null, w0 = 0, moved = false, eatClick = false;
+  const maxW = () => { const ov = document.getElementById('pin-strip-ov'); return Math.round((ov ? ov.getBoundingClientRect().width : window.innerWidth) || window.innerWidth); };
+  tab.addEventListener('pointerdown', e => {
+    if(!document.getElementById('pin-strip-ov')?.classList.contains('on') || !pinStripFull()) return; // только у открытой и заполненной полоски
+    x0 = e.clientX; w0 = document.getElementById('pin-strip').getBoundingClientRect().width; moved = false;
+    try { tab.setPointerCapture(e.pointerId); } catch(_) {}
+  });
+  tab.addEventListener('pointermove', e => {
+    if(x0 === null) return;
+    const dx = e.clientX - x0;
+    if(!moved && Math.abs(dx) < 6) return;
+    moved = true;
+    pinStripSetWidth(Math.max(PIN_COL, Math.min(maxW(), w0 + dx)), true);
+  });
+  const up = () => {
+    if(x0 === null) return;
+    x0 = null;
+    if(!moved) return; // обычное нажатие — откроет/закроет как раньше
+    eatClick = true; setTimeout(() => { eatClick = false; }, 350);
+    const w = document.getElementById('pin-strip').getBoundingClientRect().width, W = maxW();
+    if(w > W / 2) pinStripSetWidth(W); else pinStripSetWidth(0);
+  };
+  tab.addEventListener('pointerup', up);
+  tab.addEventListener('pointercancel', up);
+  tab.addEventListener('click', e => { if(eatClick){ e.stopImmediatePropagation(); e.preventDefault(); eatClick = false; } }, true); // после перетаскивания «щелчок» не закрывает полоску
+})();
 function closePinPopup(){ document.getElementById('pin-popup-ov').classList.remove('on'); }
 async function openPinPopup(){
   document.getElementById('pin-popup-ov').classList.add('on');

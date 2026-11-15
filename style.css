@@ -483,3 +483,9 @@ body.in-lobby.cal-on #cal-ov, body.in-cabinet.cal-on #cal-ov { bottom: auto; hei
   body.pane-full.cal-on #cal-ov, body.pane-full.calc-on #calc-ov, body.pane-full.gal-on #gal-ov { left: 0 !important; right: 0 !important; bottom: 0 !important; height: auto !important; z-index: 45; border: none; }
   body.pane-full #split-handle, body.pane-full #lobby-h-handle { display: none !important; }
 }
+
+/* ── Полоска «Закреплённые»: язычок можно тянуть вправо, когда кнопки не помещаются в одну колонку ── */
+#pin-tab { touch-action: none; }
+#pin-strip > * { flex-shrink: 0; } /* кнопки не сплющиваются: не поместились — колонка прокручивается и её можно растянуть */
+#pin-strip.wide { display: grid; grid-template-columns: repeat(auto-fill, 64px); grid-auto-rows: 56px; justify-items: center; align-items: center; align-content: start; gap: 0; }
+#pin-strip.dragging, #pin-tab.dragging { transition: none !important; }
