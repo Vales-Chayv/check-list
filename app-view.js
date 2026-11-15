@@ -1725,7 +1725,7 @@ function moveCardToSpace(cardId) {
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto">
     <div style="font-size:16px;font-weight:700;margin-bottom:4px">📦 Переместить карточку</div>
     <div style="font-size:13px;color:var(--t2);margin-bottom:10px">«${esc(card.title)}» → выбери кабинет</div>
-    ${(!curFam && chatGroups.length) ? `<label style="display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:13px;color:var(--t1);cursor:pointer"><input type="checkbox" id="mc-to-chat" onchange="mcToggleChat(this.checked)"> Отправить в чат группы</label>` : ''}
+    ${(!curFam && chatGroups.length) ? `<label style="display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:13px;color:var(--t1);cursor:pointer"><input type="checkbox" id="mc-to-chat" onchange="mcToggleChat(this.checked)"> Отправить в общий кабинет</label>` : ''}
     <div id="mc-normal">
     <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">${spaceBtns}</div>
     <div id="mc-cat-section" style="display:none">
@@ -1734,7 +1734,7 @@ function moveCardToSpace(cardId) {
     </div>
     </div>
     <div id="mc-chat" style="display:none">
-      <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Группа</div>
+      <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Общий кабинет</div>
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">${chatGroups.map(s=>`<button onclick="mcChatSelectGroup('${cardId}','${s.id}',this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">👨‍👩‍👧 ${esc(s.name)}</button>`).join('')}</div>
       <div id="mcc-chats" style="display:flex;flex-direction:column;gap:6px"></div>
       <div id="mcc-confirm"></div>
@@ -1749,7 +1749,7 @@ function openAddChatMember(cardId) {
   const low = s => String(s||'').trim().toLowerCase();
   const inChat = new Set((card.chatParticipants||[]).map(low));
   const cand = (currentSpace?.members||[]).filter(m => !inChat.has(low(m.name)));
-  if(!cand.length) { toast('Все участники группы уже в этом чате'); return; }
+  if(!cand.length) { toast('Все участники кабинета уже в этом чате'); return; }
   window._addChatSel = new Set();
   document.getElementById('add-chat-member-ov')?.remove();
   const ov = document.createElement('div');
@@ -2154,7 +2154,7 @@ function moveEntry(cardId, selection) {
     </label>
     <div style="font-size:13px;color:var(--t2);margin-bottom:6px">Текст-обращение (необязательно)</div>
     <textarea id="move-session-note" oninput="moveSessionNote=this.value" placeholder="Привет, вот три пункта…" style="width:100%;min-height:50px;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:8px 10px;font-size:13px;color:var(--t1);font-family:inherit;resize:vertical;margin-bottom:14px;box-sizing:border-box"></textarea>
-    ${(!_curFam && _chatGroups.length) ? `<label style="display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:13px;color:var(--t1);cursor:pointer"><input type="checkbox" id="me-to-chat" onchange="mecToggleChat(this.checked)"> Отправить в чат группы</label>` : ''}
+    ${(!_curFam && _chatGroups.length) ? `<label style="display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:13px;color:var(--t1);cursor:pointer"><input type="checkbox" id="me-to-chat" onchange="mecToggleChat(this.checked)"> Отправить в общий кабинет</label>` : ''}
     <div id="me-normal">
     <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Кабинет</div>
     <div id="move-space-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
@@ -2169,7 +2169,7 @@ function moveEntry(cardId, selection) {
     <div id="move-confirm-block"></div>
     </div>
     <div id="me-chat" style="display:none">
-      <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Группа</div>
+      <div style="font-size:13px;color:var(--t2);margin-bottom:8px">Общий кабинет</div>
       <div id="mec-groups" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">${_chatGroups.map(s=>`<button onclick="mecSelectGroup('${cardId}','${s.id}',this)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 14px;font-size:14px;color:var(--t1);cursor:pointer;text-align:left;font-family:inherit">👨‍👩‍👧 ${esc(s.name)}</button>`).join('')}</div>
       <div id="mec-chats" style="display:flex;flex-direction:column;gap:6px"></div>
       <div id="mec-assign-slot"></div>
@@ -2191,7 +2191,7 @@ function moveAssignGuard(spaceId, next) {
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:2300;display:flex;align-items:center;justify-content:center;padding:20px';
   ov.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:20px;max-width:340px;width:100%;box-sizing:border-box">
     <div style="font-size:16px;font-weight:700;margin-bottom:6px">Кому адресована запись?</div>
-    <div style="font-size:13px;color:var(--t2);margin-bottom:16px">Вы не выбрали, кому из группы она предназначена. Выбрать сейчас?</div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:16px">Вы не выбрали, кому из участников кабинета она предназначена. Выбрать сейчас?</div>
     <div style="display:flex;gap:8px">
       <button type="button" id="ma-no" style="flex:1;background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px;font-size:14px;cursor:pointer;font-family:inherit">Нет, никому</button>
       <button type="button" id="ma-yes" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:11px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Выбрать</button>

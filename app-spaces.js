@@ -55,7 +55,7 @@ async function matchContactToMember() {
     const { data: found } = await sb.from('profiles').select('id,display_name').eq('phone', phone).maybeSingle();
     if(!found) { toast('Совпадений не найдено', true); return; }
     const isKnown = spaces.some(s => (s.members||[]).some(m=>m.user_id===found.id));
-    if(!isKnown) { toast('Этот человек не состоит ни в одной из ваших групп', true); return; }
+    if(!isKnown) { toast('Этот человек не состоит ни в одном из ваших общих кабинетов', true); return; }
     await offerAliasMatch(found.id, contactName, found.display_name);
   } catch(e) { /* пользователь отменил выбор контакта */ }
 }
@@ -363,7 +363,7 @@ function membersWord(n) {
 // Чтобы добавить новый вид кабинета в фильтр — допиши сюда одну строку: id, список type из базы и название кнопки.
 // icon и tag — обозначение вида на карточке; round — форма значка (круг / скруглённый квадрат).
 const SPACE_TYPES = [
-  {id:'group',    keys:['family','group'], label:'Чаты', tag:'Кабинет чатов', icon:'💬', round:'50%'}, // бывший «Групповой»
+  {id:'group',    keys:['family','group'], label:'Чаты', tag:'Общий кабинет', icon:'💬', round:'50%'}, // бывший «Групповой»
   {id:'personal', keys:['personal'],       label:'Личные',    tag:'Личный',    icon:'👤', round:'16px'}
 ];
 const LOBBY_SORTS = [['recent','Недавние'], ['unread','Непрочитанные'], ['name','По имени'], ['mine','Мой порядок']];
@@ -497,7 +497,7 @@ function spaceRowHTML(s) {
         <div style="font-size:32px">👋</div>
         <div style="flex:1">
           <div style="font-size:17px;font-weight:700">${esc(s.name)}</div>
-          <div style="font-size:13px;color:var(--t2);margin-top:2px">${esc(myInvite.invitedBy)} зовёт тебя в группу</div>
+          <div style="font-size:13px;color:var(--t2);margin-top:2px">${esc(myInvite.invitedBy)} зовёт тебя в общий кабинет</div>
         </div>
       </div>
       <div style="display:flex;gap:8px">
@@ -561,7 +561,7 @@ function spaceRowHTML(s) {
 
 async function leaveGroup(spaceId) {
   const space = spaces.find(s=>s.id===spaceId); if(!space) return;
-  if(!confirm('Выйти из группы «' + space.name + '»?')) return;
+  if(!confirm('Выйти из общего кабинета «' + space.name + '»?')) return;
   const myName = (space.members||[]).find(m=>m.user_id===currentUser?.id)?.name;
   space.members = (space.members||[]).filter(m=>m.user_id!==currentUser?.id);
   space.members_auth = (space.members_auth||[]).filter(m=>m.user_id!==currentUser?.id);
@@ -570,9 +570,9 @@ async function leaveGroup(spaceId) {
     await sb.from('spaces').update({members: space.members, members_auth: space.members_auth}).eq('id', spaceId);
     localStorage.setItem('mc_spaces', JSON.stringify(spaces));
     renderSpacesList();
-    if(space.owner_id && typeof notifyUsers==='function') await notifyUsers([space.owner_id], '🚪 Участник вышел из группы', `${myName||'Участник'} покинул(а) «${space.name}»`);
-    if(typeof logEvent === 'function') logEvent(spaceId, space.name, 'member_left', 'покинул(а) группу', null, myName);
-    toast('Ты вышел(ла) из группы');
+    if(space.owner_id && typeof notifyUsers==='function') await notifyUsers([space.owner_id], '🚪 Участник вышел из общего кабинета', `${myName||'Участник'} покинул(а) «${space.name}»`);
+    if(typeof logEvent === 'function') logEvent(spaceId, space.name, 'member_left', 'покинул(а) общий кабинет', null, myName);
+    toast('Ты вышел(ла) из общего кабинета');
   } catch(e) { toast('Ошибка: '+e.message, true); }
 }
 
@@ -600,7 +600,7 @@ function renderSpacesList() {
   renderLobbyFilters(typeBtns, regular.length);
   list.innerHTML = invites.map(spaceRowHTML).join('')
     + shown.map(spaceRowHTML).join('')
-    + (closed.length ? `<div onclick="toggleClosedSpaces()" style="text-align:center;font-size:13px;color:var(--t3);cursor:pointer;padding:10px 0">🔒 Закрытые группы (${closed.length}) ${showClosedSpaces?'▲':'▼'}</div>` : '')
+    + (closed.length ? `<div onclick="toggleClosedSpaces()" style="text-align:center;font-size:13px;color:var(--t3);cursor:pointer;padding:10px 0">🔒 Закрытые общие кабинеты (${closed.length}) ${showClosedSpaces?'▲':'▼'}</div>` : '')
     + (showClosedSpaces ? closed.map(spaceRowHTML).join('') : '');
 }
 
@@ -656,18 +656,18 @@ function closeLobbyPanelsSwipe() {
 
 async function closeGroupSpace(id) {
   const space = spaces.find(s=>s.id===id); if(!space) return;
-  if(!confirm('Закрыть группу «' + space.name + '»? Все её чаты станут доступны только для просмотра.')) return;
+  if(!confirm('Закрыть общий кабинет «' + space.name + '»? Все её чаты станут доступны только для просмотра.')) return;
   space.status = 'closed';
   try { await sb.from('spaces').update({status:'closed'}).eq('id', id); } catch(e) {}
   localStorage.setItem('mc_spaces', JSON.stringify(spaces));
   renderSpacesList();
-    const closedTitle = '🔒 Группа закрыта';
+    const closedTitle = '🔒 Общий кабинет закрыт';
   const closedBody = `«${space.name}» закрыта и перемещена в архив`;
   if(typeof showChatNotice === 'function') showChatNotice(closedTitle, closedBody, null);
-  if(typeof logEvent === 'function') logEvent(id, space.name, 'group_closed', 'закрыл(а) группу', null);
+  if(typeof logEvent === 'function') logEvent(id, space.name, 'group_closed', 'закрыл(а) общий кабинет', null);
   const authIds = (space.members_auth||[]).map(m=>m.user_id).filter(Boolean);
   if(authIds.length && typeof notifyUsers === 'function') await notifyUsers(authIds, closedTitle, closedBody);
-  toast('✓ Группа закрыта');
+  toast('✓ Общий кабинет закрыт');
 }
 
 function onSpaceClick(id) {
@@ -815,7 +815,7 @@ async function createSpace() {
         space.pendingInvites = invites;
         await sb.from('spaces').update({pendingInvites: invites}).eq('id', id);
         localStorage.setItem('mc_spaces', JSON.stringify(spaces));
-        if(typeof notifyUsers === 'function') await notifyUsers(invites.map(i=>i.user_id), '👋 Приглашение в группу', `${invitedBy} зовёт тебя в «${name}»`);
+        if(typeof notifyUsers === 'function') await notifyUsers(invites.map(i=>i.user_id), '👋 Приглашение в общий кабинет', `${invitedBy} зовёт тебя в «${name}»`);
         invitedNames = invites.map(i=>i.name);
       }
     }
@@ -953,7 +953,7 @@ async function inviteKnownContact(spaceId, userId, name, containerId) {
   try {
     await sb.from('spaces').update({pendingInvites: space.pendingInvites}).eq('id', spaceId);
     localStorage.setItem('mc_spaces', JSON.stringify(spaces));
-    if(typeof notifyUsers === 'function') await notifyUsers([userId], '👋 Приглашение в группу', `${invitedBy} зовёт тебя в «${space.name}»`);
+    if(typeof notifyUsers === 'function') await notifyUsers([userId], '👋 Приглашение в общий кабинет', `${invitedBy} зовёт тебя в «${space.name}»`);
     renderKnownContacts(spaceId, containerId);
     toast('✓ Приглашение отправлено ' + name);
   } catch(e) { toast('Ошибка: '+e.message, true); }
@@ -1013,7 +1013,7 @@ function openPhoneRequiredModal(onSaved) {
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1002;display:flex;align-items:center;justify-content:center;padding:20px';
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:22px;max-width:360px;width:100%">
     <div style="font-size:16px;font-weight:700;margin-bottom:8px">📱 Нужен номер телефона</div>
-    <div style="font-size:13px;color:var(--t2);margin-bottom:14px">Для кабинетов чатов нужен телефон — по нему тебя смогут находить и приглашать другие участники.</div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:14px">Для общих кабинетов нужен телефон — по нему тебя смогут находить и приглашать другие участники.</div>
     <div style="display:flex;gap:6px;margin-bottom:6px">
       <span style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px 12px;font-size:14px;color:var(--t2)">+972</span>
       <input id="phone-required-inp" type="tel" placeholder="501234567" dir="ltr" style="flex:1;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px;font-size:14px;color:var(--t1);font-family:inherit;box-sizing:border-box">
@@ -1042,7 +1042,7 @@ async function savePhoneAndContinue() {
 
 function offerInvite(query, space, contactName) {
   const link = `${_SITE_URL}?space=${space.share_token}${contactName ? '&as=' + encodeURIComponent(contactName) : ''}`;
-  const text = encodeURIComponent(`Присоединяйся к группе «${space.name}» в Моих карточках: ${link}`);
+  const text = encodeURIComponent(`Присоединяйся к общему кабинету «${space.name}» в Моих карточках: ${link}`);
   const isPhone = /^\+?\d[\d\s\-()]{6,}$/.test(query);
   const div = document.createElement('div');
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1001;display:flex;align-items:center;justify-content:center;padding:20px';
@@ -1051,7 +1051,7 @@ function offerInvite(query, space, contactName) {
     <div style="font-size:13px;color:var(--t2);margin-bottom:14px">«${esc(query)}» ещё не зарегистрирован(а) в приложении. Отправь приглашение:</div>
     <div style="display:flex;flex-direction:column;gap:8px">
       ${isPhone ? `<a href="https://wa.me/${query.replace(/\D/g,'')}?text=${text}" target="_blank" style="text-decoration:none;background:#25D366;color:#fff;border-radius:var(--rsm);padding:12px;font-size:14px;font-weight:700;text-align:center">📱 Отправить в WhatsApp</a>` : ''}
-      <a href="mailto:?subject=Приглашение в группу&body=${text}" style="text-decoration:none;background:var(--s2);border:1px solid var(--b1);color:var(--t1);border-radius:var(--rsm);padding:12px;font-size:14px;text-align:center">✉️ Отправить по почте</a>
+      <a href="mailto:?subject=Приглашение в общий кабинет&body=${text}" style="text-decoration:none;background:var(--s2);border:1px solid var(--b1);color:var(--t1);border-radius:var(--rsm);padding:12px;font-size:14px;text-align:center">✉️ Отправить по почте</a>
       <button onclick="navigator.clipboard.writeText(decodeURIComponent('${text}')).then(()=>toast('✓ Скопировано'))" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:12px;font-size:14px;cursor:pointer">📋 Скопировать текст</button>
     </div>
     <button onclick="this.closest('[style*=fixed]').remove()" style="width:100%;margin-top:10px;background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;padding:8px">Закрыть</button>
@@ -1080,7 +1080,7 @@ async function addMemberToSpace(query, overrideName) {
   try {
     await sb.from('spaces').update({pendingInvites: space.pendingInvites}).eq('id', managingSpaceId);
     localStorage.setItem('mc_spaces', JSON.stringify(spaces));
-    const title = '👋 Приглашение в группу';
+    const title = '👋 Приглашение в общий кабинет';
     const body = `${invitedBy} зовёт тебя в «${space.name}»`;
     if(typeof notifyUsers === 'function') await notifyUsers([found.id], title, body);
     toast('✓ Приглашение отправлено ' + inviteName);
@@ -1139,8 +1139,8 @@ async function approveJoinRequest(spaceId, userId) {
     localStorage.setItem('mc_spaces', JSON.stringify(spaces));
     renderManageMembersList(); renderSpacesList();
     if(typeof notifyUsers === 'function') await notifyUsers([userId], '✅ Тебя приняли', `Теперь ты в «${space.name}»`, currentUser?.id, null, _SITE_URL);
-    if(typeof logEvent === 'function') logEvent(spaceId, space.name, 'member_joined', 'присоединился(лась) к группе', null, req.name);
-    toast('✓ ' + req.name + ' в группе');
+    if(typeof logEvent === 'function') logEvent(spaceId, space.name, 'member_joined', 'присоединился(лась) к общему кабинету', null, req.name);
+    toast('✓ ' + req.name + ' в общем кабинете');
   } catch(e) { toast('Ошибка: '+e.message, true); }
 }
 async function declineJoinRequest(spaceId, userId) {
@@ -1172,8 +1172,8 @@ async function acceptGroupInvite(spaceId) {
     await sb.from('spaces').update({members: space.members, members_auth: space.members_auth, pendingInvites: space.pendingInvites}).eq('id', spaceId);
        localStorage.setItem('mc_spaces', JSON.stringify(spaces));
     renderSpacesList();
-    if(typeof logEvent === 'function') logEvent(spaceId, space.name, 'member_joined', 'присоединился(лась) к группе', null, invite.name);
-    toast('✓ Ты в группе «' + space.name + '»');
+    if(typeof logEvent === 'function') logEvent(spaceId, space.name, 'member_joined', 'присоединился(лась) к общему кабинету', null, invite.name);
+    toast('✓ Ты в общем кабинете «' + space.name + '»');
   } catch(e) { toast('Ошибка: '+e.message, true); }
 }
 
@@ -1263,7 +1263,7 @@ async function loadEventsFeed() {
   const box = document.getElementById('events-feed-list');
   if(!box) return;
   const ownedIds = (spaces||[]).filter(s=>(s.type==='family'||s.type==='group') && s.owner_id===currentUser?.id).map(s=>s.id);
-  if(!ownedIds.length) { box.innerHTML = '<div style="color:var(--t3);font-size:12px">Нет групп</div>'; return; }
+  if(!ownedIds.length) { box.innerHTML = '<div style="color:var(--t3);font-size:12px">Нет общих кабинетов</div>'; return; }
   let since = null;
   const now = new Date();
   if(eventsFeedFilter==='today') since = new Date(now.getFullYear(),now.getMonth(),now.getDate()).toISOString();
@@ -1347,7 +1347,7 @@ async function openPersonalTask(cardId, spaceId) {
 async function loadMemberEventsFeed(memberSpaceIds) {
   const box = document.getElementById('member-events-feed-list');
   if(!box) return;
-  if(!memberSpaceIds.length) { box.innerHTML = '<div style="color:var(--t3);font-size:12px">Вы пока не состоите ни в одной группе</div>'; return; }
+  if(!memberSpaceIds.length) { box.innerHTML = '<div style="color:var(--t3);font-size:12px">Вы пока не состоите ни в одном общем кабинете</div>'; return; }
   const since = new Date(Date.now() - 7*24*60*60*1000).toISOString();
   try {
     const { data, error } = await sb.from('group_events').select('*')
@@ -1371,7 +1371,7 @@ async function loadMemberEventsFeed(memberSpaceIds) {
 async function loadMyAssignedTasks(memberSpaceIds) {
   const box = document.getElementById('my-tasks-list');
   if(!box) return;
-  if(!memberSpaceIds.length) { box.innerHTML = '<div style="color:var(--t3);font-size:12px">Вы пока не состоите ни в одной группе</div>'; return; }
+  if(!memberSpaceIds.length) { box.innerHTML = '<div style="color:var(--t3);font-size:12px">Вы пока не состоите ни в одном общем кабинете</div>'; return; }
   try {
     const { data, error } = await sb.from('cards').select('*').in('space_id', memberSpaceIds);
     if(error) throw error;
@@ -1618,9 +1618,9 @@ async function saveSpaceName(id) {
 //  СПИСОК КАБИНЕТОВ БЕЗ ПЕРЕЗАПУСКА (15 ноября)
 //  Слушатель в app-db.js ловит только изменения кабинетов (UPDATE). Новый кабинет, созданный на другом
 //  устройстве или куда добавили, раньше появлялся только после полного перезапуска.
-//  Теперь: подписка на новые кабинеты (INSERT) + перечитывание списка при возврате в приложение и раз в минуту в лобби.
+//  Теперь: подписка на новые и удалённые кабинеты (INSERT/DELETE) + перечитывание списка при возврате в приложение и раз в минуту в лобби.
 // ═══════════════════════════════════════════
-let _mcSpRefT = 0, _mcSpRefBusy = false, _mcSpInsCh = null;
+let _mcSpRefT = 0, _mcSpRefBusy = false, _mcSpInsCh = null, _mcSpSeen = new Set();
 async function mcRefreshSpaces(force) {
   if(_mcSpRefBusy || !navigator.onLine || typeof sb === 'undefined' || typeof currentUser === 'undefined' || !currentUser) return;
   if(!force && Date.now() - _mcSpRefT < 15000) return;
@@ -1639,6 +1639,18 @@ async function mcRefreshSpaces(force) {
       if(i === -1) { spaces.push(n); added++; changed = true; }
       else if(JSON.stringify(spaces[i]) !== JSON.stringify({ ...spaces[i], ...n })) { Object.assign(spaces[i], n); changed = true; } // тот же объект: currentSpace остаётся живым
     });
+    // удалённые: кабинет, который сервер раньше отдавал (или где я владелец/участник), а теперь не отдаёт — стёрли на другом устройстве
+    const ids = new Set(data.map(n => n.id)), me = currentUser.id, goneNames = [];
+    if(data.length) for(let i = spaces.length - 1; i >= 0; i--) {
+      const s = spaces[i];
+      if(!s || ids.has(s.id) || s.id === 'personal') continue;
+      const mine = _mcSpSeen.has(s.id) || s.owner_id === me || (s.members_auth || []).some(m => m && m.user_id === me);
+      if(!mine) continue; // например, кабинет по ссылке-приглашению, который ещё не подтвердили
+      goneNames.push(s.name || 'кабинет'); spaces.splice(i, 1); changed = true;
+      if(typeof currentSpaceId !== 'undefined' && currentSpaceId === s.id && typeof switchSpace === 'function') { try { switchSpace(); } catch(e) {} }
+    }
+    _mcSpSeen = ids;
+    if(goneNames.length && typeof toast === 'function') setTimeout(() => toast(goneNames.length === 1 ? 'Кабинет «' + goneNames[0] + '» удалён' : 'Удалено кабинетов: ' + goneNames.length), 300);
     if(!changed) return;
     try { localStorage.setItem('mc_spaces', JSON.stringify(spaces)); } catch(e) {}
     const lobby = document.getElementById('space-selector');
@@ -1651,6 +1663,7 @@ function mcSpacesInsertWatch() {
   try {
     _mcSpInsCh = sb.channel('spaces:insert-watch')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'spaces' }, () => setTimeout(() => mcRefreshSpaces(true), 800))
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'spaces' }, () => setTimeout(() => mcRefreshSpaces(true), 800)) // кабинет удалили на другом устройстве
       .subscribe();
   } catch(e) { _mcSpInsCh = null; }
 }

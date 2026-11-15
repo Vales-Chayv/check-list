@@ -410,7 +410,7 @@
       </div>
         <div class="fld"><label>Имя</label><input id="auth-name" placeholder="Имя" dir="auto" onkeydown="if(event.key==='Enter')document.getElementById('auth-surname').focus()"></div>
       <div class="fld"><label>Фамилия</label><input id="auth-surname" placeholder="Фамилия" dir="auto" onkeydown="if(event.key==='Enter')document.getElementById('auth-phone').focus()"></div>
-      <div class="fld"><label>Телефон (нужен только для кабинетов чатов)</label>
+      <div class="fld"><label>Телефон (нужен только для общих кабинетов)</label>
         <div style="display:flex;gap:6px">
           <span style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:0 12px;display:flex;align-items:center;font-size:14px;color:var(--t2)">+972</span>
           <input id="auth-phone" type="tel" placeholder="501234567" dir="ltr" style="flex:1" onkeydown="if(event.key==='Enter')document.getElementById('auth-login').focus()">
@@ -747,7 +747,7 @@
         <label>Тип</label>
            <select id="new-space-type" onchange="document.getElementById('members-section').style.display=this.value==='family'?'flex':'none'; if(this.value==='family')renderNewSpaceContacts()">
           <option value="personal">🗂️ Личный</option>
-          <option value="family">💬 Кабинет чатов</option>
+          <option value="family">💬 Общий кабинет</option>
         </select>
       </div>
       <div class="fld"><label>Название</label><input id="new-space-name" placeholder="Например: Наша семья" dir="auto"></div>

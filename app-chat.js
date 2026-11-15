@@ -549,7 +549,7 @@ async function requestCloseChat(cardId) {
   const closeReqTitle = '🔒 Запрос на закрытие чата';
   const closeReqBody = `«${card.title}» — просит закрыть ${localStorage.getItem('mc_current_member')||''}`;
   if(ownerId) await notifyUsers([ownerId], closeReqTitle, closeReqBody, null, null, `https://vales-chayv.github.io/check-list/?openSpace=${currentSpaceId}&openCard=${card.id}`);
-  toast('✓ Запрос отправлен создателю группы');
+  toast('✓ Запрос отправлен владельцу кабинета');
 }
 
 async function actuallyCloseChat(cardId) {
