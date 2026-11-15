@@ -27,6 +27,55 @@ let calPrioOpen = false; // развёрнуты ли кнопки приори�
 let calFromLobby = false; // календарь открыт с экрана кабинетов → вернуться туда при закрытии
 
 const CAL_DAYS_RU = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+// ── Выходные дни и начало недели: в облаке (вместе с настройками Word), без сети — на устройстве ──
+function calWeekCfg() {
+  let c = null;
+  try { if(typeof mcWordLocal === 'function') c = mcWordLocal().data.cal; } catch(e) {}
+  if(!c) { try { c = JSON.parse(localStorage.getItem('mc_cal_week') || 'null'); } catch(e) {} }
+  c = c || {};
+  return { we: Array.isArray(c.we) ? c.we.filter(d => d >= 0 && d <= 6) : [5, 6], start: c.start === 1 ? 1 : 0 }; // заводские: пятница и суббота, неделя с воскресенья
+}
+function calWeekSave(c) {
+  try { localStorage.setItem('mc_cal_week', JSON.stringify(c)); } catch(e) {}
+  try { if(typeof mcWordSave === 'function') mcWordSave(d => { d.cal = { we: c.we.slice(), start: c.start }; }); } catch(e) {}
+}
+const calIsWeekend = dow => calWeekCfg().we.includes(dow);
+const calDowOrder = () => { const s = calWeekCfg().start; return [0,1,2,3,4,5,6].map(i => (i + s) % 7); };
+const calYmd = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); // дата по местному времени
+function calOpenWeekSettings() {
+  document.getElementById('cal-week-ov')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'cal-week-ov';
+  ov.setAttribute('style', 'position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px');
+  const chip = (on, extra) => `border-radius:14px;padding:7px 0;font-size:13px;cursor:pointer;font-family:inherit;border:1px solid ${on?'var(--accent)':'var(--b1)'};background:${on?'var(--accent)':'var(--s1)'};color:${on?'#0f0f0f':'var(--t2)'};font-weight:${on?700:400};${extra||''}`;
+  const paint = () => {
+    const c = calWeekCfg();
+    const order = calDowOrder();
+    ov.innerHTML = `<div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:18px;width:100%;max-width:380px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="font-size:16px;font-weight:700">⚙ ${t('Настройки календаря')}</span><button data-x="1" style="background:var(--s1);border:none;color:var(--t2);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:15px">✕</button></div>
+      <div style="font-size:12px;color:var(--t3);margin-bottom:6px">${t('Выходные дни (подсвечиваются в календаре)')}</div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:8px">${order.map(d => `<button data-d="${d}" style="${chip(c.we.includes(d))}">${t(CAL_DAYS_RU[d])}</button>`).join('')}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+        <button data-p="5,6" style="${chip(false,'padding:6px 10px')}">${t('Пт и Сб (заводские)')}</button>
+        <button data-p="6,0" style="${chip(false,'padding:6px 10px')}">${t('Сб и Вс')}</button>
+        <button data-p="" style="${chip(false,'padding:6px 10px')}">${t('Без выходных')}</button>
+      </div>
+      <div style="font-size:12px;color:var(--t3);margin-bottom:6px">${t('Неделя начинается с')}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button data-s="0" style="${chip(c.start===0)}">${t('Воскресенья')}</button><button data-s="1" style="${chip(c.start===1)}">${t('Понедельника')}</button></div>
+    </div>`;
+  };
+  const apply = c => { calWeekSave(c); paint(); renderCalendar(); };
+  ov.onclick = e => {
+    if(e.target === ov || e.target.closest('[data-x]')) { ov.remove(); return; }
+    const b = e.target.closest('button'); if(!b) return;
+    const c = calWeekCfg();
+    if(b.dataset.d != null) { const d = +b.dataset.d; c.we = c.we.includes(d) ? c.we.filter(x => x !== d) : c.we.concat(d).sort(); apply(c); }
+    else if(b.dataset.p != null) { c.we = b.dataset.p ? b.dataset.p.split(',').map(Number) : []; apply(c); }
+    else if(b.dataset.s != null) { c.start = +b.dataset.s; apply(c); }
+  };
+  paint();
+  document.body.appendChild(ov);
+}
 const CAL_MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 const CAL_HOLIDAYS_IL = {
   '2026-03-03': [{ ru:"Пурим", he:"פורים", en:"Purim", type:"major" }],
@@ -488,7 +537,7 @@ function renderCalFilters() {
   const members = currentSpace?.type === 'family' ? (currentSpace?.members||[]).map(m=>m.name) : [];
   const cabs = calCabinetRubrics();
 
-  let html = '';
+  let html = `<button onclick="calOpenWeekSettings()" title="${t('Настройки календаря')}" style="background:var(--s2);border:1px solid var(--b1);border-radius:14px;padding:4px 9px;font-size:12px;color:var(--t2);cursor:pointer;white-space:nowrap;flex-shrink:0">⚙</button>`;
  const allKeys = cabs.flatMap(c => c.rubrics.map(r => r.key));
   const onCount = allKeys.filter(k => calEnabledCats.has(k)).length;
   const allOn = allKeys.length > 0 && onCount === allKeys.length;
@@ -677,7 +726,8 @@ function renderCalMonth() {
 
 const firstDay = new Date(y, m, 1);
   const lastDay = new Date(y, m + 1, 0);
-  const startDow = firstDay.getDay(); // 0=Вс ... 6=Сб — неделя уже начинается с воскресенья
+  const order = calDowOrder();
+  const startDow = (firstDay.getDay() - order[0] + 7) % 7; // сколько пустых клеток до 1-го числа (неделя — с выбранного дня)
 
   const todayStr = calTodayStr();
   const filtered = getCalCards();
@@ -691,8 +741,8 @@ const firstDay = new Date(y, m, 1);
   });
 
   let html = `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-bottom:4px">`;
-  CAL_DAYS_RU.forEach(d => {
-    html += `<div style="text-align:center;font-size:11px;color:var(--t3);padding:4px 0">${d}</div>`;
+  order.forEach(dw => {
+    html += `<div style="text-align:center;font-size:11px;color:${calIsWeekend(dw)?'var(--t2)':'var(--t3)'};font-weight:${calIsWeekend(dw)?700:400};padding:4px 0">${CAL_DAYS_RU[dw]}</div>`;
   });
   html += '</div>';
 
@@ -706,7 +756,7 @@ const firstDay = new Date(y, m, 1);
  for(let d = 1; d <= lastDay.getDate(); d++) {
     const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const isToday = dateStr === todayStr;
-    const isSat = (startDow + d - 1) % 7 === 6;
+    const isSat = calIsWeekend(new Date(y, m, d).getDay()); // выходной по настройке
     const dayCards = cardMap[dateStr] || [];
     const hasUrgent = dayCards.some(c=>c.priority==='urgent' && !c._done);
     const hasHigh = dayCards.some(c=>c.priority==='high');
@@ -740,7 +790,7 @@ const firstDay = new Date(y, m, 1);
 
 function renderCalWeek() {
   const dow = calDate.getDay();
-  const sundayOffset = -dow;
+  const sundayOffset = -((dow - calWeekCfg().start + 7) % 7); // к первому дню недели (Вс или Пн)
   const sunday = new Date(calDate);
   sunday.setDate(calDate.getDate() + sundayOffset);
 
@@ -751,8 +801,8 @@ function renderCalWeek() {
     days.push(d);
   }
 
-  const fromDate = days[0].toISOString().slice(0,10);
-  const toDate = days[6].toISOString().slice(0,10);
+  const fromDate = calYmd(days[0]);
+  const toDate = calYmd(days[6]);
   document.getElementById('cal-title').textContent = `${days[0].getDate()} ${CAL_MONTHS_RU[days[0].getMonth()].slice(0,3)} — ${days[6].getDate()} ${CAL_MONTHS_RU[days[6].getMonth()].slice(0,3)}`;
 
   const todayStr = calTodayStr();
@@ -765,9 +815,9 @@ function renderCalWeek() {
 
   let html = `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">`;
   days.forEach(d => {
-   const dateStr = d.toISOString().slice(0,10);
+   const dateStr = calYmd(d);
     const isToday = dateStr === todayStr;
-    const isSat = d.getDay() === 6;
+    const isSat = calIsWeekend(d.getDay());
     const dayCards = cardMap[dateStr] || [];
     const hasUrgent = dayCards.some(c=>c.priority==='urgent' && !c._done);
 
