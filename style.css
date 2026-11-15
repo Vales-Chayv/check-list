@@ -482,6 +482,7 @@ body.in-lobby.cal-on #cal-ov, body.in-cabinet.cal-on #cal-ov { bottom: auto; hei
   body.pane-full #desktop-cal-toolbar { left: 0 !important; right: 0 !important; }
   body.pane-full.cal-on #cal-ov, body.pane-full.calc-on #calc-ov, body.pane-full.gal-on #gal-ov { left: 0 !important; right: 0 !important; bottom: 0 !important; height: auto !important; z-index: 45; border: none; }
   body.pane-full #split-handle, body.pane-full #lobby-h-handle { display: none !important; }
+  body.pane-full #space-selector { visibility: hidden !important; } /* экран кабинетов (z-index 998) иначе перекрывает развёрнутое окно; окна календаря поверх (200–600) остаются видны */
 }
 
 /* ── Полоска «Закреплённые»: язычок можно тянуть вправо, когда кнопки не помещаются в одну колонку ── */
