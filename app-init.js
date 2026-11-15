@@ -451,7 +451,7 @@ new MutationObserver(() => {
   const onMove = e => {
     if(!dragging) return;
     const x = e.touches ? e.touches[0].clientX : e.clientX;
-    let pct = x / window.innerWidth * 100;
+    let pct = (document.documentElement.classList.contains('mc-swap') ? window.innerWidth - x : x) / window.innerWidth * 100; // колонка карточек может стоять справа
     pct = Math.max(25, Math.min(70, pct)); // границы 25%–70%
     document.documentElement.style.setProperty('--split-left', pct.toFixed(1) + '%');
     if(e.cancelable) e.preventDefault();
@@ -469,6 +469,7 @@ new MutationObserver(() => {
   };
   const onDown = e => {
     if(window.innerWidth < 900) return;
+    if(e.target.closest && e.target.closest('#split-swap')) return; // кнопка ⇄ — не перетаскивание
     dragging = true;
     document.body.style.userSelect = 'none';
     window.addEventListener('mousemove', onMove);
@@ -479,6 +480,43 @@ new MutationObserver(() => {
   };
   h.addEventListener('mousedown', onDown);
   h.addEventListener('touchstart', onDown, { passive: false });
+  // ⇄ на разделителе: кабинеты и карточки ↔ экраны А/Б (запоминается на этом устройстве)
+  if(localStorage.getItem('mc_swap') === '1') document.documentElement.classList.add('mc-swap');
+  const sw = document.createElement('button');
+  sw.id = 'split-swap'; sw.type = 'button'; sw.textContent = '⇄';
+  sw.title = 'Поменять местами: карточки ↔ экраны А/Б';
+  sw.onclick = e => {
+    e.stopPropagation();
+    const on = document.documentElement.classList.toggle('mc-swap');
+    try { localStorage.setItem('mc_swap', on ? '1' : '0'); } catch(_) {}
+    if(typeof renderCalendar === 'function') setTimeout(renderCalendar, 50);
+  };
+  h.appendChild(sw);
+})();
+
+// ── ПК: календарь, калькулятор и галерея «Во весь экран» (кнопка в верхней панели справа, Esc — обратно) ──
+(function initPaneFull() {
+  const bar = document.getElementById('desktop-cal-toolbar');
+  if(!bar) return;
+  const b = document.createElement('button');
+  b.id = 'pane-full-btn'; b.type = 'button';
+  const paint = () => { b.textContent = document.body.classList.contains('pane-full') ? '⤡ Свернуть' : '⤢ Во весь экран'; };
+  const set = on => {
+    document.body.classList.toggle('pane-full', on); paint();
+    if(typeof renderCalendar === 'function' && document.body.classList.contains('cal-on')) setTimeout(renderCalendar, 50);
+  };
+  b.onclick = () => set(!document.body.classList.contains('pane-full'));
+  paint(); bar.appendChild(b);
+  // закрыли календарь, калькулятор и галерею — режим «во весь экран» снимается
+  new MutationObserver(() => {
+    const c = document.body.classList;
+    if(c.contains('pane-full') && !c.contains('cal-on') && !c.contains('calc-on') && !c.contains('gal-on')) set(false);
+  }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  document.addEventListener('keydown', e => {
+    if(e.key !== 'Escape' || !document.body.classList.contains('pane-full')) return;
+    if(document.querySelector('body > div[style*="z-index:2000"]') || document.querySelector('.overlay.on:not(#cal-ov):not(#calc-ov):not(#gal-ov)')) return; // сначала закрываются окна поверх
+    set(false);
+  });
 })();
 
 // Телефон: «＋» и календарь прячутся во время прокрутки карточек, возвращаются через 0.7 с после остановки
