@@ -537,22 +537,30 @@ function spaceRowHTML(s) {
     acts.push(`<button onclick="leaveGroup('${s.id}')" style="${bb}background:rgba(232,96,96,.12);border:1px solid rgba(232,96,96,.3);color:var(--red)">🚪 Выйти</button>`);
   }
   const open = acts.length > 0 && lobbyOpenActs.has(s.id);
-  const unread = (!isClosed && spacesUnreadCounts[s.id]) ? `<span style="background:var(--red);color:#fff;font-size:11px;font-weight:700;padding:1px 7px;border-radius:9px">${spacesUnreadCounts[s.id]}</span>` : '';
+  const unreadN = (!isClosed && spacesUnreadCounts[s.id]) || 0; // красный кружок на значке (16 ноября: вместо метки после названия)
   const tp = spaceTypeOf(s);
   const sub = tp ? (tp.icon + ' ' + t(tp.tag) + (tp.id === 'group' && members ? ' · ' + membersWord(members) : '')) : (members ? '👥 ' + membersWord(members) : '');
   const canDrag = lobbySort === 'mine' && !isClosed;
-  return `<div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:16px;margin-bottom:12px;opacity:${isClosed?.7:1}"${canDrag ? ` class="sp-card" data-drag="${s.id}"` : ' class="sp-card"'}>
-    <div style="display:flex;align-items:center;gap:10px">
-      ${canDrag ? `<div class="sp-grip" onpointerdown="spGripDown(event,'${s.id}')" onpointermove="spGripMove(event)" onpointerup="spGripUp(event)" onpointercancel="spGripCancel(event)" title="Потяни, чтобы переставить">≡</div>` : ''}
-      <div onclick="onSpaceClick('${s.id}')" style="display:flex;align-items:center;gap:14px;flex:1;min-width:0;cursor:pointer">
-        <div class="sp-av" style="background:${spaceColor(s)}${tp ? ';border-radius:' + tp.round : ''}">${esc(spaceInitials(s.name))}</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:17px;font-weight:700;display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span dir="auto" style="overflow-wrap:anywhere">${esc(s.name)}</span>${s.password?'<span style="font-size:13px;opacity:.55">🔒</span>':''}${isClosed?'<span style="font-size:11px;color:var(--t3);font-weight:400">(закрыт)</span>':''}${unread}</div>
-          <div style="font-size:12px;color:var(--t3);margin-top:3px">${sub}</div>
+  const pinned = getSpacePins().has(s.id);
+  spCardCss();
+  const below = open || (isOwner && !isClosed && (s.joinRequests||[]).length); // есть ли что-то под верхней частью
+  return `<div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:16px 16px ${below ? 16 : 0}px;margin-bottom:12px;opacity:${isClosed?.7:1}"${canDrag ? ` class="sp-card" data-drag="${s.id}"` : ' class="sp-card"'}>
+    <div class="sp-top">
+      ${spCoverHTML(s.cover)}
+      <div style="display:flex;align-items:center;gap:10px;position:relative">
+        ${canDrag ? `<div class="sp-grip" onpointerdown="spGripDown(event,'${s.id}')" onpointermove="spGripMove(event)" onpointerup="spGripUp(event)" onpointercancel="spGripCancel(event)" title="Потяни, чтобы переставить">≡</div>` : ''}
+        <div onclick="onSpaceClick('${s.id}')" style="display:flex;align-items:center;gap:14px;flex:1;min-width:0;cursor:pointer;padding-right:${(!isClosed || acts.length) ? 62 : 0}px">
+          ${spIconHTML(s, unreadN)}
+          <div style="flex:1;min-width:0">
+            <div style="font-size:17px;font-weight:700;display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span dir="auto" style="overflow-wrap:anywhere">${esc(s.name)}</span>${s.password?'<span style="font-size:13px;opacity:.55">🔒</span>':''}${isClosed?'<span style="font-size:11px;color:var(--t3);font-weight:400">(закрыт)</span>':''}</div>
+            <div style="font-size:12px;color:var(--t3);margin-top:3px">${sub}</div>
+          </div>
         </div>
       </div>
-      ${!isClosed ? `<button class="sp-star${getSpacePins().has(s.id)?' on':''}" onclick="toggleSpacePin('${s.id}')" aria-label="Закрепить" title="Закрепить вверху">${getSpacePins().has(s.id)?'★':'☆'}</button>` : ''}
-      ${acts.length ? `<button class="sp-chev${open?' on':''}" onclick="toggleSpaceActs('${s.id}')" aria-label="Действия" title="Действия">▾</button>` : ''}
+      <div class="sp-btns">
+        ${!isClosed ? `<button class="sp-star${pinned?' on':''}" onclick="toggleSpacePin('${s.id}')" aria-label="Закрепить" title="Закрепить вверху">${spStarSVG(pinned)}</button>` : ''}
+        ${acts.length ? `<button class="sp-chev${open?' on':''}" onclick="toggleSpaceActs('${s.id}')" aria-label="Действия" title="Действия">${SP_TRI_SVG}</button>` : ''}
+      </div>
     </div>
     ${(isOwner && !isClosed && (s.joinRequests||[]).length) ? `<div onclick="openManageMembers('${s.id}')" style="margin-top:10px;background:rgba(232,197,106,.15);border:1px solid rgba(232,197,106,.4);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--accent);cursor:pointer">🔔 Запросов на вход: ${(s.joinRequests||[]).length} — посмотреть</div>` : ''}
     ${open ? `<div class="sp-acts">${acts.join('')}</div>` : ''}
@@ -1588,6 +1596,7 @@ function openEditSpace(id) {
     <input id="edit-space-name-inp" value="${esc(space.name)}" dir="auto" style="width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rsm);padding:10px;font-size:15px;color:var(--t1);font-family:inherit;margin-bottom:12px">
     <div style="font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Цвет значка</div>
     <div class="pal" id="edit-space-pal" style="margin-bottom:16px"></div>
+    ${space.owner_id && space.owner_id!==currentUser?.id ? '' : `<button onclick="openSpaceCover('${id}')" style="width:100%;margin-bottom:12px;background:var(--s2);border:1px solid var(--b1);color:var(--t1);border-radius:var(--rsm);padding:11px;font-size:14px;cursor:pointer;font-family:inherit">🖼 Обложка${spCoverOf(space.cover) ? ' — изменить' : ' — добавить картинку'}</button>`}
     <div style="display:flex;gap:8px">
       <button onclick="saveSpaceName('${id}')" style="flex:1;background:var(--accent);color:#0f0f0f;border:none;border-radius:var(--rsm);padding:11px;font-size:14px;font-weight:700;cursor:pointer">Сохранить</button>
       <button onclick="document.getElementById('edit-space-dialog')?.remove()" style="background:var(--s2);border:1px solid var(--b1);color:var(--t2);border-radius:var(--rsm);padding:11px 16px;cursor:pointer">Отмена</button>
@@ -1676,3 +1685,233 @@ setInterval(() => {
   if(document.visibilityState === 'visible' && lobby && lobby.style.display !== 'none') mcRefreshSpaces(false);
 }, 60000);
 setTimeout(mcSpacesInsertWatch, 5000);
+
+// ═══════════════════════════════════════════
+//  КАРТОЧКА КАБИНЕТА В ЛОББИ: ЗНАЧОК, ОБЛОЖКА, ★ и ▾ (16 ноября)
+//  Общий кабинет — пузырь с человечками (до 3, по числу участников), личный — квадрат с одним человечком.
+//  Непрочитанные — красный кружок на значке. Обложка — картинка справа в верхней части карточки, растворяется к тексту.
+//  Обложку ставит только владелец: «✏️ Изменить» → «🖼 Обложка». Хранится в колонке spaces.cover (jsonb):
+//  {u: адрес картинки, x, y: точка кадра 0–100 %, z: масштаб 1–3, op: прозрачность 0.1–1, br: яркость 0.3–1.3}.
+//  Сама картинка сжимается до 800 px и кладётся в облако attachments/covers/<кабинет>/.
+// ═══════════════════════════════════════════
+function spCardCss() {
+  if(document.getElementById('sp-card-css')) return;
+  const st = document.createElement('style'); st.id = 'sp-card-css';
+  st.textContent = `
+.sp-top{position:relative;margin:-16px -16px 0;padding:16px;border-radius:var(--r) var(--r) 0 0;overflow:hidden}
+.sp-cov{position:absolute;top:0;right:0;bottom:0;width:46%;pointer-events:none;-webkit-mask-image:linear-gradient(to left,#000 35%,transparent);mask-image:linear-gradient(to left,#000 35%,transparent)}
+.sp-cov img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;-webkit-user-drag:none;user-select:none}
+.sp-ic{position:relative;flex:none;width:52px;height:52px;display:flex;align-items:center;justify-content:center}
+.sp-ic svg{display:block}
+.sp-unr{position:absolute;top:-4px;right:-6px;min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;border-radius:10px;background:var(--red);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--s2);line-height:1}
+.sp-btns{position:absolute;right:8px;bottom:4px;display:flex;align-items:center;gap:6px;filter:drop-shadow(0 0 2px #000) drop-shadow(0 0 4px #000) drop-shadow(0 1px 2px #000)}
+.sp-btns .sp-star,.sp-btns .sp-chev{display:flex;padding:6px 4px;font-size:0;line-height:0}
+.sp-btns .sp-star,.sp-btns .sp-star.on{color:var(--accent)}
+.sp-btns .sp-chev{color:#fff}
+.sp-btns .sp-chev.on{color:var(--accent)}
+#sp-cover-dialog .sp-cov{pointer-events:auto;cursor:grab;touch-action:none}
+#sp-cover-dialog .sp-cov.drag{cursor:grabbing}
+#sp-cover-dialog label{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--t2);margin:10px 0}
+#sp-cover-dialog label span{width:96px;flex:none}
+#sp-cover-dialog label b{width:42px;text-align:right;font-weight:400;color:var(--accent);font-size:12px}
+#sp-cover-dialog input[type=range]{flex:1;accent-color:var(--accent)}
+.spc-bt{flex:1;padding:10px;border-radius:var(--rsm);font-size:13px;border:1px solid var(--b1);background:var(--s2);color:var(--t2);cursor:pointer;font-family:inherit}`;
+  document.head.appendChild(st);
+}
+const SP_TRI_SVG = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 8.5h14l-7 8z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+function spStarSVG(on) {
+  return `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17.2l-5.7 3.1 1.2-6.4-4.7-4.4 6.4-.8z" fill="${on ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
+}
+function spIconHTML(s, unreadN) {
+  const col = spaceColor(s), tp = spaceTypeOf(s);
+  const person = cx => `<circle cx="${cx}" cy="17" r="4.2"/><path d="M${cx - 7} 30a7 7 0 0 1 14 0z"/>`;
+  let svg;
+  if(tp && tp.id === 'group') {
+    const n = Math.min(3, Math.max(1, (s.members || []).length || 1));
+    const xs = n === 1 ? [26] : n === 2 ? [18, 34] : [13, 26, 39];
+    svg = `<svg viewBox="0 0 52 48" width="52" height="48"><path d="M8 3h36a6 6 0 0 1 6 6v23a6 6 0 0 1-6 6H21l-11 9v-9H8a6 6 0 0 1-6-6V9a6 6 0 0 1 6-6z" fill="${col}"/><g fill="#0f0f0f" opacity=".78">${xs.map(person).join('')}</g></svg>`;
+  } else {
+    svg = `<svg viewBox="0 0 52 52" width="50" height="50"><rect x="1" y="1" width="50" height="50" rx="14" fill="${col}"/><g fill="#0f0f0f" opacity=".78" transform="translate(0 5)"><circle cx="26" cy="15" r="6"/><path d="M15 34a11 11 0 0 1 22 0z"/></g></svg>`;
+  }
+  return `<div class="sp-ic">${svg}${unreadN ? `<span class="sp-unr">${unreadN > 99 ? '99+' : unreadN}</span>` : ''}</div>`;
+}
+function spCoverOf(c) { // приводит обложку из базы к проверенному виду (или null)
+  if(!c) return null;
+  if(typeof c === 'string') { try { c = JSON.parse(c); } catch(e) { return null; } }
+  if(!c || typeof c.u !== 'string' || !c.u) return null;
+  const n = (v, a, b, d) => { v = +v; return isFinite(v) ? Math.min(b, Math.max(a, v)) : d; };
+  return { u: c.u, x: n(c.x, 0, 100, 50), y: n(c.y, 0, 100, 50), z: n(c.z, 1, 3, 1), op: n(c.op, .1, 1, .6), br: n(c.br, .3, 1.3, 1) };
+}
+function spCoverImgStyle(c) {
+  return `object-position:${c.x}% ${c.y}%;transform:scale(${c.z});transform-origin:${c.x}% ${c.y}%;filter:brightness(${c.br})`;
+}
+function spCoverHTML(cover, src) {
+  const c = spCoverOf(cover); if(!c) return '';
+  return `<div class="sp-cov" style="opacity:${c.op}"><img src="${esc(src || c.u)}" alt="" loading="lazy" draggable="false" style="${spCoverImgStyle(c)}"></div>`;
+}
+
+// ─── Окно «🖼 Обложка» ───
+let _spCov = null; // {id, c:{u,x,y,z,op,br}, blob, obj, old}
+function openSpaceCover(id) {
+  const space = spaces.find(s => s.id === id); if(!space) return;
+  if(space.owner_id && space.owner_id !== currentUser?.id) { toast('Обложку меняет только владелец', true); return; }
+  spCardCss();
+  const cur = spCoverOf(space.cover);
+  _spCov = { id, c: cur ? { ...cur } : { u: '', x: 50, y: 50, z: 1, op: .6, br: 1 }, blob: null, obj: '', old: cur ? cur.u : '' };
+  document.getElementById('sp-cover-dialog')?.remove();
+  const div = document.createElement('div');
+  div.id = 'sp-cover-dialog';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
+  const tp = spaceTypeOf(space), members = (space.members || []).length;
+  const sub = tp ? (tp.icon + ' ' + t(tp.tag) + (tp.id === 'group' && members ? ' · ' + membersWord(members) : '')) : '';
+  div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:18px;width:100%;max-width:420px;max-height:100%;overflow:auto">
+    <div style="font-size:16px;font-weight:700">🖼 Обложка</div>
+    <div style="font-size:12px;color:var(--t3);margin:4px 0 12px">Двигайте картинку на карточке пальцем или мышью</div>
+    <div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:16px">
+      <div class="sp-top" id="spc-top">
+        <div id="spc-cov-wrap"></div>
+        <div style="display:flex;align-items:center;gap:14px;position:relative;pointer-events:none;padding-right:62px">
+          ${spIconHTML(space, 0)}
+          <div style="flex:1;min-width:0"><div dir="auto" style="font-size:17px;font-weight:700;overflow-wrap:anywhere">${esc(space.name)}</div><div style="font-size:12px;color:var(--t3);margin-top:3px">${sub}</div></div>
+        </div>
+        <div class="sp-btns" style="pointer-events:none"><span class="sp-star" style="display:flex">${spStarSVG(true)}</span><span class="sp-chev" style="display:flex">${SP_TRI_SVG}</span></div>
+      </div>
+    </div>
+    <div id="spc-empty" style="font-size:12px;color:var(--t3);text-align:center;margin-top:8px"></div>
+    <label><span>Масштаб</span><input type="range" id="spc-z" min="100" max="300" step="5"><b id="spc-zv"></b></label>
+    <label><span>Прозрачность</span><input type="range" id="spc-op" min="10" max="100" step="5"><b id="spc-opv"></b></label>
+    <label><span>Яркость</span><input type="range" id="spc-br" min="30" max="130" step="5"><b id="spc-brv"></b></label>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button class="spc-bt" onclick="document.getElementById('spc-file').click()">📷 Другая картинка</button>
+      <button class="spc-bt" style="color:var(--red)" onclick="spCoverRemove()">Убрать</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="spc-bt" onclick="spCoverClose()">Отмена</button>
+      <button class="spc-bt" id="spc-save" style="background:var(--accent);color:#0f0f0f;border:none;font-weight:700" onclick="spCoverSave()">Сохранить</button>
+    </div>
+    <input type="file" id="spc-file" accept="image/*" style="display:none" onchange="spCoverPick(this)">
+  </div>`;
+  document.body.appendChild(div);
+  const c = _spCov.c;
+  document.getElementById('spc-z').value = Math.round(c.z * 100);
+  document.getElementById('spc-op').value = Math.round(c.op * 100);
+  document.getElementById('spc-br').value = Math.round(c.br * 100);
+  document.getElementById('spc-z').oninput = e => { _spCov.c.z = e.target.value / 100; spCoverApply(); };
+  document.getElementById('spc-op').oninput = e => { _spCov.c.op = e.target.value / 100; spCoverApply(); };
+  document.getElementById('spc-br').oninput = e => { _spCov.c.br = e.target.value / 100; spCoverApply(); };
+  spCoverDraw();
+  if(!c.u) document.getElementById('spc-file').click(); // картинки ещё нет — сразу предлагаем выбрать
+}
+function spCoverClose() {
+  if(_spCov && _spCov.obj) { try { URL.revokeObjectURL(_spCov.obj); } catch(e) {} }
+  _spCov = null;
+  document.getElementById('sp-cover-dialog')?.remove();
+}
+function spCoverDraw() { // перерисовывает картинку в просмотре и подключает перетаскивание
+  const w = document.getElementById('spc-cov-wrap'); if(!w || !_spCov) return;
+  const c = _spCov.c;
+  w.innerHTML = c.u ? spCoverHTML(c, _spCov.obj || c.u) : '';
+  document.getElementById('spc-empty').textContent = c.u ? '' : 'Картинки нет — нажмите «📷 Другая картинка»';
+  ['spc-z', 'spc-op', 'spc-br'].forEach(i => { const el = document.getElementById(i); if(el) el.disabled = !c.u; });
+  spCoverApply();
+  const box = w.querySelector('.sp-cov'); if(!box) return;
+  const img = box.querySelector('img');
+  let d = null;
+  box.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    const W = box.clientWidth, H = box.clientHeight, nw = img.naturalWidth || W, nh = img.naturalHeight || H;
+    const s0 = Math.max(W / nw, H / nh) * _spCov.c.z;
+    d = { x: e.clientX, y: e.clientY, cx: _spCov.c.x, cy: _spCov.c.y,
+          kx: 100 / Math.max(nw * s0 - W, 40), ky: 100 / Math.max(nh * s0 - H, 40) };
+    box.classList.add('drag');
+    try { box.setPointerCapture(e.pointerId); } catch(_) {}
+  });
+  box.addEventListener('pointermove', e => {
+    if(!d) return;
+    const cl = v => Math.min(100, Math.max(0, v));
+    _spCov.c.x = cl(d.cx - (e.clientX - d.x) * d.kx); // тянем вправо — видно левую часть
+    _spCov.c.y = cl(d.cy - (e.clientY - d.y) * d.ky);
+    spCoverApply();
+  });
+  const up = () => { d = null; box.classList.remove('drag'); };
+  box.addEventListener('pointerup', up); box.addEventListener('pointercancel', up);
+}
+function spCoverApply() {
+  if(!_spCov) return;
+  const c = _spCov.c, box = document.querySelector('#spc-cov-wrap .sp-cov');
+  if(box) { box.style.opacity = c.op; const img = box.querySelector('img'); if(img) img.style.cssText = spCoverImgStyle(c); }
+  const set = (i, v) => { const el = document.getElementById(i); if(el) el.textContent = v; };
+  set('spc-zv', Math.round(c.z * 100) + '%'); set('spc-opv', Math.round(c.op * 100) + '%'); set('spc-brv', Math.round(c.br * 100) + '%');
+}
+async function spCoverShrink(file, max, q) { // уменьшает картинку до max px по длинной стороне → jpeg
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = url; });
+    const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const cv = document.createElement('canvas');
+    cv.width = Math.max(1, Math.round(img.naturalWidth * k)); cv.height = Math.max(1, Math.round(img.naturalHeight * k));
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    return await new Promise(ok => cv.toBlob(ok, 'image/jpeg', q));
+  } finally { URL.revokeObjectURL(url); }
+}
+async function spCoverPick(inp) {
+  const f = inp.files && inp.files[0]; inp.value = '';
+  if(!f || !_spCov) return;
+  try {
+    const blob = await spCoverShrink(f, 800, .82);
+    if(!blob) throw new Error('не удалось прочитать картинку');
+    if(_spCov.obj) { try { URL.revokeObjectURL(_spCov.obj); } catch(e) {} }
+    _spCov.blob = blob; _spCov.obj = URL.createObjectURL(blob);
+    Object.assign(_spCov.c, { u: 'new', x: 50, y: 50, z: 1 });
+    const zr = document.getElementById('spc-z'); if(zr) zr.value = 100;
+    spCoverDraw();
+  } catch(e) { toast('Картинка не открылась: ' + (e.message || e), true); }
+}
+function spCoverRemove() {
+  if(!_spCov) return;
+  _spCov.blob = null; _spCov.c.u = '';
+  spCoverDraw();
+}
+function spCoverPath(u) { // путь файла в attachments, если это наша обложка
+  const m = String(u || '').match(/\/storage\/v1\/object\/public\/attachments\/(covers\/[^?#]+)/);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+async function spCoverSave() {
+  if(!_spCov) return;
+  const st = _spCov, space = spaces.find(s => s.id === st.id); if(!space) { spCoverClose(); return; }
+  const btn = document.getElementById('spc-save'); if(btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    let cover = null;
+    if(st.c.u) {
+      let u = st.c.u;
+      if(st.blob) {
+        const path = 'covers/' + st.id + '/' + Date.now() + '.jpg';
+        const { error } = await sb.storage.from('attachments').upload(path, st.blob, { contentType: 'image/jpeg', upsert: true });
+        if(!error) u = sb.storage.from('attachments').getPublicUrl(path).data.publicUrl;
+        else { // облако не приняло файл — храним маленькую копию прямо в кабинете
+          const small = await spCoverShrink(st.blob, 480, .7);
+          u = await new Promise(ok => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(small); });
+        }
+      }
+      const c = st.c;
+      cover = { u, x: Math.round(c.x * 10) / 10, y: Math.round(c.y * 10) / 10, z: Math.round(c.z * 100) / 100, op: Math.round(c.op * 100) / 100, br: Math.round(c.br * 100) / 100 };
+    }
+    const { error } = await sb.from('spaces').update({ cover }).eq('id', st.id);
+    if(error) {
+      if(/cover/i.test(error.message || '')) throw new Error('в базе нет поля cover — выполните SQL из файла sql-space-cover.sql');
+      throw error;
+    }
+    const oldPath = spCoverPath(st.old);
+    if(oldPath && (!cover || cover.u !== st.old)) { try { await sb.storage.from('attachments').remove([oldPath]); } catch(e) {} }
+    space.cover = cover;
+    try { localStorage.setItem('mc_spaces', JSON.stringify(spaces)); } catch(e) {}
+    spCoverClose();
+    const eb = document.querySelector('#edit-space-dialog button[onclick^="openSpaceCover"]');
+    if(eb) eb.textContent = '🖼 Обложка' + (cover ? ' — изменить' : ' — добавить картинку');
+    renderSpacesList();
+    toast(cover ? '✓ Обложка сохранена' : '✓ Обложка убрана');
+  } catch(e) {
+    toast('Ошибка: ' + (e.message || e), true);
+    if(btn) { btn.disabled = false; btn.textContent = 'Сохранить'; }
+  }
+}
