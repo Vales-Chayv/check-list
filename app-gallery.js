@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════
 (function(){
   const CLOUD = '<svg width="22" height="17" viewBox="0 0 34 26" fill="none" stroke="#e8c56a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 22a6 6 0 0 1-.7-11.95A8 8 0 0 1 23.6 8.2 6.6 6.6 0 0 1 25 22z"/><path d="M17 10v8m-3.5-3.2L17 18.4l3.5-3.6"/></svg>';
-  const G = { type: 'all', space: 'all', sel: false, picked: new Set(), items: [], local: new Set(), orig: new Set(), shown: 90, built: false };
+  const G = { types: new Set(['img', 'vid', 'doc']), spaces: new Set(), rubs: new Set(), q: '', open: '', pq: '', coll: new Set(), view: (() => { try { return localStorage.getItem('mc_gal_view') === 'cards' ? 'cards' : 'grid'; } catch(e) { return 'grid'; } })(), sel: false, picked: new Set(), items: [], local: new Set(), orig: new Set(), shown: 90, built: false };
   const $ = id => document.getElementById(id);
   const X = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const isDesk = () => window.matchMedia('(min-width:900px)').matches;
@@ -24,6 +24,45 @@
   .gal-ch{display:inline-block;font-size:12px;padding:4px 11px;border-radius:14px;border:1px solid var(--b1);background:var(--s2);color:var(--accent);margin-right:5px;cursor:pointer;user-select:none}
   .gal-ch.on{background:var(--accent);color:#0f0f0f;border-color:var(--accent)}
   #gal-body{flex:1;min-height:0;overflow-y:auto;padding:0 14px 10px}
+  .galx-s{display:flex;gap:6px;padding:0 14px 6px}
+  .galx-q{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:var(--s2);border:1px solid var(--b1);border-radius:10px;padding:0 10px}
+  .galx-q input{flex:1;min-width:0;background:none;border:none;outline:none;color:var(--t1);font-size:14px;padding:7px 0;font-family:inherit}
+  .galx-q span{color:var(--t3);cursor:pointer;padding:4px}
+  .galx-row{display:flex;gap:6px;align-items:center;padding:0 14px 6px}
+  .galx-ty{display:flex;border:1px solid var(--b1);border-radius:16px;overflow:hidden;flex:none}
+  .galx-ty span{padding:4px 9px;font-size:15px;cursor:pointer;opacity:.35;filter:grayscale(1);user-select:none}
+  .galx-ty span.on{opacity:1;filter:none;background:var(--s2)}
+  .galx-dd{flex:1;min-width:0;padding:5px 10px;border-radius:16px;font-size:12px;border:1px solid var(--b1);color:var(--t2);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;user-select:none}
+  .galx-dd.set{background:rgba(232,197,106,.15);color:var(--accent);border-color:rgba(232,197,106,.4)}
+  .galx-dd.op{border-color:var(--t1);color:var(--t1)}
+  .galx-pan{margin:0 14px 8px;background:var(--s2);border:1px solid var(--b1);border-radius:12px;overflow:hidden}
+  .galx-ps{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--b1)}
+  .galx-ps input{flex:1;min-width:0;background:var(--s1);border:1px solid var(--b1);border-radius:8px;padding:6px 8px;color:var(--t1);font-size:13px;outline:none;font-family:inherit}
+  .galx-ps span{font-size:12px;color:var(--accent);cursor:pointer;white-space:nowrap}
+  .galx-sel{display:flex;flex-wrap:wrap;gap:5px;padding:8px 10px;border-bottom:1px solid var(--b1)}
+  .galx-sel span{background:rgba(232,197,106,.15);color:var(--accent);border:1px solid rgba(232,197,106,.35);border-radius:12px;padding:3px 8px;font-size:11px;cursor:pointer}
+  .galx-ls{max-height:36vh;overflow-y:auto}
+  .galx-it{display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;font-size:13px;user-select:none}
+  .galx-it.sub{padding-left:40px}
+  .galx-cb{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--t3);flex:none;display:flex;align-items:center;justify-content:center;font-size:12px;color:#0f0f0f;box-sizing:border-box}
+  .galx-cb.on{background:var(--accent);border-color:var(--accent)}
+  .galx-cb.part{border-color:var(--accent)}
+  .galx-cb.part::after{content:'';width:8px;height:2px;background:var(--accent)}
+  .galx-it .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .galx-it .c,.galx-gh .c{font-size:11px;color:var(--t3);font-weight:400}
+  .galx-sec{font-size:11px;color:var(--t3);padding:8px 12px 2px;text-transform:uppercase;letter-spacing:.04em}
+  .galx-gh{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;font-size:13px;font-weight:600;border-top:1px solid var(--b1);user-select:none}
+  .galx-gh:first-child{border-top:none}
+  .galx-gh .ar{color:var(--t3);font-size:11px;width:10px}
+  .galx-gh .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .galx-ft{display:flex;gap:8px;padding:8px 10px;border-top:1px solid var(--b1)}
+  .galx-ft span{flex:1;text-align:center;padding:7px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid var(--b1);color:var(--t2)}
+  .galx-ft span.ok{background:var(--accent);color:#0f0f0f;border-color:var(--accent);font-weight:700}
+  .galx-h{display:flex;align-items:baseline;gap:6px;margin:12px 2px 5px;cursor:pointer}
+  .galx-h b{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  .galx-h span{font-size:11px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+  .galx-h em{font-style:normal;font-size:12px;color:var(--accent);white-space:nowrap}
+  mark.galx-m{background:rgba(232,197,106,.35);color:inherit;border-radius:2px}
   .gal-dt{font-size:11px;color:var(--t3);margin:10px 2px 5px;text-transform:uppercase;letter-spacing:.04em}
   .gal-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:3px}
   .gal-t{position:relative;aspect-ratio:1;border-radius:5px;overflow:hidden;cursor:pointer;background:#262626;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
@@ -101,7 +140,7 @@
         seen.add(a.data);
         const t = a.type || '';
         const kind = t.startsWith('image/') ? 'img' : t.startsWith('video/') ? 'vid' : t.startsWith('audio/') ? 'aud' : t === 'application/x-mc-big' ? 'big' : 'doc';
-        out.push({ url: a.data, name: a.name || '', kind, att: kind === 'big' ? a : null, bigVid: kind === 'big' && /^video/.test((a.big && a.big.type) || ''), size: a.size || 0, ts: a.ts || parseEntryDate(ds) || base, space: c.space_id || 'personal', spaceName: spaceName(c.space_id), cardId: c.id, cardTitle: c.title || '' });
+        out.push({ url: a.data, name: a.name || '', kind, att: kind === 'big' ? a : null, bigVid: kind === 'big' && /^video/.test((a.big && a.big.type) || ''), size: a.size || 0, ts: a.ts || parseEntryDate(ds) || base, space: c.space_id || 'personal', spaceName: spaceName(c.space_id), cardId: c.id, cardTitle: c.title || '', cat: c.category || '' });
       };
       (c.attachments || []).forEach(a => push(a, ''));
       (c.entries || []).forEach(e => { (e.attachments || []).forEach(a => push(a, e.date)); (e.sessionAtts || []).forEach(a => push(a, e.date)); });
@@ -164,8 +203,9 @@
       <div class="sheet-handle"></div>
       <div class="gal-top"><span>🖼 Галерея</span><span class="sp"></span><span class="cnt" id="gal-cnt"></span><button class="gal-ib" id="gal-sync" aria-label="Обновить из облака" title="Обновить из облака">⟳</button><button class="gal-ib" id="gal-gear" aria-label="Настройки">⚙</button><button class="gal-ib" style="color:var(--t2)" onclick="closeGallery()" aria-label="Закрыть">✕</button></div>
       <div class="gal-warn" id="gal-warn"></div>
-      <div class="gal-fl" id="gal-f1"></div>
-      <div class="gal-fl" id="gal-f2"></div>
+      <div class="galx-s"><div class="galx-q">🔎<input id="gal-q" type="search" placeholder="Карточка, рубрика, кабинет, файл" autocomplete="off"><span id="gal-qx" style="display:none">✕</span></div><button class="gal-ib" id="gal-view" title="Вид"></button></div>
+      <div class="galx-row" id="gal-f1"></div>
+      <div id="gal-f2"></div>
       <div id="gal-body"></div>
       <div class="gal-bar"><span id="gal-usage"></span><span>☁ со стрелкой — файл только в облаке: нажми, чтобы сохранить на устройство</span></div>
       <div class="gal-act"><span id="gal-edit" style="display:none">✎ Править</span><span id="gal-share">↗ Поделиться</span><span id="gal-save">⬇ Сохранить</span><span id="gal-folder">📁 В папку</span><span id="gal-zip">⬇ ZIP</span><span id="gal-grip" draggable="true" title="Перетащи на рабочий стол">⠿ Перетащить</span><span id="gal-rm">🗑 С устройства</span><span id="gal-cancel">✕ Отмена</span></div>
@@ -182,8 +222,26 @@
         <div style="text-align:center;margin-top:6px"><button class="gal-btn" id="gal-setx">Закрыть</button></div>
       </div></div>`;
     document.body.appendChild(ov);
-    $('gal-f1').onclick = e => { const c = e.target.closest('.gal-ch'); if(c) { G.type = c.dataset.t; G.shown = 90; renderAll(); } };
-    $('gal-f2').onclick = e => { const c = e.target.closest('.gal-ch'); if(c) { G.space = c.dataset.s; G.shown = 90; renderAll(); } };
+    // поиск, значки типов, «Кабинеты» и «Рубрики» (16 ноября)
+    $('gal-q').oninput = e => { G.q = e.target.value.trim(); $('gal-qx').style.display = G.q ? '' : 'none'; G.shown = 90; renderFilters(); renderBody(); };
+    $('gal-qx').onclick = () => { $('gal-q').value = ''; G.q = ''; $('gal-qx').style.display = 'none'; G.shown = 90; renderFilters(); renderBody(); };
+    $('gal-view').onclick = () => { G.view = G.view === 'grid' ? 'cards' : 'grid'; try { localStorage.setItem('mc_gal_view', G.view); } catch(e) {} renderFilters(); renderBody(); };
+    $('gal-f1').onclick = e => {
+      const ty = e.target.closest('[data-ty]'), dd = e.target.closest('[data-dd]');
+      if(ty) { const k = ty.dataset.ty; if(G.types.has(k)) { if(G.types.size > 1) G.types.delete(k); } else G.types.add(k); G.shown = 90; renderAll(); }
+      else if(dd) { G.open = G.open === dd.dataset.dd ? '' : dd.dataset.dd; G.pq = ''; renderFilters(); }
+    };
+    $('gal-f2').onclick = e => {
+      const t = e.target.closest('[data-k],[data-a],[data-all],[data-g]'); if(!t) return;
+      const d = t.dataset, S = G.open === 'sp' ? G.spaces : G.rubs;
+      if(d.all !== undefined) { const ks = rubKeysOf(d.all), all = ks.every(k => G.rubs.has(k)); ks.forEach(k => all ? G.rubs.delete(k) : G.rubs.add(k)); }
+      else if(d.g !== undefined) { if(G.coll.has(d.g)) G.coll.delete(d.g); else G.coll.add(d.g); renderPanel(true); return; }
+      else if(d.k !== undefined) { if(S.has(d.k)) S.delete(d.k); else S.add(d.k); }
+      else if(d.a === 'none') S.clear();
+      else if(d.a === 'close') { G.open = ''; G.pq = ''; renderFilters(); return; }
+      pruneRubs(); G.shown = 90; renderFilters(true); renderBody();
+    };
+    $('gal-f2').oninput = e => { if(e.target.id === 'galx-pq') { G.pq = e.target.value.trim().toLowerCase(); renderPanel(true); } };
     const body = $('gal-body');
     let timer = null, long = false, sx = 0, sy = 0;
     const startSel = t => { long = true; G.sel = true; G.picked.add(+t.dataset.i); if(navigator.vibrate) try { navigator.vibrate(15); } catch(e) {} renderBody(); };
@@ -205,6 +263,7 @@
       const dl = e.target.closest('.gal-dl');
       if(dl) { e.stopPropagation(); downloadOne(dl); return; }
       if(e.target.closest('.gal-more')) { G.shown += 90; renderBody(); return; }
+      const hd = e.target.closest('.galx-h'); if(hd && !G.sel) { openCardOf(hd.dataset.card); return; }
       const t = e.target.closest('.gal-t'); if(!t) return;
       if(long) { long = false; return; }
       const i = +t.dataset.i;
@@ -291,14 +350,102 @@
     const u = await mcMediaUsage();
     $('gal-us2').textContent = 'Занято: ' + fmtMB(u.bytes) + ' · ' + u.files + ' файлов' + (u.pinned ? ' (📌 ' + u.pinned + ' закреплено: не вытесняются)' : '');
   }
-  function renderFilters() {
-    const T = [['all', 'Все'], ['img', 'Фото'], ['vid', 'Ролики'], ['doc', 'Файлы']];
-    $('gal-f1').innerHTML = T.map(t => `<span class="gal-ch${G.type === t[0] ? ' on' : ''}" data-t="${t[0]}">${t[1]}</span>`).join('');
-    const names = []; G.items.forEach(it => { if(!names.some(n => n[0] === it.space)) names.push([it.space, it.spaceName]); });
-    $('gal-f2').innerHTML = `<span class="gal-ch${G.space === 'all' ? ' on' : ''}" data-s="all">Все кабинеты</span>` + names.map(n => `<span class="gal-ch${G.space === n[0] ? ' on' : ''}" data-s="${X(n[0])}">${X(n[1])}</span>`).join('');
+  // ── фильтры (16 ноября): значки типов, кабинеты и рубрики с выбором нескольких, поиск ──
+  const kindGrp = it => it.kind === 'img' ? 'img' : (it.kind === 'vid' || (it.kind === 'big' && it.bigVid)) ? 'vid' : 'doc';
+  const rubKey = it => it.space + '|' + it.cat;
+  const rubName = c => c || 'Без рубрики';
+  function qHit(it) {
+    if(!G.q) return true;
+    const q = G.q.toLowerCase();
+    return [it.cardTitle, it.cat, it.spaceName, it.kind === 'img' || it.kind === 'vid' ? '' : it.name].some(x => String(x || '').toLowerCase().includes(q));
   }
-  function filtered() {
-    return G.items.map((it, i) => ({ it, i })).filter(o => (G.type === 'all' || (G.type === 'doc' ? (o.it.kind === 'doc' || o.it.kind === 'aud' || (o.it.kind === 'big' && !o.it.bigVid)) : G.type === 'vid' ? (o.it.kind === 'vid' || (o.it.kind === 'big' && o.it.bigVid)) : o.it.kind === G.type)) && (G.space === 'all' || o.it.space === G.space));
+  // skip: 'sp' — без учёта кабинетов, 'r' — без учёта рубрик (для счётчиков в списках)
+  function passes(it, skip) {
+    if(!G.types.has(kindGrp(it)) || !qHit(it)) return false;
+    if(skip !== 'sp' && G.spaces.size && !G.spaces.has(it.space)) return false;
+    if(skip !== 'r' && skip !== 'sp' && G.rubs.size && !G.rubs.has(rubKey(it))) return false;
+    return true;
+  }
+  function filtered() { return G.items.map((it, i) => ({ it, i })).filter(o => passes(o.it)); }
+  function cabList() { // все кабинеты, где есть файлы: [id, имя]
+    const m = new Map(); G.items.forEach(it => { if(!m.has(it.space)) m.set(it.space, it.spaceName); }); return [...m];
+  }
+  function rubGroups() { // рубрики под своими кабинетами; только выбранные кабинеты, если они выбраны
+    const m = new Map();
+    G.items.forEach(it => {
+      if(G.spaces.size && !G.spaces.has(it.space)) return;
+      if(!m.has(it.space)) m.set(it.space, { name: it.spaceName, rubs: new Map() });
+      const g = m.get(it.space); if(!g.rubs.has(it.cat)) g.rubs.set(it.cat, 0);
+    });
+    G.items.forEach(it => { const g = m.get(it.space); if(g && passes(it, 'r')) g.rubs.set(it.cat, g.rubs.get(it.cat) + 1); });
+    return [...m].map(([id, g]) => ({ id, name: g.name, rubs: [...g.rubs].sort((a, b) => rubName(a[0]).localeCompare(rubName(b[0]), 'ru')) }))
+      .sort((a, b) => String(a.name).localeCompare(String(b.name), 'ru'));
+  }
+  const rubKeysOf = sp => { const g = rubGroups().find(x => x.id === sp); return g ? g.rubs.map(r => sp + '|' + r[0]) : []; };
+  function pruneRubs() { // рубрики кабинетов, которые сняли с выбора, тоже снимаются
+    if(!G.spaces.size) return;
+    [...G.rubs].forEach(k => { if(!G.spaces.has(k.split('|')[0])) G.rubs.delete(k); });
+  }
+  const hlq = (s, q) => { s = String(s || ''); if(!q) return X(s); const i = s.toLowerCase().indexOf(q.toLowerCase()); return i < 0 ? X(s) : X(s.slice(0, i)) + '<mark class="galx-m">' + X(s.slice(i, i + q.length)) + '</mark>' + X(s.slice(i + q.length)); };
+  function ddLabel(set, names, all) {
+    if(!set.size) return all;
+    const first = names([...set][0]);
+    return first + (set.size > 1 ? ' +' + (set.size - 1) : '');
+  }
+  function renderFilters(keepPanel) {
+    const vb = $('gal-view'); if(vb) { vb.textContent = G.view === 'grid' ? '▦' : '🗂'; vb.title = G.view === 'grid' ? 'Сейчас: сетка. Нажми — по карточкам' : 'Сейчас: по карточкам. Нажми — сетка'; }
+    const cabName = id => { const c = cabList().find(x => x[0] === id); return c ? c[1] : '?'; };
+    $('gal-f1').innerHTML = `<div class="galx-ty">${[['img', '🖼', 'Фото'], ['vid', '▶️', 'Ролики'], ['doc', '📄', 'Файлы и записи']].map(t => `<span class="${G.types.has(t[0]) ? 'on' : ''}" data-ty="${t[0]}" title="${t[2]}">${t[1]}</span>`).join('')}</div>`
+      + `<div class="galx-dd${G.spaces.size ? ' set' : ''}${G.open === 'sp' ? ' op' : ''}" data-dd="sp">🗂 ${X(ddLabel(G.spaces, cabName, 'Кабинеты'))} ▾</div>`
+      + `<div class="galx-dd${G.rubs.size ? ' set' : ''}${G.open === 'r' ? ' op' : ''}" data-dd="r">📂 ${X(ddLabel(G.rubs, k => rubName(k.slice(k.indexOf('|') + 1)), 'Рубрики'))} ▾</div>`;
+    renderPanel(keepPanel);
+  }
+  // окно списка под строкой фильтров; keep — не пересоздавать поле поиска (чтобы не терялся курсор)
+  function renderPanel(keep) {
+    const box = $('gal-f2'); if(!box) return;
+    if(!G.open) { box.innerHTML = ''; return; }
+    const isSp = G.open === 'sp', S = isSp ? G.spaces : G.rubs, pq = G.pq;
+    if(!keep || !$('galx-pq')) {
+      box.innerHTML = `<div class="galx-pan"><div class="galx-ps"><input id="galx-pq" type="search" autocomplete="off"><span data-a="none">Сбросить</span></div><div id="galx-body"></div><div class="galx-ft"><span data-a="close">Закрыть</span><span class="ok" data-a="close" id="galx-ok"></span></div></div>`;
+      $('galx-pq').value = G.pq;
+    }
+    let h = '';
+    if(isSp) {
+      const cnt = new Map(); G.items.forEach(it => { if(passes(it, 'sp')) cnt.set(it.space, (cnt.get(it.space) || 0) + 1); });
+      const all = cabList(), L = all.filter(c => !pq || String(c[1]).toLowerCase().includes(pq));
+      const on = L.filter(c => S.has(c[0])), off = L.filter(c => !S.has(c[0])).sort((a, b) => (cnt.get(b[0]) || 0) - (cnt.get(a[0]) || 0) || String(a[1]).localeCompare(String(b[1]), 'ru'));
+      const it = c => `<div class="galx-it" data-k="${X(c[0])}"><span class="galx-cb${S.has(c[0]) ? ' on' : ''}">${S.has(c[0]) ? '✓' : ''}</span><span class="n">${hlq(c[1], pq)}</span><span class="c">${cnt.get(c[0]) || 0}</span></div>`;
+      if(S.size) h += `<div class="galx-sel">${[...S].map(id => `<span data-k="${X(id)}">${X((all.find(c => c[0] === id) || [0, '?'])[1])} ✕</span>`).join('')}</div>`;
+      h += `<div class="galx-ls">${on.map(it).join('')}${on.length && off.length ? '<div class="galx-sec">Остальные</div>' : ''}${off.map(it).join('')}${L.length ? '' : '<div class="galx-sec">Ничего не найдено</div>'}</div>`;
+      $('galx-pq').placeholder = 'Найти кабинет (' + all.length + ')';
+    } else {
+      const groups = rubGroups(); let n = 0;
+      groups.forEach(g => {
+        const nameHit = !pq || String(g.name).toLowerCase().includes(pq);
+        const rs = g.rubs.filter(r => nameHit || rubName(r[0]).toLowerCase().includes(pq)); if(!rs.length) return;
+        n += g.rubs.length;
+        const keys = g.rubs.map(r => g.id + '|' + r[0]), allOn = keys.every(k => S.has(k)), some = keys.some(k => S.has(k));
+        const cl = G.coll.has(g.id) && !pq, tot = g.rubs.reduce((a, r) => a + r[1], 0);
+        h += `<div class="galx-gh" data-g="${X(g.id)}"><span class="ar">${cl ? '▸' : '▾'}</span><span class="galx-cb${allOn ? ' on' : some ? ' part' : ''}" data-all="${X(g.id)}">${allOn ? '✓' : ''}</span><span class="n">${hlq(g.name, pq)}</span><span class="c">${tot}</span></div>`;
+        if(!cl) h += rs.map(r => { const k = g.id + '|' + r[0], on = S.has(k); return `<div class="galx-it sub" data-k="${X(k)}"><span class="galx-cb${on ? ' on' : ''}">${on ? '✓' : ''}</span><span class="n">${hlq(rubName(r[0]), pq)}</span><span class="c">${r[1]}</span></div>`; }).join('');
+      });
+      h = `<div class="galx-ls">${h || '<div class="galx-sec">Ничего не найдено</div>'}</div>`;
+      $('galx-pq').placeholder = 'Найти рубрику' + (G.spaces.size ? ' в выбранных кабинетах' : '');
+    }
+    const lsOld = box.querySelector('.galx-ls'), top = lsOld ? lsOld.scrollTop : 0;
+    $('galx-body').innerHTML = h;
+    const lsNew = box.querySelector('.galx-ls'); if(lsNew && keep) lsNew.scrollTop = top;
+    $('galx-ok').textContent = 'Готово · ' + (S.size || 'все');
+  }
+  function openCardOf(id) { // открыть карточку из заголовка в виде «По карточкам»
+    allCards().then(list => {
+      const card = list.find(c => c.id === id); if(!card) return;
+      if(!isDesk()) closeGallery();
+      if(typeof clOpenCard === 'function') {
+        if(!(window._clCache || []).some(c => c.id === id)) window._clCache = (window._clCache || []).concat([card]);
+        clOpenCard(id);
+      } else if(typeof openView === 'function' && (typeof cards !== 'undefined') && cards.some(c => c.id === id)) openView(id);
+    });
   }
   function renderBody() {
     const L = filtered();
@@ -306,23 +453,32 @@
     $('gal-sheet').classList.toggle('selmode', G.sel);
     { const ge = $('gal-edit'); if(ge) { const one = G.sel && G.picked.size === 1 ? G.items[[...G.picked][0]] : null; ge.style.display = one && one.kind === 'img' && window.mcPhotoEdit && /^(https?|data):/i.test(one.url) ? '' : 'none'; } }
     { const gg = $('gal-grip'); if(gg) { const one = G.sel && G.picked.size === 1 && G.items[[...G.picked][0]] && /^https?:/i.test(G.items[[...G.picked][0]].url); gg.classList.toggle('show', !!one); } }
-    const part = L.slice(0, G.shown);
+    let part = L.slice(0, G.shown);
+    if(G.view === 'cards') { // по карточкам: файлы одной карточки вместе, карточки — по самому свежему файлу
+      const order = new Map(); L.forEach(o => { if(!order.has(o.it.cardId)) order.set(o.it.cardId, order.size); });
+      part = L.slice().sort((a, b) => order.get(a.it.cardId) - order.get(b.it.cardId)).slice(0, G.shown);
+    }
     let h = '', cur = null;
     part.forEach(o => {
-      const it = o.it, lab = dayLabel(it.ts);
-      if(lab !== cur) { if(cur !== null) h += '</div>'; cur = lab; h += `<div class="gal-dt">${X(lab)}</div><div class="gal-g">`; }
+      const it = o.it, lab = G.view === 'cards' ? 'c:' + it.cardId : dayLabel(it.ts);
+      if(lab !== cur) {
+        if(cur !== null) h += '</div>'; cur = lab;
+        h += G.view === 'cards'
+          ? `<div class="galx-h" data-card="${X(it.cardId)}"><b>${hlq(it.cardTitle || 'Без названия', G.q)}</b><span>${hlq(rubName(it.cat), G.q)} · ${hlq(it.spaceName, G.q)}</span><em>открыть ›</em></div><div class="gal-g">`
+          : `<div class="gal-dt">${X(lab)}</div><div class="gal-g">`;
+      }
       const cl = !isLocal(it) && it.kind !== 'img' && it.kind !== 'big';
       const cls = 'gal-t' + (G.picked.has(o.i) ? ' on' : '') + (cl ? ' cl' : '') + ((it.kind === 'doc' || it.kind === 'aud' || it.kind === 'big') ? ' doc' : '');
       let inner;
       if(it.kind === 'img') inner = `<img src="${X(it.url)}" loading="lazy" alt="">`;
       else if(it.kind === 'vid') inner = `<video src="${X(it.url)}#t=0.1" preload="metadata" muted playsinline></video><i>▶</i>`;
       else if(it.kind === 'big') inner = `<b>${it.bigVid ? '🎞' : '🎤'}</b>${X(it.name || 'файл')}<br><span style="font-size:10px;color:var(--t3)">${window.mcBigHas && window.mcBigHas(it.url) ? 'на этом устройстве' : 'на другом устройстве'}</span>`;
-      else inner = `<b>${it.kind === 'aud' ? '🎤' : '📄'}</b>${X(it.name || (it.kind === 'aud' ? 'запись' : 'файл'))}`;
+      else inner = `<b>${it.kind === 'aud' ? '🎤' : '📄'}</b>${hlq(it.name || (it.kind === 'aud' ? 'запись' : 'файл'), G.q)}`;
       h += `<div class="${cls}" data-i="${o.i}">${inner}${cl ? '<button class="gal-dl" data-dl="' + o.i + '" aria-label="Скачать на устройство"><span>' + CLOUD + '</span></button>' : ''}${G.orig.has(it.url) ? '<u class="gal-or" title="Оригинал на этом устройстве">💎</u>' : ''}<span class="gal-sel"></span></div>`;
     });
     if(cur !== null) h += '</div>';
     if(L.length > G.shown) h += `<button class="gal-more">Показать ещё (${L.length - G.shown})</button>`;
-    $('gal-body').innerHTML = h || '<div style="padding:50px 0;text-align:center;color:var(--t3)">Здесь пока ничего нет</div>';
+    $('gal-body').innerHTML = h || `<div style="padding:50px 0;text-align:center;color:var(--t3)">${G.items.length ? 'Ничего не найдено' : 'Здесь пока ничего нет'}</div>`;
     mcMediaUsage().then(u => {
       const el = $('gal-usage'); if(!el) return;
       const cap = cfg().capMB * MB, p = cap ? u.bytes / cap : 0;
@@ -424,7 +580,7 @@
     build();
     G.sel = false; G.picked.clear(); G.shown = 90;
     G.items = collect(await allCards());
-    if(G.space !== 'all' && !G.items.some(it => it.space === G.space)) G.space = 'all';
+    { const sp = new Set(G.items.map(it => it.space)), rk = new Set(G.items.map(rubKey)); [...G.spaces].forEach(id => { if(!sp.has(id)) G.spaces.delete(id); }); [...G.rubs].forEach(k => { if(!rk.has(k)) G.rubs.delete(k); }); }
     renderAll();
     await loadLocal();
     renderBody();
