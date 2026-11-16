@@ -904,6 +904,7 @@ async function deleteSpace(id) {
     await sb.from('cards').delete().eq('space_id', id);
     await sb.from('spaces').delete().eq('id', id);
     try { await storageRemoveAtts(_spCards.flatMap(c => cardAttsOf(c)), _spCards.map(c => c.id)); } catch(e) {}
+    try { await spCoverRemoveAll(id, space.cover); } catch(e) {} // обложка кабинета (16 ноября)
     spaces = spaces.filter(s=>s.id!==id);
     localStorage.setItem('mc_spaces', JSON.stringify(spaces));
 document.getElementById('edit-space-dialog')?.remove();
@@ -1914,4 +1915,14 @@ async function spCoverSave() {
     toast('Ошибка: ' + (e.message || e), true);
     if(btn) { btn.disabled = false; btn.textContent = 'Сохранить'; }
   }
+}
+
+async function spCoverRemoveAll(id, cover) { // удаляет из облака все картинки обложки кабинета (папка covers/<id>/)
+  const paths = new Set();
+  const c = spCoverOf(cover), p = c ? spCoverPath(c.u) : ''; if(p) paths.add(p);
+  try {
+    const { data } = await sb.storage.from('attachments').list('covers/' + id, { limit: 100 });
+    (data || []).forEach(f => { if(f && f.name) paths.add('covers/' + id + '/' + f.name); });
+  } catch(e) {}
+  if(paths.size) await sb.storage.from('attachments').remove([...paths]);
 }
