@@ -17,6 +17,7 @@ let calEnabledCats = new Set(); // включённые пары «кабине�
 let calCatColors = {}; // цвета рубрик всех кабинетов: ключ «кабинет‖рубрика» → цвет
 let calOpenCab = null; // какой кабинет развёрнут в панели (аккордеон)
 let calShownCabs = new Set(); // кабинеты, вынесенные чипсами в верхнюю строку
+let calRubPanelSp = ''; // кабинет, чьё окошко рубрик открыто (16 ноября)
 let calRegion = localStorage.getItem('mc_region') || 'IL'; // регион: часовой пояс + праздники (пока только Израиль)
 const CAL_REGIONS = { IL: { tz: 'Asia/Jerusalem' } }; // позже добавим другие страны
 function calTZ() { return (CAL_REGIONS[calRegion] || CAL_REGIONS.IL).tz; }
@@ -550,11 +551,9 @@ function renderCalFilters() {
     const sp = spaces.find(s => s.id === cab.spaceId);
     const icon = sp && sp.type === 'family' ? '👨‍👩‍👧' : '🗂️';
     html += `<div style="width:1px;background:var(--b1);flex-shrink:0;margin:2px 4px"></div>`;
-    html += `<button data-sp="${esc(cab.spaceId)}" onclick="calToggleCabShown(this.dataset.sp)" title="${t('Убрать из фильтра')}" style="background:var(--s2);border:1px solid var(--accent);border-radius:14px;padding:4px 12px;font-size:12px;color:var(--accent);font-weight:600;white-space:nowrap;flex-shrink:0;cursor:pointer">${icon} ${esc(cab.spaceName)}</button>`;
-    cab.rubrics.forEach(r => {
-      const on = calEnabledCats.has(r.key);
-      html += `<button data-key="${esc(r.key)}" onclick="calToggleRubric(this.dataset.key)" style="background:${on?hex2rgba(r.color,.18):'var(--s2)'};border:1px solid ${on?hex2rgba(r.color,.5):'var(--b1)'};border-radius:14px;padding:4px 10px;font-size:12px;color:${on?r.color:'var(--t3)'};opacity:${on?'1':'.55'};cursor:pointer;white-space:nowrap;flex-shrink:0"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${r.color};margin-right:4px"></span>${esc(r.name||'—')}</button>`;
-    });
+    // 16 ноября: в ленте только кнопка кабинета «включено/всего ▾», рубрики — в окошке (calOpenRubPanel)
+    const rOn = cab.rubrics.filter(r => calEnabledCats.has(r.key)).length, opened = calRubPanelSp === cab.spaceId;
+    html += `<button data-sp="${esc(cab.spaceId)}" onclick="calOpenRubPanel(this.dataset.sp, this)" title="${t('Рубрики кабинета')}" style="background:${opened?'rgba(232,197,106,.18)':'var(--s2)'};border:1px solid var(--accent);border-radius:14px;padding:4px 12px;font-size:12px;color:var(--accent);font-weight:600;white-space:nowrap;flex-shrink:0;cursor:pointer">${icon} ${esc(cab.spaceName)} <span style="font-weight:400;opacity:.75">${rOn}/${cab.rubrics.length}</span> ${opened?'▴':'▾'}</button>`;
   });
 
   if(members.length) {
@@ -589,6 +588,7 @@ function calRefreshFilters() {
   renderCalFilters();
   renderCalendar();
   if(document.getElementById('cal-cab-panel')) renderCabinetPanel();
+  if(document.getElementById('cal-rub-panel')) renderRubPanel();
 }
 
 function calToggleRubric(key) {
@@ -1143,3 +1143,49 @@ async function calOpenCard(cardId) {
     if(dx < 0) calNext(); else calPrev();
   }, { passive: true });
 })();
+
+// ─── ОКОШКО РУБРИК КАБИНЕТА (16 ноября) ───
+// Кнопка кабинета в ленте открывает окошко под собой: рубрики цветными кнопками в несколько строк,
+// «Включить все / Выключить все» (только этот кабинет), «Убрать из ленты». Нажатие мимо закрывает.
+function calOpenRubPanel(spaceId, btn) {
+  if(calRubPanelSp === spaceId && document.getElementById('cal-rub-panel')) { calCloseRubPanel(); return; }
+  calCloseRubPanel();
+  calRubPanelSp = spaceId;
+  const r = btn ? btn.getBoundingClientRect() : { left: 8, bottom: 120 };
+  const w = Math.min(320, window.innerWidth - 16);
+  const back = document.createElement('div');
+  back.id = 'cal-rub-backdrop';
+  back.onclick = calCloseRubPanel;
+  back.style.cssText = 'position:fixed;inset:0;z-index:200;background:transparent';
+  const panel = document.createElement('div');
+  panel.id = 'cal-rub-panel';
+  panel.onclick = e => e.stopPropagation();
+  panel.style.cssText = `position:fixed;left:${Math.max(8, Math.min(r.left, window.innerWidth - w - 8))}px;top:${r.bottom + 6}px;width:${w}px;max-height:60vh;overflow-y:auto;box-sizing:border-box;background:var(--s1);border:1px solid var(--b1);border-radius:12px;padding:10px;z-index:201;box-shadow:0 10px 32px rgba(0,0,0,.55)`;
+  back.appendChild(panel);
+  document.body.appendChild(back);
+  renderRubPanel();
+  renderCalFilters(); // кнопка кабинета подсвечивается и показывает ▴
+}
+function calCloseRubPanel() {
+  const had = !!calRubPanelSp;
+  document.getElementById('cal-rub-backdrop')?.remove();
+  calRubPanelSp = '';
+  if(had && document.getElementById('cal-filters')) renderCalFilters();
+}
+function renderRubPanel() {
+  const panel = document.getElementById('cal-rub-panel'); if(!panel) return;
+  const cab = calCabinetRubrics().find(c => c.spaceId === calRubPanelSp);
+  if(!cab || !calShownCabs.has(cab.spaceId)) { calCloseRubPanel(); return; }
+  const on = cab.rubrics.filter(r => calEnabledCats.has(r.key)).length, all = on === cab.rubrics.length;
+  const lk = 'background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:2px 0;font-family:inherit;white-space:nowrap';
+  let html = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <span style="flex:1;min-width:0;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(spaces.find(x => x.id === cab.spaceId) || {}).type === 'family' ? '👨‍👩‍👧' : '🗂️'} ${esc(cab.spaceName)} <span style="font-weight:400;color:var(--t3)">${on}/${cab.rubrics.length}</span></span>
+    <button data-sp="${esc(cab.spaceId)}" onclick="calToggleCabinet(this.dataset.sp)" style="${lk}">${all ? t('Выключить все') : t('Включить все')}</button></div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">`;
+  cab.rubrics.forEach(r => {
+    const k = calEnabledCats.has(r.key);
+    html += `<button data-key="${esc(r.key)}" onclick="calToggleRubric(this.dataset.key)" style="background:${k?hex2rgba(r.color,.18):'var(--s2)'};border:1px solid ${k?hex2rgba(r.color,.5):'var(--b1)'};border-radius:14px;padding:4px 10px;font-size:12px;color:${k?r.color:'var(--t3)'};opacity:${k?'1':'.55'};cursor:pointer;white-space:nowrap;font-family:inherit"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${r.color};margin-right:4px"></span>${esc(r.name||'—')}</button>`;
+  });
+  html += `</div><div style="text-align:right;margin-top:10px"><button data-sp="${esc(cab.spaceId)}" onclick="calCloseRubPanel();calToggleCabShown(this.dataset.sp)" style="${lk};color:var(--t3)">${t('Убрать из ленты')}</button></div>`;
+  panel.innerHTML = html;
+}
