@@ -545,7 +545,7 @@ function spaceRowHTML(s) {
   spCardCss();
   const below = open || (isOwner && !isClosed && (s.joinRequests||[]).length); // есть ли что-то под верхней частью
   return `<div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:16px 16px ${below ? 16 : 0}px;margin-bottom:12px;opacity:${isClosed?.7:1}"${canDrag ? ` class="sp-card" data-drag="${s.id}"` : ' class="sp-card"'}>
-    <div class="sp-top">
+    <div class="sp-top${below ? '' : ' solo'}">
       ${spCoverHTML(s.cover)}
       <div style="display:flex;align-items:center;gap:10px;position:relative">
         ${canDrag ? `<div class="sp-grip" onpointerdown="spGripDown(event,'${s.id}')" onpointermove="spGripMove(event)" onpointerup="spGripUp(event)" onpointercancel="spGripCancel(event)" title="Потяни, чтобы переставить">≡</div>` : ''}
@@ -1699,7 +1699,8 @@ function spCardCss() {
   if(document.getElementById('sp-card-css')) return;
   const st = document.createElement('style'); st.id = 'sp-card-css';
   st.textContent = `
-.sp-top{position:relative;margin:-16px -16px 0;padding:16px;border-radius:var(--r) var(--r) 0 0;overflow:hidden}
+.sp-top{position:relative;margin:-16px -16px 0;padding:16px;border-radius:calc(var(--r) - 1px) calc(var(--r) - 1px) 0 0;overflow:hidden}
+.sp-top.solo{border-radius:calc(var(--r) - 1px)}
 .sp-cov{position:absolute;top:0;right:0;bottom:0;width:46%;pointer-events:none;-webkit-mask-image:linear-gradient(to left,#000 35%,transparent);mask-image:linear-gradient(to left,#000 35%,transparent)}
 .sp-cov img{position:absolute;max-width:none;object-fit:cover;-webkit-user-drag:none;user-select:none}
 .sp-ic{position:relative;flex:none;width:52px;height:52px;display:flex;align-items:center;justify-content:center}
@@ -1773,7 +1774,7 @@ function openSpaceCover(id) {
     <div style="font-size:16px;font-weight:700">🖼 Обложка</div>
     <div style="font-size:12px;color:var(--t3);margin:4px 0 12px">Двигайте картинку на карточке или рамку на всей картинке ниже</div>
     <div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:16px">
-      <div class="sp-top" id="spc-top">
+      <div class="sp-top solo" id="spc-top">
         <div id="spc-cov-wrap"></div>
         <div style="display:flex;align-items:center;gap:14px;position:relative;pointer-events:none;padding-right:62px">
           ${spIconHTML(space, 0)}
