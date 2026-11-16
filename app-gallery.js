@@ -63,6 +63,11 @@
   .galx-h span{font-size:11px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
   .galx-h em{font-style:normal;font-size:12px;color:var(--accent);white-space:nowrap}
   mark.galx-m{background:rgba(232,197,106,.35);color:inherit;border-radius:2px}
+  @media (min-width:900px){
+    #gal-f2{position:relative;height:0;z-index:20}
+    #gal-f2 .galx-pan{position:absolute;top:0;width:340px;max-width:calc(100% - 28px);margin:0;box-shadow:0 12px 32px rgba(0,0,0,.55)}
+    #gal-f2 .galx-ls{max-height:min(420px,50vh)}
+  }
   .gal-dt{font-size:11px;color:var(--t3);margin:10px 2px 5px;text-transform:uppercase;letter-spacing:.04em}
   .gal-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:3px}
   .gal-t{position:relative;aspect-ratio:1;border-radius:5px;overflow:hidden;cursor:pointer;background:#262626;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
@@ -241,6 +246,11 @@
       else if(d.a === 'close') { G.open = ''; G.pq = ''; renderFilters(); return; }
       pruneRubs(); G.shown = 90; renderFilters(true); renderBody();
     };
+    document.addEventListener('pointerdown', e => { // ПК: нажатие мимо открытого списка закрывает его
+      if(!G.open || !isDesk()) return;
+      if(e.target.closest && (e.target.closest('#gal-f2') || e.target.closest('#gal-f1 [data-dd]'))) return;
+      G.open = ''; G.pq = ''; renderFilters();
+    }, true);
     $('gal-f2').oninput = e => { if(e.target.id === 'galx-pq') { G.pq = e.target.value.trim().toLowerCase(); renderPanel(true); } };
     const body = $('gal-body');
     let timer = null, long = false, sx = 0, sy = 0;
@@ -436,6 +446,15 @@
     $('galx-body').innerHTML = h;
     const lsNew = box.querySelector('.galx-ls'); if(lsNew && keep) lsNew.scrollTop = top;
     $('galx-ok').textContent = 'Готово · ' + (S.size || 'все');
+    placePanel();
+  }
+  function placePanel() { // ПК: список — выпадающее окошко под своей кнопкой, а не на всю ширину
+    const pan = document.querySelector('#gal-f2 .galx-pan'), btn = document.querySelector('#gal-f1 [data-dd="' + G.open + '"]'), box = $('gal-f2');
+    if(!pan || !btn || !box) return;
+    if(!isDesk()) { pan.style.left = ''; return; }
+    const bx = box.getBoundingClientRect(), br = btn.getBoundingClientRect();
+    const left = Math.max(14, Math.min(br.left - bx.left, bx.width - pan.offsetWidth - 14));
+    pan.style.left = left + 'px';
   }
   function openCardOf(id) { // открыть карточку из заголовка в виде «По карточкам»
     allCards().then(list => {

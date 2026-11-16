@@ -817,7 +817,7 @@ function calMonthLayout() {
   const g = document.getElementById('cal-mgrid'), h = document.getElementById('cal-mhead'), body = document.getElementById('cal-body');
   if(!g) return;
   if(!calIsPhone()) { // ПК: как было
-    [g, h].forEach(x => { if(x) { x.style.gridTemplateRows = ''; x.style.gridTemplateColumns = ''; x.style.width = ''; } });
+    [g, h].forEach(x => { if(x) { x.style.gridTemplateRows = ''; x.style.gridTemplateColumns = 'repeat(7,1fr)'; x.style.width = ''; } }); // 7 столбцов, как в разметке (пустая строка стирала их — 16 ноября)
     g.querySelectorAll('.cal-mc').forEach(c => { c.querySelectorAll('.cal-mi>*').forEach(x => x.style.display = ''); c.querySelector('.cal-more')?.remove(); c.classList.remove('cal-open'); });
     return;
   }
