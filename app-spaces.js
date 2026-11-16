@@ -1701,7 +1701,7 @@ function spCardCss() {
   st.textContent = `
 .sp-top{position:relative;margin:-16px -16px 0;padding:16px;border-radius:var(--r) var(--r) 0 0;overflow:hidden}
 .sp-cov{position:absolute;top:0;right:0;bottom:0;width:46%;pointer-events:none;-webkit-mask-image:linear-gradient(to left,#000 35%,transparent);mask-image:linear-gradient(to left,#000 35%,transparent)}
-.sp-cov img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;-webkit-user-drag:none;user-select:none}
+.sp-cov img{position:absolute;max-width:none;object-fit:cover;-webkit-user-drag:none;user-select:none}
 .sp-ic{position:relative;flex:none;width:52px;height:52px;display:flex;align-items:center;justify-content:center}
 .sp-ic svg{display:block}
 .sp-unr{position:absolute;top:-4px;right:-6px;min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;border-radius:10px;background:var(--red);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--s2);line-height:1}
@@ -1710,8 +1710,11 @@ function spCardCss() {
 .sp-btns .sp-star,.sp-btns .sp-star.on{color:var(--accent)}
 .sp-btns .sp-chev{color:#fff}
 .sp-btns .sp-chev.on{color:var(--accent)}
-#sp-cover-dialog .sp-cov{pointer-events:auto;cursor:grab;touch-action:none}
-#sp-cover-dialog .sp-cov.drag{cursor:grabbing}
+#spc-top{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+#spc-top.drag,#spc-frame.drag{cursor:grabbing}
+#spc-full{position:relative;overflow:hidden;border-radius:var(--rsm);margin-top:10px;touch-action:none;user-select:none;-webkit-user-select:none;line-height:0}
+#spc-full img{width:100%;display:block;-webkit-user-drag:none}
+#spc-frame{position:absolute;border:2px solid var(--accent);border-radius:4px;box-shadow:0 0 0 999px rgba(0,0,0,.55);cursor:grab;box-sizing:border-box}
 #sp-cover-dialog label{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--t2);margin:10px 0}
 #sp-cover-dialog label span{width:96px;flex:none}
 #sp-cover-dialog label b{width:42px;text-align:right;font-weight:400;color:var(--accent);font-size:12px}
@@ -1743,8 +1746,9 @@ function spCoverOf(c) { // приводит обложку из базы к пр
   const n = (v, a, b, d) => { v = +v; return isFinite(v) ? Math.min(b, Math.max(a, v)) : d; };
   return { u: c.u, x: n(c.x, 0, 100, 50), y: n(c.y, 0, 100, 50), z: n(c.z, 1, 3, 1), op: n(c.op, .1, 1, .6), br: n(c.br, .3, 1.3, 1) };
 }
-function spCoverImgStyle(c) {
-  return `object-position:${c.x}% ${c.y}%;transform:scale(${c.z});transform-origin:${c.x}% ${c.y}%;filter:brightness(${c.br})`;
+function spCoverImgStyle(c) { // картинка в z раз больше рамки; x, y — какая часть видна (0 — левый/верхний край, 100 — правый/нижний)
+  const z = c.z;
+  return `width:${z * 100}%;height:${z * 100}%;left:${(1 - z) * c.x}%;top:${(1 - z) * c.y}%;object-position:${c.x}% ${c.y}%;filter:brightness(${c.br})`;
 }
 function spCoverHTML(cover, src) {
   const c = spCoverOf(cover); if(!c) return '';
@@ -1767,7 +1771,7 @@ function openSpaceCover(id) {
   const sub = tp ? (tp.icon + ' ' + t(tp.tag) + (tp.id === 'group' && members ? ' · ' + membersWord(members) : '')) : '';
   div.innerHTML = `<div style="background:var(--s1);border-radius:var(--r);padding:18px;width:100%;max-width:420px;max-height:100%;overflow:auto">
     <div style="font-size:16px;font-weight:700">🖼 Обложка</div>
-    <div style="font-size:12px;color:var(--t3);margin:4px 0 12px">Двигайте картинку на карточке пальцем или мышью</div>
+    <div style="font-size:12px;color:var(--t3);margin:4px 0 12px">Двигайте картинку на карточке или рамку на всей картинке ниже</div>
     <div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:16px">
       <div class="sp-top" id="spc-top">
         <div id="spc-cov-wrap"></div>
@@ -1778,6 +1782,7 @@ function openSpaceCover(id) {
         <div class="sp-btns" style="pointer-events:none"><span class="sp-star" style="display:flex">${spStarSVG(true)}</span><span class="sp-chev" style="display:flex">${SP_TRI_SVG}</span></div>
       </div>
     </div>
+    <div id="spc-full"></div>
     <div id="spc-empty" style="font-size:12px;color:var(--t3);text-align:center;margin-top:8px"></div>
     <label><span>Масштаб</span><input type="range" id="spc-z" min="100" max="300" step="5"><b id="spc-zv"></b></label>
     <label><span>Прозрачность</span><input type="range" id="spc-op" min="10" max="100" step="5"><b id="spc-opv"></b></label>
@@ -1808,39 +1813,63 @@ function spCoverClose() {
   _spCov = null;
   document.getElementById('sp-cover-dialog')?.remove();
 }
-function spCoverDraw() { // перерисовывает картинку в просмотре и подключает перетаскивание
-  const w = document.getElementById('spc-cov-wrap'); if(!w || !_spCov) return;
-  const c = _spCov.c;
-  w.innerHTML = c.u ? spCoverHTML(c, _spCov.obj || c.u) : '';
+function spCoverDraw() { // перерисовывает картинку в просмотре, всю картинку с рамкой и подключает перетаскивание
+  const w = document.getElementById('spc-cov-wrap'), full = document.getElementById('spc-full'); if(!w || !_spCov) return;
+  const c = _spCov.c, src = _spCov.obj || c.u;
+  w.innerHTML = c.u ? spCoverHTML(c, src) : '';
+  full.innerHTML = c.u ? `<img src="${esc(src)}" alt="" draggable="false"><div id="spc-frame"></div>` : '';
   document.getElementById('spc-empty').textContent = c.u ? '' : 'Картинки нет — нажмите «📷 Другая картинка»';
   ['spc-z', 'spc-op', 'spc-br'].forEach(i => { const el = document.getElementById(i); if(el) el.disabled = !c.u; });
   spCoverApply();
-  const box = w.querySelector('.sp-cov'); if(!box) return;
-  const img = box.querySelector('img');
-  let d = null;
-  box.addEventListener('pointerdown', e => {
-    e.preventDefault();
-    const W = box.clientWidth, H = box.clientHeight, nw = img.naturalWidth || W, nh = img.naturalHeight || H;
-    const s0 = Math.max(W / nw, H / nh) * _spCov.c.z;
-    d = { x: e.clientX, y: e.clientY, cx: _spCov.c.x, cy: _spCov.c.y,
-          kx: 100 / Math.max(nw * s0 - W, 40), ky: 100 / Math.max(nh * s0 - H, 40) };
-    box.classList.add('drag');
-    try { box.setPointerCapture(e.pointerId); } catch(_) {}
-  });
-  box.addEventListener('pointermove', e => {
-    if(!d) return;
-    const cl = v => Math.min(100, Math.max(0, v));
-    _spCov.c.x = cl(d.cx - (e.clientX - d.x) * d.kx); // тянем вправо — видно левую часть
-    _spCov.c.y = cl(d.cy - (e.clientY - d.y) * d.ky);
-    spCoverApply();
-  });
-  const up = () => { d = null; box.classList.remove('drag'); };
-  box.addEventListener('pointerup', up); box.addEventListener('pointercancel', up);
+  if(!c.u) return;
+  const img = w.querySelector('img'), fimg = full.querySelector('img');
+  [img, fimg].forEach(im => im && im.addEventListener('load', spCoverApply));
+  // перетаскивание: на карточке — как саму картинку (палец ведёт картинку), на всей картинке — рамку (наоборот)
+  const bind = (el, frame) => {
+    let d = null;
+    el.addEventListener('pointerdown', e => {
+      if(frame && e.target.id !== 'spc-frame' && e.target !== el.querySelector('img')) return;
+      e.preventDefault();
+      const g = spCoverGeom(); if(!g) return;
+      // сколько процентов x/y на один пиксель движения пальца
+      const kx = frame ? 100 / Math.max(g.vw * (1 - g.fw), 1) : -100 / Math.max(g.rw - g.W, 1);
+      const ky = frame ? 100 / Math.max(g.vh * (1 - g.fh), 1) : -100 / Math.max(g.rh - g.H, 1);
+      d = { x: e.clientX, y: e.clientY, cx: _spCov.c.x, cy: _spCov.c.y, kx, ky, el: frame ? document.getElementById('spc-frame') : el };
+      if(frame && e.target !== d.el) { // нажали мимо рамки — рамка прыгает центром в это место
+        const r = el.getBoundingClientRect();
+        _spCov.c.x = Math.min(100, Math.max(0, ((e.clientX - r.left) / g.vw - g.fw / 2) / Math.max(1 - g.fw, 1e-6) * 100));
+        _spCov.c.y = Math.min(100, Math.max(0, ((e.clientY - r.top) / g.vh - g.fh / 2) / Math.max(1 - g.fh, 1e-6) * 100));
+        d.cx = _spCov.c.x; d.cy = _spCov.c.y; spCoverApply();
+      }
+      d.el && d.el.classList.add('drag');
+      try { el.setPointerCapture(e.pointerId); } catch(_) {}
+    });
+    el.addEventListener('pointermove', e => {
+      if(!d) return;
+      const cl = v => Math.min(100, Math.max(0, v));
+      _spCov.c.x = cl(d.cx + (e.clientX - d.x) * d.kx);
+      _spCov.c.y = cl(d.cy + (e.clientY - d.y) * d.ky);
+      spCoverApply();
+    });
+    const up = () => { if(d && d.el) d.el.classList.remove('drag'); d = null; };
+    el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  };
+  bind(document.getElementById('spc-top'), false);
+  bind(full, true);
+}
+function spCoverGeom() { // размеры: рамка на карточке (W×H), картинка в ней (rw×rh), вся картинка снизу (vw×vh), доля видимого (fw, fh)
+  const box = document.querySelector('#spc-cov-wrap .sp-cov'), img = box && box.querySelector('img'), fimg = document.querySelector('#spc-full img');
+  if(!box || !img || !img.naturalWidth) return null;
+  const W = box.clientWidth, H = box.clientHeight, nw = img.naturalWidth, nh = img.naturalHeight;
+  const s = Math.max(W / nw, H / nh) * _spCov.c.z, rw = nw * s, rh = nh * s;
+  return { W, H, rw, rh, fw: Math.min(1, W / rw), fh: Math.min(1, H / rh), vw: fimg ? fimg.clientWidth : 0, vh: fimg ? fimg.clientHeight : 0 };
 }
 function spCoverApply() {
   if(!_spCov) return;
   const c = _spCov.c, box = document.querySelector('#spc-cov-wrap .sp-cov');
   if(box) { box.style.opacity = c.op; const img = box.querySelector('img'); if(img) img.style.cssText = spCoverImgStyle(c); }
+  const fr = document.getElementById('spc-frame'), g = fr && spCoverGeom();
+  if(fr && g) fr.style.cssText = `left:${(1 - g.fw) * c.x}%;top:${(1 - g.fh) * c.y}%;width:${g.fw * 100}%;height:${g.fh * 100}%`;
   const set = (i, v) => { const el = document.getElementById(i); if(el) el.textContent = v; };
   set('spc-zv', Math.round(c.z * 100) + '%'); set('spc-opv', Math.round(c.op * 100) + '%'); set('spc-brv', Math.round(c.br * 100) + '%');
 }
