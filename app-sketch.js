@@ -139,6 +139,11 @@ body.sk-on #desktop-sk-toggle{background:var(--accent);color:#0f0f0f;border-colo
 .sk-h.mid{width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:rgba(232,197,106,.55);border-width:1.5px;cursor:grab}
 .sk-h.g{border-radius:50%;width:16px;height:16px;margin:-8px 0 0 -8px;background:#e8c56a;border-color:#1f1f1f}
 @media (pointer:coarse){.sk-h{width:22px;height:22px;margin:-11px 0 0 -11px}.sk-h.mid{width:18px;height:18px;margin:-9px 0 0 -9px}.sk-h.g{width:24px;height:24px;margin:-12px 0 0 -12px}}
+#sk-3d{position:absolute;inset:0;z-index:7;background:#e9e6df}
+#sk-3d canvas{display:block;width:100%;height:100%;touch-action:none}
+.sk-3dbar{position:absolute;left:10px;top:10px;display:flex;gap:6px;flex-wrap:wrap;z-index:2}
+.sk-3dbar button{height:32px;border-radius:9px;border:1px solid rgba(0,0,0,.15);background:rgba(255,255,255,.94);color:#222;font-size:13px;cursor:pointer;font-family:inherit;padding:0 10px}
+.sk-3dhint{position:absolute;left:10px;bottom:10px;font-size:11px;color:#6b665c;background:rgba(255,255,255,.8);border-radius:8px;padding:5px 8px;z-index:2;max-width:70%}
 .sk-pop{position:fixed;z-index:2001;background:var(--s1);border:1px solid var(--b1);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.55);padding:12px;width:270px;font-size:13px;color:var(--t1)}
 .sk-pop .seg{display:flex;gap:4px;flex-wrap:wrap;margin:4px 0 10px}
 .sk-pop .seg button{padding:5px 9px;border-radius:8px;border:1px solid var(--b1);background:var(--s2);color:var(--t2);cursor:pointer;font-family:inherit;font-size:12px}
@@ -531,6 +536,7 @@ async function skEdit(id, recIn) {
     <button class="sk-ib" id="sk-undo" onclick="skUndo()" title="Отменить (Ctrl+Z)" aria-label="Отменить">↶</button>
     <button class="sk-ib" id="sk-redo" onclick="skRedo()" title="Повторить (Ctrl+Y)" aria-label="Повторить">↷</button>
     <button class="sk-ib" id="sk-lay-btn" onclick="skLayersToggle()" title="Слои" aria-label="Слои">${SK_LAYERS_SVG}</button>
+    <button class="sk-ib" id="sk-3d-btn" onclick="sk3dToggle()" title="Объём (3D)" aria-label="3D" style="font-weight:700;font-size:13px">3D</button>
     <button class="sk-ib sk-dock-btn" onclick="skDockMenu(this)" title="Расположение: рядом с карточками, под ними, во весь экран, отдельное окно" aria-label="Расположение">${SK_DOCK_SVG}</button>
     <button class="sk-ib solid" id="sk-send-btn" onclick="skSendMenu(this)" title="Отправить"><span class="sk-lg">Отправить ▾</span><span class="sk-sm">📤</span></button>
     <button class="sk-ib sk-hide-ph" onclick="skClose()" aria-label="Закрыть">✕</button>
@@ -618,6 +624,7 @@ function skBounds(cv) { // границы всего рисунка в коор�
 // инструменты
 function skSetTool(t) {
   if(!SK) return;
+  if(SK._3d) sk3dClose();
   if(SK.edit && t !== 'edit') { const E = SK.edit; SK.edit = null; document.getElementById('sk-edit')?.remove(); if(E.obj.type === 'skWarpImage') E.obj.objectCaching = true; skCommit(); }
   const c = SK.canvas; SK.tool = t;
   document.querySelectorAll('#sk-tools .sk-tool').forEach(b => b.classList.toggle('on', b.dataset.tool === t));
@@ -2092,4 +2099,128 @@ function skEditPanel(el) {
   el.innerHTML = `<div class="sk-ih">${E.mode === 'nodes' ? '✎ Узлы · ' + E.N.pts.length : '⧉ Искажение'}<span class="sm"></span></div><div class="sk-ib2">${body}
     <div style="display:flex;margin-top:8px">${btn('✓ Готово', 'skEditDone()', 'background:var(--accent);color:#0f0f0f;border-color:var(--accent);font-weight:700')}</div></div>`;
   el.classList.add('open'); el.onclick = null; el.onchange = null; el.oninput = null;
+}
+
+// ═══════════════════════════════════════════
+//  ЭТАП 6 (19 ноября): объём (3D). Пока для всех (решение Натальи; отделить можно через skAllowed3d()).
+//  Лист → сцена three.js 0.147 (грузится по требованию): контуры без заливки и линии — стены
+//  (толщина 12 см, высота — «Высота» фигуры или 2,7 м), фигуры с заливкой — объёмы (высота — «Высота» или 75 см),
+//  мебель из библиотеки — коробки с привычной высотой, картинки — на полу (подложка), двери и окна — проёмы не строятся.
+//  Только просмотр: вращать, приближать, двигать; «📷 Снимок» — PNG.
+// ═══════════════════════════════════════════
+const SK_THREE = (typeof window !== 'undefined' && window.SK_THREE_URLS) || ['https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js', 'https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js'];
+const SK_FURN_H = [['кроват', 500], ['диван', 800], ['кресл', 800], ['письменн', 750], ['стол', 750], ['стул', 900], ['шкаф', 2200], ['тумб', 600], ['ванн', 600], ['душ', 100], ['унитаз', 400], ['раковин', 850], ['мойк', 900], ['плит', 900], ['холодильник', 1850], ['стиральн', 850], ['модуль', 900], ['колонн', 2700], ['лестниц', 150]];
+async function sk3dLoad() { if(window.THREE && THREE.OrbitControls) return; await skLoadScript(SK_THREE[0]); await skLoadScript(SK_THREE[1]); if(!window.THREE || !THREE.OrbitControls) throw new Error('3D не загрузилось'); }
+function sk3dToggle() { if(!SK) return; if(SK._3d) sk3dClose(); else sk3dOpen(); }
+function sk3dClose() {
+  const T = SK && SK._3d; if(!T) return;
+  SK._3d = null;
+  try { T.ro.disconnect(); T.controls.dispose(); T.renderer.dispose(); } catch(e) {}
+  document.getElementById('sk-3d')?.remove();
+  document.getElementById('sk-3d-btn')?.classList.remove('gold');
+}
+async function sk3dOpen() {
+  const stage = document.getElementById('sk-stage'); if(!stage) return;
+  if(SK.edit) skEditDone();
+  const box = document.createElement('div'); box.id = 'sk-3d';
+  box.innerHTML = `<div class="sk-3dhint">Загружаю 3D…</div>`;
+  stage.appendChild(box);
+  document.getElementById('sk-3d-btn')?.classList.add('gold');
+  try { await sk3dLoad(); } catch(e) { box.querySelector('.sk-3dhint').textContent = 'Нужен интернет, чтобы открыть 3D'; setTimeout(sk3dClose, 2500); return; }
+  if(!document.body.contains(box)) return;
+  const W = stage.clientWidth, H = stage.clientHeight;
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); renderer.setSize(W, H);
+  renderer.shadowMap.enabled = true;
+  const scene = new THREE.Scene(); scene.background = new THREE.Color(0xe9e6df);
+  const cam = new THREE.PerspectiveCamera(45, W / H, .05, 2000);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xb9b3a6, .75));
+  const sun = new THREE.DirectionalLight(0xffffff, .65); sun.position.set(8, 14, 6); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); scene.add(sun);
+  box.innerHTML = `<div class="sk-3dbar"><button onclick="sk3dClose()">◼ 2D</button><button onclick="sk3dFit()">⤢ Показать всё</button><button onclick="sk3dShot()">📷 Снимок</button></div>
+    <div class="sk-3dhint">Тянуть — вращать, колесо или два пальца — ближе/дальше. Высота стен — поле «Высота» у фигуры.</div>`;
+  box.appendChild(renderer.domElement);
+  const controls = new THREE.OrbitControls(cam, renderer.domElement);
+  controls.enableDamping = false; controls.maxPolarAngle = Math.PI * .495;
+  const render = () => renderer.render(scene, cam);
+  controls.addEventListener('change', render);
+  controls.addEventListener('start', () => box.querySelector('.sk-3dhint')?.remove(), { once: true });
+  const ro = new ResizeObserver(() => { const w = stage.clientWidth, h = stage.clientHeight; if(!w || !h) return; renderer.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix(); render(); });
+  ro.observe(stage);
+  SK._3d = { renderer, scene, cam, controls, render, ro };
+  const bb = sk3dBuild(scene);
+  SK._3d.bb = bb;
+  // пол и сетка
+  const span = Math.max(4, bb.w, bb.d) * 1.6;
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(span, span), new THREE.MeshLambertMaterial({ color: 0xf4f1ea }));
+  floor.rotation.x = -Math.PI / 2; floor.position.set(bb.cx, -.002, bb.cz); floor.receiveShadow = true; scene.add(floor);
+  const grid = new THREE.GridHelper(span, Math.round(span), 0xc9c2b2, 0xddd8cc); grid.position.set(bb.cx, 0, bb.cz); scene.add(grid);
+  sk3dFit();
+}
+function sk3dFit() {
+  const T = SK && SK._3d; if(!T) return; const b = T.bb, r = Math.max(2.5, Math.hypot(b.w, b.d, b.h)) / Math.min(1, T.cam.aspect * 1.2); // узкий экран — камера дальше
+  T.controls.target.set(b.cx, Math.min(1, b.h / 3), b.cz);
+  T.cam.position.set(b.cx + r * .75, r * .85, b.cz + r * 1.05);
+  T.cam.updateProjectionMatrix(); T.controls.update(); T.render();
+}
+function sk3dShot() {
+  const T = SK && SK._3d; if(!T) return; T.render();
+  T.renderer.domElement.toBlob(async b => {
+    if(!b) return; const name = skFileName('png').replace(/\.png$/, ' 3D.png');
+    if(typeof mcNativeShareFile === 'function' && await mcNativeShareFile(b, 'Sketch3D_' + Date.now() + '.png', name)) return;
+    const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast('✓ Снимок сохранён');
+  }, 'image/png');
+}
+function sk3dBuild(scene) { // фигуры листа → объёмы; координаты в метрах: x вправо, z вниз по листу, y вверх
+  const k = skMmPx() / 1000, objs = SK.canvas.getObjects().filter(o => o.visible !== false && !o.skDim && !o.skDimOf);
+  let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity, hMax = 0;
+  const grow = (x, z, h) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); hMax = Math.max(hMax, h || 0); };
+  const col = (c, d) => { try { return new THREE.Color(c && c !== 'transparent' ? c : d); } catch(e) { return new THREE.Color(d); } };
+  const edges = (mesh) => { const e = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 25), new THREE.LineBasicMaterial({ color: 0x3a3630 })); e.position.copy(mesh.position); e.rotation.copy(mesh.rotation); scene.add(e); };
+  const mat = c => new THREE.MeshLambertMaterial({ color: c });
+  const wallSeg = (a, b, h, t, c) => { // стена по отрезку
+    const L = Math.hypot(b.x - a.x, b.z - a.z); if(L < .005) return;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(L + t, h, t), mat(c));
+    m.position.set((a.x + b.x) / 2, h / 2, (a.z + b.z) / 2); m.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x);
+    m.castShadow = m.receiveShadow = true; scene.add(m); edges(m); grow(a.x, a.z, h); grow(b.x, b.z, h);
+  };
+  const prism = (pts, h, c, y0) => { // объём по контуру
+    if(pts.length < 3) return;
+    const sh = new THREE.Shape(pts.map(p => new THREE.Vector2(p.x, -p.z)));
+    const g = new THREE.ExtrudeGeometry(sh, { depth: h, bevelEnabled: false }); g.rotateX(-Math.PI / 2);
+    const m = new THREE.Mesh(g, mat(c)); m.position.y = y0 || 0; m.castShadow = m.receiveShadow = true; scene.add(m); edges(m);
+    pts.forEach(p => grow(p.x, p.z, h + (y0 || 0)));
+  };
+  const M = p => ({ x: p.x * k, z: p.y * k });
+  objs.forEach(o => {
+    try {
+      if(o.type === 'i-text' || o.type === 'text') return;
+      if(o.type === 'image' || o.type === 'skWarpImage') { // картинка — на полу
+        const q = skCorners(o).map(M), tex = new THREE.Texture(o.getElement()); tex.needsUpdate = true;
+        if(THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding;
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute([q[0].x, .001, q[0].z, q[1].x, .001, q[1].z, q[2].x, .001, q[2].z, q[3].x, .001, q[3].z], 3));
+        g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 1, 1, 1, 1, 0, 0, 0], 2)); g.setIndex([0, 2, 1, 0, 3, 2]); g.computeVertexNormals();
+        const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: o.opacity ?? 1, side: THREE.DoubleSide })); m.receiveShadow = true; scene.add(m);
+        q.forEach(p => grow(p.x, p.z, 0)); return;
+      }
+      if(o.type === 'group') { // мебель и свои фигуры — коробка по рамке
+        const nm = String(o.skName || '').toLowerCase();
+        if(/двер|окн/.test(nm)) return;
+        const hit = SK_FURN_H.find(f => nm.includes(f[0]));
+        const h = (o.skH || (hit ? hit[1] : 600)) / 1000;
+        prism(skCorners(o).map(M), h, 0xfbfaf6); return;
+      }
+      let subs = null;
+      if(o.type !== 'path') { const N = skShapeNodes(o); if(N && N.pts.every(p => !p.c)) subs = [{ pts: N.pts, closed: N.closed }]; } // прямые стороны — одна стена на сторону
+      if(!subs) subs = skFlatten(o); if(!subs.length) return;
+      const stroke = col(o.stroke, '#e3dccd'), filled = o.fill && o.fill !== 'transparent' && o.fill !== '' && o.type !== 'line';
+      if(filled) { subs.forEach(sb => prism(sb.pts.map(M), (o.skH || 750) / 1000, col(o.fill, '#d9cfc0'))); return; }
+      const h = (o.skH || 2700) / 1000, t = .12;
+      subs.forEach(sb => { const P = sb.pts.map(M); for(let i = 1; i < P.length; i++) wallSeg(P[i - 1], P[i], h, t, 0xece6da); if(sb.closed && P.length > 2) wallSeg(P[P.length - 1], P[0], h, t, 0xece6da); });
+      void stroke;
+    } catch(e) { console.log('3d', o.type, e); }
+  });
+  if(!isFinite(x0)) { x0 = z0 = -2; x1 = z1 = 2; }
+  return { cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, w: x1 - x0, d: z1 - z0, h: hMax };
 }
