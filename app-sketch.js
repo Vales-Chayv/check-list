@@ -97,6 +97,18 @@ function skCss() {
 .sk-ly .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sk-ly button{background:none;border:none;color:var(--t2);font-size:14px;cursor:pointer;padding:3px 4px;font-family:inherit}
 .sk-ly button.off{opacity:.35}
+.sk-lib{pointer-events:auto;background:var(--s1);border:1px solid var(--b1);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.35);font-size:12px;color:var(--t1);overflow:hidden;display:flex;flex-direction:column;max-height:420px}
+.sk-lib .tabs{display:flex;gap:4px;padding:0 8px 6px;overflow-x:auto;scrollbar-width:none;flex:none}
+.sk-lib .tabs button{flex:none;padding:4px 9px;border-radius:12px;border:1px solid var(--b1);background:none;color:var(--t2);font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap}
+.sk-lib .tabs button.on{border-color:var(--accent);color:var(--accent);background:rgba(232,197,106,.14)}
+.sk-lib .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:4px 8px 8px;overflow-y:auto}
+.sk-lib .it{background:#f6f3ec;border-radius:8px;padding:6px 4px 4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;position:relative;border:1px solid transparent}
+.sk-lib .it:hover{border-color:var(--accent)}
+.sk-lib .it svg,.sk-lib .it img{width:100%;height:46px;object-fit:contain}
+.sk-lib .it span{font-size:10px;color:#333;text-align:center;line-height:1.15}
+.sk-lib .it .x{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;border:none;background:rgba(15,15,15,.65);color:#fff;font-size:10px;cursor:pointer;line-height:18px;padding:0}
+.sk-lib .act{display:flex;gap:6px;padding:0 8px 8px;flex-wrap:wrap}
+.sk-lib .act button{flex:1;min-width:110px;font-size:11px;padding:6px;border-radius:8px;border:1px dashed var(--accent);background:none;color:var(--accent);cursor:pointer;font-family:inherit}
 .sk-pop{position:fixed;z-index:2001;background:var(--s1);border:1px solid var(--b1);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.55);padding:12px;width:270px;font-size:13px;color:var(--t1)}
 .sk-pop .seg{display:flex;gap:4px;flex-wrap:wrap;margin:4px 0 10px}
 .sk-pop .seg button{padding:5px 9px;border-radius:8px;border:1px solid var(--b1);background:var(--s2);color:var(--t2);cursor:pointer;font-family:inherit;font-size:12px}
@@ -238,7 +250,7 @@ async function mcStartShow() {
   if(!skAllowed()) return;
   skCss();
   document.getElementById('mc-start')?.remove();
-  const list = (await skLocalAll()).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
+  const list = (await skLocalAll()).filter(r => r.title !== '__lib__').sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
   const last = list[0], ci = await skCardsInfo();
   const h = new Date().getHours();
   const hi = h < 5 ? 'Доброй ночи' : h < 12 ? 'Доброе утро' : h < 18 ? 'Добрый день' : 'Добрый вечер';
@@ -396,9 +408,9 @@ async function skShowList() {
       const c = e.target.closest('.sk-card[data-id]'); if(c) skEdit(c.dataset.id);
     };
   };
-  paint(await skLocalAll());
+  paint((await skLocalAll()).filter(r => r.title !== '__lib__'));
   const synced = await skSync();
-  if(document.getElementById('sk-grid')) { paint(synced); const s = document.getElementById('sk-sync'); if(s) s.textContent = navigator.onLine ? '☁ в облаке' : 'без связи'; }
+  if(document.getElementById('sk-grid')) { paint(synced.filter(r => r.title !== '__lib__')); const s = document.getElementById('sk-sync'); if(s) s.textContent = navigator.onLine ? '☁ в облаке' : 'без связи'; }
 }
 function skMenu(anchor, items) { // маленькое меню под кнопкой: items = [[текст, функция], …]
   document.getElementById('sk-menu-bk')?.remove();
@@ -445,7 +457,7 @@ async function skDelete(id) {
 }
 async function skCreate() {
   const now = new Date().toISOString();
-  const n = (await skLocalAll()).length + 1;
+  const n = (await skLocalAll()).filter(r => r.title !== '__lib__').length + 1;
   const rec = { id: skNewId(), title: 'Эскиз ' + n, data: null, thumb: '', links: [], created_at: now, updated_at: now, dirty: true };
   await skLocalPut(rec);
   return skEdit(rec.id, rec);
@@ -462,6 +474,8 @@ const SK_TOOLS = [
   ['ellipse', 'Круг / эллипс', '<svg width="20" height="20" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="7" fill="none" stroke="currentColor" stroke-width="2.2"/></svg>'],
   ['tri', 'Треугольник', '<svg width="20" height="20" viewBox="0 0 24 24"><path d="M12 4l9 16H3z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>'],
   ['dim', 'Размер — проведи от точки до точки (D)', '<svg width="20" height="20" viewBox="0 0 24 24"><path d="M3 15h18M3 11v8M21 11v8M6 13l-2 4M20 13l-2 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><text x="12" y="10" font-size="7" text-anchor="middle" fill="currentColor" font-family="sans-serif">1,2</text></svg>'],
+  ['img', 'Картинка или фото (JPG, PNG, SVG, PDF) — также Ctrl+V и перетаскивание файла', '🖼'],
+  ['lib', 'Фигуры: двери, окна, мебель, мои фигуры', '<svg width="20" height="20" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17" cy="7" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 21l4-7 4 7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M17 14v7M13.5 17.5h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'],
   ['text', 'Текст', '<span style="font-weight:700;font-family:serif;font-size:20px">T</span>'],
   ['eraser', 'Ластик — стирает фигуры, по которым проведёшь', '<svg width="20" height="20" viewBox="0 0 24 24"><path d="M3 17l9-11 8 7-7 8H6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8 21h13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>']
 ];
@@ -504,7 +518,12 @@ async function skEdit(id, recIn) {
   const canvas = new fabric.Canvas('sk-canvas', { width: stage.clientWidth, height: stage.clientHeight, preserveObjectStacking: true, selection: true, targetFindTolerance: 6, fireRightClick: false, stopContextMenu: true });
   SK = { id: rec.id, title: rec.title, links: rec.links || [], created_at: rec.created_at, canvas, hist: [], redo: [], tool: 'sel', st, meta, mute: false, pushedOnce: !!rec.pushedOnce };
   document.getElementById('sk-title').oninput = e => { SK.title = e.target.value.trim() || 'Без названия'; skSaveSoon(); };
-  document.getElementById('sk-tools').onclick = e => { const b = e.target.closest('[data-tool]'); if(b) skSetTool(b.dataset.tool); };
+  document.getElementById('sk-tools').onclick = e => {
+    const b = e.target.closest('[data-tool]'); if(!b) return;
+    if(b.dataset.tool === 'img') return skPickImage();
+    if(b.dataset.tool === 'lib') return skLibToggle();
+    skSetTool(b.dataset.tool);
+  };
   const done = () => {
     SK.mute = false;
     canvas.getObjects().forEach(o => skPrepObj(o)); // старым листам — номера фигур и слой
@@ -639,6 +658,7 @@ function skBindCanvas(c, stage) {
     if(t === 'hand' || e.button === 1 || (e.altKey && t === 'sel') || SK.space) {
       const pt = e.touches ? e.touches[0] : e; pan = { x: pt.clientX, y: pt.clientY }; c.defaultCursor = 'grabbing'; c.selection = false; return;
     }
+    if(t === 'calib') { skCalibPoint(c.getPointer(e)); return; }
     if(t === 'eraser') { erasing = true; if(o.target) { c.remove(o.target); SK.erased = true; } return; }
     if(t === 'text') {
       const p = c.getPointer(e);
@@ -967,7 +987,7 @@ async function skAttach(cardId, spaceId) {
 //  Настройки листа хранятся в рисунке: data.skMeta = {scale, unit, snapGrid, snapObj, autoDims, layers, active}.
 // ═══════════════════════════════════════════
 const SK_PX_MM = 4;
-const SK_PROPS = ['skId', 'skLayer', 'skH', 'skDims', 'skDim', 'skDimOf', 'skDimL', 'skDimOff'];
+const SK_PROPS = ['skId', 'skLayer', 'skH', 'skDims', 'skDim', 'skDimOf', 'skDimL', 'skDimOff', 'skName'];
 const SK_DIM_COL = '#c0392b';
 const SK_SCALES = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500];
 const SK_UNITS = { mm: { s: 'мм', k: 1, d: 0 }, cm: { s: 'см', k: 10, d: 1 }, m: { s: 'м', k: 1000, d: 2 } };
@@ -977,7 +997,8 @@ function skMetaFix(m) {
   if(!SK_UNITS[m.unit]) m.unit = 'cm';
   if(!(+m.scale > 0)) m.scale = 50;
   if(!Array.isArray(m.layers) || !m.layers.length) m.layers = [{ id: 'l1', name: 'Слой 1', vis: true, lock: false }];
-  if(!m.layers.some(l => l.id === m.active && l.id !== 'dims')) m.active = (m.layers.find(l => l.id !== 'dims') || m.layers[0]).id;
+  const free = l => l.id !== 'dims' && l.id !== 'under';
+  if(!m.layers.some(l => l.id === m.active && free(l))) m.active = (m.layers.find(free) || m.layers[0]).id;
   return m;
 }
 function skJSON() { const j = SK.canvas.toJSON(SK_PROPS); j.skMeta = SK.meta; return JSON.stringify(j); }
@@ -1045,6 +1066,8 @@ function skShape(o) { // что умеем мерить: {kind, w, h, len, area,
   if(o.type === 'triangle') { const w = o.width * sx * k, h = o.height * sy * k; return { kind: 'tri', name: 'Треугольник', w, h, area: w * h / 2, per: w + 2 * Math.hypot(w / 2, h) }; }
   if(o.type === 'line') { const e = skLineEnds(o); return { kind: 'line', name: 'Линия', len: Math.hypot(e[1].x - e[0].x, e[1].y - e[0].y) * k, ang: Math.round(Math.atan2(-(e[1].y - e[0].y), e[1].x - e[0].x) * 180 / Math.PI) }; }
   if(o.type === 'path' && !o.skDim) return { kind: 'path', name: 'Линия от руки', len: skPathLen(o) * k };
+  if(o.type === 'image') { const w = o.width * sx * k, h = o.height * sy * k; return { kind: 'img', name: o.skName || 'Картинка', w, h }; }
+  if(o.type === 'group' && !o.skDim) { const w = o.width * sx * k, h = o.height * sy * k; return { kind: 'grp', name: o.skName || 'Группа', w, h, area: w * h }; }
   if(o.skDim) { const e = skDimWorld(o); return { kind: 'dim', name: 'Размер', len: e ? Math.hypot(e[1].x - e[0].x, e[1].y - e[0].y) * k : 0 }; }
   return null;
 }
@@ -1161,7 +1184,7 @@ function skLayersPaint() {
     else if(a === 'lock') { L.lock = !L.lock; }
     else if(a === 'move') { act.forEach(o => { o.skLayer = id; }); c.discardActiveObject(); }
     else if(a === 'menu') { skLayerMenu(L, b); return; }
-    else if(id !== 'dims') { meta.active = id; }
+    else if(id !== 'dims' && id !== 'under') { meta.active = id; }
     skApplyLayers(); skDimsAll(); skLayersPaint(); skCommit();
   };
 }
@@ -1189,7 +1212,7 @@ function skSnapCands(skip) {
   c.getObjects().forEach(o => {
     if(o === skip || o.skDimOf || !o.visible) return;
     try {
-      if(['rect', 'ellipse', 'triangle'].includes(o.type)) { const q = skCorners(o); if(o.type === 'triangle') pts.push({ x: (q[0].x + q[1].x) / 2, y: (q[0].y + q[1].y) / 2 }, q[2], q[3]); else if(o.type === 'ellipse') pts.push({ x: (q[0].x + q[1].x) / 2, y: (q[0].y + q[1].y) / 2 }, { x: (q[1].x + q[2].x) / 2, y: (q[1].y + q[2].y) / 2 }, { x: (q[2].x + q[3].x) / 2, y: (q[2].y + q[3].y) / 2 }, { x: (q[3].x + q[0].x) / 2, y: (q[3].y + q[0].y) / 2 }); else pts.push(...q); pts.push(o.getCenterPoint()); }
+      if(['rect', 'ellipse', 'triangle', 'image', 'group'].includes(o.type) && !o.skDim) { const q = skCorners(o); if(o.type === 'triangle') pts.push({ x: (q[0].x + q[1].x) / 2, y: (q[0].y + q[1].y) / 2 }, q[2], q[3]); else if(o.type === 'ellipse') pts.push({ x: (q[0].x + q[1].x) / 2, y: (q[0].y + q[1].y) / 2 }, { x: (q[1].x + q[2].x) / 2, y: (q[1].y + q[2].y) / 2 }, { x: (q[2].x + q[3].x) / 2, y: (q[2].y + q[3].y) / 2 }, { x: (q[3].x + q[0].x) / 2, y: (q[3].y + q[0].y) / 2 }); else pts.push(...q); pts.push(o.getCenterPoint()); }
       else if(o.type === 'line') { const e = skLineEnds(o); pts.push(e[0], e[1], { x: (e[0].x + e[1].x) / 2, y: (e[0].y + e[1].y) / 2 }); }
       else if(o.skDim) { const e = skDimWorld(o); if(e) pts.push(e[0], e[1]); }
     } catch(e) {}
@@ -1293,6 +1316,17 @@ function skInfo() {
         `<div class="sk-row"><span class="k">Поворот</span><input type="text" inputmode="decimal" data-f="ang" value="${Math.round(o.angle || 0)}"><span class="u">°</span></div>` +
         `<div class="sk-res">Площадь <b>${skFmtArea(sh.area)}</b><br>${sh.kind === 'rect' ? 'Периметр' : 'Длина окружности'} <b>${skFmtPer(sh.per)}</b>${H ? `<br>Объём <b>${skFmtVol(sh.area * H)}</b><br>Площадь стен <b>${skFmtArea(sh.per * H)}</b>` : ''}</div>`;
       sm = skFmtLen(sh.w) + ' × ' + skFmtLen(sh.h) + ' · ' + skFmtArea(sh.area);
+    } else if(sh.kind === 'img') {
+      const L = SK.meta.layers.find(l => l.id === o.skLayer), under = o.skLayer === 'under';
+      body = inp('w', 'Ширина', sh.w) + inp('h', 'Высота', sh.h) +
+        `<div class="sk-row"><span class="k">Прозрачн.</span><input type="range" min="10" max="100" value="${Math.round((o.opacity ?? 1) * 100)}" data-op="1" style="flex:1;accent-color:var(--accent)"></div>` +
+        `<div style="display:flex;gap:6px;margin-top:6px"><button class="sk-ib" style="flex:1;font-size:12px" onclick="skCalibStart()">📏 Калибровать</button><button class="sk-ib" style="flex:1;font-size:12px" onclick="skUnderlay(${under ? 'false' : 'true'})">${under ? 'Не подложка' : 'Подложка'}</button></div>` +
+        `<div style="color:var(--t3);font-size:11px;margin-top:6px;line-height:1.4">Калибровка: отметь на картинке две точки, расстояние между которыми знаешь, — картинка встанет в масштаб листа.</div>`;
+      sm = skFmtLen(sh.w) + ' × ' + skFmtLen(sh.h);
+    } else if(sh.kind === 'grp') {
+      body = inp('w', 'Ширина', sh.w) + inp('h', 'Длина', sh.h) +
+        `<div class="sk-row"><span class="k">Поворот</span><input type="text" inputmode="decimal" data-f="ang" value="${Math.round(o.angle || 0)}"><span class="u">°</span></div>`;
+      sm = skFmtLen(sh.w) + ' × ' + skFmtLen(sh.h);
     } else if(sh.kind === 'tri') {
       body = inp('w', 'Основание', sh.w) + inp('h', 'Высота', sh.h) + `<div class="sk-res">Площадь <b>${skFmtArea(sh.area)}</b><br>Периметр <b>${skFmtPer(sh.per)}</b></div>`;
       sm = skFmtArea(sh.area);
@@ -1309,6 +1343,7 @@ function skInfo() {
   el.onclick = e => { if(e.target.closest('[data-tg]')) { _skInfoOpen = !_skInfoOpen; el.classList.toggle('open', _skInfoOpen); } };
   el.onchange = e => {
     const o = c.getActiveObject(); if(!o) return;
+    if(e.target.dataset.op) { skCommit(); return; }
     if(e.target.dataset.ck === 'dims') { o.skDims = e.target.checked; skDimsFor(o); skCommit(); skInfo(); return; }
     const f = e.target.dataset.f; if(!f) return;
     if(f === 'ang') { const a = parseFloat(String(e.target.value).replace(',', '.')); if(isFinite(a)) { o.rotate(a); o.setCoords(); } }
@@ -1319,11 +1354,14 @@ function skInfo() {
     }
     skDimsFor(c.getActiveObject()); c.requestRenderAll(); skCommit(); e.target.blur(); skInfo();
   };
+  el.oninput = e => { if(e.target.dataset.op) { const o = c.getActiveObject(); if(o) { o.set('opacity', e.target.value / 100); c.requestRenderAll(); } } };
   el.onkeydown = e => { if(e.key === 'Enter') e.target.blur(); e.stopPropagation(); };
 }
 function skSetSize(o, f, px) { // задать размер фигуры в пикселях листа
   const c = SK.canvas;
-  if(o.type === 'rect' || o.type === 'triangle') { if(f === 'w') o.set({ width: px, scaleX: 1 }); if(f === 'h') o.set({ height: px, scaleY: 1 }); }
+  if(o.type === 'image') { const k = px / (f === 'w' ? o.width : o.height); o.set({ scaleX: k, scaleY: k }); } // пропорции картинки сохраняются
+  else if(o.type === 'group') { if(f === 'w') o.set({ scaleX: px / o.width }); if(f === 'h') o.set({ scaleY: px / o.height }); }
+  else if(o.type === 'rect' || o.type === 'triangle') { if(f === 'w') o.set({ width: px, scaleX: 1 }); if(f === 'h') o.set({ height: px, scaleY: 1 }); }
   else if(o.type === 'ellipse') { if(f === 'w') o.set({ rx: px / 2, scaleX: 1 }); if(f === 'h') o.set({ ry: px / 2, scaleY: 1 }); }
   else if(o.type === 'line' && f === 'len') {
     const e = skLineEnds(o), L = Math.hypot(e[1].x - e[0].x, e[1].y - e[0].y) || 1;
@@ -1334,4 +1372,305 @@ function skSetSize(o, f, px) { // задать размер фигуры в пи
     return;
   }
   o.setCoords();
+}
+
+
+// ═══════════════════════════════════════════
+//  ЭТАП 3 (19 ноября): картинки и фото, подложка с калибровкой, библиотека фигур и «Мои фигуры».
+//  Картинки уменьшаются до 2000 px и загружаются в attachments/sketch-img/<id листа>/;
+//  пока нет связи — остаются внутри листа (data URL). PDF — первая страница через pdf.js (грузится по требованию).
+//  «Мои фигуры» — скрытая строка sketches с title '__lib__' (data.items), видна на всех устройствах.
+// ═══════════════════════════════════════════
+const SK_IMG_MAX = 2000;
+function skViewCenter() { const c = SK.canvas, inv = fabric.util.invertTransform(c.viewportTransform); return fabric.util.transformPoint(new fabric.Point(c.width / 2, c.height / 2), inv); }
+function skPlace(o, wantPx) { // поставить в середину видимой части листа; wantPx — ширина на листе
+  const c = SK.canvas;
+  if(wantPx && o.width) { const k = wantPx / o.width; o.set({ scaleX: k, scaleY: k }); }
+  const p = skViewCenter(), w = o.width * o.scaleX, h = o.height * o.scaleY;
+  o.set({ left: p.x - w / 2, top: p.y - h / 2, originX: 'left', originY: 'top' }); o.setCoords();
+  c.add(o); skApplyLayers(); skSetTool('sel'); c.setActiveObject(o); c.requestRenderAll(); skInfo();
+}
+function skViewWidth() { return SK.canvas.width / SK.canvas.getZoom(); }
+function skPickImage() {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*,.svg,.pdf,application/pdf'; inp.multiple = true;
+  inp.onchange = () => { [...inp.files].forEach((f, i) => setTimeout(() => skAddFile(f), i * 150)); };
+  inp.click();
+}
+function skReadText(f) { return new Promise((ok, bad) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = bad; r.readAsText(f); }); }
+function skBlobUrl(b) { return new Promise((ok, bad) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = bad; r.readAsDataURL(b); }); }
+async function skShrink(blob, max) { // картинка → не больше max px по длинной стороне; PNG остаётся PNG (прозрачность), остальное → JPEG
+  const url = URL.createObjectURL(blob);
+  try {
+    const img = await new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => bad(new Error('картинка не открылась')); i.src = url; });
+    const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round(img.naturalWidth * k)); cv.height = Math.max(1, Math.round(img.naturalHeight * k));
+    const png = /png|gif|webp/.test(blob.type || '');
+    const g = cv.getContext('2d'); if(!png) { g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); }
+    g.drawImage(img, 0, 0, cv.width, cv.height);
+    const type = png ? 'image/png' : 'image/jpeg';
+    const out = await new Promise(ok => cv.toBlob(ok, type, .88));
+    return { blob: out, type, ext: png ? 'png' : 'jpg' };
+  } finally { URL.revokeObjectURL(url); }
+}
+function skLoadScript(src) { return new Promise((ok, bad) => { if([...document.scripts].some(s => s.src === src)) return ok(); const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => bad(new Error('нет связи')); document.head.appendChild(s); }); }
+async function skPdfBlob(file) { // первая страница PDF → PNG
+  const base = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+  await skLoadScript(base + 'pdf.min.js');
+  const lib = window.pdfjsLib; if(!lib) throw new Error('PDF не открылся');
+  lib.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.js';
+  const doc = await lib.getDocument({ data: await file.arrayBuffer() }).promise, page = await doc.getPage(1);
+  const v1 = page.getViewport({ scale: 1 }), sc = Math.min(4, SK_IMG_MAX / Math.max(v1.width, v1.height)), vp = page.getViewport({ scale: sc });
+  const cv = document.createElement('canvas'); cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+  const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
+  await page.render({ canvasContext: g, viewport: vp }).promise;
+  return await new Promise(ok => cv.toBlob(ok, 'image/png'));
+}
+async function skUpload(blob, folder, ext, type) { // → публичный адрес или '' (тогда картинка останется внутри листа)
+  if(typeof sb === 'undefined' || !navigator.onLine) return '';
+  try {
+    const path = folder + '/' + Date.now() + '_' + Math.random().toString(36).slice(2, 7) + '.' + ext;
+    const { error } = await sb.storage.from('attachments').upload(path, blob, { contentType: type, upsert: true });
+    if(error) throw error;
+    return sb.storage.from('attachments').getPublicUrl(path).data.publicUrl;
+  } catch(e) { console.log('sk upload', e.message || e); return ''; }
+}
+function skImgFromUrl(url) { return new Promise((ok, bad) => fabric.Image.fromURL(url, img => img && img.width ? ok(img) : bad(new Error('картинка не открылась')), { crossOrigin: 'anonymous' })); }
+function skSvgGroup(txt) {
+  return new Promise((ok, bad) => fabric.loadSVGFromString(txt, (objs, opts) => {
+    if(!objs || !objs.length) return bad(new Error('в SVG нет фигур'));
+    objs.forEach(o => o.set({ strokeUniform: true }));
+    ok(objs.length === 1 && objs[0].type !== 'image' ? objs[0] : fabric.util.groupSVGElements(objs, opts));
+  }));
+}
+async function skAddFile(file) {
+  if(!SK || !file) return;
+  const name = (file.name || 'Картинка').replace(/\.[^.]+$/, '');
+  try {
+    skSetStatus('загружаю картинку…');
+    if(/svg/.test(file.type) || /\.svg$/i.test(file.name || '')) {
+      const g = await skSvgGroup(await skReadText(file)); g.skName = name;
+      skPlace(g, skViewWidth() * .4); skCommit(); return;
+    }
+    let blob = file;
+    if(/pdf/.test(file.type) || /\.pdf$/i.test(file.name || '')) blob = await skPdfBlob(file);
+    const sh = await skShrink(blob, SK_IMG_MAX);
+    const img = await skImgFromUrl(await skBlobUrl(sh.blob));
+    img.skName = name;
+    skPlace(img, Math.min(img.width, skViewWidth() * .6)); skCommit();
+    const url = await skUpload(sh.blob, 'sketch-img/' + SK.id, sh.ext, sh.type);
+    if(url && SK && SK.canvas.getObjects().includes(img)) { // в листе — ссылка на облако; если не открылась — остаётся копия внутри листа
+      const local = img.getSrc();
+      img.setSrc(url, (o, err) => { if(!SK) return; if(err || !o.width) { o.setSrc(local, () => SK && SK.canvas.requestRenderAll()); return; } SK.canvas.requestRenderAll(); skCommit(); }, { crossOrigin: 'anonymous' });
+    }
+  } catch(e) { toast('Не получилось вставить: ' + (e.message || e), true); skSetStatus(''); }
+}
+// Ctrl+V и перетаскивание файла на лист (ПК)
+document.addEventListener('paste', e => {
+  if(!SK || !document.getElementById('sk-ov')) return;
+  const a = SK.canvas.getActiveObject(); if((a && a.isEditing) || /INPUT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName)) return;
+  const files = [...(e.clipboardData && e.clipboardData.files || [])].filter(f => /image|pdf|svg/.test(f.type));
+  if(files.length) { e.preventDefault(); files.forEach(skAddFile); }
+});
+document.addEventListener('dragover', e => { if(SK && e.target.closest && e.target.closest('#sk-stage')) e.preventDefault(); });
+document.addEventListener('drop', e => {
+  if(!SK || !e.target.closest || !e.target.closest('#sk-stage')) return;
+  e.preventDefault(); [...(e.dataTransfer && e.dataTransfer.files || [])].forEach(skAddFile);
+});
+
+// ── калибровка картинки по двум точкам ──
+function skCalibStart() {
+  const o = SK && SK.canvas.getActiveObject(); if(!o || o.type !== 'image') return;
+  SK.calib = { img: o, pts: [], tmp: [] };
+  SK.canvas.discardActiveObject(); skSetTool('calib');
+  toast('Отметь на картинке первую точку');
+}
+function skCalibPoint(p) {
+  const K = SK.calib; if(!K) { skSetTool('sel'); return; }
+  const c = SK.canvas, z = c.getZoom();
+  K.pts.push(p);
+  SK.mute = true;
+  const dot = new fabric.Circle({ left: p.x, top: p.y, radius: 5 / z, originX: 'center', originY: 'center', fill: '#e8c56a', stroke: '#1f1f1f', strokeWidth: 1 / z, selectable: false, evented: false, excludeFromExport: true });
+  c.add(dot); K.tmp.push(dot);
+  if(K.pts.length === 2) { const ln = new fabric.Line([K.pts[0].x, K.pts[0].y, p.x, p.y], { stroke: '#e8c56a', strokeWidth: 2 / z, strokeDashArray: [6 / z, 4 / z], selectable: false, evented: false }); c.add(ln); K.tmp.push(ln); }
+  SK.mute = false; c.requestRenderAll();
+  if(K.pts.length < 2) { toast('Теперь вторую точку'); return; }
+  setTimeout(() => {
+    const [a, b] = K.pts, d = Math.hypot(b.x - a.x, b.y - a.y);
+    const v = prompt('Реальное расстояние между точками, ' + SK_UNITS[SK.meta.unit].s + ':', '');
+    SK.mute = true; K.tmp.forEach(o => c.remove(o)); SK.mute = false;
+    SK.calib = null; skSetTool('sel');
+    const mm = skParseLen(v);
+    if(!mm || d < 1) { if(v != null) toast('Не понял число', true); c.setActiveObject(K.img); skInfo(); return; }
+    const f = (mm / skMmPx()) / d, img = K.img;
+    img.set({ scaleX: img.scaleX * f, scaleY: img.scaleY * f, left: a.x + (img.left - a.x) * f, top: a.y + (img.top - a.y) * f }); img.setCoords();
+    c.setActiveObject(img); c.requestRenderAll(); skInfo(); skCommit();
+    toast('✓ Картинка в масштабе листа 1:' + SK.meta.scale);
+  }, 60);
+}
+
+// ── подложка ──
+function skUnderlay(on) {
+  const c = SK.canvas, o = c.getActiveObject(); if(!o) return;
+  const m = SK.meta;
+  if(on) {
+    if(!m.layers.some(l => l.id === 'under')) m.layers.unshift({ id: 'under', name: 'Подложка', vis: true, lock: true });
+    o.skLayer = 'under'; o.set('opacity', Math.min(o.opacity ?? 1, .45));
+    c.discardActiveObject();
+    toast('Подложка заперта — снять замок можно в «Слоях»');
+  } else { o.skLayer = m.active; o.set('opacity', 1); }
+  skApplyLayers(); skLayersPaint(); skInfo(); skCommit();
+}
+
+// ── библиотека фигур (размеры в сантиметрах) ──
+const SK_LIB = [
+  { cat: 'Архитектура', items: [
+    { n: 'Дверь 80', w: 80, h: 80, s: '<path d="M0 0V80" stroke-width="3"/><path d="M80 0A80 80 0 0 1 0 80" stroke-dasharray="5 4"/><path d="M0 0H80" stroke-width="1"/>' },
+    { n: 'Дверь 90', w: 90, h: 90, s: '<path d="M0 0V90" stroke-width="3"/><path d="M90 0A90 90 0 0 1 0 90" stroke-dasharray="5 4"/><path d="M0 0H90" stroke-width="1"/>' },
+    { n: 'Дверь двойная 140', w: 140, h: 70, s: '<path d="M0 0V70M140 0V70" stroke-width="3"/><path d="M70 0A70 70 0 0 1 0 70M70 0A70 70 0 0 0 140 70" stroke-dasharray="5 4"/><path d="M0 0H140" stroke-width="1"/>' },
+    { n: 'Окно 120', w: 120, h: 20, s: '<rect width="120" height="20" fill="#fff"/><path d="M0 8H120M0 12H120"/>' },
+    { n: 'Окно 180', w: 180, h: 20, s: '<rect width="180" height="20" fill="#fff"/><path d="M0 8H180M0 12H180M90 0V20"/>' },
+    { n: 'Лестница 100×300', w: 100, h: 300, s: '<rect width="100" height="300" fill="#fff"/>' + Array.from({ length: 10 }, (_, i) => `<path d="M0 ${28 * (i + 1)}H100"/>`).join('') + '<path d="M50 290V20M40 35L50 20L60 35" stroke-width="2"/>' },
+    { n: 'Колонна 40×40', w: 40, h: 40, s: '<rect width="40" height="40" fill="#ddd"/><path d="M0 0L40 40M40 0L0 40"/>' },
+    { n: 'Колонна ⌀40', w: 40, h: 40, s: '<circle cx="20" cy="20" r="20" fill="#ddd"/>' }
+  ] },
+  { cat: 'Мебель', items: [
+    { n: 'Кровать 160×200', w: 160, h: 200, s: '<rect width="160" height="200" rx="4" fill="#fff"/><rect x="10" y="8" width="65" height="30" rx="6" fill="#fff"/><rect x="85" y="8" width="65" height="30" rx="6" fill="#fff"/><path d="M0 60H160"/>' },
+    { n: 'Кровать 90×200', w: 90, h: 200, s: '<rect width="90" height="200" rx="4" fill="#fff"/><rect x="10" y="8" width="70" height="30" rx="6" fill="#fff"/><path d="M0 60H90"/>' },
+    { n: 'Диван 200×90', w: 200, h: 90, s: '<rect width="200" height="90" rx="8" fill="#fff"/><rect x="0" y="0" width="200" height="22" rx="6" fill="#fff"/><rect x="0" y="0" width="20" height="90" rx="6" fill="#fff"/><rect x="180" y="0" width="20" height="90" rx="6" fill="#fff"/><path d="M100 22V90"/>' },
+    { n: 'Угловой диван', w: 250, h: 170, s: '<path d="M0 0H250V90H90V170H0Z" fill="#fff"/><path d="M20 20H250M20 20V170M90 90V20"/>' },
+    { n: 'Кресло 80×80', w: 80, h: 80, s: '<rect width="80" height="80" rx="8" fill="#fff"/><rect width="80" height="20" rx="6" fill="#fff"/><rect width="15" height="80" rx="5" fill="#fff"/><rect x="65" width="15" height="80" rx="5" fill="#fff"/>' },
+    { n: 'Стол 120×80', w: 120, h: 80, s: '<rect width="120" height="80" fill="#fff"/>' },
+    { n: 'Стол ⌀100', w: 100, h: 100, s: '<circle cx="50" cy="50" r="50" fill="#fff"/>' },
+    { n: 'Стул 45×45', w: 45, h: 50, s: '<rect y="5" width="45" height="45" rx="4" fill="#fff"/><path d="M3 4H42" stroke-width="3"/>' },
+    { n: 'Шкаф 200×60', w: 200, h: 60, s: '<rect width="200" height="60" fill="#fff"/><path d="M0 0L200 60M200 0L0 60" stroke-dasharray="4 4"/><path d="M0 55H200"/>' },
+    { n: 'Тумба 60×40', w: 60, h: 40, s: '<rect width="60" height="40" fill="#fff"/><path d="M0 35H60"/>' },
+    { n: 'Письменный стол 140×70', w: 140, h: 70, s: '<rect width="140" height="70" fill="#fff"/><rect x="95" y="0" width="45" height="70" fill="#fff"/>' }
+  ] },
+  { cat: 'Кухня и ванная', items: [
+    { n: 'Ванна 170×75', w: 170, h: 75, s: '<rect width="170" height="75" rx="6" fill="#fff"/><rect x="8" y="8" width="154" height="59" rx="25" fill="#fff"/><circle cx="150" cy="37.5" r="3"/>' },
+    { n: 'Душ 90×90', w: 90, h: 90, s: '<rect width="90" height="90" fill="#fff"/><path d="M0 0L90 90M90 0L0 90"/><circle cx="45" cy="45" r="4"/>' },
+    { n: 'Унитаз', w: 40, h: 65, s: '<rect width="40" height="18" rx="3" fill="#fff"/><ellipse cx="20" cy="42" rx="18" ry="23" fill="#fff"/>' },
+    { n: 'Раковина 60×45', w: 60, h: 45, s: '<rect width="60" height="45" rx="4" fill="#fff"/><ellipse cx="30" cy="25" rx="22" ry="15" fill="#fff"/><circle cx="30" cy="8" r="2"/>' },
+    { n: 'Мойка кухонная 80×50', w: 80, h: 50, s: '<rect width="80" height="50" fill="#fff"/><rect x="6" y="8" width="44" height="36" rx="5" fill="#fff"/><rect x="56" y="8" width="18" height="36" rx="4" fill="#fff"/>' },
+    { n: 'Плита 60×60', w: 60, h: 60, s: '<rect width="60" height="60" fill="#fff"/><circle cx="17" cy="17" r="10"/><circle cx="43" cy="17" r="8"/><circle cx="17" cy="43" r="8"/><circle cx="43" cy="43" r="10"/>' },
+    { n: 'Холодильник 60×65', w: 60, h: 65, s: '<rect width="60" height="65" fill="#fff"/><path d="M0 58H60"/><text x="30" y="38" font-size="18" text-anchor="middle" stroke="none" fill="#1f1f1f" font-family="sans-serif">Х</text>' },
+    { n: 'Стиральная машина 60×60', w: 60, h: 60, s: '<rect width="60" height="60" fill="#fff"/><circle cx="30" cy="32" r="20"/><circle cx="30" cy="32" r="13"/>' },
+    { n: 'Кухонный модуль 60×60', w: 60, h: 60, s: '<rect width="60" height="60" fill="#fff"/><path d="M0 55H60"/>' }
+  ] }
+];
+function skLibSvg(it) { // фигура → SVG с размерами в сантиметрах
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${it.w} ${it.h}" width="${it.w}" height="${it.h}" overflow="visible"><g fill="none" stroke="#1f1f1f" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">${it.s}</g></svg>`;
+}
+let _skLibTab = 0, _skMine = null;
+function skLibToggle() {
+  let el = document.getElementById('sk-lib');
+  if(el) { el.remove(); document.querySelector('[data-tool="lib"]')?.classList.remove('on'); return; }
+  const side = document.getElementById('sk-side'); if(!side) return;
+  el = document.createElement('div'); el.id = 'sk-lib'; el.className = 'sk-lib';
+  side.insertBefore(el, side.firstChild);
+  document.querySelector('[data-tool="lib"]')?.classList.add('on');
+  skLibPaint();
+  if(!_skMine) skMineLoad().then(() => { if(_skLibTab === SK_LIB.length) skLibPaint(); });
+}
+function skLibPaint() {
+  const el = document.getElementById('sk-lib'); if(!el) return;
+  const tabs = SK_LIB.map(g => g.cat).concat(['⭐ Мои фигуры']);
+  let grid, act = '';
+  if(_skLibTab < SK_LIB.length) grid = SK_LIB[_skLibTab].items.map((it, i) => `<div class="it" data-i="${i}" title="${skEsc(it.n)}">${skLibSvg(it)}<span>${skEsc(it.n)}</span></div>`).join('');
+  else {
+    const mine = (_skMine && _skMine.items) || [];
+    grid = mine.length ? mine.map((it, i) => `<div class="it" data-m="${i}" title="${skEsc(it.name)}">${it.svg ? it.svg.replace(/<svg/, '<svg preserveAspectRatio="xMidYMid meet"') : `<img src="${skEsc(it.url)}" alt="">`}<span>${skEsc(it.name)}</span><button class="x" data-del="${i}" title="Удалить">✕</button></div>`).join('')
+      : `<div style="grid-column:1/-1;color:var(--t3);padding:12px 4px;text-align:center">${_skMine ? 'Здесь будут твои фигуры' : 'Загружаю…'}</div>`;
+    act = `<div class="act"><button data-a="sel">＋ Выделенное</button><button data-a="file">📥 SVG или картинка</button></div>`;
+  }
+  el.innerHTML = `<div class="sk-ih" style="cursor:default">Фигуры<span class="sm" style="color:var(--t3)">в масштабе листа</span><button class="sk-ib" style="height:26px;min-width:26px;font-size:13px" data-a="close">✕</button></div>
+    <div class="tabs">${tabs.map((t, i) => `<button data-t="${i}" class="${i === _skLibTab ? 'on' : ''}">${t}</button>`).join('')}</div>${act}<div class="grid">${grid}</div>`;
+  el.onclick = async e => {
+    const t = e.target.closest('[data-t],[data-i],[data-m],[data-a],[data-del]'); if(!t) return;
+    const d = t.dataset;
+    if(d.a === 'close') return skLibToggle();
+    if(d.t !== undefined) { _skLibTab = +d.t; return skLibPaint(); }
+    if(d.del !== undefined) { e.stopPropagation(); if(confirm('Убрать из «Моих фигур»?')) { _skMine.items.splice(+d.del, 1); skMineSave(); skLibPaint(); } return; }
+    if(d.i !== undefined) return skLibInsert(SK_LIB[_skLibTab].items[+d.i]);
+    if(d.m !== undefined) return skMineInsert(_skMine.items[+d.m]);
+    if(d.a === 'sel') return skMineAddSel();
+    if(d.a === 'file') return skMineAddFile();
+  };
+}
+async function skLibInsert(it) {
+  try {
+    const g = await skSvgGroup(skLibSvg(it));
+    g.skName = it.n;
+    const px = it.w * 10 / skMmPx(); // ширина в натуре (см → мм) → пиксели листа
+    skPlace(g, px); skCommit(); skLibAfterInsert();
+  } catch(e) { toast('Не получилось: ' + (e.message || e), true); }
+}
+function skLibAfterInsert() { if(innerWidth < 700 && document.getElementById('sk-lib')) skLibToggle(); } // на телефоне панель закрывается, чтобы было видно фигуру
+// «Мои фигуры»
+async function skMineId() {
+  const key = 'mc_sk_lib_' + (currentUser && currentUser.id);
+  let id = localStorage.getItem(key);
+  if(!id && typeof sb !== 'undefined' && navigator.onLine) {
+    try { const { data } = await sb.from('sketches').select('id,title').eq('title', '__lib__').limit(1); const r = (data || []).find(x => x.title === '__lib__'); if(r) id = r.id; } catch(e) {}
+  }
+  if(!id) id = skNewId();
+  localStorage.setItem(key, id);
+  return id;
+}
+async function skMineLoad() {
+  const id = await skMineId();
+  let rec = null;
+  try { rec = await skLoadFull(id); } catch(e) {}
+  _skMine = { id, items: (rec && rec.data && rec.data.items) || [] };
+}
+function skMineSave() {
+  if(!_skMine) return;
+  const rec = { id: _skMine.id, title: '__lib__', data: { items: _skMine.items }, thumb: '', links: [], created_at: new Date().toISOString(), updated_at: new Date().toISOString(), dirty: true, pushedOnce: true };
+  skLocalPut(rec); skPushLater(rec, 300);
+}
+async function skMineAddSel() {
+  const c = SK.canvas, a = c.getActiveObject();
+  if(!a) { toast('Сначала выдели фигуры на листе', true); return; }
+  if(!_skMine) await skMineLoad();
+  const name = prompt('Название фигуры', a.skName || 'Моя фигура'); if(name == null) return;
+  const k = skMmPx();
+  if(a.type === 'image' && /^https?:/.test(a.getSrc())) {
+    _skMine.items.unshift({ id: skNewId(), name: name || 'Картинка', url: a.getSrc(), wmm: a.width * a.scaleX * k, hmm: a.height * a.scaleY * k });
+  } else {
+    const b = a.getBoundingRect(true, true);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${b.left} ${b.top} ${b.width} ${b.height}" width="${b.width}" height="${b.height}">${a.toSVG()}</svg>`;
+    if(svg.length > 400000) { toast('Слишком сложная фигура для библиотеки', true); return; }
+    _skMine.items.unshift({ id: skNewId(), name: name || 'Моя фигура', svg, wmm: b.width * k, hmm: b.height * k });
+  }
+  skMineSave(); _skLibTab = SK_LIB.length; skLibPaint(); toast('✓ Добавлено в «Мои фигуры»');
+}
+function skMineAddFile() {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*,.svg';
+  inp.onchange = async () => {
+    const f = inp.files[0]; if(!f) return;
+    if(!_skMine) await skMineLoad();
+    const name = (f.name || 'Фигура').replace(/\.[^.]+$/, '');
+    try {
+      if(/svg/.test(f.type) || /\.svg$/i.test(f.name)) {
+        const txt = await skReadText(f); if(txt.length > 400000) throw new Error('SVG слишком большой');
+        _skMine.items.unshift({ id: skNewId(), name, svg: txt });
+      } else {
+        const sh = await skShrink(f, 1200);
+        const url = await skUpload(sh.blob, 'sketch-lib/' + (currentUser && currentUser.id), sh.ext, sh.type);
+        if(!url) throw new Error('нужен интернет');
+        _skMine.items.unshift({ id: skNewId(), name, url });
+      }
+      skMineSave(); skLibPaint(); toast('✓ Добавлено в «Мои фигуры»');
+    } catch(e) { toast('Не получилось: ' + (e.message || e), true); }
+  };
+  inp.click();
+}
+async function skMineInsert(it) {
+  try {
+    const o = it.svg ? await skSvgGroup(it.svg) : await skImgFromUrl(it.url);
+    o.skName = it.name;
+    skPlace(o, it.wmm ? it.wmm / skMmPx() : skViewWidth() * .35);
+    if(it.wmm && it.hmm && o.height) { o.set({ scaleY: (it.hmm / skMmPx()) / o.height }); o.setCoords(); }
+    skCommit(); skInfo(); skLibAfterInsert();
+  } catch(e) { toast('Не получилось: ' + (e.message || e), true); }
 }
