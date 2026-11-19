@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════
 //  СКЕТЧ-ЛИСТ + СТАРТОВЫЙ ЭКРАН (этап 1, 19 ноября)
-//  Только для пользователей, у которых в таблице mc_features стоит sketch = true (SQL: sql-sketch.sql).
+//  Для всех пользователей (решение Натальи 19 ноября). Только 3D (этап 6) — для тех, у кого в mc_features стоит d3 = true.
 //  Стартовый экран: две большие кнопки «✏️ Скетч-лист» и «🗂️ Карточки», у каждой своё приветствие.
 //  Телефон вертикально — кнопки друг под другом; повёрнутый телефон и ПК — рядом.
 //  Скетч-лист: «Мои листы» + редактор (Fabric.js 5.3.0 с CDN, грузится только при открытии).
@@ -16,7 +16,8 @@ let _skStartShown = false, _skBootSearch = (typeof location !== 'undefined' ? lo
 function skFeat() {
   try { return JSON.parse(localStorage.getItem('mc_feat_' + (currentUser && currentUser.id)) || '{}') || {}; } catch(e) { return {}; }
 }
-function skAllowed() { return !!(typeof currentUser !== 'undefined' && currentUser && skFeat().sketch); }
+function skAllowed() { return !!(typeof currentUser !== 'undefined' && currentUser); } // скетч-лист — у каждого пользователя
+function skAllowed3d() { return skAllowed() && !!skFeat().d3; } // 3D — только тем, у кого d3 = true в mc_features
 let _skChecked = '';
 async function skCheckAllowed() {
   if(typeof currentUser !== 'undefined' && currentUser && _skChecked === currentUser.id) return skAllowed(); // в облаке — один раз за запуск
@@ -267,7 +268,7 @@ async function skBoot() {
   try {
     const ok = await skCheckAllowed();
     skLobbyButton();
-    if(!ok) { _skLastWhy = 'в таблице mc_features нет строки с sketch = true для этого пользователя'; return; }
+    if(!ok) { _skLastWhy = 'пользователь не вошёл'; return; }
     const plain = !_skBootSearch || !/(space|openCard|openSpace|showEv|showDay|showDue|showReq|evId)=/.test(_skBootSearch);
     if(_skStartShown) { _skLastWhy = 'стартовый экран уже показан в этот запуск'; return; }
     if(!plain) { _skLastWhy = 'приложение открыто из уведомления или ссылки'; _skStartShown = true; return; }
@@ -294,14 +295,14 @@ async function skWhy() {
   const out = {
     'файл app-sketch.js': 'загружен',
     'вход': (typeof currentUser !== 'undefined' && currentUser && currentUser.id) ? 'да' : 'нет',
-    'доступ (mc_features)': '?',
+    '3D (mc_features)': '?',
     'кнопка в лобби': document.getElementById('lobby-sk-btn') ? 'есть' : (document.getElementById('lobby-quick') ? 'нет' : 'нет места #lobby-quick'),
     'стартовый экран': _skLastWhy
   };
   try {
     const { data, error } = await sb.from('mc_features').select('sketch,d3').eq('user_id', currentUser.id).maybeSingle();
-    out['доступ (mc_features)'] = error ? 'ошибка: ' + error.message : (data ? JSON.stringify(data) : 'строки нет');
-  } catch(e) { out['доступ (mc_features)'] = 'ошибка: ' + (e.message || e); }
+    out['3D (mc_features)'] = error ? 'ошибка: ' + error.message : (data && data.d3 ? 'включено' : 'нет');
+  } catch(e) { out['3D (mc_features)'] = 'ошибка: ' + (e.message || e); }
   console.table(out);
   return out;
 }
