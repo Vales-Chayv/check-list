@@ -49,7 +49,9 @@ function skCss() {
 .mcs-sm span{font-size:12px;padding:6px 12px;border-radius:14px;border:1px solid var(--b1);background:rgba(0,0,0,.25);color:var(--t2)}
 .mcs-sm span.gold{color:var(--accent);border-color:rgba(232,197,106,.45)}
 @media (orientation:landscape),(min-width:900px){.mcs-wrap{flex-direction:row;max-width:900px;max-height:440px}}
-#sk-ov{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;color:var(--t1)}
+#sk-ov{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;color:var(--t1);container:skov/inline-size} /* узкое окно (телефон или половина экрана) — раскладка как на телефоне */
+.sk-sm{display:none}
+@container skov (max-width:520px){.sk-lg{display:none}.sk-sm{display:inline}.sk-hd .sk-ib{min-width:32px;height:32px;padding:0 6px}.sk-hd{gap:4px}}
 .sk-hd{display:flex;align-items:center;gap:6px;padding:max(8px,env(safe-area-inset-top,8px)) 10px 8px;border-bottom:1px solid var(--b1);background:var(--s1);flex:none}
 .sk-ib{min-width:36px;height:36px;border-radius:10px;border:1px solid var(--b1);background:var(--s2);color:var(--t1);font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0 9px;font-family:inherit;white-space:nowrap;flex:none}
 .sk-ib:disabled{opacity:.35;cursor:default}
@@ -109,11 +111,32 @@ function skCss() {
 .sk-lib .it .x{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;border:none;background:rgba(15,15,15,.65);color:#fff;font-size:10px;cursor:pointer;line-height:18px;padding:0}
 .sk-lib .act{display:flex;gap:6px;padding:0 8px 8px;flex-wrap:wrap}
 .sk-lib .act button{flex:1;min-width:110px;font-size:11px;padding:6px;border-radius:8px;border:1px dashed var(--accent);background:none;color:var(--accent);cursor:pointer;font-family:inherit}
+html.sk-bottom #sk-ov,html.sk-side #sk-ov{inset:auto}
+html.sk-bottom #sk-ov{left:0;right:0;bottom:0;height:var(--sk-h,50vh);border-top:2px solid var(--accent);box-shadow:0 -8px 24px rgba(0,0,0,.35)}
+html.sk-bottom body{padding-bottom:var(--sk-h,50vh)!important}
+html.sk-bottom #space-selector{bottom:var(--sk-h,50vh)!important;height:auto!important;top:0!important}
+html.sk-bottom .fab{bottom:calc(var(--sk-h,50vh) + 18px)!important}
+html.sk-side #sk-ov{top:0;bottom:0;right:0;width:var(--sk-w,50vw);border-left:2px solid var(--accent)}
+html.sk-side body{width:calc(100% - var(--sk-w,50vw))!important;min-width:0!important}
+html.sk-side #space-selector{left:0!important;right:var(--sk-w,50vw)!important;width:auto!important}
+html.sk-side .fab{right:calc(var(--sk-w,50vw) + 18px)!important}
+.sk-dh{position:absolute;z-index:8;touch-action:none}
+html.sk-bottom .sk-dh{left:0;right:0;top:-8px;height:16px;cursor:row-resize}
+html.sk-side .sk-dh{top:0;bottom:0;left:-8px;width:16px;cursor:col-resize}
+.sk-dh::before{content:'';position:absolute;background:var(--accent);border-radius:4px;opacity:.85}
+html.sk-bottom .sk-dh::before{left:50%;top:5px;width:54px;height:6px;margin-left:-27px}
+html.sk-side .sk-dh::before{top:50%;left:5px;height:54px;width:6px;margin-top:-27px}
+#desktop-sk-toggle{background:var(--s2);border:1px solid var(--b1);border-radius:18px;padding:6px 12px;color:var(--t2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+body.sk-on #desktop-sk-toggle{background:var(--accent);color:#0f0f0f;border-color:var(--accent)}
+@media (min-width:900px){
+  body.sk-on #sk-ov{position:fixed;inset:auto;top:40px;bottom:0;left:var(--split-left);right:0;border-left:1px solid var(--b1)}
+  html.mc-swap body.sk-on #sk-ov{left:0;right:var(--split-left);border-left:none;border-right:1px solid var(--b1)}
+}
 .sk-pop{position:fixed;z-index:2001;background:var(--s1);border:1px solid var(--b1);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.55);padding:12px;width:270px;font-size:13px;color:var(--t1)}
 .sk-pop .seg{display:flex;gap:4px;flex-wrap:wrap;margin:4px 0 10px}
 .sk-pop .seg button{padding:5px 9px;border-radius:8px;border:1px solid var(--b1);background:var(--s2);color:var(--t2);cursor:pointer;font-family:inherit;font-size:12px}
 .sk-pop .seg button.on{border-color:var(--accent);color:var(--accent);background:rgba(232,197,106,.14)}
-@media (max-width:699px){
+@container skov (max-width:699px){
   .sk-side{top:auto;bottom:52px;left:8px;right:8px;width:auto;max-height:60%}
   .sk-info:not(.open) .sk-ib2{display:none}
   .sk-cell{bottom:56px}
@@ -135,7 +158,7 @@ function skCss() {
 #sk-send .row:hover{background:var(--s2);border-color:var(--b1)}
 #sk-send .chip{padding:5px 12px;border-radius:14px;font-size:12px;border:1px solid var(--b1);color:var(--t2);cursor:pointer;white-space:nowrap;background:none;font-family:inherit}
 #sk-send .chip.on{background:rgba(232,197,106,.16);border-color:var(--accent);color:var(--accent)}
-@media (max-width:699px){
+@container skov (max-width:699px){
   .sk-body{flex-direction:column-reverse}
   .sk-tools{flex-direction:row;border-right:none;border-top:1px solid var(--b1);overflow-x:auto;overflow-y:hidden;padding:6px 8px calc(6px + var(--safe));scrollbar-width:none}
   .sk-tools::-webkit-scrollbar{display:none}
@@ -283,9 +306,9 @@ async function mcStartShow() {
     e.stopPropagation();
     const a = t.dataset.act;
     mcStartHide();
-    if(a === 'new') skOpen('new');
-    else if(a === 'last' && last) skOpen(last.id);
-    else if(a === 'list') skOpen();
+    if(a === 'new') skOpen('new', 'full');
+    else if(a === 'last' && last) skOpen(last.id, 'full');
+    else if(a === 'list') skOpen(undefined, 'full');
   });
   document.body.appendChild(div);
 }
@@ -308,8 +331,10 @@ async function skBoot() {
   _skBootBusy = true;
   try {
     const ok = await skCheckAllowed();
-    skLobbyButton();
+    skLobbyButton(); skDeskButton();
     if(!ok) { _skLastWhy = 'пользователь не вошёл'; return; }
+    const solo = /[?&]sketch=([\w-]+)/.exec(_skBootSearch);
+    if(solo && !_skStartShown) { _skStartShown = true; window._skSolo = true; _skLastWhy = 'отдельное окно листа'; skOpen(solo[1] === 'list' ? undefined : solo[1], 'full'); return; }
     const plain = !_skBootSearch || !/(space|openCard|openSpace|showEv|showDay|showDue|showReq|evId)=/.test(_skBootSearch);
     if(_skStartShown) { _skLastWhy = 'стартовый экран уже показан в этот запуск'; return; }
     if(!plain) { _skLastWhy = 'приложение открыто из уведомления или ссылки'; _skStartShown = true; return; }
@@ -377,24 +402,27 @@ function skOv() {
     ov = document.createElement('div'); ov.id = 'sk-ov';
     ov.setAttribute('style', 'z-index:2000'); // общий «назад» закрывает такие окна
     document.body.appendChild(ov);
-    new MutationObserver((m, obs) => { if(!document.body.contains(ov)) { obs.disconnect(); skFlush(); SK = null; } }).observe(document.body, { childList: true });
+    new MutationObserver((m, obs) => { if(!document.body.contains(ov)) { obs.disconnect(); skFlush(); SK = null; skUndock(); } }).observe(document.body, { childList: true });
+    skApplyDock(_skWantDock || _skDock);
   }
   return ov;
 }
-async function skOpen(id) { // без id — список; 'new' — новый лист; иначе — открыть лист
+async function skOpen(id, dock) { // без id — список; 'new' — новый лист; иначе — открыть лист; dock — 'full' | 'side' | 'bottom'
   if(!skAllowed()) { toast('Скетч-лист недоступен', true); return; }
   mcStartHide();
+  _skWantDock = dock || null;
+  if(dock && document.getElementById('sk-ov')) skApplyDock(dock);
   if(id === 'new') return skCreate();
   if(id) return skEdit(id);
   return skShowList();
 }
-function skClose() { skFlush(); SK = null; document.getElementById('sk-ov')?.remove(); }
+function skClose() { skFlush(); SK = null; document.getElementById('sk-ov')?.remove(); skUndock(); if(window._skSolo) { try { window.close(); } catch(e) {} } }
 
 // ─── список листов ───
 async function skShowList() {
   skFlush(); SK = null;
   const ov = skOv();
-  ov.innerHTML = `<div class="sk-hd"><span style="font-size:18px;font-weight:700;flex:1">✏️ Мои листы</span><span class="sk-st" id="sk-sync">${navigator.onLine ? 'сверяю…' : 'без связи'}</span><button class="sk-ib" onclick="skClose()" aria-label="Закрыть">✕</button></div><div class="sk-list" id="sk-grid"></div>`;
+  ov.innerHTML = `<div class="sk-hd"><span style="font-size:18px;font-weight:700;flex:1">✏️ Мои листы</span><span class="sk-st" id="sk-sync">${navigator.onLine ? 'сверяю…' : 'без связи'}</span><button class="sk-ib sk-dock-btn" onclick="skDockMenu(this)" title="Расположение: рядом с карточками, под ними, во весь экран, отдельное окно">${SK_DOCK_SVG}</button><button class="sk-ib" onclick="skClose()" aria-label="Закрыть">✕</button></div><div class="sk-list" id="sk-grid"></div>`;
   const paint = list => {
     const g = document.getElementById('sk-grid'); if(!g) return;
     list.sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
@@ -496,7 +524,8 @@ async function skEdit(id, recIn) {
     <button class="sk-ib" id="sk-undo" onclick="skUndo()" title="Отменить (Ctrl+Z)" aria-label="Отменить">↶</button>
     <button class="sk-ib" id="sk-redo" onclick="skRedo()" title="Повторить (Ctrl+Y)" aria-label="Повторить">↷</button>
     <button class="sk-ib" id="sk-lay-btn" onclick="skLayersToggle()" title="Слои" aria-label="Слои">${SK_LAYERS_SVG}</button>
-    <button class="sk-ib solid" id="sk-send-btn" onclick="skSendMenu(this)">Отправить ▾</button>
+    <button class="sk-ib sk-dock-btn" onclick="skDockMenu(this)" title="Расположение: рядом с карточками, под ними, во весь экран, отдельное окно" aria-label="Расположение">${SK_DOCK_SVG}</button>
+    <button class="sk-ib solid" id="sk-send-btn" onclick="skSendMenu(this)" title="Отправить"><span class="sk-lg">Отправить ▾</span><span class="sk-sm">📤</span></button>
     <button class="sk-ib sk-hide-ph" onclick="skClose()" aria-label="Закрыть">✕</button>
   </div>
   <div class="sk-body">
@@ -1674,3 +1703,87 @@ async function skMineInsert(it) {
     skCommit(); skInfo(); skLibAfterInsert();
   } catch(e) { toast('Не получилось: ' + (e.message || e), true); }
 }
+
+
+// ═══════════════════════════════════════════
+//  ЭТАП 4 (19 ноября): скетч-лист рядом с карточками.
+//  Режимы окна: 'full' — во весь экран; 'side' — рядом (ПК: правая колонка, как календарь и галерея,
+//  с общим разделителем и ⇄; телефон: справа, разделитель тянется); 'bottom' — под карточками (разделитель тянется);
+//  «⧉ Отдельное окно» (ПК) — тот же лист в новом окне браузера (адрес ?sketch=<id>), его можно унести на второй монитор.
+// ═══════════════════════════════════════════
+const SK_DOCK_SVG = '<svg width="18" height="18" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 4v16" stroke="currentColor" stroke-width="2"/><rect x="13" y="5" width="7" height="14" fill="currentColor" opacity=".35"/></svg>';
+let _skDock = (() => { try { return localStorage.getItem('mc_sk_dock') || 'full'; } catch(e) { return 'full'; } })(), _skWantDock = null;
+(function() { try { const h = localStorage.getItem('mc_sk_h'), w = localStorage.getItem('mc_sk_w'); if(h) document.documentElement.style.setProperty('--sk-h', h); if(w) document.documentElement.style.setProperty('--sk-w', w); } catch(e) {} })();
+const skIsDesk = () => innerWidth >= 900;
+function skUndock() {
+  document.documentElement.classList.remove('sk-bottom', 'sk-side');
+  document.body.classList.remove('sk-on');
+}
+function skApplyDock(mode) {
+  const ov = document.getElementById('sk-ov'); if(!ov) return;
+  if(mode === 'side' && !skIsDesk() && innerWidth < 600) mode = 'bottom'; // узкий телефон стоя — рядом не поместится
+  skUndock();
+  ov.querySelector(':scope > .sk-dh')?.remove();
+  if(mode === 'side' && skIsDesk()) {
+    document.body.classList.remove('cal-on', 'calc-on', 'gal-on', 'events-on', 'pane-full');
+    document.body.classList.add('sk-on'); ov.style.zIndex = '999';
+  } else if(mode === 'side' || mode === 'bottom') {
+    document.documentElement.classList.add(mode === 'side' ? 'sk-side' : 'sk-bottom'); ov.style.zIndex = '999';
+    skDockHandle(ov, mode === 'side' ? 'x' : 'y');
+  } else { mode = 'full'; ov.style.zIndex = '2000'; }
+  _skDock = mode;
+  try { localStorage.setItem('mc_sk_dock', mode); } catch(e) {}
+  setTimeout(() => { if(SK) { SK.canvas.setDimensions({ width: document.getElementById('sk-stage').clientWidth, height: document.getElementById('sk-stage').clientHeight }); skGrid(); } }, 30);
+}
+function skDockHandle(ov, axis) { // разделитель: тянуть — одна часть больше, другая меньше
+  const h = document.createElement('div'); h.className = 'sk-dh'; h.title = 'Потяни, чтобы поменять размер';
+  ov.appendChild(h);
+  const root = document.documentElement;
+  h.addEventListener('pointerdown', e => {
+    e.preventDefault(); try { h.setPointerCapture(e.pointerId); } catch(_) {}
+    const move = ev => {
+      if(axis === 'y') { const v = Math.min(innerHeight - 120, Math.max(160, innerHeight - ev.clientY)); root.style.setProperty('--sk-h', v + 'px'); }
+      else { const v = Math.min(innerWidth - 160, Math.max(220, innerWidth - ev.clientX)); root.style.setProperty('--sk-w', v + 'px'); }
+    };
+    const up = () => {
+      h.removeEventListener('pointermove', move); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up);
+      try { localStorage.setItem(axis === 'y' ? 'mc_sk_h' : 'mc_sk_w', getComputedStyle(root).getPropertyValue(axis === 'y' ? '--sk-h' : '--sk-w').trim()); } catch(_) {}
+    };
+    h.addEventListener('pointermove', move); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
+  });
+}
+function skDockMenu(btn) {
+  const d = _skDock, items = [];
+  if(d !== 'side') items.push(['◫ Рядом с карточками', () => skApplyDock('side')]);
+  if(d !== 'bottom') items.push(['⬒ Под карточками', () => skApplyDock('bottom')]);
+  if(d !== 'full') items.push(['⛶ Во весь экран', () => skApplyDock('full')]);
+  if(d === 'side' && skIsDesk()) items.push(['⇄ Поменять местами', () => { const sw = document.getElementById('split-swap'); if(sw) sw.click(); else document.documentElement.classList.toggle('mc-swap'); setTimeout(() => skApplyDock('side'), 30); }]);
+  if(skIsDesk() && !(typeof window.isNativeApp === 'function' && window.isNativeApp()) && !window._skSolo) items.push(['⧉ Отдельное окно', () => skPopOut()]);
+  if(d !== 'full') items.push(['<span style="color:var(--t3)">✕ Закрыть скетч-лист</span>', () => skClose()]);
+  skMenu(btn, items);
+}
+function skPopOut() { // лист — в отдельное окно браузера (второй монитор)
+  const id = SK && SK.id;
+  skFlush();
+  const url = location.pathname + (id ? '?sketch=' + encodeURIComponent(id) : '?sketch=list');
+  const w = window.open(url, 'mc_sketch', 'popup,width=1200,height=820');
+  if(!w) { toast('Браузер не дал открыть окно — разрешите всплывающие окна для этого сайта', true); return; }
+  setTimeout(() => skClose(), 300);
+  toast('✓ Скетч-лист открыт в отдельном окне');
+}
+function skDeskButton() { // ПК: кнопка «✏️ Скетч» в верхней панели правой колонки, рядом с календарём и галереей
+  const bar = document.getElementById('desktop-cal-toolbar'); if(!bar || !skAllowed() || document.getElementById('desktop-sk-toggle')) return;
+  const b = document.createElement('button'); b.id = 'desktop-sk-toggle'; b.type = 'button'; b.textContent = '✏️ Скетч';
+  b.onclick = () => { if(document.body.classList.contains('sk-on')) skClose(); else skOpen(undefined, 'side'); };
+  const pf = document.getElementById('pane-full-btn');
+  pf && pf.parentNode === bar ? bar.insertBefore(b, pf) : bar.appendChild(b);
+}
+// календарь, калькулятор, галерея или события заняли правую колонку — скетч-лист закрывается (лист сохранён)
+(function skWatchPane() {
+  if(!document.body) { document.addEventListener('DOMContentLoaded', skWatchPane); return; }
+  new MutationObserver(() => {
+    const c = document.body.classList; if(!c.contains('sk-on')) return;
+    if(c.contains('cal-on') || c.contains('calc-on') || c.contains('gal-on') || c.contains('events-on')) skClose();
+  }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+})();
+window.addEventListener('resize', () => { if(document.getElementById('sk-ov') && _skDock !== 'full') { clearTimeout(window._skRz); window._skRz = setTimeout(() => skApplyDock(_skDock), 150); } });
