@@ -17,12 +17,14 @@ function skFeat() {
   try { return JSON.parse(localStorage.getItem('mc_feat_' + (currentUser && currentUser.id)) || '{}') || {}; } catch(e) { return {}; }
 }
 function skAllowed() { return !!(typeof currentUser !== 'undefined' && currentUser && skFeat().sketch); }
+let _skChecked = '';
 async function skCheckAllowed() {
+  if(typeof currentUser !== 'undefined' && currentUser && _skChecked === currentUser.id) return skAllowed(); // в облаке — один раз за запуск
   if(typeof currentUser === 'undefined' || !currentUser || typeof sb === 'undefined' || !navigator.onLine) return skAllowed();
   try {
     const q = sb.from('mc_features').select('sketch,d3').eq('user_id', currentUser.id).maybeSingle();
     const r = await Promise.race([q, new Promise(ok => setTimeout(() => ok(null), 3000))]);
-    if(r && !r.error) localStorage.setItem('mc_feat_' + currentUser.id, JSON.stringify(r.data || {}));
+    if(r && !r.error) { localStorage.setItem('mc_feat_' + currentUser.id, JSON.stringify(r.data || {})); _skChecked = currentUser.id; }
   } catch(e) {}
   return skAllowed();
 }
@@ -250,22 +252,59 @@ function mcStartHide() {
   el.classList.add('out'); setTimeout(() => el.remove(), 260);
 }
 
-// после обычного запуска (лобби, без ссылок из уведомлений) — стартовый экран, один раз за запуск
+// после обычного запуска (лобби, без ссылок из уведомлений) — стартовый экран, один раз за запуск.
+// Запуск ловим тремя способами (19 ноября, v463): обёртка initSpaces, обёртка showSpaceSelector и проверка раз в 0,5 с первые 40 с.
+let _skBootBusy = false, _skLastWhy = 'ещё не проверялось';
+function skInLobby() {
+  const sel = document.getElementById('space-selector');
+  const shown = document.body.classList.contains('in-lobby') || (sel && getComputedStyle(sel).display !== 'none');
+  return !!shown && !(typeof currentSpace !== 'undefined' && currentSpace && document.body.classList.contains('in-cabinet'));
+}
+async function skBoot() {
+  if(_skBootBusy) return;
+  if(typeof currentUser === 'undefined' || !currentUser || !currentUser.id) { _skLastWhy = 'пользователь ещё не вошёл'; return; }
+  _skBootBusy = true;
+  try {
+    const ok = await skCheckAllowed();
+    skLobbyButton();
+    if(!ok) { _skLastWhy = 'в таблице mc_features нет строки с sketch = true для этого пользователя'; return; }
+    const plain = !_skBootSearch || !/(space|openCard|openSpace|showEv|showDay|showDue|showReq|evId)=/.test(_skBootSearch);
+    if(_skStartShown) { _skLastWhy = 'стартовый экран уже показан в этот запуск'; return; }
+    if(!plain) { _skLastWhy = 'приложение открыто из уведомления или ссылки'; _skStartShown = true; return; }
+    if(!skInLobby()) { _skLastWhy = 'лобби ещё не открыто'; return; }
+    _skStartShown = true; _skLastWhy = 'показан';
+    mcStartShow();
+  } catch(e) { _skLastWhy = 'ошибка: ' + (e.message || e); }
+  finally { _skBootBusy = false; }
+}
 (function skHookStart() {
-  if(typeof initSpaces !== 'function') return;
-  const orig = initSpaces;
-  initSpaces = async function() {
-    const r = await orig.apply(this, arguments);
-    try {
-      const ok = await skCheckAllowed();
-      skLobbyButton();
-      const plain = !_skBootSearch || !/(space|openCard|openSpace|showEv|showDay|showDue|showReq|evId)=/.test(_skBootSearch);
-      const inLobby = document.body.classList.contains('in-lobby') && !(typeof currentSpace !== 'undefined' && currentSpace);
-      if(ok && plain && inLobby && !_skStartShown && !document.querySelector('.overlay.on')) { _skStartShown = true; mcStartShow(); }
-    } catch(e) { console.log('start screen', e); }
-    return r;
-  };
+  if(typeof initSpaces === 'function') {
+    const orig = initSpaces;
+    initSpaces = async function() { const r = await orig.apply(this, arguments); skBoot(); return r; };
+  }
+  if(typeof showSpaceSelector === 'function') {
+    const origS = showSpaceSelector;
+    showSpaceSelector = function() { const r = origS.apply(this, arguments); setTimeout(skBoot, 0); return r; };
+  }
+  let n = 0;
+  const t = setInterval(() => { if(++n > 80 || _skStartShown) { clearInterval(t); return; } skBoot(); }, 500);
 })();
+// проверка для Натальи: в консоли браузера (F12) набрать  skWhy()
+async function skWhy() {
+  const out = {
+    'файл app-sketch.js': 'загружен',
+    'вход': (typeof currentUser !== 'undefined' && currentUser && currentUser.id) ? 'да' : 'нет',
+    'доступ (mc_features)': '?',
+    'кнопка в лобби': document.getElementById('lobby-sk-btn') ? 'есть' : (document.getElementById('lobby-quick') ? 'нет' : 'нет места #lobby-quick'),
+    'стартовый экран': _skLastWhy
+  };
+  try {
+    const { data, error } = await sb.from('mc_features').select('sketch,d3').eq('user_id', currentUser.id).maybeSingle();
+    out['доступ (mc_features)'] = error ? 'ошибка: ' + error.message : (data ? JSON.stringify(data) : 'строки нет');
+  } catch(e) { out['доступ (mc_features)'] = 'ошибка: ' + (e.message || e); }
+  console.table(out);
+  return out;
+}
 function skLobbyButton() { // кнопка «✏️ Скетч-лист» в строке быстрых кнопок лобби
   const q = document.getElementById('lobby-quick'); if(!q) return;
   const ex = document.getElementById('lobby-sk-btn');
