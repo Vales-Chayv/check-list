@@ -1,5 +1,5 @@
 importScripts('sw-media.js');
-const CACHE = 'mc-v461';
+const CACHE = 'mc-v462';
 const APP_FILES = [
   '/check-list/',
   '/check-list/index.html',
@@ -23,6 +23,7 @@ const APP_FILES = [
   '/check-list/app-transfer.js',
   '/check-list/app-zip-archive.js',
   '/check-list/app-links.js',
+  '/check-list/app-sketch.js',
   
 ];
 // Внешние библиотеки (грузятся с CDN): без них приложение не запускается без интернета
@@ -32,6 +33,7 @@ const CDN_FILES = [
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
+  'https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js', // редактор скетч-листа
 ];
 
 self.addEventListener('install', e => {
