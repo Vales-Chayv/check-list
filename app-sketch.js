@@ -77,6 +77,35 @@ function skCss() {
 .sk-stage .canvas-container{position:absolute!important;inset:0}
 .sk-grid{position:absolute;inset:0;pointer-events:none}
 .sk-zoom{position:absolute;right:10px;bottom:10px;display:flex;gap:4px;z-index:3}
+.sk-cell{position:absolute;left:10px;bottom:14px;font-size:11px;color:#8a8270;pointer-events:none;z-index:2}
+.sk-snapmk{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border:2px solid #d4a52c;border-radius:50%;background:rgba(232,197,106,.25);pointer-events:none;display:none;z-index:4}
+.sk-side{position:absolute;top:10px;right:10px;width:228px;display:flex;flex-direction:column;gap:8px;max-height:calc(100% - 64px);z-index:5;pointer-events:none}
+.sk-info,.sk-layers{pointer-events:auto;background:var(--s1);border:1px solid var(--b1);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.35);font-size:12px;color:var(--t1);overflow:hidden}
+.sk-info:empty{display:none}
+.sk-ih{display:flex;align-items:center;gap:6px;padding:8px 10px;cursor:pointer;font-weight:600}
+.sk-ih .sm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:400;color:var(--accent)}
+.sk-ib2{padding:0 10px 10px}
+.sk-row{display:flex;align-items:center;gap:6px;margin:5px 0}
+.sk-row span.k{width:74px;color:var(--t2);flex:none}
+.sk-row input[type=text]{flex:1;min-width:0;background:var(--s2);border:1px solid var(--b1);border-radius:7px;color:var(--t1);padding:5px 7px;font-size:13px;font-family:inherit}
+.sk-row .u{color:var(--t3);width:22px}
+.sk-res{background:rgba(232,197,106,.1);border-radius:8px;padding:6px 8px;margin-top:6px;line-height:1.7;color:var(--accent)}
+.sk-res b{color:var(--t1);font-weight:600}
+.sk-chk{display:flex;align-items:center;gap:6px;margin-top:6px;color:var(--t2);cursor:pointer}
+.sk-ly{display:flex;align-items:center;gap:4px;padding:5px 8px;border-top:1px solid var(--b1);cursor:pointer}
+.sk-ly.on{background:rgba(232,197,106,.12)}
+.sk-ly .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sk-ly button{background:none;border:none;color:var(--t2);font-size:14px;cursor:pointer;padding:3px 4px;font-family:inherit}
+.sk-ly button.off{opacity:.35}
+.sk-pop{position:fixed;z-index:2001;background:var(--s1);border:1px solid var(--b1);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.55);padding:12px;width:270px;font-size:13px;color:var(--t1)}
+.sk-pop .seg{display:flex;gap:4px;flex-wrap:wrap;margin:4px 0 10px}
+.sk-pop .seg button{padding:5px 9px;border-radius:8px;border:1px solid var(--b1);background:var(--s2);color:var(--t2);cursor:pointer;font-family:inherit;font-size:12px}
+.sk-pop .seg button.on{border-color:var(--accent);color:var(--accent);background:rgba(232,197,106,.14)}
+@media (max-width:699px){
+  .sk-side{top:auto;bottom:52px;left:8px;right:8px;width:auto;max-height:60%}
+  .sk-info:not(.open) .sk-ib2{display:none}
+  .sk-cell{bottom:56px}
+}
 .sk-zoom button{height:32px;min-width:32px;border-radius:9px;border:1px solid rgba(0,0,0,.15);background:rgba(255,255,255,.92);color:#333;font-size:13px;cursor:pointer;font-family:inherit;padding:0 8px}
 .sk-menu{position:fixed;z-index:2001;background:var(--s1);border:1px solid var(--b1);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.55);padding:6px;min-width:210px}
 .sk-menu button{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--t1);font-size:14px;padding:10px 12px;border-radius:8px;cursor:pointer;text-align:left;font-family:inherit}
@@ -432,6 +461,7 @@ const SK_TOOLS = [
   ['rect', 'Прямоугольник', '<svg width="20" height="20" viewBox="0 0 24 24"><rect x="3.5" y="6" width="17" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="2.2"/></svg>'],
   ['ellipse', 'Круг / эллипс', '<svg width="20" height="20" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="7" fill="none" stroke="currentColor" stroke-width="2.2"/></svg>'],
   ['tri', 'Треугольник', '<svg width="20" height="20" viewBox="0 0 24 24"><path d="M12 4l9 16H3z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>'],
+  ['dim', 'Размер — проведи от точки до точки (D)', '<svg width="20" height="20" viewBox="0 0 24 24"><path d="M3 15h18M3 11v8M21 11v8M6 13l-2 4M20 13l-2 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><text x="12" y="10" font-size="7" text-anchor="middle" fill="currentColor" font-family="sans-serif">1,2</text></svg>'],
   ['text', 'Текст', '<span style="font-weight:700;font-family:serif;font-size:20px">T</span>'],
   ['eraser', 'Ластик — стирает фигуры, по которым проведёшь', '<svg width="20" height="20" viewBox="0 0 24 24"><path d="M3 17l9-11 8 7-7 8H6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8 21h13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>']
 ];
@@ -443,6 +473,7 @@ async function skEdit(id, recIn) {
   catch(e) { ov.innerHTML = `<div class="sk-hd"><button class="sk-ib" onclick="skShowList()">←</button><span style="flex:1;padding:0 8px">${skEsc(e.message || e)}</span><button class="sk-ib" onclick="skClose()">✕</button></div>`; return; }
   if(!rec) { toast('Лист не найден', true); return skShowList(); }
   const st = { stroke: localStorage.getItem('mc_sk_stroke') || '#1f1f1f', fill: localStorage.getItem('mc_sk_fill') || '', width: +localStorage.getItem('mc_sk_w') || 3 };
+  const meta = skMetaFix(rec.data && rec.data.skMeta);
   ov.innerHTML = `
   <div class="sk-hd">
     <button class="sk-ib" onclick="skShowList()" title="Мои листы" aria-label="Мои листы">←</button>
@@ -450,6 +481,7 @@ async function skEdit(id, recIn) {
     <span class="sk-st sk-hide-ph" id="sk-status"></span>
     <button class="sk-ib" id="sk-undo" onclick="skUndo()" title="Отменить (Ctrl+Z)" aria-label="Отменить">↶</button>
     <button class="sk-ib" id="sk-redo" onclick="skRedo()" title="Повторить (Ctrl+Y)" aria-label="Повторить">↷</button>
+    <button class="sk-ib" id="sk-lay-btn" onclick="skLayersToggle()" title="Слои" aria-label="Слои">${SK_LAYERS_SVG}</button>
     <button class="sk-ib solid" id="sk-send-btn" onclick="skSendMenu(this)">Отправить ▾</button>
     <button class="sk-ib sk-hide-ph" onclick="skClose()" aria-label="Закрыть">✕</button>
   </div>
@@ -458,6 +490,9 @@ async function skEdit(id, recIn) {
     <div class="sk-main">
       <div class="sk-props" id="sk-props"></div>
       <div class="sk-stage" id="sk-stage"><canvas class="sk-grid" id="sk-gridc"></canvas><canvas id="sk-canvas"></canvas>
+        <div class="sk-snapmk" id="sk-snapmk"></div>
+        <div class="sk-side" id="sk-side"><div class="sk-info" id="sk-info"></div><div class="sk-layers" id="sk-layers" style="display:none"></div></div>
+        <div class="sk-cell" id="sk-cell"></div>
         <div class="sk-zoom"><button onclick="skZoomBy(1/1.25)" aria-label="Мельче">−</button><button id="sk-zv" onclick="skFit()" title="Показать всё">100%</button><button onclick="skZoomBy(1.25)" aria-label="Крупнее">＋</button></div>
       </div>
     </div>
@@ -467,16 +502,19 @@ async function skEdit(id, recIn) {
   }
   const stage = document.getElementById('sk-stage');
   const canvas = new fabric.Canvas('sk-canvas', { width: stage.clientWidth, height: stage.clientHeight, preserveObjectStacking: true, selection: true, targetFindTolerance: 6, fireRightClick: false, stopContextMenu: true });
-  SK = { id: rec.id, title: rec.title, links: rec.links || [], created_at: rec.created_at, canvas, hist: [], redo: [], tool: 'sel', st, mute: false, pushedOnce: !!rec.pushedOnce };
+  SK = { id: rec.id, title: rec.title, links: rec.links || [], created_at: rec.created_at, canvas, hist: [], redo: [], tool: 'sel', st, meta, mute: false, pushedOnce: !!rec.pushedOnce };
   document.getElementById('sk-title').oninput = e => { SK.title = e.target.value.trim() || 'Без названия'; skSaveSoon(); };
   document.getElementById('sk-tools').onclick = e => { const b = e.target.closest('[data-tool]'); if(b) skSetTool(b.dataset.tool); };
   const done = () => {
-    SK.hist = [JSON.stringify(canvas.toJSON())];
-    skSetTool('sel'); skPaintProps(); skUndoBtns();
+    SK.mute = false;
+    canvas.getObjects().forEach(o => skPrepObj(o)); // старым листам — номера фигур и слой
+    skApplyLayers();
+    SK.hist = [skJSON()];
+    skSetTool('sel'); skPaintProps(); skUndoBtns(); skInfo(); skLayersPaint();
     if(canvas.getObjects().length) skFit(); else { canvas.setViewportTransform([1, 0, 0, 1, 0, 0]); skGrid(); }
     skSetStatus(rec.dirty ? '● на устройстве' : '☁ сохранено');
   };
-  if(rec.data) canvas.loadFromJSON(rec.data, () => { canvas.renderAll(); done(); }); else done();
+  if(rec.data) { SK.mute = true; canvas.loadFromJSON(rec.data, () => { canvas.renderAll(); done(); }); } else done();
   skBindCanvas(canvas, stage);
   new ResizeObserver(() => { if(!SK || SK.canvas !== canvas) return; canvas.setDimensions({ width: stage.clientWidth, height: stage.clientHeight }); skGrid(); }).observe(stage);
 }
@@ -490,8 +528,8 @@ function skGrid() {
   c.width = W * dpr; c.height = H * dpr; c.style.width = W + 'px'; c.style.height = H + 'px';
   const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
   const v = SK.canvas.viewportTransform, z = v[0];
-  let step = 20 * z; while(step < 10) step *= 5;
-  const big = step * 5;
+  const gs = skGridStep(), step = gs.px * z, big = gs.bigPx * z;
+  const cell = document.getElementById('sk-cell'); if(cell) cell.textContent = 'клетка ' + skFmtLen(gs.mm);
   const draw = (s, col) => {
     g.strokeStyle = col; g.lineWidth = 1; g.beginPath();
     for(let x = ((v[4] % s) + s) % s; x < W; x += s) { g.moveTo(Math.round(x) + .5, 0); g.lineTo(Math.round(x) + .5, H); }
@@ -530,7 +568,7 @@ function skSetTool(t) {
   if(t === 'pen') { c.freeDrawingBrush = new fabric.PencilBrush(c); c.freeDrawingBrush.color = SK.st.stroke; c.freeDrawingBrush.width = SK.st.width; c.freeDrawingBrush.decimate = 2; }
   const sel = t === 'sel';
   c.selection = sel; c.skipTargetFind = !(sel || t === 'eraser');
-  c.getObjects().forEach(o => { o.selectable = sel; o.hoverCursor = sel ? 'move' : (t === 'eraser' ? 'not-allowed' : 'crosshair'); });
+  skApplyLayers();
   if(!sel) c.discardActiveObject();
   c.defaultCursor = t === 'hand' ? 'grab' : sel ? 'default' : 'crosshair';
   c.requestRenderAll(); skPaintProps();
@@ -539,7 +577,7 @@ function skPaintProps() {
   const el = document.getElementById('sk-props'); if(!el || !SK) return;
   const st = SK.st, act = SK.canvas.getActiveObjects();
   const sw = (key, list) => list.map(col => `<button class="sk-sw${col === '' ? ' none' : ''}${st[key] === col ? ' on' : ''}" data-k="${key}" data-c="${col}" style="${col ? 'background:' + col : ''}" title="${col || 'без заливки'}"></button>`).join('');
-  el.innerHTML = `<span class="sk-lb">Линия</span>${sw('stroke', SK_COLORS)}<input type="color" data-k="stroke" value="${/^#[0-9a-f]{6}$/i.test(st.stroke) ? st.stroke : '#1f1f1f'}" title="Свой цвет">
+  el.innerHTML = `<button class="sk-ib gold" id="sk-sheet-btn" onclick="skSheetMenu(this)" title="Масштаб, единицы, привязка">📐 1:${SK.meta.scale} · ${SK_UNITS[SK.meta.unit].s}</button><span class="sk-sep"></span><span class="sk-lb">Линия</span>${sw('stroke', SK_COLORS)}<input type="color" data-k="stroke" value="${/^#[0-9a-f]{6}$/i.test(st.stroke) ? st.stroke : '#1f1f1f'}" title="Свой цвет">
     <span class="sk-sep"></span><span class="sk-lb">Заливка</span>${sw('fill', [''].concat(SK_COLORS.slice(1, 8).map(c => c)))}
     <span class="sk-sep"></span><span class="sk-lb">Толщина</span><input type="range" min="1" max="30" value="${st.width}" data-k="width"><span class="sk-lb" id="sk-wv">${st.width}</span>
     ${act.length ? `<span class="sk-sep"></span><button class="sk-ib" onclick="skDup()" title="Копия (Ctrl+D)">⧉</button><button class="sk-ib" onclick="skOrder(1)" title="Вперёд">⬆</button><button class="sk-ib" onclick="skOrder(-1)" title="Назад">⬇</button><button class="sk-ib" onclick="skDel()" title="Удалить (Delete)" style="color:var(--red)">🗑</button>` : ''}`;
@@ -577,10 +615,11 @@ function skBindCanvas(c, stage) {
     const h1 = [x2 - L * Math.cos(a - .45), y2 - L * Math.sin(a - .45)], h2 = [x2 - L * Math.cos(a + .45), y2 - L * Math.sin(a + .45)];
     return `M ${x1} ${y1} L ${x2} ${y2} M ${h1[0]} ${h1[1]} L ${x2} ${y2} L ${h2[0]} ${h2[1]}`;
   };
-  const snap = (e, p) => { // Shift — ровно: квадрат, круг, линия под 45°
+  const snap = (e, p) => { // привязка к углам/сетке; Shift — ровно: квадрат, круг, линия под 45°
+    p = skSnap(p, draft);
     if(!e.shiftKey || !p0) return p;
     const dx = p.x - p0.x, dy = p.y - p0.y;
-    if(SK.tool === 'line' || SK.tool === 'arrow') { const a = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * Math.PI / 4, l = Math.hypot(dx, dy); return { x: p0.x + l * Math.cos(a), y: p0.y + l * Math.sin(a) }; }
+    if(SK.tool === 'line' || SK.tool === 'arrow' || SK.tool === 'dim') { const a = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * Math.PI / 4, l = Math.hypot(dx, dy); return { x: p0.x + l * Math.cos(a), y: p0.y + l * Math.sin(a) }; }
     const m = Math.max(Math.abs(dx), Math.abs(dy)); return { x: p0.x + Math.sign(dx || 1) * m, y: p0.y + Math.sign(dy || 1) * m };
   };
   const place = (p) => {
@@ -589,7 +628,10 @@ function skBindCanvas(c, stage) {
     else if(t === 'rect' || t === 'tri') draft.set({ left: x, top: y, width: w, height: h });
     else if(t === 'ellipse') draft.set({ left: x, top: y, rx: w / 2, ry: h / 2 });
     else if(t === 'arrow') { c.remove(draft); draft = new fabric.Path(arrowPath(p0.x, p0.y, p.x, p.y), { ...base(), fill: '' }); c.add(draft); }
-    draft.setCoords(); c.requestRenderAll();
+    else if(t === 'dim') { c.remove(draft); draft = skDimGroup(p0, p, 0, {}) || new fabric.Line([p0.x, p0.y, p.x, p.y], { stroke: SK_DIM_COL, strokeWidth: 1 }); draft.selectable = false; draft.evented = false; c.add(draft); }
+    draft.setCoords();
+    if(t !== 'dim' && t !== 'arrow') { draft.skDims = SK.meta.autoDims; skDimsFor(draft); }
+    c.requestRenderAll();
   };
   c.on('mouse:down', o => {
     const e = o.e, t = SK.tool;
@@ -604,13 +646,14 @@ function skBindCanvas(c, stage) {
       c.add(it); skSetTool('sel'); c.setActiveObject(it); it.enterEditing(); it.selectAll(); c.requestRenderAll();
       return;
     }
-    if(['line', 'arrow', 'rect', 'ellipse', 'tri'].includes(t)) {
-      p0 = c.getPointer(e); strokeAt = Date.now();
+    if(['line', 'arrow', 'rect', 'ellipse', 'tri', 'dim'].includes(t)) {
+      SK.snapCands = null; p0 = skSnap(c.getPointer(e)); strokeAt = Date.now();
       const b = base();
       if(t === 'line') draft = new fabric.Line([p0.x, p0.y, p0.x, p0.y], { ...b, fill: '' });
       else if(t === 'rect') draft = new fabric.Rect({ ...b, left: p0.x, top: p0.y, width: 0, height: 0 });
       else if(t === 'tri') draft = new fabric.Triangle({ ...b, left: p0.x, top: p0.y, width: 0, height: 0 });
       else if(t === 'ellipse') draft = new fabric.Ellipse({ ...b, left: p0.x, top: p0.y, rx: 0, ry: 0 });
+      else if(t === 'dim') draft = new fabric.Line([p0.x, p0.y, p0.x, p0.y], { stroke: SK_DIM_COL, strokeWidth: 1, fill: '' });
       else draft = new fabric.Path(arrowPath(p0.x, p0.y, p0.x + .1, p0.y), { ...b, fill: '' });
       draft.selectable = false; c.add(draft);
     }
@@ -621,6 +664,7 @@ function skBindCanvas(c, stage) {
     if(pan) { const pt = e.touches ? e.touches[0] : e; c.relativePan(new fabric.Point(pt.clientX - pan.x, pt.clientY - pan.y)); pan = { x: pt.clientX, y: pt.clientY }; skGrid(); return; }
     if(erasing && SK.tool === 'eraser') { const tg = c.findTarget(e, false); if(tg) { c.remove(tg); SK.erased = true; } return; }
     if(draft && p0) place(snap(e, c.getPointer(e)));
+    else if(!pan && ['line', 'arrow', 'rect', 'ellipse', 'tri', 'dim'].includes(SK.tool) && !(e.touches)) { SK.snapCands = null; skSnap(c.getPointer(e)); } // показать точку привязки до нажатия
   });
   c.on('mouse:up', () => {
     if(pan) { pan = null; c.defaultCursor = SK.tool === 'hand' ? 'grab' : 'default'; c.selection = SK.tool === 'sel'; return; }
@@ -628,19 +672,28 @@ function skBindCanvas(c, stage) {
     if(draft) {
       const d = draft; draft = null; p0 = null;
       const r = d.getBoundingRect(true, true);
+      skSnapMark(null); SK.snapCands = null;
       if(SK.pinchAt > strokeAt || (r.width < 3 && r.height < 3)) { c.remove(d); c.requestRenderAll(); return; } // случайное касание или два пальца
-      d.set({ objectCaching: true }); d.setCoords(); skCommit();
+      if(SK.tool === 'dim') { d.set({ selectable: SK.tool === 'sel', evented: true }); skApplyLayers(); skCommit(); return; }
+      d.set({ objectCaching: true }); d.setCoords(); skDimsFor(d); skApplyLayers(); skCommit();
     }
   });
   c.on('path:created', o => {
     if(SK.pinchAt > strokeAt) { c.remove(o.path); c.requestRenderAll(); return; }
-    o.path.set({ strokeLineCap: 'round', strokeLineJoin: 'round', selectable: false }); skCommit();
+    o.path.set({ strokeLineCap: 'round', strokeLineJoin: 'round', strokeUniform: true, selectable: false }); skCommit();
   });
-  c.on('object:modified', () => skCommit());
+  // номер фигуры и слой — каждой новой; размеры следуют за фигурой; удалили фигуру — уходят и её размеры
+  c.on('object:added', o => { if(!SK.mute && o.target) skPrepObj(o.target); });
+  c.on('object:removed', o => { if(SK.mute || SK.dimBusy || !o.target || !o.target.skId || o.target.skDim) return; skDimsRemove(o.target.skId); });
+  const follow = o => { if(!o.target) return; skDimsForTarget(o.target); skInfo(); };
+  c.on('object:moving', o => { skGridMove(o.target); follow(o); });
+  c.on('object:scaling', follow);
+  c.on('object:rotating', follow);
+  c.on('object:modified', o => { const t = o.target; if(t && t.skDim && !t.skDimOf) skDimRebuild(t); else skDimsForTarget(t); skInfo(); skCommit(); });
   c.on('text:editing:exited', o => { if(o.target && !o.target.text.trim()) c.remove(o.target); skCommit(); });
-  c.on('selection:created', () => skPaintProps());
-  c.on('selection:updated', () => skPaintProps());
-  c.on('selection:cleared', () => skPaintProps());
+  c.on('selection:created', () => { skPaintProps(); skInfo(); });
+  c.on('selection:updated', () => { skPaintProps(); skInfo(); });
+  c.on('selection:cleared', () => { skPaintProps(); skInfo(); });
   // колесо: масштаб (ПК); с Shift — прокрутка вбок
   c.on('mouse:wheel', o => {
     const e = o.e; e.preventDefault(); e.stopPropagation();
@@ -680,16 +733,16 @@ function skBindCanvas(c, stage) {
 // история: отмена / повтор
 function skCommit() {
   if(!SK || SK.mute) return;
-  const c = SK.canvas;
-  if(SK.tool !== 'sel') c.getObjects().forEach(o => { o.selectable = false; });
-  const js = JSON.stringify(c.toJSON());
+  skApplyLayers();
+  const js = skJSON();
   if(SK.hist[SK.hist.length - 1] === js) return;
   SK.hist.push(js); if(SK.hist.length > 80) SK.hist.shift();
   SK.redo = []; skUndoBtns(); skSaveSoon(js);
 }
 function skRestore(js) {
   const c = SK.canvas; SK.mute = true;
-  c.loadFromJSON(js, () => { c.renderAll(); SK.mute = false; skSetTool(SK.tool); skSaveSoon(js); });
+  try { SK.meta = skMetaFix(JSON.parse(js).skMeta); } catch(e) {}
+  c.loadFromJSON(js, () => { c.renderAll(); SK.mute = false; skSetTool(SK.tool); skPaintProps(); skInfo(); skLayersPaint(); skGrid(); skSaveSoon(js); });
 }
 function skUndo() { if(!SK || SK.hist.length < 2) return; SK.redo.push(SK.hist.pop()); skRestore(SK.hist[SK.hist.length - 1]); skUndoBtns(); }
 function skRedo() { if(!SK || !SK.redo.length) return; const js = SK.redo.pop(); SK.hist.push(js); skRestore(js); skUndoBtns(); }
@@ -710,7 +763,7 @@ function skOrder(dir) { if(!SK) return; const c = SK.canvas; c.getActiveObjects(
 let _skSaveT = null;
 function skSaveSoon(js) {
   if(!SK) return;
-  const snap = { id: SK.id, title: SK.title, links: SK.links, created_at: SK.created_at, data: js ? JSON.parse(js) : SK.canvas.toJSON(), canvas: SK.canvas };
+  const snap = { id: SK.id, title: SK.title, links: SK.links, created_at: SK.created_at, data: JSON.parse(js || skJSON()), canvas: SK.canvas };
   skSetStatus('сохраняю…');
   clearTimeout(_skSaveT);
   _skSaveT = setTimeout(() => skWrite(snap), 600);
@@ -759,7 +812,7 @@ document.addEventListener('keydown', e => {
   else if(mod && k === 'd') { e.preventDefault(); skDup(); }
   else if(k === 'delete' || k === 'backspace') { if(a) { e.preventDefault(); skDel(); } }
   else if(k === 'escape') { c.discardActiveObject(); c.requestRenderAll(); skSetTool('sel'); }
-  else if(!mod) { const m = { v: 'sel', h: 'hand', p: 'pen', l: 'line', a: 'arrow', r: 'rect', o: 'ellipse', t: 'text', e: 'eraser' }[k]; if(m) skSetTool(m); }
+  else if(!mod) { const m = { v: 'sel', h: 'hand', p: 'pen', l: 'line', a: 'arrow', r: 'rect', o: 'ellipse', t: 'text', e: 'eraser', d: 'dim' }[k]; if(m) skSetTool(m); }
 });
 document.addEventListener('keyup', e => { if(SK && e.code === 'Space') { SK.space = false; SK.canvas.defaultCursor = SK.tool === 'hand' ? 'grab' : 'default'; } });
 
@@ -904,4 +957,381 @@ async function skAttach(cardId, spaceId) {
     toast('✓ Эскиз добавлен в «' + (title || 'карточку') + '»');
     return true;
   } catch(e) { console.log('skAttach', e); toast('Не получилось: ' + (e.message || e), true); return false; }
+}
+
+
+// ═══════════════════════════════════════════
+//  ЭТАП 2 (19 ноября): масштаб и единицы, размеры цифрами, площадь/периметр/объём,
+//  размерные линии (инструмент «Размер» и размеры у фигур), слои, привязка к сетке и углам.
+//  1 пиксель листа = 0,25 мм на бумаге (SK_PX_MM = 4); в натуре: мм = пиксели × масштаб / 4.
+//  Настройки листа хранятся в рисунке: data.skMeta = {scale, unit, snapGrid, snapObj, autoDims, layers, active}.
+// ═══════════════════════════════════════════
+const SK_PX_MM = 4;
+const SK_PROPS = ['skId', 'skLayer', 'skH', 'skDims', 'skDim', 'skDimOf', 'skDimL', 'skDimOff'];
+const SK_DIM_COL = '#c0392b';
+const SK_SCALES = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500];
+const SK_UNITS = { mm: { s: 'мм', k: 1, d: 0 }, cm: { s: 'см', k: 10, d: 1 }, m: { s: 'м', k: 1000, d: 2 } };
+const SK_LAYERS_SVG = '<svg width="18" height="18" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M3 13l9 5 9-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+function skMetaFix(m) {
+  m = Object.assign({ scale: 50, unit: 'cm', snapGrid: false, snapObj: true, autoDims: true, layers: null, active: 'l1' }, m || {});
+  if(!SK_UNITS[m.unit]) m.unit = 'cm';
+  if(!(+m.scale > 0)) m.scale = 50;
+  if(!Array.isArray(m.layers) || !m.layers.length) m.layers = [{ id: 'l1', name: 'Слой 1', vis: true, lock: false }];
+  if(!m.layers.some(l => l.id === m.active && l.id !== 'dims')) m.active = (m.layers.find(l => l.id !== 'dims') || m.layers[0]).id;
+  return m;
+}
+function skJSON() { const j = SK.canvas.toJSON(SK_PROPS); j.skMeta = SK.meta; return JSON.stringify(j); }
+const skMmPx = () => SK.meta.scale / SK_PX_MM; // мм в натуре на 1 пиксель листа
+function skNum(v, d) { return (+v).toLocaleString('ru-RU', { minimumFractionDigits: d, maximumFractionDigits: d }); }
+function skFmtLen(mm) { // длина в единицах листа: «4,20 м», «420 см», «4200 мм»
+  const u = SK_UNITS[SK.meta.unit]; let v = mm / u.k;
+  let d = u.d; if(u.k === 10 && Math.abs(v - Math.round(v)) < .05) d = 0;
+  return skNum(v, d) + ' ' + u.s;
+}
+function skFmtPer(mm) { return SK.meta.unit === 'cm' && mm >= 1000 ? skNum(mm / 1000, 2) + ' м' : skFmtLen(mm); } // периметр: в сантиметрах длинно — показываем в метрах
+function skFmtArea(mm2) { const m2 = mm2 / 1e6; return m2 >= .01 ? skNum(m2, 2) + ' м²' : skNum(mm2 / 100, 1) + ' см²'; }
+function skFmtVol(mm3) { const m3 = mm3 / 1e9; return m3 >= .01 ? skNum(m3, 2) + ' м³' : skNum(mm3 / 1e6, 1) + ' л'; }
+function skParseLen(str) { // «420», «4,2», «420-12», «2*1,5» → мм
+  const t = String(str || '').replace(/,/g, '.').replace(/\s+/g, '').replace(/[×х]/g, '*');
+  if(!t || !/^[\d.+\-*/()]+$/.test(t)) return null;
+  let v; try { v = Function('"use strict";return (' + t + ')')(); } catch(e) { return null; }
+  return isFinite(v) && v > 0 ? v * SK_UNITS[SK.meta.unit].k : null;
+}
+function skGridStep() { // шаг клетки в натуре, чтобы на экране клетка была не мельче ~12 px
+  const z = SK.canvas.getZoom(), mpp = skMmPx();
+  const list = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000];
+  let mm = list.find(v => v / mpp * z >= 12) || list[list.length - 1];
+  const big = mm * (String(mm)[0] === '5' ? 2 : 5);
+  return { mm, px: mm / mpp, bigPx: big / mpp };
+}
+
+// номер фигуры и слой
+function skPrepObj(o) {
+  if(!o || !SK) return;
+  if(!o.skId) o.skId = skNewId().slice(0, 12);
+  if(o.skDim) { o.skLayer = 'dims'; skDimsLayer(); }
+  else if(!o.skLayer || !SK.meta.layers.some(l => l.id === o.skLayer)) o.skLayer = SK.meta.active;
+  if(o.type === 'path' && o.strokeUniform !== true && o.skNew) o.strokeUniform = true;
+}
+
+// ── геометрия фигуры (в пикселях листа) ──
+function skLocalBox(o) {
+  if(o.type === 'ellipse') return { w: o.rx * 2, h: o.ry * 2 };
+  return { w: o.width, h: o.height };
+}
+function skCorners(o) { // углы рамки фигуры без толщины линии, в координатах листа: tl, tr, br, bl
+  const M = o.calcTransformMatrix(), b = skLocalBox(o), P = (x, y) => fabric.util.transformPoint(new fabric.Point(x, y), M);
+  return [P(-b.w / 2, -b.h / 2), P(b.w / 2, -b.h / 2), P(b.w / 2, b.h / 2), P(-b.w / 2, b.h / 2)];
+}
+function skLineEnds(o) {
+  const lp = o.calcLinePoints(), M = o.calcTransformMatrix();
+  return [fabric.util.transformPoint(new fabric.Point(lp.x1, lp.y1), M), fabric.util.transformPoint(new fabric.Point(lp.x2, lp.y2), M)];
+}
+function skPathLen(o) { // длина линии карандаша (по точкам), с учётом масштаба фигуры
+  let L = 0, prev = null; const sx = o.scaleX || 1, sy = o.scaleY || 1;
+  (o.path || []).forEach(cmd => {
+    const n = cmd.length; if(n < 3) return;
+    const pt = { x: cmd[n - 2] * sx, y: cmd[n - 1] * sy };
+    if(prev && cmd[0] !== 'M') L += Math.hypot(pt.x - prev.x, pt.y - prev.y);
+    prev = pt;
+  });
+  return L;
+}
+function skShape(o) { // что умеем мерить: {kind, w, h, len, area, per} — в мм
+  if(!o) return null;
+  const k = skMmPx(), sx = Math.abs(o.scaleX || 1), sy = Math.abs(o.scaleY || 1);
+  if(o.type === 'rect') { const w = o.width * sx * k, h = o.height * sy * k; return { kind: 'rect', name: 'Прямоугольник', w, h, area: w * h, per: 2 * (w + h) }; }
+  if(o.type === 'ellipse') { const a = o.rx * sx * k, b = o.ry * sy * k; return { kind: 'ellipse', name: a === b ? 'Круг' : 'Эллипс', w: a * 2, h: b * 2, area: Math.PI * a * b, per: Math.PI * (3 * (a + b) - Math.sqrt((3 * a + b) * (a + 3 * b))) }; }
+  if(o.type === 'triangle') { const w = o.width * sx * k, h = o.height * sy * k; return { kind: 'tri', name: 'Треугольник', w, h, area: w * h / 2, per: w + 2 * Math.hypot(w / 2, h) }; }
+  if(o.type === 'line') { const e = skLineEnds(o); return { kind: 'line', name: 'Линия', len: Math.hypot(e[1].x - e[0].x, e[1].y - e[0].y) * k, ang: Math.round(Math.atan2(-(e[1].y - e[0].y), e[1].x - e[0].x) * 180 / Math.PI) }; }
+  if(o.type === 'path' && !o.skDim) return { kind: 'path', name: 'Линия от руки', len: skPathLen(o) * k };
+  if(o.skDim) { const e = skDimWorld(o); return { kind: 'dim', name: 'Размер', len: e ? Math.hypot(e[1].x - e[0].x, e[1].y - e[0].y) * k : 0 }; }
+  return null;
+}
+
+// ── размерные линии ──
+function skDimGroup(p1, p2, off, opt) {
+  const dx = p2.x - p1.x, dy = p2.y - p1.y, L = Math.hypot(dx, dy); if(L < 2) return null;
+  const ux = dx / L, uy = dy / L, nx = -uy, ny = ux, t = 5, col = SK_DIM_COL;
+  const A = { x: p1.x + nx * off, y: p1.y + ny * off }, B = { x: p2.x + nx * off, y: p2.y + ny * off };
+  const ln = (a, b, w) => new fabric.Line([a.x, a.y, b.x, b.y], { stroke: col, strokeWidth: w || 1, strokeLineCap: 'round', objectCaching: false });
+  const items = [ln(A, B)];
+  if(Math.abs(off) > 1) { const s = Math.sign(off); items.push(ln({ x: p1.x + nx * s * 2, y: p1.y + ny * s * 2 }, { x: A.x + nx * s * 4, y: A.y + ny * s * 4 }, .8), ln({ x: p2.x + nx * s * 2, y: p2.y + ny * s * 2 }, { x: B.x + nx * s * 4, y: B.y + ny * s * 4 }, .8)); }
+  const tk = (P) => ln({ x: P.x - (ux + nx) * t * .7, y: P.y - (uy + ny) * t * .7 }, { x: P.x + (ux + nx) * t * .7, y: P.y + (uy + ny) * t * .7 }, 1.4);
+  items.push(tk(A), tk(B));
+  let ang = Math.atan2(dy, dx) * 180 / Math.PI; if(ang > 90) ang -= 180; if(ang <= -90) ang += 180;
+  items.push(new fabric.Text(skFmtLen(L * skMmPx()), { left: (A.x + B.x) / 2, top: (A.y + B.y) / 2, originX: 'center', originY: 'center', angle: ang, fontSize: 13, fill: col, fontFamily: 'system-ui, sans-serif', textBackgroundColor: 'rgba(246,243,236,.92)', objectCaching: false }));
+  const g = new fabric.Group(items, { skDim: true, skDimOf: opt.of || null, skDimOff: off, skLayer: 'dims', objectCaching: false, lockScalingFlip: true, subTargetCheck: false });
+  if(opt.of) { g.selectable = false; g.evented = false; g.excludeFromExport = false; }
+  const inv = fabric.util.invertTransform(g.calcTransformMatrix());
+  const l1 = fabric.util.transformPoint(new fabric.Point(p1.x, p1.y), inv), l2 = fabric.util.transformPoint(new fabric.Point(p2.x, p2.y), inv);
+  g.skDimL = [l1.x, l1.y, l2.x, l2.y];
+  return g;
+}
+function skDimWorld(g) {
+  if(!g || !g.skDimL) return null; const M = g.calcTransformMatrix(), L = g.skDimL;
+  return [fabric.util.transformPoint(new fabric.Point(L[0], L[1]), M), fabric.util.transformPoint(new fabric.Point(L[2], L[3]), M)];
+}
+function skDimsLayer() { // слой «Размеры» — всегда сверху
+  const ls = SK.meta.layers;
+  if(!ls.some(l => l.id === 'dims')) ls.push({ id: 'dims', name: 'Размеры', vis: true, lock: false });
+}
+function skDimsRemove(id) {
+  const c = SK.canvas; SK.dimBusy = true;
+  c.getObjects().filter(o => o.skDimOf === id).forEach(o => c.remove(o));
+  SK.dimBusy = false;
+}
+function skDimsFor(o) { // размеры у фигуры: пересоздать по её нынешнему положению
+  if(!o || !SK || o.skDim) return;
+  const c = SK.canvas;
+  if(!o.skId) skPrepObj(o);
+  skDimsRemove(o.skId);
+  if(!o.skDims || !c.getObjects().includes(o) || o.visible === false) return;
+  const L = SK.meta.layers.find(l => l.id === o.skLayer); if(L && !L.vis) return;
+  const off = 26, list = [];
+  if(o.type === 'rect' || o.type === 'ellipse') { const q = skCorners(o); list.push([q[0], q[1], -off], [q[3], q[0], -off]); }
+  else if(o.type === 'triangle') { const q = skCorners(o); list.push([q[3], q[2], off], [q[3], q[0], -off]); }
+  else if(o.type === 'line') { const e = skLineEnds(o); list.push([e[0], e[1], -off * .8]); }
+  SK.dimBusy = true;
+  list.forEach(d => { const g = skDimGroup(d[0], d[1], d[2], { of: o.skId }); if(g) { g.skId = skNewId().slice(0, 12); c.add(g); } });
+  SK.dimBusy = false;
+  skApplyLayers();
+}
+let _skDimRaf = 0;
+function skDimsForTarget(t) { // при движении — не чаще раза в кадр
+  if(!t) return;
+  cancelAnimationFrame(_skDimRaf);
+  _skDimRaf = requestAnimationFrame(() => { if(!SK) return; (t.type === 'activeSelection' ? t.getObjects() : [t]).forEach(o => { if(!o.skDim) skDimsFor(o); }); SK.canvas.requestRenderAll(); });
+}
+function skDimsAll() { if(!SK) return; SK.canvas.getObjects().filter(o => !o.skDim).forEach(o => skDimsFor(o)); SK.canvas.getObjects().filter(o => o.skDim && !o.skDimOf).forEach(g => skDimRebuild(g, true)); }
+function skDimRebuild(g, keepSel, k) { // свой размер после растяжения/поворота — пересобрать с новой длиной
+  const c = SK.canvas, e = skDimWorld(g); if(!e) return;
+  if(k) e.forEach(p => { p.x *= k; p.y *= k; });
+  const n = skDimGroup(e[0], e[1], g.skDimOff || 0, {}); if(!n) return;
+  n.skId = g.skId; n.skLayer = 'dims';
+  const idx = c.getObjects().indexOf(g), wasAct = c.getActiveObject() === g;
+  SK.dimBusy = true; c.remove(g); c.insertAt(n, Math.max(0, idx)); SK.dimBusy = false;
+  skApplyLayers();
+  if(wasAct && !keepSel) c.setActiveObject(n);
+}
+
+// ── слои ──
+function skApplyLayers() {
+  if(!SK) return;
+  const c = SK.canvas, meta = SK.meta, ord = new Map(meta.layers.map((l, i) => [l.id, i])), sel = SK.tool === 'sel';
+  if(c.getObjects().some(o => o.skDim)) skDimsLayer();
+  c._objects.sort((a, b) => (ord.get(a.skLayer) ?? 0) - (ord.get(b.skLayer) ?? 0));
+  const act = c.getActiveObject();
+  c.getObjects().forEach(o => {
+    const L = meta.layers.find(l => l.id === o.skLayer) || meta.layers[0];
+    o.visible = L.vis !== false;
+    const auto = !!o.skDimOf, free = !L.lock && o.visible;
+    o.selectable = sel && free && !auto;
+    o.evented = free && !auto && (sel || SK.tool === 'eraser');
+    o.hoverCursor = sel ? 'move' : (SK.tool === 'eraser' ? 'not-allowed' : 'crosshair');
+  });
+  if(act && (act.type === 'activeSelection' ? act.getObjects() : [act]).some(o => !o.selectable)) c.discardActiveObject();
+  c.requestRenderAll();
+}
+function skLayersToggle() {
+  const el = document.getElementById('sk-layers'); if(!el) return;
+  const show = el.style.display === 'none';
+  el.style.display = show ? '' : 'none';
+  document.getElementById('sk-lay-btn')?.classList.toggle('gold', show);
+  if(show) skLayersPaint();
+}
+function skLayersPaint() {
+  const el = document.getElementById('sk-layers'); if(!el || !SK || el.style.display === 'none') return;
+  const meta = SK.meta, c = SK.canvas, act = c.getActiveObjects().filter(o => !o.skDimOf), cnt = id => c.getObjects().filter(o => o.skLayer === id && !o.skDimOf).length;
+  const rows = meta.layers.slice().reverse().map(l => `<div class="sk-ly${l.id === meta.active ? ' on' : ''}" data-ly="${l.id}">
+    <button data-a="vis" class="${l.vis === false ? 'off' : ''}" title="${l.vis === false ? 'Показать' : 'Скрыть'}">${l.vis === false ? '🙈' : '👁'}</button>
+    <button data-a="lock" class="${l.lock ? '' : 'off'}" title="${l.lock ? 'Снять замок' : 'Запереть'}">${l.lock ? '🔒' : '🔓'}</button>
+    <span class="nm">${skEsc(l.name)} <span style="color:var(--t3)">${cnt(l.id)}</span></span>
+    ${act.length && l.id !== 'dims' && l.id !== meta.active ? `<button data-a="move" title="Перенести выделенное в этот слой">⇢</button>` : ''}
+    <button data-a="menu" title="Ещё">⋯</button></div>`).join('');
+  el.innerHTML = `<div class="sk-ih" style="cursor:default">Слои<span class="sm"></span><button class="sk-ib" style="height:26px;min-width:26px;font-size:13px" data-a="add" title="Новый слой">＋</button><button class="sk-ib" style="height:26px;min-width:26px;font-size:13px" data-a="close">✕</button></div>${rows}
+    <div style="padding:6px 10px 8px;color:var(--t3);font-size:11px">Новые фигуры попадают в отмеченный слой.</div>`;
+  el.onclick = e => {
+    const b = e.target.closest('[data-a]'), row = e.target.closest('[data-ly]'), id = row && row.dataset.ly, L = id && meta.layers.find(l => l.id === id);
+    const a = b && b.dataset.a;
+    if(a === 'close') { skLayersToggle(); return; }
+    if(a === 'add') { const n = meta.layers.filter(l => l.id !== 'dims').length + 1, nl = { id: 'l' + Date.now().toString(36), name: 'Слой ' + n, vis: true, lock: false }; const di = meta.layers.findIndex(l => l.id === 'dims'); di < 0 ? meta.layers.push(nl) : meta.layers.splice(di, 0, nl); meta.active = nl.id; }
+    else if(!L) return;
+    else if(a === 'vis') { L.vis = L.vis === false; }
+    else if(a === 'lock') { L.lock = !L.lock; }
+    else if(a === 'move') { act.forEach(o => { o.skLayer = id; }); c.discardActiveObject(); }
+    else if(a === 'menu') { skLayerMenu(L, b); return; }
+    else if(id !== 'dims') { meta.active = id; }
+    skApplyLayers(); skDimsAll(); skLayersPaint(); skCommit();
+  };
+}
+function skLayerMenu(L, anchor) {
+  const meta = SK.meta, i = meta.layers.indexOf(L), c = SK.canvas;
+  const items = [];
+  if(L.id !== 'dims') items.push(['🔤 Переименовать', () => { const t = prompt('Название слоя', L.name); if(t && t.trim()) { L.name = t.trim(); skLayersPaint(); skCommit(); } }]);
+  if(L.id !== 'dims' && i < meta.layers.length - 1 && meta.layers[i + 1].id !== 'dims') items.push(['⬆ Выше', () => { meta.layers.splice(i, 1); meta.layers.splice(i + 1, 0, L); skApplyLayers(); skLayersPaint(); skCommit(); }]);
+  if(L.id !== 'dims' && i > 0) items.push(['⬇ Ниже', () => { meta.layers.splice(i, 1); meta.layers.splice(i - 1, 0, L); skApplyLayers(); skLayersPaint(); skCommit(); }]);
+  if(L.id === 'dims' || meta.layers.filter(l => l.id !== 'dims').length > 1) items.push(['<span style="color:var(--red)">🗑 Удалить слой</span>', () => {
+    const objs = c.getObjects().filter(o => o.skLayer === L.id);
+    if(objs.length && !confirm('Удалить слой «' + L.name + '» вместе с ' + skPlural(objs.length, 'фигурой', 'фигурами', 'фигурами') + '?')) return;
+    SK.dimBusy = true; objs.forEach(o => c.remove(o)); SK.dimBusy = false;
+    objs.forEach(o => { if(o.skId) skDimsRemove(o.skId); });
+    if(L.id === 'dims') c.getObjects().forEach(o => { if(o.skDims) o.skDims = false; });
+    meta.layers.splice(meta.layers.indexOf(L), 1);
+    SK.meta = skMetaFix(meta); skApplyLayers(); skLayersPaint(); skInfo(); skCommit();
+  }]);
+  skMenu(anchor, items);
+}
+
+// ── привязка ──
+function skSnapCands(skip) {
+  const c = SK.canvas, pts = [];
+  c.getObjects().forEach(o => {
+    if(o === skip || o.skDimOf || !o.visible) return;
+    try {
+      if(['rect', 'ellipse', 'triangle'].includes(o.type)) { const q = skCorners(o); if(o.type === 'triangle') pts.push({ x: (q[0].x + q[1].x) / 2, y: (q[0].y + q[1].y) / 2 }, q[2], q[3]); else if(o.type === 'ellipse') pts.push({ x: (q[0].x + q[1].x) / 2, y: (q[0].y + q[1].y) / 2 }, { x: (q[1].x + q[2].x) / 2, y: (q[1].y + q[2].y) / 2 }, { x: (q[2].x + q[3].x) / 2, y: (q[2].y + q[3].y) / 2 }, { x: (q[3].x + q[0].x) / 2, y: (q[3].y + q[0].y) / 2 }); else pts.push(...q); pts.push(o.getCenterPoint()); }
+      else if(o.type === 'line') { const e = skLineEnds(o); pts.push(e[0], e[1], { x: (e[0].x + e[1].x) / 2, y: (e[0].y + e[1].y) / 2 }); }
+      else if(o.skDim) { const e = skDimWorld(o); if(e) pts.push(e[0], e[1]); }
+    } catch(e) {}
+  });
+  return pts;
+}
+function skSnap(p, skip) { // точка → ближайший угол/конец фигуры (в 10 px экрана) или узел сетки
+  if(!SK) return p;
+  const z = SK.canvas.getZoom();
+  if(SK.meta.snapObj) {
+    if(!SK.snapCands) SK.snapCands = skSnapCands(skip);
+    let best = null, bd = 10 / z;
+    SK.snapCands.forEach(q => { const d = Math.hypot(q.x - p.x, q.y - p.y); if(d < bd) { bd = d; best = q; } });
+    if(best) { skSnapMark(best); return { x: best.x, y: best.y }; }
+  }
+  skSnapMark(null);
+  if(SK.meta.snapGrid) { const s = skGridStep().px; return { x: Math.round(p.x / s) * s, y: Math.round(p.y / s) * s }; }
+  return p;
+}
+function skSnapMark(p) {
+  const m = document.getElementById('sk-snapmk'); if(!m) return;
+  if(!p) { m.style.display = 'none'; return; }
+  const q = fabric.util.transformPoint(new fabric.Point(p.x, p.y), SK.canvas.viewportTransform);
+  m.style.left = q.x + 'px'; m.style.top = q.y + 'px'; m.style.display = 'block';
+}
+function skGridMove(o) { // перетаскивание фигуры с привязкой к сетке: левый верхний угол — в узел
+  if(!o || !SK.meta.snapGrid) return;
+  const s = skGridStep().px, r = o.getBoundingRect(true, true);
+  const dx = Math.round(r.left / s) * s - r.left, dy = Math.round(r.top / s) * s - r.top;
+  o.set({ left: o.left + dx, top: o.top + dy }); o.setCoords();
+}
+
+// ── настройки листа: масштаб, единицы, привязка ──
+function skSheetMenu(btn) {
+  document.getElementById('sk-pop-bk')?.remove();
+  const m = SK.meta;
+  const bk = document.createElement('div'); bk.id = 'sk-pop-bk'; bk.setAttribute('style', 'position:fixed;inset:0;z-index:2001');
+  const pop = document.createElement('div'); pop.className = 'sk-pop';
+  const paint = () => {
+    pop.innerHTML = `<b>📐 Лист</b>
+      <div style="color:var(--t3);margin-top:8px">Масштаб</div><div class="seg">${SK_SCALES.map(v => `<button data-sc="${v}" class="${m.scale === v ? 'on' : ''}">1:${v}</button>`).join('')}</div>
+      <div style="color:var(--t3)">Единицы</div><div class="seg">${Object.keys(SK_UNITS).map(u => `<button data-un="${u}" class="${m.unit === u ? 'on' : ''}">${SK_UNITS[u].s}</button>`).join('')}</div>
+      <label class="sk-chk"><input type="checkbox" data-ck="snapObj" ${m.snapObj ? 'checked' : ''}> Привязка к углам и концам</label>
+      <label class="sk-chk"><input type="checkbox" data-ck="snapGrid" ${m.snapGrid ? 'checked' : ''}> Привязка к сетке</label>
+      <label class="sk-chk"><input type="checkbox" data-ck="autoDims" ${m.autoDims ? 'checked' : ''}> Размеры у новых фигур</label>
+      <div style="color:var(--t3);font-size:11px;margin-top:10px;line-height:1.4">При смене масштаба реальные размеры фигур не меняются — меняется их размер на листе.</div>`;
+  };
+  paint();
+  pop.onclick = e => {
+    e.stopPropagation();
+    const b = e.target.closest('button'); if(!b) return;
+    if(b.dataset.sc) skSetScale(+b.dataset.sc);
+    else if(b.dataset.un) { m.unit = b.dataset.un; skDimsAll(); skCommit(); }
+    paint(); skPaintProps(); skInfo(); skGrid();
+  };
+  pop.onchange = e => { const k = e.target.dataset.ck; if(k) { m[k] = e.target.checked; skCommit(); } };
+  bk.appendChild(pop); bk.onclick = () => bk.remove();
+  document.body.appendChild(bk);
+  const r = btn.getBoundingClientRect();
+  pop.style.left = Math.max(8, Math.min(r.left, innerWidth - pop.offsetWidth - 8)) + 'px';
+  pop.style.top = Math.min(r.bottom + 6, innerHeight - pop.offsetHeight - 8) + 'px';
+}
+function skSetScale(ns) { // реальные размеры сохраняются: всё на листе растягивается в old/new раз
+  const m = SK.meta, k = m.scale / ns; if(k === 1) return;
+  const c = SK.canvas; c.discardActiveObject();
+  SK.dimBusy = true;
+  c.getObjects().filter(o => !o.skDim).forEach(o => {
+    if(o.type === 'i-text' || o.type === 'text') o.set({ left: o.left * k, top: o.top * k });
+    else o.set({ left: o.left * k, top: o.top * k, scaleX: o.scaleX * k, scaleY: o.scaleY * k });
+    o.setCoords();
+  });
+  c.getObjects().filter(o => o.skDim && !o.skDimOf).forEach(g => skDimRebuild(g, true, k));
+  SK.dimBusy = false;
+  m.scale = ns;
+  const v = c.viewportTransform; c.setViewportTransform([v[0] / k, 0, 0, v[3] / k, v[4], v[5]]);
+  skDimsAll(); skGrid(); skCommit();
+}
+
+// ── панель «Размеры» у выделенной фигуры ──
+let _skInfoOpen = false;
+function skInfo() {
+  const el = document.getElementById('sk-info'); if(!el || !SK) return;
+  const c = SK.canvas, act = c.getActiveObjects().filter(o => !o.skDimOf);
+  if(!act.length) { el.innerHTML = ''; return; }
+  const ae = document.activeElement; if(ae && el.contains(ae) && ae.tagName === 'INPUT' && ae.type === 'text') return; // не мешать вводу
+  const u = SK_UNITS[SK.meta.unit].s;
+  const inp = (k, label, mm, unit) => `<div class="sk-row"><span class="k">${label}</span><input type="text" inputmode="decimal" data-f="${k}" value="${mm == null ? '' : String(skNum(mm / SK_UNITS[SK.meta.unit].k, SK_UNITS[SK.meta.unit].d + 1)).replace(/\s/g, '').replace(/,?0+$/, '')}" placeholder="—"><span class="u">${unit || u}</span></div>`;
+  let head, body = '';
+  if(act.length > 1) {
+    let area = 0, n = 0; act.forEach(o => { const s = skShape(o); if(s && s.area) { area += s.area; n++; } });
+    head = 'Выбрано: ' + act.length; const sm = n ? 'площадь ' + skFmtArea(area) : '';
+    body = n ? `<div class="sk-res">Общая площадь (${n}): <b>${skFmtArea(area)}</b></div>` : '<div style="color:var(--t3)">У выделенного нет площади</div>';
+    el.innerHTML = `<div class="sk-ih" data-tg="1">${head}<span class="sm">${sm}</span>▾</div><div class="sk-ib2">${body}</div>`;
+  } else {
+    const o = act[0], sh = skShape(o);
+    if(!sh) { el.innerHTML = ''; return; }
+    const H = o.skH || null;
+    let sm = '';
+    if(sh.kind === 'rect' || sh.kind === 'ellipse') {
+      body = inp('w', 'Ширина', sh.w) + inp('h', 'Длина', sh.h) + inp('H', 'Высота', H) +
+        `<div class="sk-row"><span class="k">Поворот</span><input type="text" inputmode="decimal" data-f="ang" value="${Math.round(o.angle || 0)}"><span class="u">°</span></div>` +
+        `<div class="sk-res">Площадь <b>${skFmtArea(sh.area)}</b><br>${sh.kind === 'rect' ? 'Периметр' : 'Длина окружности'} <b>${skFmtPer(sh.per)}</b>${H ? `<br>Объём <b>${skFmtVol(sh.area * H)}</b><br>Площадь стен <b>${skFmtArea(sh.per * H)}</b>` : ''}</div>`;
+      sm = skFmtLen(sh.w) + ' × ' + skFmtLen(sh.h) + ' · ' + skFmtArea(sh.area);
+    } else if(sh.kind === 'tri') {
+      body = inp('w', 'Основание', sh.w) + inp('h', 'Высота', sh.h) + `<div class="sk-res">Площадь <b>${skFmtArea(sh.area)}</b><br>Периметр <b>${skFmtPer(sh.per)}</b></div>`;
+      sm = skFmtArea(sh.area);
+    } else if(sh.kind === 'line') {
+      body = inp('len', 'Длина', sh.len) + `<div class="sk-res">Угол <b>${sh.ang}°</b></div>`;
+      sm = skFmtLen(sh.len);
+    } else {
+      body = `<div class="sk-res">Длина <b>${skFmtLen(sh.len)}</b></div>`; sm = skFmtLen(sh.len);
+    }
+    if(['rect', 'ellipse', 'tri', 'line'].includes(sh.kind)) body += `<label class="sk-chk"><input type="checkbox" data-ck="dims" ${o.skDims ? 'checked' : ''}> Размеры на листе</label>`;
+    el.innerHTML = `<div class="sk-ih" data-tg="1">${sh.name}<span class="sm">${sm}</span>▾</div><div class="sk-ib2">${body}</div>`;
+  }
+  el.classList.toggle('open', _skInfoOpen);
+  el.onclick = e => { if(e.target.closest('[data-tg]')) { _skInfoOpen = !_skInfoOpen; el.classList.toggle('open', _skInfoOpen); } };
+  el.onchange = e => {
+    const o = c.getActiveObject(); if(!o) return;
+    if(e.target.dataset.ck === 'dims') { o.skDims = e.target.checked; skDimsFor(o); skCommit(); skInfo(); return; }
+    const f = e.target.dataset.f; if(!f) return;
+    if(f === 'ang') { const a = parseFloat(String(e.target.value).replace(',', '.')); if(isFinite(a)) { o.rotate(a); o.setCoords(); } }
+    else if(f === 'H') { const v = String(e.target.value).trim() ? skParseLen(e.target.value) : null; o.skH = v || null; }
+    else {
+      const mm = skParseLen(e.target.value); if(!mm) { toast('Не понял число', true); skInfo(); return; }
+      skSetSize(o, f, mm / skMmPx());
+    }
+    skDimsFor(c.getActiveObject()); c.requestRenderAll(); skCommit(); e.target.blur(); skInfo();
+  };
+  el.onkeydown = e => { if(e.key === 'Enter') e.target.blur(); e.stopPropagation(); };
+}
+function skSetSize(o, f, px) { // задать размер фигуры в пикселях листа
+  const c = SK.canvas;
+  if(o.type === 'rect' || o.type === 'triangle') { if(f === 'w') o.set({ width: px, scaleX: 1 }); if(f === 'h') o.set({ height: px, scaleY: 1 }); }
+  else if(o.type === 'ellipse') { if(f === 'w') o.set({ rx: px / 2, scaleX: 1 }); if(f === 'h') o.set({ ry: px / 2, scaleY: 1 }); }
+  else if(o.type === 'line' && f === 'len') {
+    const e = skLineEnds(o), L = Math.hypot(e[1].x - e[0].x, e[1].y - e[0].y) || 1;
+    const p2 = { x: e[0].x + (e[1].x - e[0].x) / L * px, y: e[0].y + (e[1].y - e[0].y) / L * px };
+    const n = new fabric.Line([e[0].x, e[0].y, p2.x, p2.y], { stroke: o.stroke, strokeWidth: o.strokeWidth, strokeUniform: true, strokeLineCap: o.strokeLineCap, fill: '', skId: o.skId, skLayer: o.skLayer, skDims: o.skDims });
+    const idx = c.getObjects().indexOf(o);
+    c.remove(o); c.insertAt(n, idx); skApplyLayers(); c.setActiveObject(n);
+    return;
+  }
+  o.setCoords();
 }
